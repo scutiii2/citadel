@@ -1,341 +1,342 @@
 <script setup lang="ts">
-import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
-import NotePromotionPanel from "./components/NotePromotionPanel.vue";
-import { matchesWords } from "../../utils/search";
-import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed, nextTick, onMounted, reactive, ref, useId, watch } from "vue";
-import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
-import {
-  NOTE_BODY_MAX,
-  NOTE_TAG_MAX,
-  NOTE_TAGS_MAX,
-  NOTE_TITLE_MAX,
-  NOTES_MAX,
-  normalizeTag,
-  notesClient,
-  type Note,
-  type TagSuggestions,
-} from "./api/NotesClient";
-import { ApiError } from "../../api/http";
-import ListRow from "../../components/ui/lists/ListRow.vue";
-import SearchField from "../../components/ui/lists/SearchField.vue";
-import CharacterCount from "../../components/ui/status/CharacterCount.vue";
-import { growOnResize, growToContent } from "../../utils/browser/autoGrow";
-import StateMessage from "../../components/ui/status/StateMessage.vue";
-import DangerZone from "../../components/ui/status/DangerZone.vue";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import "../../components/layout/infoPage.css";
-import TagInput from "../../components/ui/forms/TagInput.vue";
-import ToggleSwitch from "../../components/ui/forms/ToggleSwitch.vue";
+import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
+import PageLayout from "../../components/layout/PageLayout.vue";
+import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
+import { ApiError } from "../../api/http";
+import { useAuthStore } from "../../stores/auth";
+import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { errorMessage } from "../../utils/errors";
-import { formatUtc } from "../../utils/time";
+import { brainClient, folderProblem, normalizeFolder, type BrainFile, type FileChanges } from "./api/BrainClient";
+import FileEditor from "./components/FileEditor.vue";
+import FileList from "./components/FileList.vue";
+import { useBrainStore } from "./stores/brain";
 
-/** The signed-in account's private notes (ember_api's /api/notes, kept in
- * db_gateway). A list on the left and an editor on the right; on a narrow
- * screen one at a time. Edits are a draft until Save. Each note has tags and a
- * switch that says whether agents may read it. */
+/** The Notes page: the account's long-term memory as a file browser. A list on the left (folders, search,
+ * files) and an editor on the right; on a narrow screen one at a time. Edits are a draft until Save. Agents
+ * read every file; the editor has a switch that lets them edit one. */
 
 const NEW = "new";
+const store = useBrainStore();
+const auth = useAuthStore();
 
-const notes = ref<Note[]>([]);
-const loading = ref(true);
-const loadError = ref("");
-const notice = ref("");
-const query = ref("");
-const matches = computed(() => notes.value.filter(note => matchesWords(query.value, note.title, note.body, ...note.tags)));
-const searchField = ref<InstanceType<typeof SearchField> | null>(null);
-const listScroll = ref<HTMLElement | null>(null);
-const titleField = ref<HTMLInputElement | null>(null);
-const bodyField = ref<HTMLTextAreaElement | null>(null);
-
-// The open note: a note id, NEW for one not saved yet, or null for none.
+// The open file: an id, NEW for one not saved yet, or null for none.
 const selected = ref<string | null>(null);
-const publicationTarget = useId();
-const form = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
-const saved = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
-// Grow the note within the editor scroller, including after a viewport resize.
-watch([() => form.body, bodyField], async () => {
-  await nextTick();
-  if (bodyField.value) growToContent(bodyField.value);
-});
-growOnResize(bodyField);
-// What is typed in the tag box but not added yet (TagInput's v-model:text) and the component itself.
-const tagInput = ref("");
-const tagField = ref<InstanceType<typeof TagInput> | null>(null);
-// Who saved the open note last. Not part of the draft: only a save from this page changes it.
-const savedEditor = ref<Note["last_editor"]>("user");
-// The updated_at of the version the editor opened. A save sends it, so the server can refuse to
-// overwrite a change made since (by an agent, or this note open in another tab).
-const openedAt = ref("");
+// The version the editor holds as saved (its revision goes with every save); null for a new file.
+const opened = ref<BrainFile | null>(null);
+const opening = ref(false);
+const openError = ref("");
+let openRun = 0; // a late answer for a file the user has left is dropped
+const form = reactive({ title: "", body: "", tags: [] as string[], folder: "", agentEditable: false });
+const saved = reactive({ title: "", body: "", tags: [] as string[], folder: "", agentEditable: false });
+const tagText = ref("");
+const editor = ref<InstanceType<typeof FileEditor> | null>(null);
+const listHost = ref<HTMLElement | null>(null);
 // The newer version the server holds, while a refused save waits for the user's choice.
-const conflict = ref<Note | null>(null);
+const conflict = ref<BrainFile | null>(null);
 const saving = ref(false);
 const removing = ref(false);
+const reverting = ref(false);
 const formError = ref("");
+const notice = ref("");
+const query = ref("");
+const folder = ref<string | null>(null);
 
+const busy = computed(() => saving.value || removing.value || reverting.value || opening.value);
 const sameTags = (a: string[], b: string[]) => a.length === b.length && a.every((tag, i) => tag === b[i]);
+const cleanFolder = computed(() => normalizeFolder(form.folder));
+const problem = computed(() => folderProblem(cleanFolder.value));
 // A tag typed but not added yet counts as an unsaved edit, so it is never lost silently.
 const dirty = computed(
   () =>
     selected.value !== null &&
-    (form.title !== saved.title ||
+    !opening.value &&
+    (form.title.trim() !== saved.title ||
       form.body !== saved.body ||
-      form.agentReadable !== saved.agentReadable ||
+      cleanFolder.value !== saved.folder ||
+      form.agentEditable !== saved.agentEditable ||
       !sameTags(form.tags, saved.tags) ||
-      tagInput.value.trim() !== ""),
+      tagText.value.trim() !== ""),
 );
-const canSave = computed(
-  () => form.title.trim() !== "" && dirty.value && !saving.value && !removing.value && conflict.value === null,
-);
-const atLimit = computed(() => notes.value.length >= NOTES_MAX);
+const canSave = computed(() => (selected.value === NEW || opened.value !== null) && form.title.trim() !== "" && dirty.value && !busy.value && conflict.value === null && problem.value === "");
+const canRevert = computed(() => opened.value?.edited === true && !dirty.value && !busy.value && conflict.value === null);
+const revertHint = computed(() => (opened.value?.edited && dirty.value ? "Save or discard your changes first." : ""));
 
-// The tags this account already uses (not on the open note yet), most used first: the input's suggestions.
+const maxChars = computed(() => store.summary?.max_record_chars ?? 20_000);
 const knownTags = computed(() => {
   const counts = new Map<string, number>();
-  for (const note of notes.value) for (const tag of note.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  for (const file of store.files) for (const tag of file.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
   return [...counts]
     .filter(([tag]) => !form.tags.includes(tag))
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([tag, count]) => ({ tag, count }));
 });
 
-// Laya's suggestions: existing tags that may fit this note. Nothing is applied until the user picks one.
-const suggestion = ref<TagSuggestions | null>(null);
-const suggesting = ref(false);
-const suggestError = ref("");
-let suggestRun = 0; // a late answer for a note the user has left is dropped
-const canSuggest = computed(
-  () => knownTags.value.length > 0 && !suggesting.value && (form.title.trim() !== "" || form.body.trim() !== ""),
-);
-const suggestedTags = computed(() => (suggestion.value?.suggested ?? []).filter((tag) => !form.tags.includes(tag)));
+const shown = computed(() => {
+  if (store.hits !== null) return store.hits;
+  const wanted = folder.value;
+  if (wanted === null) return store.files;
+  return store.files.filter((f) => (wanted === "" ? f.folder === "" : f.folder === wanted || f.folder.startsWith(`${wanted}/`)));
+});
 
-async function suggest(): Promise<void> {
-  if (!canSuggest.value) return;
-  tagField.value?.commit();
-  const run = ++suggestRun;
-  suggesting.value = true;
-  suggestError.value = "";
-  suggestion.value = null;
-  try {
-    const found = await notesClient.suggestTags({ title: form.title, body: form.body, tags: [...form.tags] });
-    if (run === suggestRun) suggestion.value = found;
-  } catch (err) {
-    if (run === suggestRun) suggestError.value = errorMessage(err);
-  } finally {
-    if (run === suggestRun) suggesting.value = false;
-  }
+function formatBytes(bytes: number): string {
+  return bytes < 1_000_000 ? `${Math.round(bytes / 1000)} KB` : `${(bytes / 1_000_000).toFixed(1)} MB`;
+}
+const quotaLevel = computed<"" | "near" | "full">(() => {
+  const s = store.summary;
+  if (!s) return "";
+  if (s.files >= s.max_files || s.bytes >= s.max_total_bytes) return "full";
+  return s.files >= s.max_files * 0.8 || s.bytes >= s.max_total_bytes * 0.8 ? "near" : "";
+});
+const quotaText = computed(() => {
+  const s = store.summary;
+  return s ? `${s.files} of ${s.max_files} files · ${formatBytes(s.bytes)} of ${formatBytes(s.max_total_bytes)}` : "";
+});
+const headLabel = computed(() => {
+  if (selected.value === NEW) return "New file";
+  if (opened.value?.source === "automatic") return "Written by an agent";
+  if (opened.value?.source === "shared") return "Shared with you";
+  return "Your file";
+});
+
+// Search waits for a pause in typing; an empty box shows the list again.
+let timer: ReturnType<typeof setTimeout> | undefined;
+watch(query, (value) => {
+  clearTimeout(timer);
+  store.clearSearch();
+  if (value.trim() && auth.account) timer = setTimeout(() => void store.search(value), 300);
+}, { flush: "sync" });
+
+onMounted(() => void store.load());
+onBeforeUnmount(() => {
+  resetPage();
+  store.forget();
+});
+
+/** Fills the editor, and what counts as saved, from a file (or empty for a new one). */
+function fillEditor(file: BrainFile | null, startFolder = ""): void {
+  saved.title = form.title = file?.title ?? "";
+  saved.body = form.body = file?.body ?? "";
+  form.tags = [...(file?.tags ?? [])];
+  saved.tags = [...form.tags];
+  saved.folder = form.folder = file?.folder ?? startFolder;
+  saved.agentEditable = form.agentEditable = file?.agent_editable ?? false;
+  opened.value = file;
+  conflict.value = null;
+  tagText.value = "";
 }
 
-// New tags written by a light model (tag-writer). Like suggestions, nothing is applied until the user picks one.
-const generated = ref<string[] | null>(null);
-const generating = ref(false);
-const generateError = ref("");
-let generateRun = 0;
-const canGenerate = computed(() => !generating.value && (form.title.trim() !== "" || form.body.trim() !== ""));
-const generatedTags = computed(() => (generated.value ?? []).filter((tag) => !form.tags.includes(tag)));
-
-async function generate(): Promise<void> {
-  if (!canGenerate.value) return;
-  tagField.value?.commit();
-  const run = ++generateRun;
-  generating.value = true;
-  generateError.value = "";
-  generated.value = null;
-  try {
-    const made = await notesClient.generateTags({ title: form.title, body: form.body, tags: [...form.tags] });
-    if (run === generateRun) generated.value = made.tags;
-  } catch (err) {
-    if (run === generateRun) generateError.value = errorMessage(err);
-  } finally {
-    if (run === generateRun) generating.value = false;
-  }
-}
-async function load(): Promise<void> {
-  loading.value = true;
-  try {
-    notes.value = await notesClient.list();
-    loadError.value = "";
-  } catch (err) {
-    loadError.value = errorMessage(err);
-  } finally {
-    loading.value = false;
-  }
-}
-onMounted(load);
-
-function show(target: string | null): void {
+async function show(target: string | null): Promise<void> {
+  if (!auth.account) return;
   const previous = selected.value;
+  const run = ++openRun;
   selected.value = target;
   formError.value = "";
   notice.value = "";
-  const note = target === null || target === NEW ? undefined : notes.value.find((n) => n.id === target);
-  fillEditor(note);
-  void nextTick(async () => {
-    // A discard dialog closes on its own render tick before focus returns.
-    await nextTick();
-    if (selected.value !== target) return;
-    if (target !== null) titleField.value?.focus();
-    else {
-      const row = Array.from(listScroll.value?.querySelectorAll<HTMLButtonElement>("button[data-note-id]") ?? [])
-        .find(button => button.dataset.noteId === previous);
-      if (row) row.focus();
-      else searchField.value?.$el.querySelector("input")?.focus();
+  openError.value = "";
+  opening.value = false;
+  fillEditor(null, target === NEW ? (folder.value ?? "") : "");
+  if (target !== null && target !== NEW) {
+    opening.value = true;
+    try {
+      const file = await brainClient.get(target);
+      if (run === openRun) fillEditor(file);
+    } catch (err) {
+      if (run === openRun) openError.value = errorMessage(err);
+    } finally {
+      if (run === openRun) opening.value = false;
     }
-  });
-}
-/** Fills the editor, and what counts as saved, from a note (or empty). */
-function fillEditor(note: Note | undefined): void {
-  saved.title = form.title = note?.title ?? "";
-  saved.body = form.body = note?.body ?? "";
-  form.tags = [...(note?.tags ?? [])];
-  saved.tags = [...form.tags];
-  saved.agentReadable = form.agentReadable = note?.agent_readable ?? false;
-  savedEditor.value = note?.last_editor ?? "user";
-  openedAt.value = note?.updated_at ?? "";
-  conflict.value = null;
-  tagInput.value = "";
-  suggestRun++; // an answer still on its way belongs to the note that was open
-  suggestion.value = null;
-  suggestError.value = "";
-  suggesting.value = false;
-  generateRun++;
-  generated.value = null;
-  generateError.value = "";
-  generating.value = false;
+  }
+  await nextTick();
+  if (run !== openRun) return;
+  if (target !== null) editor.value?.focusTitle();
+  else (listHost.value?.querySelector<HTMLElement>(`[data-file-id="${previous}"]`) ?? listHost.value?.querySelector<HTMLElement>("input"))?.focus();
 }
 
 // Leaving unsaved edits asks first; the target waits here meanwhile.
 const discardTarget = ref<string | null | undefined>(undefined);
 function go(target: string | null): void {
-  if (saving.value || removing.value || target === selected.value) return;
+  if (!auth.account || busy.value || target === selected.value) return;
   if (dirty.value) discardTarget.value = target;
-  else show(target);
+  else void show(target);
 }
 function discard(): void {
   const target = discardTarget.value;
   discardTarget.value = undefined;
-  if (target !== undefined) show(target);
+  if (target !== undefined) void show(target);
 }
 
 // Leaving the page with unsaved edits asks first, like the Settings page.
-const { open: leaveOpen, answer: answerLeave } = useUnsavedGuard({
-  dirty: () => dirty.value,
-  busy: () => saving.value || removing.value,
-});
+const { open: leaveOpen, answer: answerLeave } = useUnsavedGuard({ dirty: () => dirty.value, busy: () => busy.value });
 
 function startNew(): void {
-  if (atLimit.value) {
-    notice.value = `You can keep at most ${NOTES_MAX} notes. Delete one to add another.`;
+  if (!auth.account || store.status !== "ready") return;
+  if (quotaLevel.value === "full") {
+    notice.value = "Your brain is full. Delete a file, or ask an administrator to raise the limit.";
     return;
   }
   go(NEW);
 }
 
+function changesFromEditor(): FileChanges {
+  const changes: FileChanges = {};
+  if (form.title.trim() !== saved.title) changes.title = form.title.trim();
+  if (form.body !== saved.body) changes.body = form.body;
+  if (!sameTags(form.tags, saved.tags)) changes.tags = [...form.tags];
+  if (cleanFolder.value !== saved.folder) changes.folder = cleanFolder.value;
+  if (form.agentEditable !== saved.agentEditable) changes.agent_editable = form.agentEditable;
+  return changes;
+}
+
 async function save(): Promise<void> {
-  if (selected.value === null) return;
-  tagField.value?.commit(); // a tag still in the box is part of the note
-  if (tagInput.value.trim() !== "") return; // it could not be added (too many tags): its message is showing
-  if (!canSave.value) return;
+  const id = selected.value;
+  const revision = opened.value?.revision;
+  if (!auth.account || id === null || busy.value) return;
+  const run = openRun;
+  editor.value?.commitTags(); // a tag still in the box is part of the file
+  if (tagText.value.trim() !== "") return; // it could not be added (too many tags): its message is showing
+  if (!canSave.value || (id !== NEW && revision === undefined)) return;
   saving.value = true;
   formError.value = "";
   try {
-    const draft = {
-      title: form.title.trim(),
-      body: form.body,
-      tags: [...form.tags],
-      agent_readable: form.agentReadable,
-    };
-    const note =
-      selected.value === NEW
-        ? await notesClient.create(draft)
-        : await notesClient.update(selected.value, draft, openedAt.value);
-    // The newest edit goes first, as the server lists them.
-    notes.value = [note, ...notes.value.filter((n) => n.id !== note.id)];
-    selected.value = note.id;
-    fillEditor(note);
+    const record =
+      revision === undefined
+        ? await store.create({ title: form.title.trim(), body: form.body, tags: [...form.tags], folder: cleanFolder.value })
+        : await store.save(id, changesFromEditor(), revision);
+    if (run !== openRun) return;
+    selected.value = record.id;
+    fillEditor(record);
     notice.value = "Saved.";
   } catch (err) {
-    if (err instanceof ApiError && err.status === 412 && selected.value !== null && selected.value !== NEW) {
-      await loadConflict(selected.value);
-    } else {
-      formError.value = errorMessage(err);
-    }
+    if (run !== openRun) return;
+    if (err instanceof ApiError && err.status === 412 && id !== NEW) await loadConflict(id, run);
+    else formError.value = errorMessage(err);
   } finally {
-    saving.value = false;
+    if (run === openRun) saving.value = false;
   }
 }
 
-/** The server refused a save because the note changed: fetch its newer version and ask what to do. */
-async function loadConflict(id: string): Promise<void> {
+/** The server refused because the file changed: fetch its newer version and ask what to do. */
+async function loadConflict(id: string, run: number): Promise<void> {
   try {
-    conflict.value = await notesClient.get(id);
+    const latest = await brainClient.get(id);
+    if (run === openRun) conflict.value = latest;
   } catch (err) {
-    formError.value = errorMessage(err);
+    if (run === openRun) formError.value = errorMessage(err);
   }
 }
 /** Drops the user's edits for the newer version. */
 function showTheirs(): void {
   const theirs = conflict.value;
   if (theirs === null) return;
-  notes.value = notes.value.some((n) => n.id === theirs.id)
-    ? notes.value.map((n) => (n.id === theirs.id ? theirs : n))
-    : [theirs, ...notes.value];
   fillEditor(theirs);
   notice.value = "Showing the newer version.";
+  void store.load();
 }
-/** Saves the user's edits over the newer version. */
+/** Saves the user's edits over the newer version: only the fields the user changed are sent. */
 async function keepMine(): Promise<void> {
   const theirs = conflict.value;
   if (theirs === null) return;
-  openedAt.value = theirs.updated_at;
+  opened.value = theirs;
   conflict.value = null;
   await save();
+}
+
+const confirmRevert = ref(false);
+async function revert(): Promise<void> {
+  const file = opened.value;
+  if (!auth.account || file === null || !canRevert.value) return;
+  const run = openRun;
+  reverting.value = true;
+  formError.value = "";
+  try {
+    const restored = await store.revert(file.id, file.revision);
+    if (run !== openRun) return;
+    fillEditor(restored);
+    notice.value = "Original text restored.";
+  } catch (err) {
+    if (run !== openRun) return;
+    if (err instanceof ApiError && err.status === 412) await loadConflict(file.id, run);
+    else formError.value = errorMessage(err);
+  } finally {
+    if (run === openRun) {
+      reverting.value = false;
+      confirmRevert.value = false;
+    }
+  }
 }
 
 const confirmDelete = ref(false);
 async function remove(): Promise<void> {
   const id = selected.value;
-  if (id === null || id === NEW || removing.value) return;
+  if (!auth.account || id === null || id === NEW || busy.value) return;
+  const run = openRun;
   removing.value = true;
   formError.value = "";
   try {
-    await notesClient.remove(id);
-    notes.value = notes.value.filter((n) => n.id !== id);
-    show(null);
-    notice.value = "Note deleted.";
+    await store.remove(id);
+    if (run !== openRun) return;
+    removing.value = false;
+    confirmDelete.value = false;
+    void show(null);
+    notice.value = "File deleted.";
   } catch (err) {
+    if (run !== openRun) return;
     formError.value = errorMessage(err);
-  } finally {
     removing.value = false;
     confirmDelete.value = false;
   }
 }
 
-function preview(note: Note): string {
-  return note.body.trim().replace(/\s+/g, " ").slice(0, 80);
+function resetPage(): void {
+  ++openRun;
+  clearTimeout(timer);
+  selected.value = null;
+  opening.value = saving.value = removing.value = reverting.value = false;
+  openError.value = formError.value = notice.value = "";
+  discardTarget.value = undefined;
+  confirmDelete.value = confirmRevert.value = false;
+  answerLeave(false);
+  query.value = "";
+  folder.value = null;
+  fillEditor(null);
 }
+
+watch(() => auth.account?.id, () => {
+  resetPage();
+  if (auth.account) void store.load();
+}, { flush: "sync" });
 </script>
 
 <template>
-  <PageLayout class="notes info-content" :class="{ 'note-open': selected !== null }" title="Notes" description="Your thoughts, kept close." wide fill>
+  <PageLayout class="notes info-content" :class="{ 'file-open': selected !== null }" title="Notes" description="Your long-term memory: the files you and your agents keep." wide fill>
     <template #actions>
-      <button type="button" class="primary new-note" :disabled="saving || removing" @click="startNew">New note</button>
+      <button type="button" class="primary new-file" :disabled="busy || store.status !== 'ready'" @click="startNew">New file</button>
     </template>
     <div class="column">
-
-      <p v-if="notice" class="notice" role="status">{{ notice }}</p>
-      <StateMessage v-if="loading" kind="loading">Loading …</StateMessage>
-      <StateMessage v-else-if="loadError" kind="error" @retry="load">Could not load your notes: {{ loadError }}</StateMessage>
+      <p v-if="quotaText" class="quota" :class="quotaLevel" data-test="quota">
+        <svg v-if="quotaLevel" class="line-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 11.5h-13zM8 6.5v3M8 11.5v.5" /></svg>
+        {{ quotaText }}<template v-if="quotaLevel === 'full'"> · full</template><template v-else-if="quotaLevel === 'near'"> · nearly full</template>
+      </p>
+      <p v-if="store.summary?.skipped" class="muted skipped" role="status">
+        {{ store.summary.skipped }} {{ store.summary.skipped === 1 ? "file" : "files" }} in your brain folder could not be read and {{ store.summary.skipped === 1 ? "is" : "are" }} not shown.
+      </p>
+      <p v-if="notice" class="notice-line" role="status">{{ notice }}</p>
+      <p v-if="store.status === 'ready' && store.error" class="error" role="alert">Could not refresh your files: {{ store.error }}</p>
+      <StateMessage v-if="store.status === 'idle' || store.status === 'loading'" kind="loading">Loading …</StateMessage>
+      <StateMessage v-else-if="store.status === 'error'" kind="error" @retry="store.load()">Could not load your files: {{ store.error }}</StateMessage>
 
       <ListEditorLayout
         v-else
         class="layout"
         :editing="selected !== null"
-        list-label="Notes list"
-        editor-label="Note editor"
-        back-label="All notes"
+        list-label="Files list"
+        editor-label="File editor"
+        back-label="All files"
         visible-scrollbars
-        :busy="saving || removing"
+        :busy="busy"
         :saving="saving"
         :dirty="dirty"
         :can-save="canSave"
@@ -343,200 +344,95 @@ function preview(note: Note): string {
         @submit="save"
       >
         <template #list>
-          <div class="list-heading"><span>{{ query.trim() ? 'Search results' : 'All notes' }}</span><span>{{ query.trim() ? matches.length + ' of ' + notes.length : notes.length + '/' + NOTES_MAX + ' notes' }}</span></div>
-          <SearchField ref="searchField" v-model="query" class="notes-search" label="Search notes" placeholder="Search notes…" />
-          <div ref="listScroll" class="list-scroll pane-scroll">
-            <StateMessage v-if="notes.length === 0 && selected !== NEW" kind="empty">You have no notes yet.</StateMessage>
-            <ul v-else class="list" aria-label="Notes">
-              <li v-if="selected === NEW">
-                <ListRow class="note-row" active>
-                  <span class="title">{{ form.title.trim() || "New note" }}</span>
-                  <span class="muted">Not saved yet</span>
-                </ListRow>
-              </li>
-              <li v-for="n in matches" :key="n.id">
-                <ListRow class="note-row" :active="n.id === selected" :data-note-id="n.id" :disabled="saving || removing" @click="go(n.id)">
-                  <span class="title">{{ n.id === selected && form.title.trim() ? form.title.trim() : n.title }}</span>
-                  <span v-if="preview(n)" class="snippet">{{ preview(n) }}</span>
-                  <span v-if="n.tags.length || n.agent_readable || n.last_editor === 'agent'" class="row-tags">
-                    <span v-for="tag in n.tags" :key="tag" class="tag status-badge">{{ tag }}</span>
-                    <span v-if="n.agent_readable" class="tag status-badge agent-mark">Agents can read</span>
-                    <span v-if="n.last_editor === 'agent'" class="tag status-badge agent-mark">Agent edit</span>
-                  </span>
-                  <span class="muted">{{ formatUtc(n.updated_at) }}</span>
-                </ListRow>
-              </li>
-            </ul>
-            <StateMessage v-if="notes.length && matches.length === 0 && selected !== NEW" kind="empty" title="No notes match your search.">Try another title, phrase, or tag.<template #action><button type="button" class="link-btn" @click="query = ''">Clear search</button></template></StateMessage>
+          <div ref="listHost" class="list-host">
+            <FileList
+              v-model:query="query"
+              v-model:folder="folder"
+              :rows="shown"
+              :folders="store.folders"
+              :selected-id="selected === NEW ? null : selected"
+              :draft-title="selected === NEW ? form.title : null"
+              :is-search="store.hits !== null"
+              :search-busy="store.searching"
+              :search-error="store.searchError"
+              :disabled="busy"
+              @select="go"
+            />
           </div>
-          <details v-if="selected === null" class="library-publishing">
-            <summary>Obsidian &amp; publishing <span aria-hidden="true">›</span></summary>
-            <div :id="publicationTarget + '-library'" />
-          </details>
-          <p class="list-help">Search titles, note text, and tags.</p>
         </template>
 
         <template #head>
-            <span class="context-label"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3" /></svg>{{ form.agentReadable ? "Agents can read" : "Private note" }}</span>
+          <span class="context-label"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>{{ headLabel }}</span>
         </template>
 
         <template #editor>
-          <div class="writing">
-          <p v-if="savedEditor === 'agent'" class="agent-edit-note">
-            An agent last changed this note. Saving your own changes removes this mark.
-          </p>
-          <label class="title-field">
-            <span class="sr-only">Title</span>
-            <input ref="titleField" v-model="form.title" type="text" :maxlength="NOTE_TITLE_MAX" aria-label="Title" aria-describedby="note-title-count" placeholder="Untitled note" :disabled="saving || removing" />
-            <CharacterCount id="note-title-count" class="note-count" :length="form.title.length" :max="NOTE_TITLE_MAX" />
-          </label>
-          <label class="body-field">
-            <span class="sr-only">Note</span>
-            <textarea ref="bodyField" v-model="form.body" rows="10" placeholder="Start writing…" :maxlength="NOTE_BODY_MAX" aria-label="Note text" aria-describedby="note-body-count" :disabled="saving || removing" />
-            <CharacterCount id="note-body-count" class="note-count" :length="form.body.length" :max="NOTE_BODY_MAX" />
-          </label>
-          </div>
-          <div id="note-tools" class="note-tools">
-          <details class="tag-tools">
-            <summary><span>Tags</span><span class="summary-hint">{{ form.tags.join(", ") || "Add tags" }} <span aria-hidden="true">›</span></span></summary>
-          <div class="field">
-            <div class="field-head">
-              <span class="field-label">Tags</span>
-              <button
-                v-if="knownTags.length"
-                type="button"
-                class="chip"
-                :disabled="!canSuggest"
-                :aria-busy="suggesting"
-                title="Ask Laya, a local model, which of your existing tags fit this note"
-                @click="suggest"
-              >
-                {{ suggesting ? "Suggesting …" : "Suggest tags" }}
-              </button>
-              <button
-                type="button"
-                class="chip"
-                :disabled="!canGenerate"
-                :aria-busy="generating"
-                title="Ask a light model to write up to three new tags for this note"
-                @click="generate"
-              >
-                {{ generating ? "Generating …" : "Generate tag" }}
-              </button>
-            </div>
-            <TagInput
+          <StateMessage v-if="opening" kind="loading">Opening …</StateMessage>
+          <StateMessage v-else-if="openError" kind="error" @retry="selected !== null && show(selected)">Could not open this file: {{ openError }}</StateMessage>
+          <template v-else>
+            <FileEditor
               :key="selected ?? ''"
-              ref="tagField"
-              v-model="form.tags"
-              v-model:text="tagInput"
-              :known="knownTags"
-              :normalize="normalizeTag"
-              :max="NOTE_TAGS_MAX"
-              :max-length="NOTE_TAG_MAX"
-              :disabled="saving || removing"
+              ref="editor"
+              v-model:title="form.title"
+              v-model:body="form.body"
+              v-model:tags="form.tags"
+              v-model:tagText="tagText"
+              v-model:folder="form.folder"
+              v-model:agentEditable="form.agentEditable"
+              :file="opened"
+              :folders="store.folders"
+              :known-tags="knownTags"
+              :max-chars="maxChars"
+              :folder-problem="problem"
+              :can-revert="canRevert"
+              :revert-hint="revertHint"
+              :disabled="busy"
+              @revert="confirmRevert = true"
+              @remove="confirmDelete = true"
             />
-            <div v-if="suggestion" class="suggestions" role="status">
-              <template v-if="suggestedTags.length">
-                <span class="muted">Laya suggests:</span>
-                <button
-                  v-for="tag in suggestedTags"
-                  :key="tag"
-                  type="button"
-                  class="tag pick"
-                  :aria-label="`Add suggested tag ${tag}`"
-                  @click="tagField?.add(tag)"
-                >
-                  + {{ tag }}
-                </button>
-              </template>
-              <span v-else class="muted">None of your other tags seem to fit this note.</span>
-              <span v-if="suggestion.skipped" class="muted">
-                {{ suggestion.skipped }} of your tags {{ suggestion.skipped === 1 ? "was" : "were" }} not checked.
-              </span>
+            <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
+            <div v-if="conflict" class="conflict" role="alert">
+              <p>{{ conflict.last_editor === "agent" ? "An agent" : "Another session" }} changed this file after you opened it.</p>
+              <div class="conflict-actions">
+                <button type="button" class="chip" @click="showTheirs">Show their version (drops my changes)</button>
+                <button v-if="dirty" type="button" class="chip" @click="keepMine">Save mine anyway</button>
+              </div>
             </div>
-            <p v-if="suggestError" class="error" role="alert">{{ suggestError }}</p>
-            <div v-if="generated" class="suggestions" role="status">
-              <template v-if="generatedTags.length">
-                <span class="muted">New tags:</span>
-                <button
-                  v-for="tag in generatedTags"
-                  :key="tag"
-                  type="button"
-                  class="tag pick"
-                  :aria-label="`Add generated tag ${tag}`"
-                  @click="tagField?.add(tag)"
-                >
-                  + {{ tag }}
-                </button>
-              </template>
-              <span v-else class="muted">No new tag came to mind for this note.</span>
-            </div>
-            <p v-if="generateError" class="error" role="alert">{{ generateError }}</p>
-          </div>
-          </details>
-          <details class="agent-tools">
-            <summary><span>Agent access</span><span class="summary-hint">{{ form.agentReadable ? "Agents can read" : "Only you" }} <span aria-hidden="true">›</span></span></summary>
-          <div class="agent-access">
-            <ToggleSwitch
-              :checked="form.agentReadable"
-              :disabled="saving || removing"
-              @change="form.agentReadable = ($event.target as HTMLInputElement).checked"
-            >
-              Let agents read this note
-            </ToggleSwitch>
-            <p v-if="form.agentReadable" class="agent-warning" role="note">
-              Agents can read this note. Be careful what you put in it: do not store passwords, keys or other private data.
-            </p>
-          </div>
-          </details>
-          <details class="publishing-tools">
-            <summary><span>Obsidian &amp; publishing</span><span aria-hidden="true">›</span></summary>
-      <div :id="`${publicationTarget}-editor`" />
-          </details>
-          <details v-if="selected !== NEW" class="manage-tools">
-            <summary>Manage note <span aria-hidden="true">›</span></summary>
-            <DangerZone class="note-danger"><template #label><b>Danger zone</b></template><button type="button" class="danger" :disabled="saving || removing" @click="confirmDelete = true">Delete this note</button></DangerZone>
-          </details>
-          </div>
-          <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
-          <div v-if="conflict" class="conflict" role="alert">
-            <p>
-              {{ conflict.last_editor === "agent" ? "An agent" : "Another session" }} changed this note after you opened
-              it.
-            </p>
-            <div class="conflict-actions">
-              <button type="button" class="chip" @click="showTheirs">Show their version (drops my changes)</button>
-              <button type="button" class="chip" @click="keepMine">Save mine anyway</button>
-            </div>
-          </div>
+          </template>
         </template>
 
         <template #placeholder>
           <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
-          <h3>A little room to think</h3><p>Pick a note, or start a new one.</p>
-          <button type="button" class="chip" @click="startNew">Create a note</button>
+          <h3>What you and your agents remember</h3>
+          <p>Pick a file, or start a new one.</p>
+          <button type="button" class="chip" @click="startNew">Create a file</button>
         </template>
       </ListEditorLayout>
     </div>
 
-    <Teleport v-if="!loading && !loadError" :to="`#${publicationTarget}-${selected === null ? 'library' : 'editor'}`">
-      <NotePromotionPanel :note-id="selected && selected !== NEW ? selected : null" :dirty="dirty" :source-version="JSON.stringify([openedAt, saved.title, saved.body, saved.tags])" />
-    </Teleport>
-
     <ConfirmModal
       :open="confirmDelete"
-      title="Delete this note?"
-      message="This note will be gone for good."
-      confirm-label="Delete note"
+      title="Delete this file?"
+      message="This file will be gone for good, with the saved original text if it has one."
+      confirm-label="Delete file"
       danger
       :busy="removing"
       @confirm="remove"
       @close="confirmDelete = false"
     />
     <ConfirmModal
+      :open="confirmRevert"
+      title="Restore the original text?"
+      message="The text, title and tags from before your first change come back. Your changes are replaced."
+      confirm-label="Restore original"
+      danger
+      :busy="reverting"
+      @confirm="revert"
+      @close="confirmRevert = false"
+    />
+    <ConfirmModal
       :open="leaveOpen"
       title="Leave without saving?"
-      message="This note has changes you have not saved."
+      message="This file has changes you have not saved."
       confirm-label="Leave page"
       danger
       @confirm="answerLeave(true)"
@@ -545,7 +441,7 @@ function preview(note: Note): string {
     <ConfirmModal
       :open="discardTarget !== undefined"
       title="Discard your changes?"
-      message="This note has changes you have not saved."
+      message="This file has changes you have not saved."
       confirm-label="Discard"
       danger
       @confirm="discard"
@@ -558,55 +454,29 @@ function preview(note: Note): string {
 <style scoped>
 .layout { --workspace-columns: 360px minmax(0, 1fr); }
 .layout :deep(.list-pane) { overflow: hidden; }
-.notes-search { margin-bottom: 12px; flex-shrink: 0; }
-.list-scroll { flex: 1; min-height: 0; }
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
-
-.list li { border-bottom: 1px solid var(--border); }
-.list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.new-note { flex-shrink: 0; min-height: 40px; }
-.title { font-weight: 600; overflow-wrap: anywhere; }
-.snippet { color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.note-row .muted { font-size: .8em; }
-.row-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-.agent-mark { border-color: var(--warning); color: var(--warning); }
-.note-danger { margin-bottom: 16px; }
-.title-field, .body-field { display: flex; flex-direction: column; min-width: 0; gap: 10px; }
-.notes .editor .title-field input { width: 100%; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; font-size: 1.65em; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }
-.body-field { flex: 1; gap: 12px; }
-.editor textarea { width: 100%; min-height: 230px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; line-height: 1.9; resize: none; overflow-y: hidden; }
-.note-count { align-self: flex-end; }
-.note-tools { flex-shrink: 0; border-top: 1px solid var(--border); padding: 0 28px; }
-.note-tools > details + details { border-top: 1px solid var(--border); }
-summary > [aria-hidden], .summary-hint { color: var(--muted); }
-.summary-hint { font-size: .9em; min-width: 0; text-align: right; overflow-wrap: anywhere; }
-.summary-hint > span { margin-left: 12px; }
-.note-tools details[open] > summary { color: var(--accent); }
-.field, .agent-access { display: flex; flex-direction: column; gap: 12px; padding: 0 0 16px; }
-.field-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.field-label { margin-right: auto; font-size: .85em; color: var(--muted); }
-.suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.tag.pick { font: inherit; font-size: .8em; padding: 1px 7px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); cursor: pointer; }
-.tag.pick:hover { border-color: var(--accent); }
+.list-host { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.new-file { flex-shrink: 0; min-height: 40px; }
+.quota { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: .85em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.quota.near .line-icon { color: var(--warning); }
+.quota.full .line-icon { color: var(--danger); }
+.skipped, .notice-line { margin: 0 0 8px; font-size: .85em; }
 .conflict { display: flex; flex-direction: column; gap: 8px; margin: 12px 20px; padding: 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: .9em; }
 .conflict p { margin: 0; }
 .conflict-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.agent-edit-note, .agent-warning { margin: 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: .85em; }
-.agent-warning { background: color-mix(in srgb, var(--warning) 12%, var(--bg)); }
+.conflict-actions button { overflow-wrap: anywhere; }
 .form-error { margin: 12px 20px; }
-.library-publishing { margin: 14px 10px 0; border-top: 1px solid var(--border); flex-shrink: 0; max-height: 40%; overflow-y: auto; }
-@media (max-width: 900px) and (min-width: 768px) { .notes .layout { --workspace-columns: 280px minmax(0, 1fr); } .note-tools { padding-inline: 20px; } }
+.notes :deep(.error), .notes :deep(button.danger) { color: var(--text); }
+@media (max-width: 900px) and (min-width: 768px) { .notes .layout { --workspace-columns: 280px minmax(0, 1fr); } }
 @media (max-width: 767px) {
   .notes :deep(.page-column) { padding: 18px 16px 12px; }
   .notes :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
   .notes :deep(.page-title) { margin: 0; }
   .notes :deep(.page-description) { display: none; }
-  .notes :deep(.page-actions button), .list-scroll :deep(button) { min-width: 44px; min-height: 44px; }
-  .notes.note-open :deep(.page-head) { display: none; }
-  .note-row { min-height: 100px; }
-  .notes .editor .title-field input { font-size: 1.45em; }
-  .editor textarea { min-height: 250px; }
-  .note-tools { padding-inline: 20px; }
-  summary, .note-tools button { min-width: 44px; min-height: 44px; }
+  .notes :deep(.page-actions button) { min-width: 44px; min-height: 44px; }
+  .notes.file-open :deep(.page-head) { display: none; }
+  .conflict-actions button, .layout button.chip,
+  .notes :deep(.state button), .notes :deep(dialog .actions button),
+  .notes :deep(.file-editor [role="option"]) { min-width: 44px; min-height: 44px; }
 }
 </style>
