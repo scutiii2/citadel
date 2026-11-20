@@ -41,6 +41,7 @@ CATALOG: tuple[Collection, ...] = (
     Collection("brain_promotion_attempts", "brains", "<promotion id>:<attempt>", None, "/brains/accounts/{uid}"),
     Collection("brain_promotion_decisions", "brains", "<promotion id>:<attempt>", None, "/brains/accounts/{uid}"),
     Collection("brain_suggestions", "brains", "<hash>", None, "/brains/accounts/{uid}"),
+    Collection("brain_stacks", "brain", "<owner uid>:<chat id>", None, "/stack/accounts/{uid}"),
     Collection(STATE, "schema", "stronghold"),
 )
 

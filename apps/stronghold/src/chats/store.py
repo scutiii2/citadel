@@ -235,6 +235,9 @@ class ChatStore:
             await self._store.delete(MESSAGES, _key(owner, chat_id))
             await self._store.delete(CHATS, _key(owner, chat_id))
 
+    async def exists(self, owner: str, chat_id: str) -> bool:
+        return await self._store.get(CHATS, _key(owner, chat_id)) is not None
+
     async def delete(self, owner: str, chat_id: str) -> None:
         await self._doc(owner, chat_id)
         await self._remove(owner, [chat_id])
