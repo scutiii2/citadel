@@ -94,7 +94,7 @@ def _tool_is_enabled(name: str, enabled: set[str]) -> bool:
 
 def _other_server(name: str) -> bool:
     """A registry tool of a connection other than `main` (for example `bard__tool_bard_speak`)."""
-    return not name.startswith((_PREFIX, private_turn.TOOL_PREFIX))
+    return "__" in name and not name.startswith((_PREFIX, private_turn.TOOL_PREFIX))
 
 
 def list_tools(enabled_extensions: list[str] | None = None) -> list[Any]:
@@ -153,29 +153,33 @@ def is_read_only_builtin(name: str) -> bool:
 
 def _qualified(name: str) -> str:
     """`name` as the registry lists it. A model that drops the "main__" prefix (tool descriptions and
-    instructions name tools bare) still reaches the built-in tool it meant; anything else is unchanged."""
+    instructions name tools bare) still reaches the built-in tool it meant. An exact registry name, such as a
+    connection's `bard__tool_bard_speak`, always wins over that guess."""
     if name.startswith((_PREFIX, private_turn.TOOL_PREFIX)):
         return name
-    qualified = _PREFIX + name
-    return qualified if any(tool.name == qualified for tool in client.list_tools()) else name
+    listed = {tool.name for tool in client.list_tools()}
+    if name in listed:
+        return name
+    return _PREFIX + name if _PREFIX + name in listed else name
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> str:
     name = _qualified(name)
-    if tool_filter.is_blocked(unprefixed(name) if name.startswith(_PREFIX) else name):
+    private = name.startswith(private_turn.TOOL_PREFIX)
+    short = name if private else unprefixed(name)
+    if tool_filter.is_blocked(short):
         raise PermissionError(f"tool {name!r} is switched off for this user")
-    if name.startswith(private_turn.TOOL_PREFIX):
+    if private:
         return _call_private(name, arguments)
-    if name.startswith(_PREFIX) and not agent_spec.current().tools.allows(unprefixed(name)):
+    scope = agent_spec.current().tools
+    if not (scope.allows_explicitly(short) if _other_server(name) else scope.allows(short)):
         # The model only sees in-scope tools, but may still name another one.
         raise PermissionError(f"tool {name!r} is not available to this agent")
-    if name.startswith(_PREFIX) and tool_filter.is_blocked(unprefixed(name)):
-        # Switched off by the user for their own chats; the model may still name it.
-        raise PermissionError(f"tool {name!r} is switched off for this user")
     on_progress = tool_progress.current()
     # The asking user rides in the call's _meta: the session is shared by
-    # every user, so it can't go in a header (see internal_auth.py).
-    meta = internal_auth.requester_meta()
+    # every user, so it can't go in a header (see internal_auth.py). Armory
+    # alone needs this context. Outside connections use their configured auth.
+    meta = internal_auth.requester_meta() if name.startswith(_PREFIX) else None
     # Each only passed when set, so the plain call keeps its original shape.
     extra: dict[str, Any] = {}
     if on_progress:
