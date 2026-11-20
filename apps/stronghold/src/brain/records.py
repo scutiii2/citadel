@@ -95,7 +95,7 @@ def render(record: Record) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _header_line(line: str) -> tuple[str, object]:
+def header_line(line: str) -> tuple[str, object]:
     key, separator, raw = line.partition(": ")
     if not separator or not key.isidentifier():
         raise RecordError("A header line is not `key: value`.")
@@ -113,7 +113,7 @@ def parse(text: str, *, folder: str, fallback_id: str, fallback_title: str, fall
     head, closed, rest = text[len(_FENCE) + 1:].partition("\n" + _FENCE + "\n")
     if not closed:
         raise RecordError("The header is not closed.")
-    values = dict(_header_line(line) for line in head.split("\n") if line)
+    values = dict(header_line(line) for line in head.split("\n") if line)
     body = rest[1:] if rest.startswith("\n") else rest
     body = body[:-1] if body.endswith("\n") else body
 

@@ -309,6 +309,25 @@ class BrainFiles:
             account.loaded_at = None
             raise
 
+    @property
+    def root(self) -> Path:
+        return self._root
+
+    @asynccontextmanager
+    async def locked(self, uid: object):
+        """The account lock and folder for work that bypasses the note index (skills).
+        A purged account (deleted while an agent still held its token) is refused."""
+        home = self._home(uid)
+        account = self._accounts.setdefault(uid, _Account())
+        async with account.lock:
+            if account.purged:
+                raise BrainError(404, "No such account.")
+            yield home, account
+
+    async def mutate(self, account: _Account, operation: Callable, *args) -> None:
+        """Run disk work in a thread while holding the lock `locked` gave out (same rules as note writes)."""
+        await self._mutate(account, operation, *args)
+
     def _check(self, title: str, body: str, tags: Iterable[str], folder: str) -> tuple[str, str, tuple[str, ...], str]:
         title = str(title).strip()
         if not title or len(title) > TITLE_MAX:
