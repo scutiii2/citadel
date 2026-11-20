@@ -1,6 +1,7 @@
 """Legion service identity and verified requester context for shared MCP sessions."""
 from __future__ import annotations
 
+import re
 import threading
 import time
 from collections import OrderedDict
@@ -21,6 +22,7 @@ from src.citadel_auth import (
 keyring = from_env("legion", data_dir=data_dir(Path(__file__).resolve().parents[2]))
 _latest: OrderedDict[str, tuple[float, str]] = OrderedDict()
 _lock = threading.Lock()
+_CHAT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,7 @@ class Requester:
     uid: str = ""
     brain_scope: str = ""
     requester_token: str = field(default="", repr=False)
+    chat_id: str = ""
 
     @classmethod
     def from_verified(cls) -> "Requester":
@@ -99,6 +102,9 @@ def requester_meta() -> dict | None:
     scope = current_requester().brain_scope
     if scope in {"instance", "personal"}:
         meta["brain_scope"] = scope
+    chat = current_requester().chat_id
+    if _CHAT_ID.fullmatch(chat or ""):
+        meta["chat_id"] = chat
     return meta
 
 

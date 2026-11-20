@@ -423,3 +423,21 @@ def test_user_limits_are_sent_to_agents_that_understand_them(agent_url: str) -> 
 
 def test_user_limits_are_omitted_for_older_agents(old_agent_url: str) -> None:
     assert _ask(McpAgentGateway(None), old_agent_url, limits={"max_output_tokens": 500})["limits"] is None
+
+
+async def test_ask_sends_the_chat_id_when_the_caller_has_one(monkeypatch):
+    from src.agents.gateway import Caller, McpAgentGateway
+    sent = {}
+
+    async def fake_call(self, url, caller, tool, arguments, on_event=None):
+        sent[tool] = arguments
+        return {}
+
+    monkeypatch.setattr(McpAgentGateway, "_call", fake_call)
+    await McpAgentGateway().ask("http://a", Caller("ana", "a@x", "u-1", chat_id="chat-1"), question="q", history=[],
+                                request_id="r", caveman=False, enabled_extensions=[], on_event=None)
+    assert sent["ask"]["chat_id"] == "chat-1"
+    sent.clear()
+    await McpAgentGateway().ask("http://a", Caller("ana", "a@x", "u-1"), question="q", history=[],
+                                request_id="r", caveman=False, enabled_extensions=[], on_event=None)
+    assert "chat_id" not in sent["ask"]

@@ -45,6 +45,7 @@ class Caller:
     uid: str = ""
     brain_scope: str = ""
     requester_token: str = field(default="", repr=False)
+    chat_id: str = ""
 
 
 class AgentGateway(Protocol):
@@ -222,6 +223,8 @@ class McpAgentGateway:
             status = await self._call(url, caller, "status", {})
             if status.get("user_limits"):
                 arguments["limits"] = limits
+        if caller.chat_id:
+            arguments["chat_id"] = caller.chat_id
         return await self._call(url, caller, "ask", arguments, on_event)
 
     async def interpret(self, url, caller, text):

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from dataclasses import replace
 import json
 import os
 import sys
@@ -177,6 +178,7 @@ async def ask(
     allow_read_only: bool = False,
     exact_context: bool = False,
     limits: dict[str, int] | None = None,
+    chat_id: str | None = None,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ask this agent a question. Runs its own tool-calling loop against
@@ -212,6 +214,7 @@ async def ask(
     offered only when this agent's plan_tool is on too. plan_lean: ask the
     model to update the checklist only when an item changes status.
     limits: the asking user's own output-token and tool-round caps; lower only.
+    chat_id: the chat for Stronghold's tools, used only as a selection hint.
 
     exact_context: count what fills the context window with the provider's own
     token counter; the result's `context_breakdown_exact` says whether that worked.
@@ -236,7 +239,8 @@ async def ask(
     # The asking user, from portcullis's / chat_app's identity headers; every
     # mcp_server tool this turn calls carries it on (see internal_auth.py).
     started_at = agent_events.now_iso()
-    requester_token = internal_auth.bind_requester(internal_auth.current_requester())
+    requester_token = internal_auth.bind_requester(
+        replace(internal_auth.current_requester(), chat_id=chat_id or ""))
     from src.agents.roles.architect.pipeline import ArchitectError
 
     try:

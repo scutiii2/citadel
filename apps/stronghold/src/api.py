@@ -153,7 +153,7 @@ def create_app(
         app.state.turns = TurnRegistry(
             app.state.chats, app.state.usage, app.state.agent_gateway, settings.usage, PlatformLogs(app.state.platform),
             pricing=app.state.pricing, directory=app.state.agents, keyring=keyring,
-            requester_refresh=app.state.platform.requester_token)
+            requester_refresh=app.state.platform.requester_token, compactor=app.state.compactor)
         if registration is not None:
             # Migrate only once Treasury knows this instance: a cold start would answer 404 and skip the migration.
             try:

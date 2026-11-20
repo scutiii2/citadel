@@ -28,6 +28,7 @@ from typing import Any
 
 from src.agents.directory import AgentDirectory, AgentEntry
 from src.agents.gateway import AgentCallError, AgentGateway, Caller
+from src.brain.compaction import StackCompactor
 from src.chats.store import ChatNotFound, ChatStore, message_time
 from src.turns import question_answers, second_brain, summarization
 from src.turns.logs import TurnLogs
@@ -40,6 +41,7 @@ from src.turns.requester_tokens import RequesterRenewal, RequesterRefreshError
 logger = logging.getLogger(__name__)
 
 TERMINAL = ("final", "error")
+_STACK_TOOL_PREFIX = "stronghold__tool_stack_"
 # Events a subscriber can't rebuild from the snapshot are kept; tokens are
 # folded into Turn.text instead, so this bounds memory, not answer length.
 EVENT_BUFFER = 256
@@ -198,6 +200,7 @@ class Turn:
     # What the chat-turn log says about each agent that ran, and the prompts it got (same order).
     trace_agents: list[dict[str, Any]] = field(default_factory=list)
     trace_prompts: list[dict[str, Any]] = field(default_factory=list)
+    stack_tool_used: bool = False
     sequence: int = 0
     events: deque = field(default_factory=lambda: deque(maxlen=EVENT_BUFFER))
     condition: asyncio.Condition = field(default_factory=asyncio.Condition)
@@ -313,6 +316,7 @@ class TurnRegistry:
         retention_seconds: float = 120.0,
         requester_refresh=None,
         keyring=None,
+        compactor: StackCompactor | None = None,
     ) -> None:
         self._chats = chats
         self._usage_service = usage_service
@@ -321,6 +325,7 @@ class TurnRegistry:
         self._logs = logs
         self._pricing = pricing
         self._directory = directory
+        self._compactor = compactor
         self._max_running = max_running_per_account
         self._retention = retention_seconds
         self._requester_refresh, self._keyring = requester_refresh, keyring
@@ -542,10 +547,14 @@ class TurnRegistry:
             await asyncio.shield(self._finish(turn, _interrupted(turn.text), status="failed", error=None))
             raise
         except Exception as error:  # A bug here must still end the turn for its watchers.
-            logger.exception("turn %s crashed", turn.request_id)
-            await self._logs.error(
-                turn.owner, "chat.answer", f"{type(error).__name__}: {error}", traceback.format_exc()
-            )
+            if turn.stack_tool_used:
+                logger.warning("Turn %s crashed: %s", turn.request_id, type(error).__name__)
+                await self._logs.error(turn.owner, "chat.answer", "The answer could not be completed.")
+            else:
+                logger.exception("turn %s crashed", turn.request_id)
+                await self._logs.error(
+                    turn.owner, "chat.answer", f"{type(error).__name__}: {error}", traceback.format_exc()
+                )
             await self._finish(
                 turn, "error: the answer could not be completed", status="failed", error="The answer could not be completed."
             )
@@ -572,6 +581,8 @@ class TurnRegistry:
             return
 
         async def on_event(event: dict[str, Any]) -> None:
+            if str(event.get("tool") or "").startswith(_STACK_TOOL_PREFIX):
+                turn.stack_tool_used = True
             if event.get("type") in (
                 "token", "token_reset", "step_start", "step_progress", "step_end", "usage",
                 "approval_request", "approval_resolved", "question_request", "question_resolved",
@@ -588,12 +599,18 @@ class TurnRegistry:
             agent_question = second_brain.save_request(
                 question, turn.chat_id, turn.request_id, str(messages[-1].get("at") or message_time()), turn.options.second_brain_scope,
             )
+        await self._compact_stack(turn)
+        if turn.cancel_requested:
+            await self._finish(turn, "⏹️ Cancelled.", status="cancelled", error=None, cancelled=True)
+            return
+
         turn.asking = True
         try:
             result = await self._gateway.ask(
                 turn.agent.url,
                 Caller(turn.caller.username, turn.caller.email, turn.caller.uid,
-                       turn.options.second_brain_scope if turn.options.save_to_second_brain else ""),
+                       turn.options.second_brain_scope if turn.options.save_to_second_brain else "",
+                       chat_id=turn.chat_id),
                 question=agent_question,
                 history=summarization.history_for_agent(earlier),
                 request_id=turn.request_id,
@@ -612,11 +629,18 @@ class TurnRegistry:
                 limits=dict(turn.options.limits) or None,
             )
         except AgentCallError as error:
-            await self._logs.error(turn.owner, "chat.answer", f"{turn.agent.id}: {error}")
-            await self._finish(turn, f"error: {error}", status="failed", error=str(error))
+            message = "The answer could not be completed." if turn.stack_tool_used else str(error)
+            await self._logs.error(turn.owner, "chat.answer", f"{turn.agent.id}: {message}")
+            await self._finish(turn, f"error: {message}", status="failed", error=message)
             return
         finally:
             turn.asking = False
+
+        calls = result.get("tool_calls")
+        if isinstance(calls, list) and any(
+            isinstance(call, dict) and str(call.get("name") or "").startswith(_STACK_TOOL_PREFIX) for call in calls
+        ):
+            turn.stack_tool_used = True
 
         errors = result.get("private_extension_errors")
         if isinstance(errors, list) and errors:
@@ -656,6 +680,22 @@ class TurnRegistry:
             message["agent_usage"] = [_agent_usage(row) for row in rows[:MAX_AGENT_USAGE_ROWS]]
         await self._record_usage(turn, "chat", result)
         await self._finish(turn, message, status="cancelled" if cancelled else "completed", error=None, cancelled=cancelled)
+
+    async def _compact_stack(self, turn: Turn) -> None:
+        """Compacts the chat's short-term memory when it is near full. A failure does not stop the turn."""
+        if self._compactor is None:
+            return
+        try:
+            view = await self._compactor.view(turn.owner, turn.chat_id)
+            if not self._compactor.needs_compaction(view):
+                return
+            outcome = await self._compactor.compact(turn.owner, turn.chat_id, turn.caller)
+        except Exception as error:  # noqa: BLE001 - memory upkeep must not stop an answer
+            logger.info("stack compaction of chat %s skipped: %s", turn.chat_id, type(error).__name__)
+            return
+        if outcome is not None:
+            for result in outcome.results:
+                await self._record_usage(turn, "compaction", result)
 
     async def _auto_summarize(
         self, turn: Turn, earlier: list[dict[str, Any]], question: dict[str, Any]
@@ -712,8 +752,11 @@ class TurnRegistry:
             await self._chats.replace_messages(turn.owner, turn.chat_id, [*current, message], agent_id=turn.agent.id)
         except ChatNotFound:
             pass  # deleted while the answer was running
-        except Exception:
-            logger.exception("saving the answer of turn %s failed", turn.request_id)
+        except Exception as error:
+            if turn.stack_tool_used:
+                logger.warning("Saving turn %s failed: %s", turn.request_id, type(error).__name__)
+            else:
+                logger.exception("saving the answer of turn %s failed", turn.request_id)
         terminal: dict[str, Any] = (
             {"type": "error", "message": error}
             if error is not None
@@ -727,7 +770,7 @@ class TurnRegistry:
         """One chat-turn log line per answered question (port of chat_app's
         chat traces): the question, who answered and how long it took."""
         elapsed = round(monotonic() - turn.started_at, 1)
-        question = " ".join(turn.question.split())
+        question = "Chat turn" if turn.stack_tool_used else " ".join(turn.question.split())
         question = question if len(question) <= 80 else question[:79] + "…"
         details = {
             "chat_id": turn.chat_id,
@@ -736,15 +779,16 @@ class TurnRegistry:
             "model": message.get("model"),
             "total_tokens": message.get("total_tokens"),
             "enabled_extensions": list(turn.options.enabled_extensions),
-            "response": str(message.get("content", ""))[:TRACE_RESPONSE_MAX],
         }
+        if not turn.stack_tool_used:
+            details["response"] = str(message.get("content", ""))[:TRACE_RESPONSE_MAX]
         if turn.trace_agents:
             details["agents"] = turn.trace_agents
         await self._logs.chat_trace(
             turn.owner,
             f"{question} → {turn.agent.id}/{message.get('model') or status}, {elapsed}s",
             json.dumps(details, ensure_ascii=False, indent=2),
-            json.dumps(turn.trace_prompts, ensure_ascii=False) if turn.trace_prompts else None,
+            json.dumps(turn.trace_prompts, ensure_ascii=False) if turn.trace_prompts and not turn.stack_tool_used else None,
         )
 
 

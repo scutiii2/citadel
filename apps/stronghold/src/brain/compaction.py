@@ -37,6 +37,9 @@ class StackCompactor:
         self._gateway = gateway
         self._directory = directory
 
+    async def view(self, owner: str, chat_id: str) -> dict[str, Any]:
+        return await self._stacks.view(owner, chat_id)
+
     def needs_compaction(self, view: dict[str, Any]) -> bool:
         return bool(view.get("warn"))
 
