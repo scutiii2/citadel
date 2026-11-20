@@ -28,10 +28,11 @@ from typing import Any
 
 from src.agents.directory import AgentDirectory, AgentEntry
 from src.agents.gateway import AgentCallError, AgentGateway, Caller
-from src.brain.compaction import StackCompactor
+from src.brain.compaction import CompactionError, StackCompactor
 from src.chats.store import ChatNotFound, ChatStore, message_time
 from src.turns import question_answers, second_brain, summarization
 from src.turns.logs import TurnLogs
+from src.turns.step_digest import is_stack_tool
 from src.usage.rows import stored_rows, usage_rows
 from src.usage.service import UsageService
 from src.usage.settings import Pricing, UsageSettings, with_cost
@@ -41,7 +42,6 @@ from src.turns.requester_tokens import RequesterRenewal, RequesterRefreshError
 logger = logging.getLogger(__name__)
 
 TERMINAL = ("final", "error")
-_STACK_TOOL_PREFIX = "stronghold__tool_stack_"
 # Events a subscriber can't rebuild from the snapshot are kept; tokens are
 # folded into Turn.text instead, so this bounds memory, not answer length.
 EVENT_BUFFER = 256
@@ -561,9 +561,11 @@ class TurnRegistry:
 
     async def _answer(self, turn: Turn) -> None:
         try:
-            messages = (await self._chats.get(turn.owner, turn.chat_id))["messages"]
+            chat = await self._chats.get(turn.owner, turn.chat_id, include_stack_privacy=True)
         except ChatNotFound:
             return
+        messages = chat["messages"]
+        turn.stack_tool_used = chat["stack_tool_used"]
         if not messages or messages[-1].get("role") != "user":
             await self._finish(turn, "error: nothing to answer", status="failed", error="Nothing to answer.")
             return
@@ -581,7 +583,7 @@ class TurnRegistry:
             return
 
         async def on_event(event: dict[str, Any]) -> None:
-            if str(event.get("tool") or "").startswith(_STACK_TOOL_PREFIX):
+            if is_stack_tool(event.get("tool")):
                 turn.stack_tool_used = True
             if event.get("type") in (
                 "token", "token_reset", "step_start", "step_progress", "step_end", "usage",
@@ -638,7 +640,7 @@ class TurnRegistry:
 
         calls = result.get("tool_calls")
         if isinstance(calls, list) and any(
-            isinstance(call, dict) and str(call.get("name") or "").startswith(_STACK_TOOL_PREFIX) for call in calls
+            isinstance(call, dict) and is_stack_tool(call.get("name")) for call in calls
         ):
             turn.stack_tool_used = True
 
@@ -690,6 +692,10 @@ class TurnRegistry:
             if not self._compactor.needs_compaction(view):
                 return
             outcome = await self._compactor.compact(turn.owner, turn.chat_id, turn.caller)
+        except CompactionError as error:
+            if error.result is not None:
+                await self._record_usage(turn, "compaction", error.result)
+            return
         except Exception as error:  # noqa: BLE001 - memory upkeep must not stop an answer
             logger.info("stack compaction of chat %s skipped: %s", turn.chat_id, type(error).__name__)
             return
@@ -749,12 +755,15 @@ class TurnRegistry:
             message = {**message, "steps": [{k: v for k, v in s.items() if k != "id"} for s in turn.steps]}
         try:
             current = (await self._chats.get(turn.owner, turn.chat_id))["messages"]
-            await self._chats.replace_messages(turn.owner, turn.chat_id, [*current, message], agent_id=turn.agent.id)
+            await self._chats.replace_messages(
+                turn.owner, turn.chat_id, [*current, message], agent_id=turn.agent.id,
+                stack_tool_used=turn.stack_tool_used,
+            )
         except ChatNotFound:
             pass  # deleted while the answer was running
-        except Exception as error:
+        except Exception as save_error:
             if turn.stack_tool_used:
-                logger.warning("Saving turn %s failed: %s", turn.request_id, type(error).__name__)
+                logger.warning("Saving turn %s failed: %s", turn.request_id, type(save_error).__name__)
             else:
                 logger.exception("saving the answer of turn %s failed", turn.request_id)
         terminal: dict[str, Any] = (

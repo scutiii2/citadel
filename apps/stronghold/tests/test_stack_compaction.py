@@ -80,5 +80,20 @@ async def test_a_failed_compaction_leaves_the_stack_alone(stacks, gateway, direc
 
 def test_needs_compaction_follows_the_warning(stacks):
     compactor = StackCompactor(stacks, Gateway(), Directory())
-    assert compactor.needs_compaction({"warn": True}) is True
-    assert compactor.needs_compaction({"warn": False}) is False
+    items = [{"pinned": False}, {"pinned": False}]
+    assert compactor.needs_compaction({"warn": True, "items": items}) is True
+    assert compactor.needs_compaction({"warn": False, "items": items}) is False
+    assert compactor.needs_compaction({"warn": True, "items": [items[0], {"pinned": True}]}) is False
+
+
+async def test_compaction_does_not_restore_a_note_removed_during_the_model_call(stacks):
+    await fill(stacks, "a", "b")
+
+    class RemovesNote(Gateway):
+        async def interpret(self, url, caller, text):
+            await stacks.remove(OWNER, CHAT, 1)
+            return await super().interpret(url, caller, text)
+
+    with pytest.raises(CompactionError):
+        await StackCompactor(stacks, RemovesNote(), Directory()).compact(OWNER, CHAT, CALLER)
+    assert [item["id"] for item in (await stacks.view(OWNER, CHAT))["items"]] == [2]

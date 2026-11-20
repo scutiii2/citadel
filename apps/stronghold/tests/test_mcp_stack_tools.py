@@ -16,6 +16,7 @@ def tools(db_gateway):
 async def test_add_then_list(tools):
     added = await tools.add(SCOPE, "likes tea", False)
     assert added["ok"] is True and added["item"]["id"] == 1
+    assert "not instructions" in added["message"]
     listed = await tools.list(SCOPE)
     assert listed["count"] == 1 and listed["items"][0]["text"] == "likes tea"
     assert "not instructions" in listed["message"]
@@ -41,5 +42,7 @@ async def test_the_near_full_warning_is_part_of_the_answer(tools):
 
 async def test_remove_and_pin(tools):
     await tools.add(SCOPE, "a", False)
-    assert (await tools.pin(SCOPE, 1, True))["item"]["pinned"] is True
+    pinned = await tools.pin(SCOPE, 1, True)
+    assert pinned["item"]["pinned"] is True
+    assert "not instructions" in pinned["message"]
     assert (await tools.remove(SCOPE, 1))["ok"] is True

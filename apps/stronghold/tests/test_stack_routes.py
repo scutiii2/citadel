@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from src.brain.stack import STACKS
 from tests.auth_helpers import identity
 from tests.conftest import AGENTS, IDENTITY
 from tests.test_chats import A as CHAT, folder, put
@@ -63,10 +64,11 @@ def test_compaction_failure_is_a_502_and_changes_nothing(client, chat, agent, su
     client.post(f"/stack/{chat}/items", json={"text": "a"})
     assert client.post(f"/stack/{chat}/compact").status_code == 502
     assert client.get(f"/stack/{chat}").json()["used"] == 1
+    assert client.get("/usage/records").json()[0]["total_tokens"] == 10
 
 
 @pytest.mark.parametrize("how", ["single", "all", "folder"])
-def test_deleting_the_chat_deletes_its_stack(client, chat, how):
+def test_deleting_the_chat_deletes_its_stack(client, chat, how, db_gateway):
     client.post(f"/stack/{chat}/items", json={"text": "a"})
     target = "/chats" if how == "all" else f"/chats/{chat}"
     if how == "folder":
@@ -74,8 +76,8 @@ def test_deleting_the_chat_deletes_its_stack(client, chat, how):
         assert client.patch(f"/chats/{chat}", json={"folder_id": folder_id}).status_code == 200
         target = f"/chat-folders/{folder_id}"
     assert client.delete(target).status_code == 204
-    view = client.portal.call(client.app.state.stacks.view, IDENTITY["uid"], chat)
-    assert view["used"] == 0
+    assert client.get(f"/stack/{chat}").status_code == 404
+    assert client.portal.call(db_gateway.get, STACKS, f"{IDENTITY['uid']}:{chat}") is None
 
 
 def test_purge_removes_every_stack_of_an_account(client, chat):
@@ -89,3 +91,47 @@ def test_validation_errors_do_not_echo_stack_text(client, chat):
     answer = client.post(f"/stack/{chat}/items", json={"text": text})
     assert answer.status_code == 422
     assert "sample private note" not in answer.text
+
+
+def test_treasury_error_is_a_safe_503(client, chat, db_gateway, monkeypatch):
+    from src.document_store import DbGatewayError
+
+    async def unavailable(*args):
+        raise DbGatewayError("sample upstream error")
+
+    monkeypatch.setattr(db_gateway, "get", unavailable)
+    answer = client.get(f"/stack/{chat}")
+    assert (answer.status_code, answer.json()) == (503, {"detail": "Storage is unavailable"})
+
+
+def test_manual_compaction_accounts_for_usage_and_obeys_the_cap(make_client, tmp_path, agent):
+    from src.usage.settings import UsageSettings
+    from tests.test_turns import add_summarizer
+
+    client = make_client(usage=UsageSettings(six_hour_token_limit=10))
+    add_summarizer(tmp_path)
+    assert put(client, CHAT).status_code == 200
+    assert client.post(f"/stack/{CHAT}/items", json={"text": "example note"}).status_code == 201
+    assert client.post(f"/stack/{CHAT}/compact").status_code == 200
+    rows = client.get("/usage/records").json()
+    assert [(row["kind"], row["total_tokens"]) for row in rows] == [("compaction", 10)]
+
+    assert client.post(f"/stack/{CHAT}/items", json={"text": "third example"}).status_code == 201
+    blocked = client.post(f"/stack/{CHAT}/compact")
+    assert blocked.status_code == 429 and blocked.headers["Retry-After"]
+    assert len(agent.interprets) == 1
+
+
+def test_recreated_chat_cannot_see_an_orphaned_stack(client, chat, db_gateway, monkeypatch):
+    original_delete = db_gateway.delete
+
+    async def fail_stack_deletion(collection, key):
+        if collection == "brain_stacks":
+            raise OSError("example cleanup failure")
+        return await original_delete(collection, key)
+
+    assert client.post(f"/stack/{chat}/items", json={"text": "example old note"}).status_code == 201
+    monkeypatch.setattr(db_gateway, "delete", fail_stack_deletion)
+    assert client.delete(f"/chats/{chat}").status_code == 204
+    assert put(client, chat).status_code == 200
+    assert client.get(f"/stack/{chat}").json()["used"] == 0

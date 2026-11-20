@@ -147,17 +147,20 @@ class ChatStore:
         docs = await self._all(CHATS, owner)
         return [_details(d) for d in sorted(docs, key=lambda d: (d["updated_at"], d["created_at"]), reverse=True)]
 
-    async def get(self, owner: str, chat_id: str) -> dict[str, Any]:
+    async def get(self, owner: str, chat_id: str, *, include_stack_privacy: bool = False) -> dict[str, Any]:
         doc = await self._store.get(CHATS, _key(owner, chat_id))
         body = await self._store.get(MESSAGES, _key(owner, chat_id)) if doc else None
         if doc is None:
             raise ChatNotFound(chat_id)
-        return {**_details(doc), "messages": body["messages"] if body else []}
+        chat = {**_details(doc), "messages": body["messages"] if body else []}
+        if include_stack_privacy:
+            chat["stack_tool_used"] = doc.get("stack_tool_used", False)
+        return chat
 
     # --- writing ---------------------------------------------------------------------------
 
     async def put(self, owner: str, chat_id: str, title: str, agent_id: str | None,
-                  messages: list[ChatMessage]) -> dict[str, Any]:
+                  messages: list[ChatMessage], *, stack_tool_used: bool = False) -> dict[str, Any]:
         """Creates the chat or replaces its title, agent and transcript."""
         _encode(messages)
         key = _key(owner, chat_id)
@@ -168,6 +171,8 @@ class ChatStore:
                 raise ChatLimitError(f"At most {MAX_CHATS_PER_ACCOUNT} chats per account - delete some first")
             doc = {"key": key, "owner": owner, "chat_id": chat_id, "folder_id": None, "pinned": False,
                    "save_to_second_brain": False, "second_brain_scope": "instance", "created_at": now}
+        if stack_tool_used:
+            doc["stack_tool_used"] = True
         doc.update(title=title, agent_id=agent_id, message_count=len(messages), updated_at=now)
         await self._save(doc, messages)
         return {**_details(doc), "messages": messages}
@@ -179,10 +184,12 @@ class ChatStore:
         await self._store.put(CHATS, doc["key"], checked(ChatDoc, doc))
 
     async def replace_messages(self, owner: str, chat_id: str, messages: list[ChatMessage],
-                               agent_id: str | None = None) -> dict[str, Any]:
+                               agent_id: str | None = None, *, stack_tool_used: bool = False) -> dict[str, Any]:
         """New transcript for an existing chat, keeping its title (and its agent unless one is given)."""
         doc = await self._doc(owner, chat_id)
         _encode(messages)
+        if stack_tool_used:
+            doc["stack_tool_used"] = True
         doc.update(message_count=len(messages), updated_at=_now())
         if agent_id is not None:
             doc["agent_id"] = agent_id
@@ -207,7 +214,7 @@ class ChatStore:
     async def branch(self, owner: str, source_id: str, upto: int) -> dict[str, Any]:
         """A new chat holding the source's messages up to and including answer `upto`, which must be one of
         the assistant's plain answers. It keeps the source's agent and folder (never its pin)."""
-        source = await self.get(owner, source_id)
+        source = await self.get(owner, source_id, include_stack_privacy=True)
         messages = source["messages"]
         target = messages[upto] if 0 <= upto < len(messages) else None
         if target is None or target.get("role") != "assistant" or target.get("kind"):
@@ -215,7 +222,8 @@ class ChatStore:
         title = f"Branch of {source['title']}"
         if len(title) > TITLE_MAX:
             title = title[:TITLE_MAX - 1] + "…"
-        branched = await self.put(owner, str(uuid.uuid4()), title, source["agent_id"], messages[:upto + 1])
+        branched = await self.put(owner, str(uuid.uuid4()), title, source["agent_id"], messages[:upto + 1],
+                                  stack_tool_used=source["stack_tool_used"])
         if source["folder_id"] is not None:
             await self.update(owner, branched["chat_id"], {"folder_id": source["folder_id"]})
             branched["folder_id"] = source["folder_id"]
@@ -235,8 +243,12 @@ class ChatStore:
             await self._store.delete(MESSAGES, _key(owner, chat_id))
             await self._store.delete(CHATS, _key(owner, chat_id))
 
+    async def generation(self, owner: str, chat_id: str) -> str | None:
+        doc = await self._store.get(CHATS, _key(owner, chat_id))
+        return doc["created_at"] if doc is not None else None
+
     async def exists(self, owner: str, chat_id: str) -> bool:
-        return await self._store.get(CHATS, _key(owner, chat_id)) is not None
+        return await self.generation(owner, chat_id) is not None
 
     async def delete(self, owner: str, chat_id: str) -> None:
         await self._doc(owner, chat_id)

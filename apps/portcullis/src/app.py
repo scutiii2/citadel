@@ -53,6 +53,7 @@ from src.routes import (
     settings as settings_routes,
     shares,
     skills,
+    stack,
     templates,
     traffic as traffic_routes,
     triage,
@@ -230,6 +231,7 @@ def create_app(
     app.include_router(admin_tuning.router)
     app.include_router(admin_treasury.router)
     app.include_router(chats.router)
+    app.include_router(stack.router)
     app.include_router(chat_folders.router)
     app.include_router(templates.router)
     app.include_router(nav_preferences.router)

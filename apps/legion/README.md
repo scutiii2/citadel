@@ -576,6 +576,18 @@ in the offered catalog while that connection lists tools.
 
 Edits apply the next time Legion starts. Armory's `main` connection still uses a `url` entry.
 
+### Stronghold MCP connection
+
+The built-in `stronghold` connection discovers Stronghold's `/mcp` address through
+Treasury. A saved server with the ID `stronghold` overrides the built-in address. Citadel
+credentials go only to the Stronghold address registered in Treasury.
+Legion starts without Stronghold and retries the connection in the background.
+
+Agents need `tools.allow: ["stronghold__*"]` or a matching individual tool entry
+to see and use stack tools. Stronghold supplies the optional `chat_id` argument
+of `ask`. Legion forwards it with the signed requester as Stronghold MCP call
+metadata so the tools can select the requester's chat.
+
 ## Private extensions
 
 A private extension is a user's own MCP server, passed to `ask()` per turn by

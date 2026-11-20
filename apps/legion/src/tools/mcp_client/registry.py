@@ -25,6 +25,7 @@ from mcp import types
 from mcp.client.session import ClientSession
 from mcp.shared.exceptions import McpError
 
+from src.citadel_auth import resolved
 from src.tools.mcp_client.config import OriginRef, ServerConfig, load_servers_config
 from src.tools.mcp_client.schema import inline_refs
 from src.tools.mcp_client.transports import open_session
@@ -114,6 +115,8 @@ class McpClientRegistry:
         self._auth_by_server = {}
         self._catalog_reconnect_lock = asyncio.Lock()
         self._builtin_tasks: dict[str, asyncio.Task[None]] = {}
+        self._builtin_urls: dict[str, str | Callable[[], str]] = {}
+        self._signed_builtins: dict[str, ClientSession] = {}
         self._resolve_origin = resolve_origin
         self._active: dict[str, str] = {}
         self._down: dict[tuple[str, str], float] = {}
@@ -141,6 +144,7 @@ class McpClientRegistry:
         load_servers_config() - see its docstring. `extra_headers` go on
         every HTTP server's session, reconnects included."""
         self._configs = load_servers_config(config_path, url_overrides, builtins)
+        self._builtin_urls = {name: entry["url"] for name, entry in (builtins or {}).items()}
         self._extra_headers = dict(extra_headers or {})
         self._auth_by_server = dict(auth_by_server or {})
         for server_id, config in self._configs.items():
@@ -168,6 +172,7 @@ class McpClientRegistry:
 
         stack = self._stacks.pop(server_id, None)
         self._sessions.pop(server_id, None)
+        self._signed_builtins.pop(server_id, None)
         self._last_known_tools.pop(server_id, None)
         if stack is not None:
             await stack.aclose()
@@ -307,6 +312,18 @@ class McpClientRegistry:
             await self._drop_origin(config.id)
             await self._connect_origins(config, self._eligible_origins(config))
 
+    def _uses_builtin_url(self, config: ServerConfig) -> bool:
+        """A saved replacement may use the name without being the internal peer."""
+        if config.transport != "http" or config.url is None:
+            return False
+        trusted = self._builtin_urls[config.id]
+        if config.url is trusted:
+            return True
+        try:
+            return httpx.URL(resolved(config.url)) == httpx.URL(resolved(trusted))
+        except (KeyError, ValueError, httpx.InvalidURL):
+            return False
+
     async def _connect_one(self, server_id: str, config: ServerConfig) -> ServerStatus:
         if config.origins:
             return await self._connect_origins(config, self._eligible_origins(config) or list(config.origins))
@@ -314,6 +331,7 @@ class McpClientRegistry:
         try:
             auth = self._auth_by_server.get(server_id)
             if server_id in self._builtin_tasks:
+                auth = auth if self._uses_builtin_url(config) else None
                 opened, session, namespaced_tools = await self._open_origin(config, extra_headers=self._extra_headers, auth=auth)
             else:
                 session = await open_session(local_stack, config, CONNECT_TIMEOUT_SECONDS, self._extra_headers,
@@ -338,6 +356,8 @@ class McpClientRegistry:
         self._stacks[server_id] = opened
         self._last_known_tools[server_id] = namespaced_tools
         self._sessions[server_id] = session
+        if server_id in self._builtin_tasks and auth is not None:
+            self._signed_builtins[server_id] = session
         status = ServerStatus(
             id=server_id,
             label=config.label,
@@ -418,7 +438,9 @@ class McpClientRegistry:
                     on_progress(message)
 
             extra["progress_callback"] = progress_callback
-        if meta is not None and not origin_connection:
+        if meta is not None and not origin_connection and (
+            server_id not in self._builtin_tasks or self._signed_builtins.get(server_id) is session
+        ):
             extra["meta"] = meta
 
         async def call(on: Any) -> types.CallToolResult:
@@ -464,6 +486,7 @@ class McpClientRegistry:
             task.cancel()
         await asyncio.gather(*self._builtin_tasks.values(), return_exceptions=True)
         self._builtin_tasks.clear()
+        self._signed_builtins.clear()
         for stack in (*self._stacks.values(), *self._retired_origins.values()):
             try:
                 await stack.aclose()

@@ -12,8 +12,6 @@ import logging
 
 import httpx
 from fastapi import Depends, FastAPI, Request
-from fastapi.exception_handlers import request_validation_exception_handler
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from src.agents import routes as agents_routes
@@ -146,7 +144,9 @@ def create_app(
         app.state.dictation = DictationRelay()
         app.state.shares = ShareStore(app.state.store)
         app.state.chats = ChatStore(app.state.store, app.state.shares)
-        app.state.stacks = StackStore(app.state.store, await asyncio.to_thread(load_limits, data_settings))
+        app.state.stacks = StackStore(
+            app.state.store, await asyncio.to_thread(load_limits, data_settings), app.state.chats.generation,
+        )
         app.state.compactor = StackCompactor(app.state.stacks, app.state.agent_gateway, app.state.agents)
         app.state.pricing = Pricing(settings.pricing)
         app.state.usage = UsageService(app.state.store, settings.usage, app.state.pricing)
@@ -219,12 +219,6 @@ def create_app(
     @app.exception_handler(TicketUnavailable)
     async def tickets_down(_request: Request, _error: TicketUnavailable):
         return JSONResponse({"detail": "armory is unreachable"}, status_code=502)
-
-    @app.exception_handler(RequestValidationError)
-    async def invalid_request(request: Request, error: RequestValidationError):
-        if request.url.path.startswith("/stack/"):
-            return JSONResponse({"detail": "Invalid stack request."}, status_code=422)
-        return await request_validation_exception_handler(request, error)
 
     @app.exception_handler(DbGatewayUnavailable)
     async def storage_down(_request: Request, _error: DbGatewayUnavailable):

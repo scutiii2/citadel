@@ -112,7 +112,7 @@ def _chat_gone() -> HTTPException:
 async def _delete_stacks(request: Request, owner: str, chat_ids: list[str]) -> None:
     for chat_id in chat_ids:
         try:
-            await request.app.state.stacks.delete(owner, chat_id)
+            await request.app.state.stacks.delete(owner, chat_id, orphan_only=True)
         except Exception as error:
             logger.warning("Stack cleanup after chat deletion failed: %s", type(error).__name__)
 

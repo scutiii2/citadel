@@ -106,7 +106,7 @@ async def open_session(
             raise ConnectionError("Could not reach the MCP origin") from error
         headers = {**resolve_headers(config), **(extra_headers or {})}
         options = {"auth": auth} if auth else {}
-        if config.origins:
+        if config.origins or (config.id == "stronghold" and auth is not None):
             options["httpx_client_factory"] = partial(_origin_client, url)
         read_stream, write_stream, _get_session_id = await stack.enter_async_context(
             streamablehttp_client(url, headers=headers or None, **options)

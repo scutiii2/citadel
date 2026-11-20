@@ -15,6 +15,10 @@ from src.turns import summarization
 class CompactionError(Exception):
     """No usable summary; the stack is unchanged."""
 
+    def __init__(self, message: str, result: dict[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.result = result
+
 
 @dataclass(frozen=True)
 class CompactionOutcome:
@@ -41,11 +45,10 @@ class StackCompactor:
         return await self._stacks.view(owner, chat_id)
 
     def needs_compaction(self, view: dict[str, Any]) -> bool:
-        return bool(view.get("warn"))
+        return bool(view["warn"]) and sum(not item["pinned"] for item in view["items"]) > 1
 
     async def compact(self, owner: str, chat_id: str, caller: Caller) -> CompactionOutcome | None:
-        view = await self._stacks.view(owner, chat_id)
-        items = [item for item in view["items"] if not item["pinned"]]
+        generation, items = await self._stacks.compaction_items(owner, chat_id)
         if not items:
             return None
         agent = await self._directory.get(summarization.SUMMARIZER_AGENT_ID) if self._directory else None
@@ -59,9 +62,11 @@ class StackCompactor:
             raise CompactionError("The context summarizer did not answer.") from error
         text = result.get("response")
         if not isinstance(text, str) or not text.strip():
-            raise CompactionError("The summarizer returned an empty summary.")
+            raise CompactionError("The summarizer returned an empty summary.", result)
         try:
-            await self._stacks.apply_compaction(owner, chat_id, [item["id"] for item in items], text)
+            await self._stacks.apply_compaction(
+                owner, chat_id, [item["id"] for item in items], text, expected_generation=generation,
+            )
         except StackError as error:
-            raise CompactionError(str(error)) from error
+            raise CompactionError(str(error), result) from error
         return CompactionOutcome(replaced=len(items), results=[result])

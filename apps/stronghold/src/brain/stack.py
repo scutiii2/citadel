@@ -7,6 +7,7 @@ MCP tools, the REST routes and the turn engine cannot disagree.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 from weakref import WeakValueDictionary
@@ -40,8 +41,10 @@ def _clean(text: str) -> str:
 
 
 class StackStore:
-    def __init__(self, store: DocumentStore, limits: StackLimits) -> None:
+    def __init__(self, store: DocumentStore, limits: StackLimits,
+                 chat_generation: Callable[[str, str], Awaitable[str | None]] | None = None) -> None:
         self._store = store
+        self._chat_generation = chat_generation
         self.limits = limits
         self._locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
 
@@ -50,8 +53,14 @@ class StackStore:
         return self._locks.setdefault(key, asyncio.Lock())
 
     async def _load(self, owner: str, chat_id: str) -> dict[str, Any]:
+        generation = await self._chat_generation(owner, chat_id) if self._chat_generation else ""
+        if generation is None:
+            raise StackError(404, "No such chat.")
         doc = await self._store.get(STACKS, _key(owner, chat_id))
-        return doc or {"owner": owner, "chat_id": chat_id, "items": [], "next_id": 1, "updated_at": _now()}
+        if doc and doc.get("chat_generation") == generation:
+            return doc
+        return {"owner": owner, "chat_id": chat_id, "chat_generation": generation,
+                "items": [], "next_id": 1, "updated_at": _now()}
 
     async def _save(self, doc: dict[str, Any]) -> None:
         doc["updated_at"] = _now()
@@ -109,10 +118,16 @@ class StackStore:
             await self._save(doc)
             return item
 
-    async def apply_compaction(self, owner: str, chat_id: str, replaced_ids: list[int], text: str) -> dict[str, Any]:
+    async def compaction_items(self, owner: str, chat_id: str) -> tuple[str, list[dict[str, Any]]]:
+        doc = await self._load(owner, chat_id)
+        return doc["chat_generation"], [item for item in doc["items"] if not item["pinned"]]
+
+    async def apply_compaction(
+        self, owner: str, chat_id: str, replaced_ids: list[int], text: str, *, expected_generation: str | None = None,
+    ) -> dict[str, Any]:
         """Swap the named unpinned items for one compaction item placed first.
 
-        An item that changed meanwhile (removed, or pinned after the summary was asked for) is left alone."""
+        With a generation, discard a summary if a sampled item changed during the model call."""
         clean = _clean(text)
         if not clean:
             raise StackError(422, "The summary cannot be empty.")
@@ -122,7 +137,9 @@ class StackStore:
             doc = await self._load(owner, chat_id)
             requested = set(replaced_ids)
             doomed = {item["id"] for item in doc["items"] if item["id"] in requested and not item["pinned"]}
-            if not doomed:
+            if not doomed or (expected_generation is not None and (
+                expected_generation != doc["chat_generation"] or doomed != requested
+            )):
                 raise StackError(409, "Nothing to replace; the stack changed.")
             kept = [item for item in doc["items"] if item["id"] not in doomed]
             summary = {"id": doc["next_id"], "text": clean, "pinned": False, "source": "compaction", "at": _now()}
@@ -131,8 +148,10 @@ class StackStore:
             await self._save(doc)
             return summary
 
-    async def delete(self, owner: str, chat_id: str) -> None:
+    async def delete(self, owner: str, chat_id: str, *, orphan_only: bool = False) -> None:
         async with self._lock(_key(owner, chat_id)):
+            if orphan_only and self._chat_generation and await self._chat_generation(owner, chat_id) is not None:
+                return
             await self._store.delete(STACKS, _key(owner, chat_id))
 
     async def purge_owner(self, owner: str) -> None:

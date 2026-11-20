@@ -24,10 +24,13 @@ class StackTools:
         except StackError as error:
             return {"ok": False, "message": str(error)}
         warn = await self._warn(scope)
-        return {"ok": True, "item": item, "warn": warn, "message": "Saved." + (" " + _COMPACT if warn else "")}
+        return {"ok": True, "item": item, "warn": warn, "message": f"Saved. {_DATA}" + (" " + _COMPACT if warn else "")}
 
     async def list(self, scope: Scope) -> dict[str, Any]:
-        view = await self._stacks.view(scope.uid, scope.chat_id)
+        try:
+            view = await self._stacks.view(scope.uid, scope.chat_id)
+        except StackError as error:
+            return {"ok": False, "message": str(error)}
         if not view["items"]:
             return {"ok": True, "count": 0, "items": [], "warn": False, "message": "The short-term memory is empty."}
         return {"ok": True, "count": view["used"], "items": view["items"], "warn": view["warn"],
@@ -45,4 +48,5 @@ class StackTools:
             item = await self._stacks.pin(scope.uid, scope.chat_id, item_id, pinned)
         except StackError as error:
             return {"ok": False, "message": str(error)}
-        return {"ok": True, "item": item, "message": "Pinned." if pinned else "Unpinned."}
+        action = "Pinned." if pinned else "Unpinned."
+        return {"ok": True, "item": item, "message": f"{action} {_DATA}"}

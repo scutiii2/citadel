@@ -57,6 +57,21 @@ automatic compaction keeps the available history and continues answering. An
 existing compacted summary is also available to subsequent routing briefs.
 
 
+## Chat short-term memory
+
+These routes require login and `chat.use`. Portcullis forwards them to Stronghold,
+which checks that the signed requester owns the chat.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/chats/{id}/stack` | Read stack items and capacity |
+| `POST /api/chats/{id}/stack/items` | Add `{"text": "...", "pinned": false}` |
+| `PUT /api/chats/{id}/stack/items/{item_id}` | Set `{"pinned": true}` or unpin with `false` |
+| `DELETE /api/chats/{id}/stack/items/{item_id}` | Remove an item |
+| `POST /api/chats/{id}/stack/compact` | Compact unpinned items |
+
+Send `Content-Type: application/json` on POST requests, including compaction.
+
 ## Internal Router metadata and access
 
 `GET /api/agents` adds derived `internal_role` status metadata (not an agent-file field)

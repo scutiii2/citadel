@@ -24,6 +24,7 @@ from src.services.uid_log_filter import redact
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+_STACK_COMPACTION_TIMEOUT = httpx.Timeout(70.0, connect=10.0)
 _STREAM_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0)
 _CONNECTION_FEATURES = frozenset(("/bard/speak", "/bard/voices", "/attachments/audio",
                                   "/attachments/document", "/attachments/dictate", "/attachments/dictate/partial"))
@@ -86,6 +87,8 @@ class StrongholdForwarder:
         json: Any = None,
     ) -> ForwardedResponse:
         """One call to a fixed Stronghold path. `path` is built by the route, never by the browser."""
+        stack = path.startswith("/stack/")
+        timeout = _STACK_COMPACTION_TIMEOUT if stack and path.endswith("/compact") else _TIMEOUT
         try:
             # A purge path carries an account uid: keep it out of the traffic counters and the log.
             with self._traffic.timed("stronghold", f"{method} {redact(path)}") as timing:
@@ -95,7 +98,7 @@ class StrongholdForwarder:
                     params=params,
                     json=json,
                     headers=self._headers(account), auth=ServiceAuth(self._identity, "stronghold"),
-                    timeout=_TIMEOUT,
+                    timeout=timeout,
                     follow_redirects=False,  # the identity headers must never follow one
                 )
                 timing.ok = response.status_code < 500
@@ -104,7 +107,8 @@ class StrongholdForwarder:
             raise StrongholdUnavailable(type(error).__name__) from error
         # Tool service routes return safe 502 details, including Treasury save refusals.
         tool_service = path in _CONNECTION_FEATURES or path.startswith("/admin/tool-services/")
-        if response.status_code >= 500 and not (response.status_code == 502 and tool_service):
+        safe_error = (tool_service and response.status_code == 502) or (stack and response.status_code in {502, 503})
+        if response.status_code >= 500 and not safe_error:
             raise StrongholdUnavailable(f"stronghold answered {response.status_code}")
         return ForwardedResponse(
             response.status_code,

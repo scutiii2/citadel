@@ -40,6 +40,7 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `GET /health` | Open. `{"status": "ok"}` |
 | `GET /whoami` | Echoes the requester. Portcullis exposes it as `GET /api/stronghold/whoami` |
 | `/notes/...` | Notes, tags, tag suggestions and generation. Portcullis exposes them as `/api/notes/...` after checking `chat.use` |
+| `/stack/...` | Short-term memory for a single chat. Portcullis exposes this under `/api/chats/{id}/stack`. |
 | `/memory/...` | Assistant memory. Portcullis exposes it as `/api/memory/...` after checking `chat.use` |
 | `/tickets/...`, `/ticket-admin/...` | Tickets (Armory keeps them) and the account's read receipts (Treasury, collection `ticket_seen`). Portcullis exposes them as `/api/tickets/...` (`tickets.create`) and `/api/admin/tickets...`, `/api/admin/ticket-groups...` (`tickets.manage`) |
 | `/triage/titles`, `/triage/ask` | Option titles from the `title-writer` agent and typed questions to the Triage Assistant (Laya); both count toward the token limits. Portcullis exposes them as `/api/triage/...` after checking `chat.use` |
@@ -56,7 +57,34 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/usage/...` | Token usage and limits, kept in Treasury (collection `usage_records`). Portcullis exposes the reads as `/api/usage/...` and `/api/admin/usage/...`, and calls `POST /usage/check` and `POST /usage/records` around every agent call |
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
 | `/skills/...` | Learned skills, which Armory keeps. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
-| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `brains`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
+| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `stack`, `brains`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
+
+## MCP server
+
+Legion connects to `/mcp` over Streamable HTTP with a signed service assertion. The tools are
+`tool_stack_add`, `tool_stack_list`, `tool_stack_remove`, and `tool_stack_pin`.
+A call carries a signed requester and a `chat_id` hint. Stronghold verifies the requester
+and checks chat ownership before reading or changing the stack. Listed notes are untrusted data.
+
+## Short-term memory
+
+Each chat has a stack in Treasury. Defaults are 40 items, 500 characters per normal item,
+1,500 per compaction item, and a warning at 80% capacity. Overrides use the `brain` table
+and `stack` key in Stronghold's `settings.db`. When full, an add drops the oldest
+unpinned item. If every item is pinned, it refuses the add.
+
+The `context-summarizer` agent in Legion combines unpinned items when the next turn starts
+after a warning or when the user requests compaction. Pinned items stay in the stack.
+Deleting a chat removes its stack. Portcullis purges an account's stacks on account deletion.
+
+| Route | Purpose |
+|---|---|
+| `GET /stack/{chat_id}` | Read items, capacity, and warning status |
+| `POST /stack/{chat_id}/items` | Add text with optional pinning |
+| `PUT /stack/{chat_id}/items/{item_id}` | Set the item's pinned state |
+| `DELETE /stack/{chat_id}/items/{item_id}` | Remove an item |
+| `POST /stack/{chat_id}/compact` | Compact unpinned items |
+| `DELETE /stack/accounts/{uid}` | Purge a deleted account's stacks |
 
 ## Tool services
 

@@ -2,17 +2,42 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+from uuid import uuid4
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, Field
 
 from src.agents.gateway import Caller
 from src.brain.compaction import CompactionError
 from src.brain.stack import StackError
+from src.document_store import DbGatewayError
 from src.requester import Requester, current_requester
+from src.usage.limits import limit_reached
+from src.usage.rows import stored_rows
 
-router = APIRouter(prefix="/stack", tags=["stack"])
+
+class StackRoute(APIRoute):
+    def get_route_handler(self) -> Callable[[Request], Awaitable[Response]]:
+        handle = super().get_route_handler()
+
+        async def safe_response(request: Request) -> Response:
+            try:
+                return await handle(request)
+            except RequestValidationError:
+                raise HTTPException(422, "Invalid stack request.") from None
+            except DbGatewayError:
+                raise HTTPException(503, "Storage is unavailable") from None
+            except StackError as error:
+                raise HTTPException(error.status, str(error)) from None
+
+        return safe_response
+
+
+router = APIRouter(prefix="/stack", tags=["stack"], route_class=StackRoute)
 ChatId = Annotated[str, Path(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
 ItemId = Annotated[int, Path(gt=0)]
 
@@ -31,10 +56,6 @@ async def _own_chat(request: Request, requester: Requester, chat_id: str) -> Non
         raise HTTPException(404, "No such chat.")
 
 
-def _refuse(error: StackError) -> HTTPException:
-    return HTTPException(error.status, str(error))
-
-
 @router.delete("/accounts/{uid}", status_code=204)
 async def purge_account(request: Request, uid: Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")]) -> Response:
     await request.app.state.stacks.purge_owner(uid)
@@ -50,29 +71,20 @@ async def view(chat_id: ChatId, request: Request, requester: Requester = Depends
 @router.post("/{chat_id}/items", status_code=201)
 async def add(chat_id: ChatId, body: NewItem, request: Request, requester: Requester = Depends(current_requester)):
     await _own_chat(request, requester, chat_id)
-    try:
-        return await request.app.state.stacks.add(requester.uid, chat_id, body.text, pinned=body.pinned, source="user")
-    except StackError as error:
-        raise _refuse(error) from error
+    return await request.app.state.stacks.add(requester.uid, chat_id, body.text, pinned=body.pinned, source="user")
 
 
 @router.put("/{chat_id}/items/{item_id}")
 async def pin(chat_id: ChatId, item_id: ItemId, body: PinBody, request: Request,
               requester: Requester = Depends(current_requester)):
     await _own_chat(request, requester, chat_id)
-    try:
-        return await request.app.state.stacks.pin(requester.uid, chat_id, item_id, body.pinned)
-    except StackError as error:
-        raise _refuse(error) from error
+    return await request.app.state.stacks.pin(requester.uid, chat_id, item_id, body.pinned)
 
 
 @router.delete("/{chat_id}/items/{item_id}", status_code=204)
 async def remove(chat_id: ChatId, item_id: ItemId, request: Request, requester: Requester = Depends(current_requester)):
     await _own_chat(request, requester, chat_id)
-    try:
-        await request.app.state.stacks.remove(requester.uid, chat_id, item_id)
-    except StackError as error:
-        raise _refuse(error) from error
+    await request.app.state.stacks.remove(requester.uid, chat_id, item_id)
     return Response(status_code=204)
 
 
@@ -80,10 +92,28 @@ async def remove(chat_id: ChatId, item_id: ItemId, request: Request, requester: 
 async def compact(chat_id: ChatId, request: Request, requester: Requester = Depends(current_requester)):
     await _own_chat(request, requester, chat_id)
     caller = Caller(requester.username, requester.email, requester.uid)
+    usage = request.app.state.usage
+    block = await usage.check(requester.uid)
+    if block is not None:
+        raise limit_reached(block)
+    failure = None
+    outcome = None
     try:
         outcome = await request.app.state.compactor.compact(requester.uid, chat_id, caller)
+        results = outcome.results if outcome is not None else []
     except CompactionError as error:
-        raise HTTPException(502, str(error)) from error
+        failure = error
+        results = [error.result] if error.result is not None else []
+    request_id = uuid4().hex
+    for result in results:
+        rows = stored_rows(result)
+        if rows:
+            try:
+                await usage.record(requester.uid, request_id, "compaction", chat_id, rows)
+            except DbGatewayError:
+                pass
+    if failure is not None:
+        raise HTTPException(502, str(failure)) from None
     view_now = await request.app.state.stacks.view(requester.uid, chat_id)
     await request.app.state.platform.log_action(requester.uid, "stack.compact", "Compacted short-term memory")
     return {"compacted": outcome is not None, "replaced": outcome.replaced if outcome else 0, **view_now}

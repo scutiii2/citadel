@@ -34,10 +34,15 @@ LABEL = (
 CUT_MARK = "... (more steps omitted)"
 
 
+def is_stack_tool(name: object) -> bool:
+    return isinstance(name, str) and name.startswith("stronghold__tool_stack_")
+
+
 def _visible(steps: object) -> list[dict[str, Any]]:
     if not isinstance(steps, list):
         return []
-    return [s for s in steps if isinstance(s, dict) and s.get("tool") and s["tool"] not in SKIPPED_TOOLS]
+    return [s for s in steps if isinstance(s, dict) and s.get("tool")
+            and s["tool"] not in SKIPPED_TOOLS and not is_stack_tool(s["tool"])]
 
 
 def has_visible_steps(steps: object) -> bool:

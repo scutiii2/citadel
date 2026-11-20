@@ -11,6 +11,7 @@ from pydantic import Field
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from src.brain.stack import StackError
 from src.document_store import DbGatewayError
 from src.mcp_tools.scope import ScopeError, resolve_scope
 from src.mcp_tools.stack_tools import StackTools
@@ -51,7 +52,7 @@ def build_server(app, host: str) -> FastMCP:
         try:
             async with resolve_scope(app) as scope:
                 return await call(scope, *args)
-        except ScopeError as error:
+        except (ScopeError, StackError) as error:
             return {"ok": False, "message": str(error)}
         except DbGatewayError:
             return {"ok": False, "message": "Short-term memory storage is unavailable."}

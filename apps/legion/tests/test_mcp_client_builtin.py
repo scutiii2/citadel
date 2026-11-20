@@ -1,6 +1,8 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+
 from src.tools.mcp_client.config import load_servers_config
 from src.citadel_auth import settings_store
 
@@ -79,3 +81,91 @@ def test_a_down_builtin_does_not_delay_main_and_retries_in_the_background(tmp_pa
             await client.aclose()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("saved, trusted", [
+    ({"transport": "stdio", "command": "external"}, False),
+    ({"transport": "http", "url": "http://outside.test/mcp"}, False),
+    ({"transport": "http", "url": "http://stronghold.test/mcp"}, True),
+])
+def test_only_the_trusted_http_destination_gets_internal_credentials(tmp_path, monkeypatch, saved, trusted):
+    from src.tools.mcp_client import registry
+
+    db = tmp_path / "settings.db"
+    settings_store.put(db, "servers", "stronghold", {"label": "Saved", **saved})
+    auth = object()
+    meta = {"requester_token": "sample", "chat_id": "chat-1"}
+    applied_auth = []
+
+    class Session:
+        async def list_tools(self):
+            return SimpleNamespace(tools=[])
+
+        async def call_tool(self, name, arguments, **extra):
+            return extra.get("meta")
+
+    async def open_session(stack, config, *args, **options):
+        applied_auth.append(options.get("auth"))
+        return Session()
+
+    monkeypatch.setattr(registry, "open_session", open_session)
+
+    async def run():
+        client = registry.McpClientRegistry()
+        try:
+            await client.connect_all(db, builtins=STRONGHOLD, auth_by_server={"stronghold": auth})
+            async with asyncio.timeout(2):
+                while not any(status.status == "connected" for status in client.statuses()):
+                    await asyncio.sleep(0.01)
+            sent = await client.call_tool("stronghold__tool_stack_list", {}, meta=meta)
+            assert sent == (meta if trusted else None)
+            assert applied_auth == [auth if trusted else None]
+        finally:
+            await client.aclose()
+
+    asyncio.run(run())
+
+
+def test_stronghold_stream_rejects_cross_origin_redirects(monkeypatch):
+    from contextlib import AsyncExitStack, asynccontextmanager
+    from functools import partial
+
+    from src.tools.mcp_client import transports
+    from src.tools.mcp_client.config import validate_server
+
+    transport_options = {}
+
+    async def reachable(url, timeout):
+        pass
+
+    @asynccontextmanager
+    async def stream(url, **options):
+        transport_options.update(options)
+        yield None, None, None
+
+    class Session:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def initialize(self):
+            pass
+
+    monkeypatch.setattr(transports, "_check_tcp_reachable", reachable)
+    monkeypatch.setattr(transports, "streamablehttp_client", stream)
+    monkeypatch.setattr(transports, "ClientSession", Session)
+    config = validate_server("stronghold", STRONGHOLD["stronghold"])
+
+    async def run():
+        async with AsyncExitStack() as stack:
+            await transports.open_session(stack, config, 1, auth=object())
+
+    asyncio.run(run())
+    factory = transport_options["httpx_client_factory"]
+    assert isinstance(factory, partial) and factory.func is transports._origin_client
+    assert factory.args == ("http://stronghold.test/mcp",)
