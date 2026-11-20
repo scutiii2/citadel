@@ -20,6 +20,7 @@ export const router = createRouter({
     { path: "/analytics", name: "analytics", component: () => import("../views/AnalyticsView.vue"), meta: { permission: ANALYTICS_PERMISSIONS } },
     { path: "/tickets", name: "tickets", component: () => import("../views/TicketsAdminView.vue"), meta: { permission: "tickets.manage" } },
     { path: "/usage-settings", name: "usage-settings", component: () => import("../views/UsageSettingsView.vue"), meta: { permission: "settings.manage" } },
+    { path: "/tool-services", name: "tool-services", component: () => import("../views/ToolServicesView.vue"), meta: { permission: "extensions.manage" } },
     { path: "/login", name: "login", component: () => import("../views/LoginView.vue"), meta: { guestOnly: true } },
     { path: "/no-access", name: "no-access", component: () => import("../views/NoAccessView.vue") },
     { path: "/:pathMatch(.*)*", redirect: "/" },
