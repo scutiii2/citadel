@@ -136,7 +136,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `persona` | no | `""` | Persona text placed after the identity line in the system prompt. |
 | `instructions` | no | `""` (built-in default) | Tool-use instructions placed last in the system prompt. Empty uses `DEFAULT_INSTRUCTIONS` in `src/agents/agent_roles.py`. |
 | `focus` | no | `""` | One-line summary of what the agent is good at. Used for the orchestrator roster. Should be concrete. |
-| `tools.allow` | no | `[]` (all) | fnmatch globs on mcp_server tool names without the `main__` prefix. Empty means all tools. |
+| `tools.allow` | no | `[]` | fnmatch globs on tool names with the `main__` prefix removed. Outside MCP connection tools require a matching allow glob. |
 | `tools.deny` | no | `[]` | Globs removed after `allow`. Deny wins. |
 | `role` | yes | none | `orchestrator`, `router`, `specialist` or `architect`. Architects use a language provider, never entry, and require `tools.deny: ["*"]`; recall, learning and the plan tool must be off. The code pipeline is implemented; operations is reserved for a later phase. |
 | `mode` | orchestrator only | `legacy` | `legacy` preserves delegation and direct tools; `plan` offers only `ask_user` and `submit_plan`, with a live architect catalog. Automatic memory and skill recall remain runtime calls. |
@@ -565,6 +565,14 @@ Legion tries the listed origins in order. A connection failure or timeout puts t
 on a 30-second cooldown. A tool call that fails returns its error. The next call uses the
 backup when one is available. The MCP registry's tool listing checks whether a preferred origin has recovered
 after the cooldown. A protocol or HTTP refusal does not trigger failover.
+
+A tool from an outside MCP connection uses the name `<server-id>__<tool>`.
+Add a matching `tools.allow` glob such as `bard__*` to offer it to the agent.
+An empty allow list leaves outside connection tools hidden, and `tools.deny` still wins.
+Legion applies `enabled_extensions` only to Armory’s proxied extensions.
+Outside tools follow the normal approval policy, including in Auto mode.
+A Legion connection with the same ID takes the place of Armory’s proxied extension
+in the offered catalog while that connection lists tools.
 
 Edits apply the next time Legion starts. Armory's `main` connection still uses a `url` entry.
 

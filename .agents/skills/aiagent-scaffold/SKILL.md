@@ -53,7 +53,7 @@ agent one provider+model, all `--MCP-->` mcp_server.
    enabled files), `enabled`,
    `role` (required: `orchestrator`, `router`, `specialist`), `entry`, `llm.{provider,gateway,model,fallback_gateways,temperature,reasoning_effort,max_effort,min_tier,max_tier,max_tokens,max_tool_rounds,max_turn_tokens,max_turn_seconds}`,
    `persona`, `instructions`, `focus`, `tools.{allow,deny}` (fnmatch on tool names without the
-   `main__` prefix; empty allow = all; deny wins),
+   `main__` prefix; deny wins),
    `memory_recall` (entry agent only: loads the user's newest saved notes before
    the question), `skill_recall` (loads the user's approved skills that match the
    question; needs `tool_skill_*` allowed), `skill_learning` (proposes a skill for
@@ -62,6 +62,7 @@ agent one provider+model, all `--MCP-->` mcp_server.
    called directly, like `title-writer` and `tag-writer`) and `plan_tool`
    (`false` stops it offering `update_plan`; set it `false` on every specialist,
    the checklist is the orchestrator's). There is no `routing` block any more.
+   Legion offers a outside connection's tools to an agent only through an explicit `tools.allow` glob such as `<server-id>__*`.
    For automatic gateway failover, set `llm.fallback_gateways` to an ordered
    list of same-provider names or `{ "gateway": "openrouter", "model": "..." }`
    objects (`model` optional; default `[]`). Keep the primary in `llm.gateway`.

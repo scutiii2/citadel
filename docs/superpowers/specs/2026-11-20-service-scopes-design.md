@@ -49,6 +49,8 @@ A guard answers "may this happen?" and refuses when it cannot decide. Test: if t
 ## Tool placement
 Stronghold serves a tool, as its own MCP server, when any is true: it reads or writes data Stronghold owns; it needs the asking account's identity or Citadel permissions; it has no meaning outside Citadel. Armory serves a tool when all are true: it works on its input or an external system; it touches no Citadel user data; it is safe to expose to outside agents. A generic-sounding tool that needs Stronghold data goes to Stronghold. No exceptions (tickets moved to Stronghold). Legion connects to both.
 
+Legion offers a outside connection's tools to an agent only through an explicit `tools.allow` glob such as `<server-id>__*`.
+
 ## Brain (Stronghold)
 Replaces Armory's memory, notes and skills capabilities, Obsidian brains, and Plan 15.
 - **Brain** is the main capability. Personal, plus one **global brain**.
