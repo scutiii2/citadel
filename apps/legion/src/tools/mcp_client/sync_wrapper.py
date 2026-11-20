@@ -24,9 +24,9 @@ from src.tools.mcp_client.registry import McpClientRegistry, ServerStatus
 
 
 class SyncMcpClient:
-    def __init__(self) -> None:
+    def __init__(self, resolve_origin: Callable[[str], str] | None = None) -> None:
         self._loop = asyncio.new_event_loop()
-        self._registry = McpClientRegistry()
+        self._registry = McpClientRegistry(resolve_origin=resolve_origin)
         self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
         self._thread.start()
 

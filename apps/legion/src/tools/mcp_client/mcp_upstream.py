@@ -41,7 +41,7 @@ _PREFIX = f"{_SERVER_ID}__"
 
 _log = logging.getLogger(__name__)
 
-client = SyncMcpClient()
+client = SyncMcpClient(resolve_origin=catalog.outside_origin)
 
 # The built-in mcp_server tools (agent-facing names, "main__<tool>") that declare readOnlyHint, from
 # the last list_tools(). A new frozenset each time, so a reader never sees a half-built one.
@@ -78,7 +78,7 @@ def connect(url_override: str | None = None) -> None:
     """Saved main URLs win over the catalog; an explicit CLI override wins over both."""
     main = settings_store.read_all(_CONFIG_PATH, "servers").get(_SERVER_ID, {})
     url_overrides = {_SERVER_ID: url_override} if url_override else (
-        {_SERVER_ID: catalog.mcp_url} if not main.get("url") and main.get("transport", "http") == "http" else None)
+        {_SERVER_ID: catalog.mcp_url} if not main.get("url") and not main.get("origins") and main.get("transport", "http") == "http" else None)
     # Armory checks a signed service assertion on /mcp.
     client.connect_all(_CONFIG_PATH, url_overrides, auth_by_server={_SERVER_ID: ServiceAuth(internal_auth.keyring, "armory")})
 
