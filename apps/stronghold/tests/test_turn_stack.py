@@ -74,11 +74,12 @@ def test_the_ask_call_carries_the_chat_id(client, agent, chat_with_message, monk
     run_turn(client, chat_with_message)
 
 
-def test_stack_tool_text_is_excluded_from_chat_traces(client, agent, chat_with_message, platform, monkeypatch):
+@pytest.mark.parametrize("tool", ["stronghold__tool_stack_list", "stronghold__tool_brain_read"])
+def test_memory_tool_text_is_excluded_from_chat_traces(client, agent, chat_with_message, platform, monkeypatch, tool):
     sample = "example remembered fact"
 
     async def ask(url, caller, **kwargs):
-        await kwargs["on_event"]({"type": "step_start", "id": "1", "tool": "stronghold__tool_stack_list"})
+        await kwargs["on_event"]({"type": "step_start", "id": "1", "tool": tool})
         return {
             "response": sample,
             "agent_usage": [{"agent_id": "claude-agent", "prompt": [{"role": "user", "content": sample}]}],

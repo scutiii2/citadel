@@ -17,9 +17,15 @@ def test_other_routes_still_win_over_the_mount(client):
     assert client.put("/health").status_code == 405
 
 
-def test_the_server_offers_the_four_stack_tools(client):
-    names = {tool.name for tool in __import__("asyncio").run(client.app.state.mcp.list_tools())}
-    assert names == {"tool_stack_add", "tool_stack_list", "tool_stack_remove", "tool_stack_pin"}
+def test_the_server_offers_the_stack_and_brain_tools(client):
+    listed = __import__("asyncio").run(client.app.state.mcp.list_tools())
+    assert {tool.name for tool in listed} == {
+        "tool_stack_add", "tool_stack_list", "tool_stack_remove", "tool_stack_pin",
+        "tool_brain_search", "tool_brain_read", "tool_brain_list", "tool_brain_write", "tool_brain_update",
+    }
+    assert all(tool.description for tool in listed)
+    write = next(tool for tool in listed if tool.name == "tool_brain_write")
+    assert "Never save" in write.description
 
 
 MCP = "http://127.0.0.1:29650/mcp"
@@ -85,3 +91,22 @@ def test_signed_legion_calls_carry_verified_mcp_metadata(client, auth_stack, db_
 
 def test_portcullis_cannot_initialize_the_mcp_transport(client):
     assert rpc(client, client.auth, "initialize", INIT).status_code == 403
+
+
+def test_a_signed_legion_call_can_write_a_brain_note_without_a_chat(client, auth_stack):
+    legion = ServiceAuth(auth_stack["legion"], "stronghold")
+    started = rpc(client, legion, "initialize", INIT)
+    assert started.status_code == 200
+    headers = {"Mcp-Session-Id": started.headers["Mcp-Session-Id"]}
+    assert rpc(client, legion, "notifications/initialized", {}, headers=headers, request_id=None).status_code == 202
+    token = identity()["X-Citadel-Requester"]
+    written = rpc(client, legion, "tools/call", {
+        "name": "tool_brain_write",
+        "arguments": {"title": "A preference", "body": "Prefers oatmeal.", "tags": ["food"]},
+        "_meta": {"requester_token": token},
+    }, headers=headers)
+    note = result(written)["structuredContent"]
+    assert note["ok"] is True
+    response = client.get("/brain/search", params={"q": "oatmeal"})
+    assert response.status_code == 200
+    assert [hit["id"] for hit in response.json()["results"]] == [note["file"]["id"]]

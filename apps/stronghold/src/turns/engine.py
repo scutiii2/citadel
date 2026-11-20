@@ -32,7 +32,7 @@ from src.brain.compaction import CompactionError, StackCompactor
 from src.chats.store import ChatNotFound, ChatStore, message_time
 from src.turns import question_answers, second_brain, summarization
 from src.turns.logs import TurnLogs
-from src.turns.step_digest import is_stack_tool
+from src.turns.step_digest import is_private_memory_tool
 from src.usage.rows import stored_rows, usage_rows
 from src.usage.service import UsageService
 from src.usage.settings import Pricing, UsageSettings, with_cost
@@ -200,6 +200,7 @@ class Turn:
     # What the chat-turn log says about each agent that ran, and the prompts it got (same order).
     trace_agents: list[dict[str, Any]] = field(default_factory=list)
     trace_prompts: list[dict[str, Any]] = field(default_factory=list)
+    # Reuse the persisted stack privacy flag for long-term memory calls as well.
     stack_tool_used: bool = False
     sequence: int = 0
     events: deque = field(default_factory=lambda: deque(maxlen=EVENT_BUFFER))
@@ -583,7 +584,7 @@ class TurnRegistry:
             return
 
         async def on_event(event: dict[str, Any]) -> None:
-            if is_stack_tool(event.get("tool")):
+            if is_private_memory_tool(event.get("tool")):
                 turn.stack_tool_used = True
             if event.get("type") in (
                 "token", "token_reset", "step_start", "step_progress", "step_end", "usage",
@@ -640,7 +641,7 @@ class TurnRegistry:
 
         calls = result.get("tool_calls")
         if isinstance(calls, list) and any(
-            isinstance(call, dict) and is_stack_tool(call.get("name")) for call in calls
+            isinstance(call, dict) and is_private_memory_tool(call.get("name")) for call in calls
         ):
             turn.stack_tool_used = True
 

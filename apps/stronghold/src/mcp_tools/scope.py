@@ -1,4 +1,4 @@
-"""Who a Stronghold MCP tool call is for: the signed requester plus a chat id the account owns."""
+"""Who a Stronghold MCP tool call is for: the signed requester, plus (for short-term memory) a chat id the account owns."""
 
 from __future__ import annotations
 
@@ -12,13 +12,18 @@ _CHAT_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 class ScopeError(Exception):
-    """The call cannot be tied to one account's chat; the tool answers with this message."""
+    """The call cannot be tied to one account (and chat); the tool answers with this message."""
 
 
 @dataclass(frozen=True)
 class Scope:
     uid: str
     chat_id: str
+
+
+@dataclass(frozen=True)
+class Account:
+    uid: str
 
 
 def _request_context():
@@ -30,8 +35,8 @@ def _request_context():
         return None
 
 
-@asynccontextmanager
-async def resolve_scope(app):
+def _credentials():
+    """Read the signed requester token and metadata from Legion's call."""
     context = _request_context()
     if context is None:
         raise ScopeError("No request context.")
@@ -42,15 +47,35 @@ async def resolve_scope(app):
     token = extras.get("requester_token", header_token)
     if not isinstance(token, str) or not token:
         raise ScopeError("No signed requester.")
-    chat_id = extras.get("chat_id")
-    if not isinstance(chat_id, str) or not _CHAT_ID.fullmatch(chat_id):
-        raise ScopeError("This call is not tied to a chat.")
+    return caller, token, extras
+
+
+@asynccontextmanager
+async def _verified(app, caller, token):
     try:
         async with requester_context(app.state.keyring, caller, token, "stronghold") as who:
             if who is None:
                 raise ScopeError("No signed requester.")
-            if not await app.state.chats.exists(who.uid, chat_id):
-                raise ScopeError("This chat does not belong to the asking account.")
-            yield Scope(who.uid, chat_id)
+            yield who
     except AuthError:
         raise ScopeError("The requester could not be verified.") from None
+
+
+@asynccontextmanager
+async def resolve_scope(app):
+    caller, token, extras = _credentials()
+    chat_id = extras.get("chat_id")
+    if not isinstance(chat_id, str) or not _CHAT_ID.fullmatch(chat_id):
+        raise ScopeError("This call is not tied to a chat.")
+    async with _verified(app, caller, token) as who:
+        if not await app.state.chats.exists(who.uid, chat_id):
+            raise ScopeError("This chat does not belong to the asking account.")
+        yield Scope(who.uid, chat_id)
+
+
+@asynccontextmanager
+async def resolve_account(app):
+    """For account-wide tools (long-term memory): the verified account, no chat id needed."""
+    caller, token, _extras = _credentials()
+    async with _verified(app, caller, token) as who:
+        yield Account(who.uid)
