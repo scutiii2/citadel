@@ -54,6 +54,10 @@ class FileChange(BaseModel):
     expected_revision: int | None = Field(default=None, ge=1)
 
 
+class RevertFile(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
+
+
 def row(record: Record) -> dict[str, Any]:
     """A file without its body (list and search rows)."""
     return {
@@ -115,8 +119,10 @@ async def delete_file(file_id: FileId, request: Request, requester: Requester = 
 
 
 @router.post("/files/{file_id}/revert")
-async def revert_file(file_id: FileId, request: Request, requester: Requester = Depends(current_requester)):
-    return full(await _files(request).revert(requester.uid, file_id))
+async def revert_file(file_id: FileId, request: Request, body: RevertFile | None = None,
+                      requester: Requester = Depends(current_requester)):
+    revision = body.expected_revision if body is not None else None
+    return full(await _files(request).revert(requester.uid, file_id, expected_revision=revision))
 
 
 @router.get("/search")

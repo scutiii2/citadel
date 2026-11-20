@@ -88,6 +88,7 @@ class StrongholdForwarder:
     ) -> ForwardedResponse:
         """One call to a fixed Stronghold path. `path` is built by the route, never by the browser."""
         stack = path.startswith("/stack/")
+        brain = path.startswith("/brain/") or path == "/admin/brain-settings"
         timeout = _STACK_COMPACTION_TIMEOUT if stack and path.endswith("/compact") else _TIMEOUT
         try:
             # A purge path carries an account uid: keep it out of the traffic counters and the log.
@@ -107,7 +108,7 @@ class StrongholdForwarder:
             raise StrongholdUnavailable(type(error).__name__) from error
         # Tool service routes return safe 502 details, including Treasury save refusals.
         tool_service = path in _CONNECTION_FEATURES or path.startswith("/admin/tool-services/")
-        safe_error = (tool_service and response.status_code == 502) or (stack and response.status_code in {502, 503})
+        safe_error = (tool_service and response.status_code == 502) or ((stack or brain) and response.status_code in {502, 503})
         if response.status_code >= 500 and not safe_error:
             raise StrongholdUnavailable(f"stronghold answered {response.status_code}")
         return ForwardedResponse(

@@ -61,7 +61,8 @@ def test_an_agent_written_file_warns_and_a_user_edit_can_be_reverted(client):
     assert shown["source"] == "automatic" and "break the agent" in shown["warning"]
     edited = client.put(f"/brain/files/{made.id}", json={"body": "user fix"}).json()
     assert edited["edited"] is True
-    back = client.post(f"/brain/files/{made.id}/revert")
+    assert client.post(f"/brain/files/{made.id}/revert", json={"expected_revision": 1}).status_code == 412
+    back = client.post(f"/brain/files/{made.id}/revert", json={"expected_revision": edited["revision"]})
     assert back.status_code == 200 and back.json()["body"] == "from the agent" and back.json()["edited"] is False
     assert client.post(f"/brain/files/{made.id}/revert").status_code == 409
 
@@ -117,6 +118,7 @@ def test_health_survives_a_brain_root_that_cannot_hold_files(make_client, monkey
     assert client.get("/health").status_code == 200
     assert client.get("/brain/files").status_code == 503
     assert client.post("/brain/files", json={"title": "a", "body": "b"}).status_code == 503
+    assert client.delete("/brain/accounts/u-1").status_code == 503
 
 
 def test_brain_query_text_is_removed_from_access_logs(client):

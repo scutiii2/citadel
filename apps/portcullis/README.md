@@ -72,6 +72,12 @@ which checks that the signed requester owns the chat.
 
 Send `Content-Type: application/json` on POST requests, including compaction.
 
+## Long-term memory (Brain)
+
+Accounts with `chat.use` can list and create files at `/api/brain/files`, read, update and delete an individual file at `/api/brain/files/{id}`, and revert an edit with `POST /api/brain/files/{id}/revert`. `GET /api/brain/search` accepts `q` and optional `limit`. `GET /api/brain/summary` shows disk usage and limits.
+
+Staff with `settings.manage` can read and update limits at `/api/admin/stronghold-brain-settings`. On account deletion, Portcullis asks Stronghold to purge the account’s long-term memory and logs any unconfirmed purge.
+
 ## Internal Router metadata and access
 
 `GET /api/agents` adds derived `internal_role` status metadata (not an agent-file field)

@@ -259,3 +259,58 @@ async def test_a_failed_move_preserves_the_original_location(files, monkeypatch)
         await files.update(U1, record.id, folder="new")
     assert await files.get(U1, record.id) == record
     assert not list((home(files) / "new").glob("*.md"))
+
+
+async def test_revert_copy_counts_toward_the_byte_quota(files):
+    from dataclasses import replace
+
+    written = await files.create(U1, title="automatic", body="x" * 100, actor="agent")
+    initial_size = (await files.summary(U1))["bytes"]
+    files.limits = replace(files.limits, max_total_bytes=initial_size + 10)
+    await refused(files.update(U1, written.id, body="y" * 100), 409)
+
+    files.limits = replace(files.limits, max_total_bytes=initial_size * 3)
+    await files.update(U1, written.id, body="y" * 100)
+    assert (await files.summary(U1))["bytes"] == sum(path.stat().st_size for path in home(files).rglob("*.md"))
+    await files.revert(U1, written.id)
+    assert (await files.summary(U1))["bytes"] == next(home(files).glob("*.md")).stat().st_size
+
+
+async def test_create_never_replaces_a_file_on_a_filename_collision(files, monkeypatch):
+    from uuid import UUID
+
+    from src.brain import files as module
+
+    generated = iter([UUID(hex="a" * 32), UUID(hex="a" * 8 + "b" * 24)])
+    monkeypatch.setattr(module.uuid, "uuid4", lambda: next(generated))
+    first = await files.create(U1, title="same", body="original")
+    await refused(files.create(U1, title="same", body="replacement"), 409)
+    assert await files.get(U1, first.id) == first
+
+
+async def test_deleted_accounts_cannot_be_recreated_by_an_in_flight_agent(files):
+    await files.create(U1, title="first", body="x")
+    await files.purge(U1)
+    await refused(files.create(U1, title="late", body="x", actor="agent"), 404)
+    assert not home(files).exists()
+
+
+async def test_delete_can_retry_when_the_original_could_not_be_removed(files, monkeypatch):
+    from src.brain import files as module
+
+    record = await files.create(U1, title="automatic", body="initial", actor="agent")
+    await files.update(U1, record.id, body="edited")
+    original = home(files) / ".originals" / f"{record.id}.md"
+    remove = module._remove
+
+    def fail_to_remove_original(root, account, path):
+        if path == original:
+            raise PermissionError("blocked")
+        remove(root, account, path)
+
+    with monkeypatch.context() as blocked:
+        blocked.setattr(module, "_remove", fail_to_remove_original)
+        with pytest.raises(PermissionError):
+            await files.delete(U1, record.id)
+    await files.delete(U1, record.id)
+    assert not original.exists()

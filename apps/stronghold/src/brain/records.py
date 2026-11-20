@@ -20,6 +20,7 @@ import json
 import ntpath
 import re
 from dataclasses import dataclass
+from pathlib import PureWindowsPath
 
 from src.notes.store import normalize_tags
 
@@ -52,6 +53,12 @@ class Record:
     updated_at: str = ""
 
 
+def reserved_name(name: str) -> bool:
+    """Use the Windows filename rules on every platform, including Python 3.12."""
+    check = getattr(ntpath, "isreserved", None)
+    return check(name) if check is not None else PureWindowsPath(name).is_reserved()
+
+
 def clean_folder(raw: str) -> str:
     """Normalize up to three relative folder segments inside an account."""
     text = raw.strip()
@@ -62,7 +69,7 @@ def clean_folder(raw: str) -> str:
         return ""
     segments = text.split("/")
     if len(segments) > MAX_DEPTH or not all(
-        _SEGMENT.fullmatch(part) and not ntpath.isreserved(part) for part in segments
+        _SEGMENT.fullmatch(part) and not reserved_name(part) for part in segments
     ):
         raise RecordError(f"A folder is up to {MAX_DEPTH} levels of lowercase letters, digits, - and _ (40 characters each).")
     return "/".join(segments)

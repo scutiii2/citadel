@@ -308,7 +308,8 @@ async def delete_account(
     # These domains live in Stronghold. Best effort: the account is already gone.
     for domain, what in (("memory", "Memory notes"), ("notes", "Notes"),
                          ("skills", "Skills"), ("templates", "Templates"), ("usage", "Usage"), ("tickets", "Tickets"), ("shares", "Share links"),
-                         ("tuning", "Response limits"), ("chats", "Chats and folders"), ("stack", "Short-term memory"), ("brains", "Brain connections"),
+                         ("tuning", "Response limits"), ("chats", "Chats and folders"), ("stack", "Short-term memory"),
+                         ("brain", "Long-term memory"), ("brains", "Brain connections"),
                          ("account-agents", "Switched-off agents"), ("user-extensions", "Private extensions"),
                          ("turns", "Running answers")):
         try:

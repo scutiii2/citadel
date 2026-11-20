@@ -33,6 +33,7 @@ from src.routes import (
     admin_treasury,
     attachments,
     bard,
+    brain_files,
     capability_files,
     internal as internal_routes,
     auth,
@@ -49,6 +50,7 @@ from src.routes import (
     notes,
     server_info,
     app_policy_routes,
+    stronghold_brain_settings,
     stronghold_usage_settings,
     settings as settings_routes,
     shares,
@@ -227,11 +229,13 @@ def create_app(
     app.include_router(agent_admin.router)
     app.include_router(app_policy_routes.router)
     app.include_router(stronghold_usage_settings.router)
+    app.include_router(stronghold_brain_settings.router)
     app.include_router(agent_admin.prompts_router)
     app.include_router(admin_tuning.router)
     app.include_router(admin_treasury.router)
     app.include_router(chats.router)
     app.include_router(stack.router)
+    app.include_router(brain_files.router)
     app.include_router(chat_folders.router)
     app.include_router(templates.router)
     app.include_router(nav_preferences.router)

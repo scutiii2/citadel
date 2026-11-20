@@ -86,6 +86,39 @@ Deleting a chat removes its stack. Portcullis purges an account's stacks on acco
 | `POST /stack/{chat_id}/compact` | Compact unpinned items |
 | `DELETE /stack/accounts/{uid}` | Purge a deleted account's stacks |
 
+## Long-term memory (Brain)
+
+Stronghold stores one account’s notes under `<root>/accounts/<uid>/[folder/]<slug>-<id8>.md`. Folders can be up to three levels deep. Each file has a header between `---` lines with one JSON value per `key: value` line, followed by a blank line and the Markdown body. The account folder identifies the owner. Records carry an id, title, tags, source, last editor, edit permission, edited flag, revision, and creation and update timestamps. A headerless Markdown file dropped into an account folder is adopted as a manual note.
+
+For automatic notes, the first user edit to the title, body or tags saves a revert copy in `.originals/<id>.md`. Automatic notes return an editing warning. Agents can read every note in their account. They can edit automatic notes and manual notes the user marks `agent_editable`. Only users can move or delete notes or change that flag.
+
+Legion calls `tool_brain_search`, `tool_brain_read`, `tool_brain_list`, `tool_brain_write`, and `tool_brain_update` through signed `/mcp` requests. Each call needs a verified requester. Search uses BM25 over titles, tags and Markdown bodies. Stronghold creates the folder on first write.
+
+| Method and path | Input | Result |
+|---|---|---|
+| `GET /brain/files` | Optional `folder` | File summaries and folders |
+| `POST /brain/files` | `title` with optional `body`, `tags`, `folder` | Created file |
+| `GET /brain/files/{id}` | File id | File and Markdown body |
+| `PUT /brain/files/{id}` | Changed fields and optional `expected_revision` | Updated file |
+| `DELETE /brain/files/{id}` | File id | 204 |
+| `POST /brain/files/{id}/revert` | File id and optional `expected_revision` in the request body | Restored file |
+| `GET /brain/search` | `q` and optional `limit` | Ranked summaries and snippets |
+| `GET /brain/summary` | | File count, bytes including revert copies, skipped files, and current quota |
+| `DELETE /brain/accounts/{uid}` | Deleted account uid from Portcullis | 204 |
+
+`GET /admin/brain-settings` returns active limits, ranges and the root. `PUT /admin/brain-settings` applies limit changes live. The `brain` table in `settings.db` stores `long_term`, `stack`, and `root`. Stronghold chooses the root at startup from `STRONGHOLD_BRAIN_ROOT`, then the saved `root`, then `<data dir>/brain`.
+
+| Section | Setting | Default | Accepted range |
+|---|---|---:|---:|
+| `long_term` | `max_record_chars` | 20,000 | 200–100,000 |
+| `long_term` | `max_files` | 500 | 1–5,000 |
+| `long_term` | `max_total_bytes` | 5,000,000 | 10,000–100,000,000 |
+| `long_term` | `search_limit` | 8 | 1–30 |
+| `stack` | `max_items` | 40 | 2–200 |
+| `stack` | `max_item_chars` | 500 | 20–2,000 |
+| `stack` | `compact_item_chars` | 1,500 | 100–6,000 |
+| `stack` | `warn_ratio` | 0.8 | 0.3–0.95 |
+
 ## Tool services
 
 Stronghold calls Bard for speech, Scribe for dictation and audio attachments, and Reader for document attachments. Configure these three services in **Stronghold Admin → Tool services**. Stronghold stores one record per service in its `settings.db` table `tool_services`. A record holds `enabled`, a Treasury `service_id`, an ordered list of `{origin_id, header_value?}` references, and a parent `token`. Treasury stores the addresses and lists Stronghold in `used_by`. Admin responses expose token-presence flags. Each request sends `X-Internal-Token` only to its selected origin, using that origin's override when present.

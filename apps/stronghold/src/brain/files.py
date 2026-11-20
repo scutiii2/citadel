@@ -12,7 +12,6 @@ if several Stronghold processes ever share it).
 from __future__ import annotations
 
 import asyncio
-import ntpath
 import os
 import re
 import shutil
@@ -27,13 +26,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from src.brain.limits import LONG_TERM_RANGES, LongTermLimits
-from src.brain.records import EDITORS, TITLE_MAX, Record, RecordError, clean_folder, parse, path_id, render, slug
+from src.brain.records import EDITORS, TITLE_MAX, Record, RecordError, clean_folder, parse, path_id, render, reserved_name, slug
 from src.brain.search import Bm25Index, make_snippet
 from src.clock import utcnow
 from src.notes.store import normalize_tags
 
 ORIGINALS = ".originals"
 _UID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+_ORIGINAL = re.compile(r"[0-9a-f]{32}\.md")
+_MAX_STORED_BYTES = LONG_TERM_RANGES["max_record_chars"][1] * 4 + 4096
 
 
 class BrainError(Exception):
@@ -62,6 +63,8 @@ class _Account:
     def __init__(self) -> None:
         self.lock = asyncio.Lock()
         self.entries: dict[str, _Entry] = {}
+        self.original_sizes: dict[str, int] = {}
+        self.purged = False
         self.loaded_at: float | None = None
         self.skipped = 0
         self.index: Bm25Index | None = None
@@ -94,23 +97,51 @@ def _walk_error(error: OSError) -> None:
     raise error
 
 
-def _scan(root: Path, home: Path, max_bytes: int) -> tuple[dict[str, _Entry], int]:
-    entries: dict[str, _Entry] = {}
-    skipped = 0
+def _has_home(root: Path, home: Path) -> bool:
     _confine(root, home, home)
     try:
         if not stat.S_ISDIR(root.stat().st_mode) or not stat.S_ISDIR(home.stat().st_mode):
             raise NotADirectoryError
     except FileNotFoundError:
-        return entries, 0
+        # A new folder is normal. An unavailable drive or UNC share is a storage error.
+        Path(root.absolute().anchor).stat()
+        return False
+    return True
+
+
+def _original_sizes(home: Path) -> dict[str, int]:
+    folder = home / ORIGINALS
+    sizes: dict[str, int] = {}
+    if not _inside(home, folder) or folder.is_symlink():
+        return sizes
+    try:
+        with os.scandir(folder) as children:
+            for child in children:
+                if _ORIGINAL.fullmatch(child.name) and _inside(home, Path(child.path)):
+                    info = child.stat(follow_symlinks=False)
+                    if stat.S_ISREG(info.st_mode):
+                        sizes[child.name.removesuffix(".md")] = info.st_size
+    except FileNotFoundError:
+        pass
+    return sizes
+
+
+def _scan(root: Path, home: Path) -> tuple[dict[str, _Entry], dict[str, int], int]:
+    entries: dict[str, _Entry] = {}
+    skipped = 0
+    if not _has_home(root, home):
+        return entries, {}, 0
     for current, dirs, names in os.walk(home, followlinks=False, onerror=_walk_error):
+        directory = Path(current)
+        resolved = directory.resolve()
+        # Compare resolved locations to skip Windows junctions and aliases on Python 3.11 too.
         dirs[:] = sorted(
             name for name in dirs
             if not name.startswith(".")
-            and not (Path(current) / name).is_symlink()
-            and not (Path(current) / name).is_junction()
+            and not (directory / name).is_symlink()
+            and (directory / name).resolve() == resolved / name
         )
-        relative = Path(current).relative_to(home).as_posix()
+        relative = directory.relative_to(home).as_posix()
         try:
             folder = clean_folder("" if relative == "." else relative)
         except RecordError:
@@ -118,13 +149,13 @@ def _scan(root: Path, home: Path, max_bytes: int) -> tuple[dict[str, _Entry], in
             dirs[:] = []
             continue
         for name in sorted(names):
-            path = Path(current) / name
+            path = directory / name
             if not name.endswith(".md") or name.startswith(".") or path.is_symlink():
                 continue
             try:
                 _confine(root, home, path)
                 info = path.stat()
-                if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
+                if not stat.S_ISREG(info.st_mode) or info.st_size > _MAX_STORED_BYTES:
                     raise RecordError("too large")
                 record = parse(path.read_text(encoding="utf-8"), folder=folder, fallback_id=path_id(f"{folder}/{name}"),
                                fallback_title=path.stem, fallback_time=_stamp(info.st_mtime))
@@ -135,7 +166,7 @@ def _scan(root: Path, home: Path, max_bytes: int) -> tuple[dict[str, _Entry], in
                 skipped += 1
                 continue
             entries[record.id] = _Entry(record, path, info.st_size)
-    return entries, skipped
+    return entries, _original_sizes(home), skipped
 
 
 def _write(root: Path, home: Path, path: Path, text: str) -> None:
@@ -151,6 +182,13 @@ def _write(root: Path, home: Path, path: Path, text: str) -> None:
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def _create_record(root: Path, home: Path, path: Path, text: str) -> None:
+    _confine(root, home, path)
+    if os.path.lexists(path):
+        raise BrainError(409, "A file already exists at that location.")
+    _write(root, home, path, text)
 
 
 def _remove(root: Path, home: Path, path: Path) -> None:
@@ -191,22 +229,38 @@ def _save_change(root: Path, home: Path, previous: Path, target: Path, text: str
 def _read_original(root: Path, home: Path, path: Path, record: Record) -> Record:
     _confine(root, home, path)
     try:
+        info = path.stat()
+        if not stat.S_ISREG(info.st_mode) or info.st_size > _MAX_STORED_BYTES:
+            raise BrainError(409, "The original cannot be read.")
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
         raise BrainError(409, "There is nothing to revert.") from None
     except UnicodeError:
         raise BrainError(409, "The original cannot be read.") from None
     try:
-        return parse(text, folder=record.folder, fallback_id=record.id,
-                     fallback_title=record.title, fallback_time=record.updated_at)
+        original = parse(text, folder=record.folder, fallback_id=record.id,
+                         fallback_title=record.title, fallback_time=record.updated_at)
     except RecordError:
         raise BrainError(409, "The original cannot be read.") from None
+    if original.id != record.id:
+        raise BrainError(409, "The original cannot be read.")
+    return original
+
+
+def _delete_record(root: Path, home: Path, active: Path | None, original: Path) -> None:
+    _confine(root, home, original)
+    if active is not None:
+        _remove(root, home, active)
+    _remove(root, home, original)
 
 
 def _purge(root: Path, home: Path) -> None:
-    _confine(root, home, home)
-    if os.path.lexists(home):
+    if _has_home(root, home):
         shutil.rmtree(home)
+
+
+def _used_bytes(account: _Account) -> int:
+    return sum(entry.size for entry in account.entries.values()) + sum(account.original_sizes.values())
 
 
 def _entry(account: _Account, file_id: object) -> _Entry:
@@ -226,7 +280,7 @@ class BrainFiles:
         self._accounts: dict[str, _Account] = {}
 
     def _home(self, uid: object) -> Path:
-        if not isinstance(uid, str) or not _UID.fullmatch(uid) or ntpath.isreserved(uid):
+        if not isinstance(uid, str) or not _UID.fullmatch(uid) or reserved_name(uid):
             raise BrainError(400, "Invalid account.")
         return self._root / "accounts" / uid
 
@@ -236,8 +290,9 @@ class BrainFiles:
         account = self._accounts.setdefault(uid, _Account())
         async with account.lock:
             now = self._monotonic()
-            if account.loaded_at is None or now - account.loaded_at >= self._refresh:
-                account.entries, account.skipped = await asyncio.to_thread(_scan, self._root, home, LONG_TERM_RANGES["max_record_chars"][1] * 4 + 4096)
+            if not account.purged and (account.loaded_at is None or now - account.loaded_at >= self._refresh):
+                scanned = await asyncio.to_thread(_scan, self._root, home)
+                account.entries, account.original_sizes, account.skipped = scanned
                 account.loaded_at, account.index = now, None
             yield home, account
 
@@ -272,7 +327,7 @@ class BrainFiles:
     def _room(self, account: _Account, extra_bytes: int, new_file: bool) -> None:
         if new_file and len(account.entries) >= self.limits.max_files:
             raise BrainError(409, f"You have reached the limit of {self.limits.max_files} files.")
-        if sum(entry.size for entry in account.entries.values()) + extra_bytes > self.limits.max_total_bytes:
+        if extra_bytes > 0 and _used_bytes(account) + extra_bytes > self.limits.max_total_bytes:
             raise BrainError(409, "Your long-term memory is full.")
 
     async def list(self, uid: str, folder: str | None = None) -> list[Record]:
@@ -314,14 +369,18 @@ class BrainFiles:
             raise BrainError(400, "Unknown editor.")
         title, body, tag_tuple, folder = self._check(title, body, tags, folder)
         async with self._open(uid) as (home, account):
+            if account.purged:
+                raise BrainError(404, "No such account.")
             now = _now()
             record = Record(uuid.uuid4().hex, title, body, folder, tag_tuple, "manual" if actor == "user" else "automatic",
                             actor, False, False, 1, now, now)
             text = render(record)
             size = len(text.encode("utf-8"))
             self._room(account, size, True)
+            if record.id in account.entries or record.id in account.original_sizes:
+                raise BrainError(409, "A file already exists with that id.")
             path = home / folder / f"{slug(title)}-{record.id[:8]}.md"
-            await self._mutate(account, _write, self._root, home, path, text)
+            await self._mutate(account, _create_record, self._root, home, path, text)
             account.entries[record.id] = _Entry(record, path, size)
             account.index = None
             return record
@@ -355,18 +414,24 @@ class BrainFiles:
                 revision=old.revision + 1, updated_at=_now())
             text = render(record)
             size = len(text.encode("utf-8"))
-            self._room(account, size - entry.size, False)
-            path = entry.path if new_folder == old.folder else home / new_folder / entry.path.name
             original = (home / ORIGINALS / f"{old.id}.md", render(old)) if keep_original else None
+            original_size = len(original[1].encode("utf-8")) if original is not None else 0
+            original_delta = original_size - account.original_sizes.get(old.id, 0) if original is not None else 0
+            self._room(account, size - entry.size + original_delta, False)
+            path = entry.path if new_folder == old.folder else home / new_folder / entry.path.name
             await self._mutate(account, _save_change, self._root, home, entry.path, path, text, original)
+            if original is not None:
+                account.original_sizes[old.id] = original_size
             account.entries[record.id] = _Entry(record, path, size)
             account.index = None
             return record
 
-    async def revert(self, uid: str, file_id: str) -> Record:
+    async def revert(self, uid: str, file_id: str, *, expected_revision: int | None = None) -> Record:
         async with self._open(uid) as (home, account):
             entry = _entry(account, file_id)
             old = entry.record
+            if expected_revision is not None and expected_revision != old.revision:
+                raise BrainError(412, "This file changed since you opened it.")
             original_path = home / ORIGINALS / f"{old.id}.md"
             if not old.edited:
                 raise BrainError(409, "There is nothing to revert.")
@@ -375,24 +440,29 @@ class BrainFiles:
                              last_editor=original.last_editor, revision=old.revision + 1, updated_at=_now())
             text = render(record)
             size = len(text.encode("utf-8"))
-            self._room(account, size - entry.size, False)
+            self._room(account, size - entry.size - account.original_sizes.get(old.id, 0), False)
             await self._mutate(account, _write, self._root, home, entry.path, text)
             await self._mutate(account, _remove, self._root, home, original_path)
+            account.original_sizes.pop(old.id, None)
             account.entries[record.id] = _Entry(record, entry.path, size)
             account.index = None
             return record
 
     async def delete(self, uid: str, file_id: str) -> None:
         async with self._open(uid) as (home, account):
-            entry = _entry(account, file_id)
-            await self._mutate(account, _remove, self._root, home, entry.path)
-            await self._mutate(account, _remove, self._root, home, home / ORIGINALS / f"{entry.record.id}.md")
-            del account.entries[file_id]
+            entry = account.entries.get(file_id)
+            if entry is None and file_id not in account.original_sizes:
+                raise BrainError(404, "No such file.")
+            active = entry.path if entry is not None else None
+            original = home / ORIGINALS / f"{file_id}.md"
+            await self._mutate(account, _delete_record, self._root, home, active, original)
+            account.entries.pop(file_id, None)
+            account.original_sizes.pop(file_id, None)
             account.index = None
 
     async def summary(self, uid: str) -> dict[str, int]:
         async with self._open(uid) as (_, account):
-            return {"files": len(account.entries), "bytes": sum(e.size for e in account.entries.values()),
+            return {"files": len(account.entries), "bytes": _used_bytes(account),
                     "skipped": account.skipped, "max_files": self.limits.max_files,
                     "max_total_bytes": self.limits.max_total_bytes, "max_record_chars": self.limits.max_record_chars}
 
@@ -400,5 +470,9 @@ class BrainFiles:
         home = self._home(uid)
         account = self._accounts.setdefault(uid, _Account())
         async with account.lock:
+            # In-flight agents may still carry a signed requester for the deleted uid.
+            account.purged = True
+            account.entries.clear()
+            account.original_sizes.clear()
+            account.loaded_at, account.index, account.skipped = None, None, 0
             await self._mutate(account, _purge, self._root, home)
-            account.entries, account.loaded_at, account.index = {}, None, None

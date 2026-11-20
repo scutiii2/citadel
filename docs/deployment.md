@@ -241,7 +241,7 @@ Legion's Anthropic-protocol and OpenAI-protocol agents call their models through
 
 ## Stronghold
 
-Portcullis calls Stronghold's product routes. Legion connects to Stronghold's signed `/mcp` endpoint for short-term memory.
+Portcullis calls Stronghold's product routes. Legion connects to Stronghold's signed `/mcp` endpoint for short- and long-term memory.
 
 - **Storage**: Treasury, connection `stronghold` (`stronghold.db` in `.data/treasury/`). the `stronghold` connection is built in; Stronghold registers its own instance.
 - **Keys**: `.data/stronghold/keys.json` is made on first start. It holds the key that encrypts saved calendar links and the web push key pair. Back the folder up. Without the file, saved links must be entered again and browsers must subscribe to push again.
@@ -250,6 +250,8 @@ Portcullis calls Stronghold's product routes. Legion connects to Stronghold's si
 - Stronghold reads Legion's agent registry from `.data/legion/` (mounted read-only) and calls Armory for the assistant memory.
 - **Token limits and prices**: `usage.six_hour_token_limit`, `usage.weekly_token_limit` and the `pricing` block are in `docker/configs/stronghold/app.json` (Stronghold keeps usage). A limit set in Portcullis's config is ignored.
 - Stronghold calls Portcullis's `/internal` routes with signed service assertions (account standing, admin switches, email, Errors log). Its address comes from Treasury’s catalog.
+
+Stronghold keeps long-term memory as plain Markdown on the `.data/stronghold` volume by default (`/data/brain` in the container). Include this folder and its `.originals` subfolders in backups. To move the folder, mount a writable volume, set `STRONGHOLD_BRAIN_ROOT` to its path and restart Stronghold. The live brain settings cap the bytes used by managed files and their revert copies in each account.
 
 ### Short-term memory rollout
 

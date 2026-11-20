@@ -17,11 +17,16 @@ def redact(text: str) -> str:
     return _UID_IN_PATH.sub(r"[redacted]", text)
 
 
+_BRAIN_QUERY = re.compile(r'(/brain/[^?\s"]*)\?[^\s"]*')
+
+
 class UidLogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         def redact(value):
             text = str(value)
-            return _UID_IN_PATH.sub(r"\1[redacted]", text) if "/owners/" in text or "/accounts/" in text else value
+            redacted = _UID_IN_PATH.sub(r"\1[redacted]", text)
+            redacted = _BRAIN_QUERY.sub(r"\1?[redacted]", redacted)
+            return redacted if redacted != text else value
 
         record.msg = redact(record.msg)
         if isinstance(record.args, tuple):
