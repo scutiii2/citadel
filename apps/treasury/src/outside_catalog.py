@@ -187,3 +187,15 @@ def delete_group(db: Path, service_id: str, confirm: bool = False) -> None:
             if u["service_id"] == service_id:
                 _delete(connection, USERS_TABLE, key)
         _delete(connection, GROUPS_TABLE, service_id)
+
+
+def lookup(db: Path, address: object) -> dict:
+    """Is this address's origin in the catalog? Read only: nothing is recorded."""
+    origin, path = split_origin(address)
+    with _transaction(db) as connection:
+        groups, origins, users = _state(connection)
+    for origin_id, row in origins.items():
+        if row["origin"] == origin:
+            return {"found": True, "origin": origin, "path": path, "origin_id": origin_id,
+                    "group": _row(row["service_id"], groups, origins, users)}
+    return {"found": False, "origin": origin, "path": path, "origin_id": None, "group": None}

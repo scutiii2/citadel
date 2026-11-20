@@ -61,6 +61,10 @@ class OutsideBody(BaseModel):
 
 
 
+class LookupBody(BaseModel):
+    address: str
+
+
 class RenameBody(BaseModel):
     name: str
 
@@ -217,6 +221,16 @@ def create_app(manager: InstanceManager, keyring: Keyring | None = None, setting
             raise HTTPException(409, "this Treasury keeps no settings database")
         try:
             return await asyncio.to_thread(outside_catalog.add_origin, settings_db, body.origin, body.name, caller.name)
+        except outside_catalog.OutsideCatalogError as error:
+            raise HTTPException(400, str(error)) from error
+
+    @app.post("/outside/lookup")
+    async def lookup_outside(body: LookupBody) -> dict[str, Any]:
+        """Which group an address belongs to, for a consumer form. Records nothing."""
+        if settings_db is None:
+            raise HTTPException(409, "this Treasury keeps no settings database")
+        try:
+            return await asyncio.to_thread(outside_catalog.lookup, settings_db, body.address)
         except outside_catalog.OutsideCatalogError as error:
             raise HTTPException(400, str(error)) from error
 

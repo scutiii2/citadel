@@ -111,3 +111,15 @@ def test_a_failed_add_origin_rolls_back_the_group_and_origin(db):
     with pytest.raises(sqlite3.IntegrityError, match="registration failed"):
         oc.add_origin(db, "http://bard:1", "bard", "legion")
     assert oc.view(db) == {"groups": []}
+
+
+def test_lookup_finds_an_origin_with_its_group_and_path_and_records_nothing(db):
+    group = oc.add_origin(db, "http://bard:29400", "bard", "legion")
+    found = oc.lookup(db, "http://BARD:29400/mcp/")
+    assert found["found"] is True and found["path"] == "/mcp"
+    assert found["origin_id"] == group["origins"][0]["origin_id"] and found["group"]["name"] == "bard"
+    missing = oc.lookup(db, "http://other:1/x")
+    assert missing == {"found": False, "origin": "http://other:1", "path": "/x", "origin_id": None, "group": None}
+    assert oc.view(db)["groups"][0]["used_by"] == ["legion"] and len(oc.view(db)["groups"]) == 1
+    with pytest.raises(oc.OutsideCatalogError):
+        oc.lookup(db, "nope")

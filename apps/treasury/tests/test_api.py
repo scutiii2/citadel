@@ -203,3 +203,14 @@ async def test_outside_admin_routes_belong_to_portcullis_and_deletes_list_the_us
         gone = await portcullis.delete(f"/admin/outside/{sid}?confirm=true")
         assert gone.status_code == 200 and gone.json() == {"groups": []}
         assert (await portcullis.patch(f"/admin/outside/{sid}", json={"name": "x"})).status_code == 404
+
+
+async def test_any_service_can_look_an_address_up_without_changing_anything(registering):
+    caller, _ = registering
+    async with caller("legion") as legion, caller("armory") as armory:
+        await legion.post("/outside/origins", json={"origin": "http://bard:29400", "name": "bard"})
+        found = (await armory.post("/outside/lookup", json={"address": "http://bard:29400/mcp"})).json()
+        assert found["found"] is True and found["path"] == "/mcp" and found["group"]["name"] == "bard"
+        assert (await armory.post("/outside/lookup", json={"address": "http://x:1"})).json()["found"] is False
+        assert (await armory.post("/outside/lookup", json={"address": "bad"})).status_code == 400
+        assert (await armory.get("/outside")).json()["groups"][0]["used_by"] == ["legion"]
