@@ -40,9 +40,16 @@ def test_too_few_tool_calls_do_not_qualify(calls):
 
 def test_bookkeeping_tools_do_not_count_toward_the_minimum():
     extras = (call("main__tool_mem_search"), call("main__tool_skill_search"), call("main__tool_skill_mark"),
-              call(delegation.TOOL_NAME), call("update_plan"), call("ask_user"))
+              call(delegation.TOOL_NAME), call("update_plan"), call("ask_user"),
+              call("stronghold__tool_skill_search"), call("stronghold__tool_brain_search"),
+              call("stronghold__tool_stack_add"))
     assert skill_reflection.eligible_calls(result(*THREE[:2], *extras)) is None
     assert len(skill_reflection.eligible_calls(result(*THREE, *extras))) == 3
+
+
+def test_a_stronghold_memory_call_is_bookkeeping_not_a_step():
+    extras = (call("stronghold__tool_skill_mark"), call("stronghold__tool_brain_write"), call("stronghold__tool_stack_list"))
+    assert skill_reflection.eligible_calls(result(*THREE[:2], *extras)) is None
 
 
 @pytest.mark.parametrize("name", ["main__tool_web_search", "main__tool_firecrawl_scrape", "main__tool_email_send", "u_myext__fetch"])
@@ -157,7 +164,7 @@ def test_the_default_propose_calls_the_skill_tool_through_the_upstream_client(mo
 
     skill_reflection._propose(draft)
 
-    assert calls == [("main__tool_skill_propose", draft)]
+    assert calls == [("stronghold__tool_skill_propose", draft)]
 
 
 def test_the_proposal_sees_the_turns_identity_in_its_worker_thread(helper, monkeypatch):

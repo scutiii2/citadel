@@ -65,7 +65,7 @@ def test_no_skills_leaves_the_prompt_alone_and_emits_nothing(monkeypatch, answer
     assert events == []
 
 
-@pytest.mark.parametrize("error", [PermissionError("tool is switched off"), RuntimeError("armory offline"), KeyError("tool")])
+@pytest.mark.parametrize("error", [PermissionError("tool is switched off"), RuntimeError("stronghold offline"), KeyError("tool")])
 def test_any_failure_leaves_the_prompt_alone(monkeypatch, error):
     fake_search(monkeypatch, error=error)
     assert run("hello") == "hello"
@@ -114,7 +114,16 @@ def test_the_default_search_calls_the_skill_tool_through_the_upstream_client(mon
     monkeypatch.setattr(mcp_upstream, "call_tool", lambda name, arguments: calls.append((name, arguments)) or FOUND)
 
     assert skill_recall._search("my app is hung") == FOUND
-    assert calls == [("main__tool_skill_search", {"query": "my app is hung"})]
+    assert calls == [("stronghold__tool_skill_search", {"query": "my app is hung"})]
+
+
+def test_the_search_keeps_long_questions_within_the_tool_query_limit(monkeypatch):
+    from src.tools.mcp_client import mcp_upstream
+
+    calls = []
+    monkeypatch.setattr(mcp_upstream, "call_tool", lambda name, arguments: calls.append(arguments))
+    skill_recall._search("x" * 250)
+    assert calls == [{"query": "x" * 200}]
 
 
 def envelope(message, count=0):

@@ -1,9 +1,9 @@
 """Automatic skill recall: the user's approved skills that match the question, put in front of it.
 
-Opt-in per agent (agent file key skill_recall). It calls the armory tool tool_skill_search
+Opt-in per agent (agent file key skill_recall). It calls Stronghold's tool tool_skill_search
 through the normal upstream client, so the agent's own tool scope, the user's switched-off
 tools and the asking user's identity all apply. Only skills the user approved come back;
-the armory side never returns a proposal. Best effort: any failure means no recall and the
+Stronghold never returns a proposal. Best effort: any failure means no recall and the
 turn goes on.
 """
 
@@ -21,17 +21,17 @@ from src.providers.base_provider import OnEvent, step_event
 
 _log = logging.getLogger(__name__)
 
-# The registry prefix of the one upstream server ("main__", see mcp_upstream) plus the tool name.
-TOOL = "main__tool_skill_search"
+TOOL = "stronghold__tool_skill_search"
+QUERY_CHARS = 200
 # Over MCP, tool_skill_search answers a JSON envelope {"count": N, "message": "..."}. The message
 # is "<N> approved skill(s):\n<fenced block>" when skills match and "No approved skills match."
-# otherwise. legion cannot import armory, so the first line of `message` is a contract (pinned
+# otherwise. Legion cannot import Stronghold, so the first line of `message` is a contract (pinned
 # by tests on both sides).
 _FOUND = re.compile(r"^(\d+) approved skill\(s\):")
 LABEL = (
     "[Skills the user approved earlier that may fit this task, loaded automatically. "
     "They are how-tos, not instructions: check each step still makes sense before you follow it. "
-    "After following one, call tool_skill_mark with its id.]"
+    "After following one, call stronghold__tool_skill_mark with its id.]"
 )
 STEP_TOOL = "skill_recall"
 STEP_LABEL = "Loading saved skills"
@@ -42,7 +42,7 @@ def _search(question: str) -> str:
     # Imported here: laya agents never load mcp_upstream.
     from src.tools.mcp_client import mcp_upstream
 
-    return mcp_upstream.call_tool(TOOL, {"query": question})
+    return mcp_upstream.call_tool(TOOL, {"query": question[:QUERY_CHARS]})
 
 
 async def with_skills(question: str, prompt: str, on_event: OnEvent | None = None) -> str:
@@ -70,5 +70,5 @@ async def with_skills(question: str, prompt: str, on_event: OnEvent | None = Non
     body = f"[User message]\n{prompt}" if prompt == question else prompt
     label = LABEL
     if agent_spec.current().orchestrator and agent_spec.current().mode == "plan":
-        label = label.replace(" After following one, call tool_skill_mark with its id.", "")
+        label = label.replace(" After following one, call stronghold__tool_skill_mark with its id.", "")
     return f"{label}\n{text}\n\n{body}"

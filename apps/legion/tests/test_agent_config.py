@@ -495,7 +495,11 @@ def _recall_setup(monkeypatch, *, recall_on):
     spec = dataclasses.replace(reloaded.agent_spec.current(), memory_recall=recall_on)
     monkeypatch.setattr(reloaded.agent_spec, "current", lambda: spec)
     searches = []
-    monkeypatch.setattr(reloaded.memory_recall, "_search", lambda: searches.append(1) or "1 saved note(s):\nblock")
+    def search(query):
+        searches.append(query)
+        return '{"ok": true, "results": [{"id": "note", "title": "Example", "snippet": "block"}]}'
+
+    monkeypatch.setattr(reloaded.memory_recall, "_search", search)
     seen = {}
 
     async def _fake_run_chat(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
@@ -518,7 +522,7 @@ def test_run_chat_gives_the_provider_the_recalled_notes_when_recall_is_on(monkey
 
     asyncio.run(reloaded.run_chat("hi", [], []))
 
-    assert searches == [1]
+    assert searches == ["hi"]
     assert seen["question"].startswith(reloaded.memory_recall.LABEL)
     assert seen["question"].endswith("[User message]\nhi")
     assert attachment_questions == ["hi"]  # attachments still see the original question

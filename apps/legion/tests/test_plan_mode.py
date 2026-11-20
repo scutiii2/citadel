@@ -128,11 +128,11 @@ def test_hallucinated_capabilities_and_second_plan_never_execute(monkeypatch, pl
 def test_skill_recall_plan_text_and_legacy_bytes(monkeypatch, plan_spec):
     monkeypatch.setattr(skill_recall, "_search", lambda _: "1 approved skill(s):\nSkill text")
     output = asyncio.run(skill_recall.with_skills("q", "q"))
-    assert "tool_skill_mark" not in output and "Skill text" in output
+    assert "stronghold__tool_skill_mark" not in output and "Skill text" in output
     monkeypatch.setattr(agent_spec, "_current", replace(plan_spec, mode="legacy"))
     output = asyncio.run(skill_recall.with_skills("q", "q"))
     assert output == skill_recall.LABEL + "\n1 approved skill(s):\nSkill text\n\n[User message]\nq"
-    assert "After following one, call tool_skill_mark with its id." in output
+    assert "After following one, call stronghold__tool_skill_mark with its id." in output
 
 
 def test_plan_mode_keeps_runtime_recall_and_bypasses_entry_routing(monkeypatch, plan_spec):
