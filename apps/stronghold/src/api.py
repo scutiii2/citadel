@@ -12,6 +12,8 @@ import logging
 
 import httpx
 from fastapi import Depends, FastAPI, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from src.agents import routes as agents_routes
@@ -31,6 +33,10 @@ from src.citadel_auth.treasury import register_in_background
 from src.chats import routes as chats_routes
 from src.chats.store import ChatStore
 from src.config import Settings, load_settings
+from src.brain import routes as stack_routes
+from src.brain.compaction import StackCompactor
+from src.brain.limits import load_limits
+from src.brain.stack import StackStore
 from src.document_store import DbGatewayClient, DbGatewayError, DbGatewayUnavailable, DocumentStore
 from src import log_privacy
 from src.keys import load_keys
@@ -137,6 +143,8 @@ def create_app(
         app.state.dictation = DictationRelay()
         app.state.shares = ShareStore(app.state.store)
         app.state.chats = ChatStore(app.state.store, app.state.shares)
+        app.state.stacks = StackStore(app.state.store, await asyncio.to_thread(load_limits, data_settings))
+        app.state.compactor = StackCompactor(app.state.stacks, app.state.agent_gateway, app.state.agents)
         app.state.pricing = Pricing(settings.pricing)
         app.state.usage = UsageService(app.state.store, settings.usage, app.state.pricing)
         app.state.turns = TurnRegistry(
@@ -173,6 +181,7 @@ def create_app(
     app.include_router(bard_routes.router)
     app.include_router(tool_services_routes.router)
     app.include_router(brains_routes.router)
+    app.include_router(stack_routes.router)
     app.include_router(instance_migration.router)
     app.include_router(chats_routes.router)
     app.include_router(chats_routes.folder_router)
@@ -201,6 +210,12 @@ def create_app(
     @app.exception_handler(TicketUnavailable)
     async def tickets_down(_request: Request, _error: TicketUnavailable):
         return JSONResponse({"detail": "armory is unreachable"}, status_code=502)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, error: RequestValidationError):
+        if request.url.path.startswith("/stack/"):
+            return JSONResponse({"detail": "Invalid stack request."}, status_code=422)
+        return await request_validation_exception_handler(request, error)
 
     @app.exception_handler(DbGatewayUnavailable)
     async def storage_down(_request: Request, _error: DbGatewayUnavailable):

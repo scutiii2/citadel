@@ -242,10 +242,10 @@ class ChatStore:
         await self._doc(owner, chat_id)
         await self._remove(owner, [chat_id])
 
-    async def delete_all(self, owner: str) -> int:
+    async def delete_all(self, owner: str) -> list[str]:
         chat_ids = [d["chat_id"] for d in await self._all(CHATS, owner)]
         await self._remove(owner, chat_ids)
-        return len(chat_ids)
+        return chat_ids
 
     async def purge_owner(self, owner: str) -> None:
         """Everything a deleted account kept: chats, transcripts and folders (its share links go with its
@@ -351,17 +351,17 @@ class ChatStore:
     async def count_in_folder(self, owner: str, folder_id: int) -> int:
         return sum(1 for chat in await self._all(CHATS, owner) if chat["folder_id"] == folder_id)
 
-    async def delete_folder(self, owner: str, folder_id: int, running: set[str]) -> tuple[str, int]:
+    async def delete_folder(self, owner: str, folder_id: int, running: set[str]) -> tuple[str, list[str]]:
         """Deletes the folder and every chat in it, revoking their links first. `running` holds this
         account's chat ids that have an answer being written: if any is in the folder nothing is deleted
-        (FolderBusy). Returns (folder name, chats deleted)."""
+        (FolderBusy). Returns the folder name and deleted chat IDs."""
         doc = await self._folder(owner, folder_id)
         chat_ids = [c["chat_id"] for c in await self._all(CHATS, owner) if c["folder_id"] == folder_id]
         if running.intersection(chat_ids):
             raise FolderBusy(folder_id)
         await self._remove(owner, chat_ids)
         await self._store.delete(FOLDERS, doc["key"])
-        return doc["name"], len(chat_ids)
+        return doc["name"], chat_ids
 
 
 def message_time() -> str:
