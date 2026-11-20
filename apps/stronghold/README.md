@@ -56,7 +56,7 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/turns/...` | Chat turns, run here (one replica only: running turns live in memory). `POST /turns/{chat}` saves the question and starts the answer; `GET /turns/{chat}/events` is the SSE stream; `/approvals`, `/questions`, `/cancel`, `/summarize`, `/clear`, `/suggestion`; `GET /turns/running`; `DELETE /turns/{chat}` and `DELETE /turns` stop turns. The start body carries a `trusted` block (`forced_approval`, `tools_execute`, `extension_ids`, `second_brain_available`) that only Portcullis may fill. Error and chat-trace lines go to Portcullis's `POST /internal/logs`. Portcullis still runs its own copy until Plan 10.4 |
 | `/usage/...` | Token usage and limits, kept in Treasury (collection `usage_records`). Portcullis exposes the reads as `/api/usage/...` and `/api/admin/usage/...`, and calls `POST /usage/check` and `POST /usage/records` around every agent call |
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
-| `/skills/...` | Learned skills, which Armory keeps. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
+| `/skills/...` | Learned skills kept in Stronghold’s Brain. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
 | `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `stack`, `brains`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
 
 ## MCP server
@@ -118,6 +118,16 @@ Legion calls `tool_brain_search`, `tool_brain_read`, `tool_brain_list`, `tool_br
 | `stack` | `max_item_chars` | 500 | 20–2,000 |
 | `stack` | `compact_item_chars` | 1,500 | 100–6,000 |
 | `stack` | `warn_ratio` | 0.8 | 0.3–0.95 |
+
+## Skills
+
+Stronghold stores one Markdown file per skill under `<brain root>/accounts/<uid>/.skills/`. Back up this folder with the rest of the Brain. The long-term notes quota excludes skill files.
+
+Legion can propose skills with `tool_skill_propose`, search approved skills with `tool_skill_search`, and record outcomes with `tool_skill_mark`. Only signed-in users can approve, edit, retire or delete skills through the `/skills` routes that Portcullis exposes as `/api/skills`. Account deletion also purges the files.
+
+Titles, when-to-use text, steps and tool lists allow up to 80, 300, 1,200 and 200 characters respectively. Agents can have at most 20 proposals awaiting approval per account. Each account can have 50 active skills and 200 skill files. Search returns up to three approved skills using whole-word BM25. Armory's prefix matching and existing skill data do not carry over.
+
+A skill stops appearing in search after at least three failures when failures outnumber successes. Editing resets both counts.
 
 ## Tool services
 

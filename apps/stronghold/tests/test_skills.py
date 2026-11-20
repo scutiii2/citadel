@@ -134,3 +134,13 @@ def test_health_survives_a_brain_root_that_cannot_hold_skills(make_client, monke
     assert app.get("/health").status_code == 200
     assert app.get("/skills").status_code == 503
     assert app.delete("/skills/accounts/u-1").status_code == 503
+
+
+def test_a_file_at_the_skills_directory_is_a_readable_refusal(client):
+    folder = client.app.state.brain_files.root / "accounts" / "u-1" / ".skills"
+    folder.parent.mkdir(parents=True)
+    folder.touch()
+    assert client.get("/health").status_code == 200
+    answer = client.get("/skills")
+    assert answer.status_code == 503
+    assert answer.json()["detail"] == "Skill storage is unavailable."

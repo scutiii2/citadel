@@ -75,7 +75,7 @@ def test_the_ask_call_carries_the_chat_id(client, agent, chat_with_message, monk
 
 
 @pytest.mark.parametrize("tool", [
-    "stronghold__tool_stack_list", "stronghold__tool_brain_read", "stronghold__tool_skill_search", "skill_recall",
+    "stronghold__tool_stack_list", "stronghold__tool_brain_read", "stronghold__tool_skill_search", "skill_recall", "memory_recall",
 ])
 def test_memory_tool_text_is_excluded_from_chat_traces(client, agent, chat_with_message, platform, monkeypatch, tool):
     sample = "example remembered fact"

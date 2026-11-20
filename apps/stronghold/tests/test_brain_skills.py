@@ -134,9 +134,29 @@ async def test_damaged_or_foreign_files_are_skipped_and_ids_keep_counting(skills
     made = await propose(skills)
     (folder(brain) / "9.md").write_text("no header at all", encoding="utf-8")
     (folder(brain) / "notes.md").write_text("---\nid: 1\n---\n", encoding="utf-8")
-    (folder(brain) / "2.md").write_text((folder(brain) / "1.md").read_text(encoding="utf-8"), encoding="utf-8")  # id 1 inside 2.md
+    (folder(brain) / "2.md").write_bytes((folder(brain) / "1.md").read_bytes())  # id 1 inside 2.md
     assert [s.id for s in await skills.list(U1)] == [made.id]
-    assert (await propose(skills, title="Next")).id == 2
+    assert (await propose(skills, title="Next")).id == 10
+    assert (folder(brain) / "2.md").read_bytes() == (folder(brain) / "1.md").read_bytes()
+
+
+async def test_damaged_files_still_count_toward_the_disk_cap(skills, brain, monkeypatch):
+    monkeypatch.setattr(skill_module, "MAX_SKILLS", 2)
+    folder(brain).mkdir(parents=True)
+    for skill_id in (1, 2):
+        (folder(brain) / f"{skill_id}.md").write_text("no header", encoding="utf-8")
+    assert await skills.list(U1) == []
+    assert "full" in await refused(propose(skills), 409)
+    assert len(list(folder(brain).iterdir())) == 2
+
+
+async def test_reproposing_cannot_exceed_the_proposal_cap(skills, monkeypatch):
+    monkeypatch.setattr(skill_module, "MAX_PROPOSED", 1)
+    first = await propose(skills)
+    await skills.set_status(U1, first.id, "retired")
+    waiting = await propose(skills, title="Another")
+    assert "waiting for approval" in await refused(skills.set_status(U1, first.id, "proposed"), 409)
+    assert (await skills.set_status(U1, waiting.id, "proposed")).status == "proposed"
 
 
 async def test_purge_removes_only_skills_and_a_purged_account_is_refused(skills, brain):

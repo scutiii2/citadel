@@ -21,7 +21,7 @@ import stat
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from src.brain.files import BrainError, BrainFiles, _Account, _confine, _has_home, _remove, _write
+from src.brain.files import BrainError, BrainFiles, _Account, _confine, _create_record, _has_home, _remove, _write
 from src.brain.records import RecordError, header_line
 from src.brain.search import Bm25Index, tokens
 from src.clock import utcnow
@@ -35,6 +35,7 @@ PROPOSED, ACTIVE, RETIRED = "proposed", "active", "retired"
 STATUSES = (PROPOSED, ACTIVE, RETIRED)
 SUCCESS, FAILURE = "success", "failure"
 _FILE = re.compile(r"[1-9][0-9]{0,8}\.md")
+_MAX_ID = 999_999_999
 _MAX_FILE_BYTES = 16_384
 _FENCE = "---"
 
@@ -129,38 +130,42 @@ def _linked_folder(home: Path) -> bool:
     return folder.is_symlink() or folder.resolve() != home.resolve() / SKILLS
 
 
-def _write_skill(root: Path, home: Path, path: Path, text: str) -> None:
+def _write_skill(root: Path, home: Path, path: Path, text: str, create: bool) -> None:
     if _linked_folder(home):
         raise BrainError(403, "That path is outside the skill folder.")
-    _write(root, home, path, text)
+    write = _create_record if create else _write
+    write(root, home, path, text)
 
 
-def _read_all(root: Path, home: Path) -> dict[int, Skill]:
+def _read_all(root: Path, home: Path) -> tuple[dict[int, Skill], list[int]]:
     found: dict[int, Skill] = {}
+    occupied: list[int] = []
     if not _has_home(root, home):
-        return found
+        return found, occupied
     folder = home / SKILLS
     if _linked_folder(home):
-        return found
+        return found, occupied
     _confine(root, home, folder)
     try:
         names = sorted(os.listdir(folder))
-    except (FileNotFoundError, NotADirectoryError):
-        return found
+    except FileNotFoundError:
+        return found, occupied
     for name in names:
         if not _FILE.fullmatch(name):
             continue
+        skill_id = int(name.removesuffix(".md"))
+        occupied.append(skill_id)
         path = folder / name
         try:
             _confine(root, home, path)
             info = path.lstat()
             if not stat.S_ISREG(info.st_mode) or info.st_size > _MAX_FILE_BYTES:
                 continue
-            skill = parse(path.read_text(encoding="utf-8"), int(name.removesuffix(".md")))
+            skill = parse(path.read_text(encoding="utf-8"), skill_id)
         except (BrainError, FileNotFoundError, UnicodeError, RecordError, RecursionError):
             continue
         found[skill.id] = skill
-    return found
+    return found, occupied
 
 
 def _purge_skills(root: Path, home: Path) -> None:
@@ -186,11 +191,16 @@ class SkillFiles:
     def __init__(self, brain: BrainFiles) -> None:
         self._brain = brain
 
-    async def _load(self, home: Path) -> dict[int, Skill]:
+    async def _scan(self, home: Path) -> tuple[dict[int, Skill], list[int]]:
         return await asyncio.to_thread(_read_all, self._brain.root, home)
 
-    async def _save(self, account: _Account, home: Path, skill: Skill) -> None:
-        await self._brain.mutate(account, _write_skill, self._brain.root, home, home / SKILLS / f"{skill.id}.md", render(skill))
+    async def _load(self, home: Path) -> dict[int, Skill]:
+        skills, _ = await self._scan(home)
+        return skills
+
+    async def _save(self, account: _Account, home: Path, skill: Skill, *, create: bool = False) -> None:
+        path = home / SKILLS / f"{skill.id}.md"
+        await self._brain.mutate(account, _write_skill, self._brain.root, home, path, render(skill), create)
 
     @staticmethod
     def _same_title(skills: dict[int, Skill], title: str, *, except_id: int = 0) -> Skill | None:
@@ -202,16 +212,16 @@ class SkillFiles:
         steps = _clean("steps", steps, MAX_STEPS)
         tools = _clean("tools list", tools, MAX_TOOLS, required=False)
         async with self._brain.locked(uid) as (home, account):
-            skills = await self._load(home)
+            skills, occupied = await self._scan(home)
             same = self._same_title(skills, title)
             if same is not None:
                 return same, True
-            if sum(1 for s in skills.values() if s.status == PROPOSED) >= MAX_PROPOSED:
-                raise BrainError(409, f"You already have {MAX_PROPOSED} skills waiting for approval. Ask the user to review them first.")
-            if len(skills) >= MAX_SKILLS:
+            self._check_proposal_room(skills)
+            skill_id = max(occupied, default=0) + 1
+            if len(occupied) >= MAX_SKILLS or skill_id > _MAX_ID:
                 raise BrainError(409, "The skill list is full. The user must delete some skills first.")
-            skill = Skill(max(skills, default=0) + 1, title, when_to_use, steps, tools, PROPOSED, 0, 0, _now())
-            await self._save(account, home, skill)
+            skill = Skill(skill_id, title, when_to_use, steps, tools, PROPOSED, 0, 0, _now())
+            await self._save(account, home, skill, create=True)
             return skill, False
 
     async def search(self, uid: str, query: str = "", limit: int = DEFAULT_LIMIT) -> list[Skill]:
@@ -225,6 +235,11 @@ class SkillFiles:
             skills = await self._load(home)
         return sorted(skills.values(), key=lambda skill: -skill.id)
 
+    @staticmethod
+    def _check_proposal_room(skills: dict[int, Skill]) -> None:
+        if sum(1 for s in skills.values() if s.status == PROPOSED) >= MAX_PROPOSED:
+            raise BrainError(409, f"You already have {MAX_PROPOSED} skills waiting for approval. Ask the user to review them first.")
+
     async def set_status(self, uid: str, skill_id: int, status: str) -> Skill | None:
         if status not in STATUSES:
             raise BrainError(422, "That is not a valid skill status.")
@@ -235,6 +250,8 @@ class SkillFiles:
                 return None
             if status == ACTIVE and skill.status != ACTIVE and sum(1 for s in skills.values() if s.status == ACTIVE) >= MAX_ACTIVE:
                 raise BrainError(409, f"You already have {MAX_ACTIVE} active skills. Retire one first.")
+            if status == PROPOSED and skill.status != PROPOSED:
+                self._check_proposal_room(skills)
             changed = replace(skill, status=status)
             await self._save(account, home, changed)
             return changed

@@ -241,7 +241,7 @@ Legion's Anthropic-protocol and OpenAI-protocol agents call their models through
 
 ## Stronghold
 
-Portcullis calls Stronghold's product routes. Legion connects to Stronghold's signed `/mcp` endpoint for short- and long-term memory.
+Portcullis calls Stronghold's product routes. Legion connects to Stronghold's signed `/mcp` endpoint for short-term memory, long-term memory, and skills.
 
 - **Storage**: Treasury, connection `stronghold` (`stronghold.db` in `.data/treasury/`). the `stronghold` connection is built in; Stronghold registers its own instance.
 - **Keys**: `.data/stronghold/keys.json` is made on first start. It holds the key that encrypts saved calendar links and the web push key pair. Back the folder up. Without the file, saved links must be entered again and browsers must subscribe to push again.
@@ -258,6 +258,12 @@ Stronghold keeps long-term memory as plain Markdown on the `.data/stronghold` vo
 The built-in Stronghold MCP connection needs no configuration. Restart Legion
 to load the connection and deploy Legion and Stronghold from the same repo
 version so Legion's `ask` tool accepts the chat ID Stronghold sends.
+
+### Skills and recall rollout
+
+Deploy Stronghold and Legion from the same repo version. Ember needs the `stronghold__tool_brain_*`, `stronghold__tool_skill_*` and `stronghold__tool_stack_*` allow globs. If the machine's `agent_overrides.json` replaces `ember.json`, apply the same allow list and notes instructions to the override.
+
+Keep Armory's `skills` capability offline. Stronghold stores new skill files in `.skills/` inside each account's Brain folder, so include that folder in backups. Citadel no longer reads or purges the old Armory skill data. Agents can propose those skills again, and Plan 20f will support recreating them by hand.
 
 ## Tool services
 
