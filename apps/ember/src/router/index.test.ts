@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authClient, type Account } from "../api/auth/AuthClient";
 import { UnauthorizedError } from "../api/http";
 import { router } from ".";
+import { dedicatedCapabilityPage } from "./capabilityPages";
 import { NAV_PAGES, visiblePages } from "./pages";
 import { commandsClient } from "../api/tools/CommandsClient";
 import { useAuthStore } from "../stores/auth";
@@ -81,6 +82,20 @@ describe("Shares route", () => {
 });
 
 describe("removed page links", () => {
+  it("opens chat for an old Memory link", async () => {
+    me.mockResolvedValue(ACCOUNT);
+
+    await router.push("/memory");
+
+    expect(router.currentRoute.value.name).toBe("chat");
+  });
+
+  it("has no Memory nav entry or capability link", () => {
+    expect(NAV_PAGES.map((page) => page.to)).not.toContain("/memory");
+    expect(NAV_PAGES.map((page) => page.label)).not.toContain("Memory");
+    expect(dedicatedCapabilityPage("memory")).toBeUndefined();
+  });
+
   it("opens chat for an old Watchers link", async () => {
     me.mockResolvedValue({ ...ACCOUNT, permissions: [...ACCOUNT.permissions, "watchers.view"] });
 

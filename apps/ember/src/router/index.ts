@@ -83,12 +83,6 @@ export const router = createRouter({
       meta: { permission: "chat.use" },
     },
     {
-      path: "/memory",
-      name: "memory",
-      component: () => import("../features/memory/MemoryView.vue"),
-      meta: { permission: "chat.use" },
-    },
-    {
       path: "/skills",
       name: "skills",
       component: () => import("../features/skills/SkillsView.vue"),

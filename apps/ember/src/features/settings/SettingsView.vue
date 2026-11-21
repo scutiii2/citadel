@@ -28,6 +28,7 @@ import { bardClient } from "../../api/files/BardClient";
 import { useReadAloudVoice } from "../chat/composables/useReadAloudVoice";
 import { useChatStore } from "../chat/stores/chat";
 import { useNavPrefsStore } from "../../stores/navigation/navPrefs";
+import { NAV_PAGES } from "../../router/pages";
 import { isDefault } from "../../utils/navigation/navArrangement";
 import { filterSettings, type SearchableSetting } from "./utils/settingsSearch";
 
@@ -352,7 +353,7 @@ const modified = computed(() => ({
   "context-panel": draft.value.contextPanel !== true,
   "context-accuracy": draft.value.contextAccuracy !== DEFAULT_CONTEXT_ACCURACY,
   "appearance-theme": draft.value.theme !== DEFAULT_THEME,
-  "sidebar-pages": !isDefault(draft.value.sidebar),
+  "sidebar-pages": !isDefault(draft.value.sidebar, NAV_PAGES),
   "response-limits": Object.values(limitsState.value.draft).some(value => value !== ""),
 }));
 const modifiedCount = computed(() => Object.values(modified.value).filter(Boolean).length);

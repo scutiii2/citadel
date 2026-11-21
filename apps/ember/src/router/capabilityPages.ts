@@ -11,7 +11,6 @@ interface CapabilityPage {
 
 const CAPABILITY_PAGES: Record<string, CapabilityPage> = {
   notes: { to: "/notes", permission: "chat.use" },
-  memory: { to: "/memory", permission: "chat.use" },
   gen: { to: "/generator", permission: "tools.execute" },
   ticket: { to: "/tickets", permission: "tickets.create" },
   pdf: {

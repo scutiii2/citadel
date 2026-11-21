@@ -7,7 +7,7 @@
 import { computed, ref } from "vue";
 import SettingRow from "../../../components/ui/forms/SettingRow.vue";
 import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
-import { visiblePages } from "../../../router/pages";
+import { NAV_PAGES, visiblePages } from "../../../router/pages";
 import { usePageVisibilityStore } from "../../../stores/navigation/pageVisibility";
 import { useAuthStore } from "../../../stores/auth";
 import { useNavPrefsStore } from "../../../stores/navigation/navPrefs";
@@ -41,7 +41,7 @@ const rows = computed(() => [
   ...groups.value.rest.map((page) => ({ page, pinned: false })),
 ]);
 const hidden = computed(() => new Set(prefs.value.hidden));
-const modified = computed(() => !isDefault(prefs.value));
+const modified = computed(() => !isDefault(prefs.value, NAV_PAGES));
 
 const dragging = ref<string | null>(null);
 const over = ref<string | null>(null);

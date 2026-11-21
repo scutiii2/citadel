@@ -94,7 +94,7 @@ async function show(options: { admin?: boolean; query?: string; permissions?: st
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      ...["/notes", "/memory", "/generator", "/tickets"].map(path => ({path, component: {template:"<div/>"}})),
+      ...["/notes", "/generator", "/tickets"].map(path => ({path, component: {template:"<div/>"}})),
       { path: "/capabilities", component: CapabilitiesView },
       { path: "/capabilities/supermarket", component: { template: "<div />" } },
       { path: "/capabilities/:name", component: { template: "<div />" } },
@@ -128,8 +128,8 @@ describe("Capabilities tool and workspace access",()=>{
     const w=await show();await choose(w,"PDF files");expect(w.get('.detail-footer a').attributes('href')).toBe('/capabilities/pdf_merger');
     const readonly=await show({permissions:['tools.view']});await choose(readonly,'PDF files');expect(readonly.find('.detail-footer a').exists()).toBe(false);
   });
-  it("links dedicated notes, memory, generator and ticket pages through their permissions",async()=>{
-    const definitions=[['notes','Notes','/notes'],['memory','Memory','/memory'],['gen','Generator','/generator'],['ticket','Tickets','/tickets']];
+  it("links dedicated notes, generator and ticket pages through their permissions",async()=>{
+    const definitions=[['notes','Notes','/notes'],['gen','Generator','/generator'],['ticket','Tickets','/tickets']];
     mocks.capabilities.mockResolvedValue(definitions.map(([name,label])=>({name,label,enabled:true,tools:[],resources:[]})));
     const w=await show({permissions:['tools.view','chat.use','tools.execute','tickets.create']});
     for(const [,label,path] of definitions){await choose(w,label!);expect(w.get('.detail-footer a').attributes('href')).toBe(path);}

@@ -16,8 +16,9 @@ interface Arranged<T> {
   rest: T[];
 }
 
-export function isDefault(prefs: NavPrefs): boolean {
-  return prefs.order.length === 0 && prefs.pinned.length === 0 && prefs.hidden.length === 0;
+export function isDefault(prefs: NavPrefs, pages: readonly Page[]): boolean {
+  const { order, pinned, hidden } = prefs;
+  return !pages.some(({ to }) => order.includes(to) || pinned.includes(to) || hidden.includes(to));
 }
 
 /** Every page, pinned ones first, each group in the saved order. */

@@ -124,7 +124,7 @@ describe("setHidden", () => {
 
 describe("isDefault", () => {
   it("is true only for the empty arrangement", () => {
-    expect(isDefault(EMPTY_PREFS)).toBe(true);
-    expect(isDefault(prefs({ hidden: ["/a"] }))).toBe(false);
+    expect(isDefault(EMPTY_PREFS, PAGES)).toBe(true);
+    expect(isDefault(prefs({ hidden: ["/a"] }), PAGES)).toBe(false);
   });
 });
