@@ -9,6 +9,8 @@ import { ApiError } from "../../api/http";
 import { useAuthStore } from "../../stores/auth";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { errorMessage } from "../../utils/errors";
+import ProposalsDialog from "../proposals/components/ProposalsDialog.vue";
+import { useProposalsStore } from "../proposals/stores/proposals";
 import ShareDialog, { type ShareTarget } from "../sharing/components/ShareDialog.vue";
 import { headingsOf } from "../sharing/utils/headings";
 import { brainClient, folderProblem, normalizeFolder, type BrainFile, type FileChanges } from "./api/BrainClient";
@@ -22,6 +24,8 @@ import { useBrainStore } from "./stores/brain";
 
 const NEW = "new";
 const store = useBrainStore();
+const proposals = useProposalsStore();
+const suggesting = ref(false);
 const auth = useAuthStore();
 
 // The open file: an id, NEW for one not saved yet, or null for none.
@@ -126,9 +130,15 @@ watch(query, (value) => {
   if (value.trim() && auth.account) timer = setTimeout(() => void store.search(value), 300);
 }, { flush: "sync" });
 
-onMounted(() => void store.load());
+function loadNotes(): void {
+  void store.load();
+  void proposals.load();
+}
+
+onMounted(loadNotes);
 onBeforeUnmount(() => {
   resetPage();
+  proposals.forget();
   store.forget();
 });
 
@@ -308,6 +318,12 @@ async function remove(): Promise<void> {
   }
 }
 
+function suggested(message: string): void {
+  suggesting.value = false;
+  notice.value = message;
+  void store.load();
+}
+
 function resetPage(): void {
   ++openRun;
   clearTimeout(timer);
@@ -317,6 +333,7 @@ function resetPage(): void {
   discardTarget.value = undefined;
   confirmDelete.value = confirmRevert.value = false;
   shareTarget.value = null;
+  suggesting.value = false;
   answerLeave(false);
   query.value = "";
   folder.value = null;
@@ -325,13 +342,16 @@ function resetPage(): void {
 
 watch(() => auth.account?.id, () => {
   resetPage();
-  if (auth.account) void store.load();
+  if (auth.account) loadNotes();
 }, { flush: "sync" });
 </script>
 
 <template>
   <PageLayout class="notes info-content" :class="{ 'file-open': selected !== null }" title="Notes" description="Your long-term memory: the files you and your agents keep." wide fill>
     <template #actions>
+      <button v-if="proposals.items.length > 0" type="button" class="pill-btn ghost suggestions-btn" :disabled="busy" @click="suggesting = true">
+        Suggestions ({{ proposals.items.length }})
+      </button>
       <button type="button" class="primary new-file" :disabled="busy || store.status !== 'ready'" @click="startNew">New file</button>
     </template>
     <div class="column">
@@ -431,6 +451,7 @@ watch(() => auth.account?.id, () => {
       </ListEditorLayout>
     </div>
 
+    <ProposalsDialog v-if="suggesting" :open="suggesting" @close="suggesting = false" @done="suggested" />
     <ShareDialog v-if="shareTarget" :open="true" :target="shareTarget" @close="shareTarget = null" />
     <ConfirmModal
       :open="confirmDelete"
@@ -480,6 +501,7 @@ watch(() => auth.account?.id, () => {
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .list-host { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .new-file { flex-shrink: 0; min-height: 40px; }
+.suggestions-btn { min-height: 44px; }
 .quota { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: .85em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .quota.near .line-icon { color: var(--warning); }
 .quota.full .line-icon { color: var(--danger); }

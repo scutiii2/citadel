@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/http";
 import { useAuthStore } from "../../stores/auth";
 import { makeAccount } from "../../testing/account";
+import { proposalsClient, type Proposal } from "../proposals/api/ProposalsClient";
 import { brainClient, type BrainFile, type BrainFileRow, type BrainSummary, type SearchHit } from "./api/BrainClient";
 import NotesView from "./NotesView.vue";
 import { useBrainStore } from "./stores/brain";
@@ -11,6 +12,13 @@ import { useBrainStore } from "./stores/brain";
 vi.mock("./api/BrainClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api/BrainClient")>()),
   brainClient: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), revert: vi.fn(), remove: vi.fn(), search: vi.fn(), summary: vi.fn() },
+}));
+
+vi.mock("../proposals/api/ProposalsClient", () => ({
+  proposalsClient: { list: vi.fn(), get: vi.fn(), accept: vi.fn(), decline: vi.fn() },
+}));
+vi.mock("../proposals/components/ProposalsDialog.vue", () => ({
+  default: { props: ["open"], emits: ["close", "done"], template: '<button data-test="proposals-dialog" @click="$emit(\'done\', \'Kept as a file.\')">dialog</button>' },
 }));
 
 vi.mock("../sharing/components/ShareDialog.vue", () => ({
@@ -50,6 +58,7 @@ const realClose = HTMLDialogElement.prototype.close;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(proposalsClient).list.mockResolvedValue([]);
   // jsdom does not implement <dialog>.showModal; give it the open flag the component reads.
   HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
     this.setAttribute("open", "");
@@ -391,4 +400,27 @@ describe("NotesView", () => {
     wrapper = null;
     expect(store.files).toEqual([]);
   });
+});
+
+it("shows no Suggestions button when nothing waits", async () => {
+  const w = await setup();
+  expect(w.text()).not.toContain("Suggestions (");
+});
+
+it("shows the count, opens the dialog, and reloads the files after a keep", async () => {
+  const row = (id: string): Proposal => ({
+    id, title: "Tea", folder: "", tags: [], chat_id: "chat", item_ids: [], status: "pending",
+    created_at: "2026-01-01T00:00:00Z", decided_at: null, result_id: null, chars: 9,
+  });
+  vi.mocked(proposalsClient).list.mockResolvedValue([row("p1"), row("p2")]);
+  const w = await setup();
+  const open = w.findAll("button").find((b) => b.text() === "Suggestions (2)")!;
+  expect(open).toBeDefined();
+  client.list.mockClear();
+  await open.trigger("click");
+  await w.get("[data-test='proposals-dialog']").trigger("click");
+  await flushPromises();
+  expect(w.find("[data-test='proposals-dialog']").exists()).toBe(false);
+  expect(w.text()).toContain("Kept as a file.");
+  expect(client.list).toHaveBeenCalled();
 });
