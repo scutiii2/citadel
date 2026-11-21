@@ -17,14 +17,14 @@ import "../components/infoPage.css";
       <GatewayConnectionCard
         id="conversation-gateway"
         title="ConversationGateway (chat models)"
-        example="http://conversationgateway:29407"
+        example="http://conversation-gateway:29407"
         :load="gatewaySettings"
         :store="setGatewaySettings"
       />
       <GatewayConnectionCard
         id="decision-gateway"
         title="DecisionGateway (Laya and Jev)"
-        example="http://decisiongateway:29406"
+        example="http://decision-gateway:29406"
         :load="decisionGatewaySettings"
         :store="setDecisionGatewaySettings"
       />
