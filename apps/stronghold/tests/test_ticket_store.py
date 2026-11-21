@@ -162,3 +162,65 @@ async def test_purging_an_owner_deletes_only_their_tickets(store):
     await store.insert_ticket(**draft(owner="u-2", title="b"))
     assert await store.purge_owner("u-1") == 1
     assert await store.get_ticket(1) is None and await store.get_ticket(2) is not None
+
+
+
+async def test_group_titles_follow_the_source_ticket_until_its_account_is_purged(store, db_gateway):
+    first, _, group = await store.insert_ticket(**draft(title="Private first report"))
+    await store.insert_ticket(**draft(owner="u-2", title="Remaining report", group_id=group))
+    await store.move_ticket(first, None, T1)
+    assert (await store.get_group(group))["title"] == "Private first report"
+
+    assert await store.purge_owner("u-1") == 1
+    assert (await store.get_group(group))["title"] == "Remaining report"
+    assert (await store.list_groups(since=T0))[0]["title"] == "Remaining report"
+    assert all("Private first report" not in str(doc) for doc in db_gateway.records.values())
+
+
+
+async def test_failed_ticket_write_leaves_status_comments_and_staff_activity_unchanged(store, db_gateway, monkeypatch):
+    from src.document_store import DbGatewayUnavailable
+
+    await store.insert_ticket(**draft())
+    await store.update_ticket(1, {"status": "resolved"}, T1)
+
+    async def down(*args):
+        raise DbGatewayUnavailable("storage unreachable")
+
+    monkeypatch.setattr(db_gateway, "put", down)
+    with pytest.raises(DbGatewayUnavailable):
+        await store.reopen_own(1, "u-1", T2)
+    with pytest.raises(DbGatewayUnavailable):
+        await store.add_comment(1, "root", "staff", "Staff reply", T2)
+    ticket = await store.get_ticket(1)
+    assert (ticket["status"], ticket["updated_at"], ticket["last_staff_activity_at"]) == ("resolved", T1, None)
+    assert await store.list_comments(1) == []
+
+
+async def test_possible_group_filter_and_update_whitelist(store, db_gateway):
+    assert await store.list_tickets() == []
+    assert db_gateway.records == {}
+    await store.insert_ticket(**draft())
+    await store.insert_ticket(**draft(possible_group_id=1))
+    with pytest.raises(ValueError, match="Cannot change: owner"):
+        await store.update_ticket(2, {"owner": "different"}, T1)
+    assert [ticket["id"] for ticket in await store.list_tickets(possible_only=True)] == [2]
+
+
+
+async def test_a_failed_counter_write_does_not_publish_a_ticket(store, db_gateway, monkeypatch):
+    from src.document_store import DbGatewayUnavailable
+
+    put = db_gateway.put
+
+    async def fail_ticket_counter(collection, key, doc):
+        if (collection, key) == ("ticket_counters", "tickets"):
+            raise DbGatewayUnavailable("counter unreachable")
+        await put(collection, key, doc)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(db_gateway, "put", fail_ticket_counter)
+        with pytest.raises(DbGatewayUnavailable):
+            await store.insert_ticket(**draft())
+    assert await store.list_tickets() == []
+    assert (await store.insert_ticket(**draft()))[0] == 1

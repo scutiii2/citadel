@@ -31,7 +31,7 @@ Both loaded once at boot by `src/run.py`:
 
 - **`.env`** - credentials and deployment settings, gitignored. Copy
   `.env.example` to `.env`. See [`docs/secrets.md`](docs/secrets.md).
-- **Armory Admin pages** - capabilities, connections, deployment values, email, limits and ticket settings, saved in
+- **Armory Admin pages** - capabilities, connections, deployment values, email and limits, saved in
   `.data/armory/settings.db`. See [`docs/settings.md`](docs/settings.md).
 
 The Connections page manages required Bard, Scribe, and Reader settings and optional shared MCP or REST connections. Armory keeps the addresses and credentials. Signed calls from Stronghold and Portcullis use the corresponding `/connections` routes. Existing shared MCP extensions keep their names after migration.
@@ -55,16 +55,7 @@ Each tool this server offers lives under its own folder in
 shape every capability follows and how to add a new one:
 
 - [`capabilities/server_manager`](src/capabilities/server_manager) - start/stop/restart/list managed apps (`/server ...`)
-- [`capabilities/tickets`](src/capabilities/tickets) - file bugs and feature suggestions, list and follow your own tickets (`/ticket ...`).
-
-Support tickets use the always-on `/tickets` reporter routes and `/ticket-admin`
-staff routes, even when the chat capability is offline. SQLite storage defaults
-to `tickets/tickets.db` in Armory's data folder, configurable with `MCP_TICKETS_DB_PATH`.
-Tags, automatic-report caps, elevation rules and Laya limits are saved in Armory's `settings.db` (table `settings`, key `tickets`); staff edit them on the Ticket settings page of Armory Admin. Optional `LAYA_URL` points at the
-Triage Assistant's MCP address (a Legion agent on port 29611, which asks the shared Laya service; in Docker use
-`http://legion:29611/mcp`, because 127.0.0.1 is the container itself) for advisory grouping and
-tagging; blank skips Laya. Armory holds no Laya model.
-Ember permissions and triage interfaces are planned separately.
+Stronghold serves support tickets and account usage tools. Ember’s Tickets and Usage pages replace the retired Armory `/ticket` and `/usage` slash commands. Armory Admin’s Ticket settings page still reaches Stronghold through Portcullis. Existing Armory ticket databases stay on disk without migration.
 
 Every capability can be turned off without touching code, live - no
 restart needed. `GET /capabilities` lists each one's current state
@@ -90,7 +81,7 @@ see [`src/resources/README.md`](src/resources/README.md).
 
 Runtime state is not kept in this folder. It lives in the Citadel root, one folder per service:
 
-- **`.data/armory/`** - databases (`memory/`, `skills/`, `tickets/`, `email/`), `uploads/`, `watchers/`, `pdf_merger/store/` and `logs/` (`server.log` plus one file per error reference id).
+- **`.data/armory/`** - databases (`memory/`, `skills/`, `email/`), `uploads/`, `watchers/`, `pdf_merger/store/` and `logs/` (`server.log` plus one file per error reference id).
 - **`.cache/armory/`** - files Armory can make again: the Obsidian index and `media_downloader/store/`.
 
 `CITADEL_DATA_DIR` and `CITADEL_CACHE_DIR` in the root `.env` move the two roots; each `MCP_*_DIR` / `MCP_*_PATH` setting still overrides one path. Configuration stays in the tracked `configs/` folders.

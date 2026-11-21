@@ -63,12 +63,8 @@ class Settings:
     memory_db_path: Path = Path(_env("MCP_MEMORY_DB_PATH", str(DATA / "memory" / "memory.db")))
     # Per-user learned skills (capabilities/skills). Runtime state: gitignored.
     skills_db_path: Path = Path(_env("MCP_SKILLS_DB_PATH", str(DATA / "skills" / "skills.db")))
-    # Capability toggles, extensions and ticket settings that admin pages change (citadel_auth/settings_store.py).
+    # Capability toggles and extensions that admin pages change (citadel_auth/settings_store.py).
     settings_db_path: Path = Path(_env("MCP_SETTINGS_DB_PATH", str(DATA / "settings.db")))
-    # Support tickets (capabilities/tickets/utils/service.py): SQLite file and the optional Laya MCP address (http://host:29611/mcp).
-    # Blank LAYA_URL skips Laya; tickets still work.
-    tickets_db_path: Path = Path(_env("MCP_TICKETS_DB_PATH", str(DATA / "tickets" / "tickets.db")))
-    laya_url: str = _env("LAYA_URL", "")
     # db_gateway, where portcullis keeps per-account notes; the notes capability reads those shared with agents.
     # The instance must list the connection; requests carry Armory service assertions.
     treasury_url: str = _env("TREASURY_URL", str(_APP.get("treasury_url") or "http://127.0.0.1:29602"))
@@ -102,8 +98,7 @@ class Settings:
     media_signing_key: str = _env("MCP_MEDIA_SIGNING_KEY", "")
 
     # Folders the read-only capabilities look at, relative to apps/armory/.
-    # usage_report: ai_agent's usage log. vault: the Obsidian vault. repo_reader: the folder holding project repos.
-    usage_dir: Path = Path(_env("MCP_USAGE_DIR", str(data_dir(_PROJECT.parent / "legion") / "usage")))
+    # vault: the Obsidian vault. repo_reader: the folder holding project repos.
     vault_dir: Path = Path(_env("MCP_VAULT_DIR", "../../../../Brain"))
     workspace_dir: Path = Path(_env("MCP_WORKSPACE_DIR", "../../../.."))
 

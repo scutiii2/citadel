@@ -22,7 +22,6 @@ READ_ONLY = {
     "media": {"tool_media_probe", "tool_media_status", "tool_media_listFiles", "tool_media_packages"},
     "pdf": {"tool_pdf_inspect", "tool_pdf_listFiles"},
     "vault": {"tool_vault_search", "tool_vault_listNotes", "tool_vault_readNote"},
-    "usage": {"tool_usage_summary"},
     "repo": {"tool_repo_listRepos", "tool_repo_log", "tool_repo_diff", "tool_repo_grep"},
     "web": {"tool_web_search", "tool_web_readPage"},
     "notes": {"tool_notes_listNotes", "tool_notes_searchNotes", "tool_notes_readNote"},
@@ -31,7 +30,7 @@ READ_ONLY = {
 }
 # Capabilities whose tools change something, spend credits or crawl, or run commands: none may declare it.
 # generator joined it when its tools gained email_to (they can send mail).
-NEVER = ("server_manager", "tables", "firecrawl", "email", "tickets", "generator")
+NEVER = ("server_manager", "tables", "firecrawl", "email", "generator")
 
 
 @pytest.fixture
@@ -75,8 +74,8 @@ def test_the_notes_write_tools_are_not_read_only(loaded):
 def test_capabilities_that_change_things_or_spend_credits_never_declare_it(folder):
     source = (CAPABILITIES / folder / "tool.py").read_text(encoding="utf-8")
 
-    # email and tickets mix reads and writes: they may declare a read tool, but only one at a time.
-    allowed = {"email": 1, "tickets": 2}.get(folder, 0)
+    # Email mixes reads and writes and declares one read tool.
+    allowed = {"email": 1}.get(folder, 0)
     assert source.count("readOnlyHint=True") == allowed, folder
 
 

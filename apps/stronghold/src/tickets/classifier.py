@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import math
 import uuid
 from typing import Any, Literal
 
@@ -43,7 +42,7 @@ class TicketClassifier:
         await self._usage.record(caller.uid, uuid.uuid4().hex, "ticket", None, stored_rows(outcome.result))
         answer = outcome.answer
         confidence = answer["confidence"]
-        if answer["uncertain"] or answer.get("unknown") or not math.isfinite(confidence) or confidence < threshold:
+        if answer["uncertain"] or answer.get("unknown") or not threshold <= confidence <= 1:
             return None
         return answer
 

@@ -73,6 +73,7 @@ async def test_an_uncertain_verdict_marks_a_possible_group_without_joining(db_ga
     second = await file(service, title="Maybe the same")
     assert second.ticket["group_id"] != first.ticket["group_id"]
     assert second.ticket["possible_group_id"] == first.ticket["group_id"]
+    assert second.ticket["tags"] == []
 
 
 async def test_a_classifier_that_is_down_leaves_the_ticket_ungrouped_and_untagged(db_gateway):
@@ -113,12 +114,12 @@ async def test_automatic_reports_are_redacted(db_gateway):
 
 
 async def test_group_priority_rises_with_size_unless_pinned(db_gateway):
-    service = make(db_gateway, FakeClassifier(verdicts=["yes", "yes", "yes"]),
+    service = make(db_gateway, FakeClassifier(tag="email", verdicts=["yes", "yes", "yes"]),
                    elevation={"high": {"tickets": 3, "recent": 99}, "urgent": {"tickets": 99, "recent": 99}})
     for number in range(3):
         outcome = await file(service, owner=f"u-{number}", title=f"same {number}")
     assert outcome.ticket["effective_priority"] == "high"
-    pinned = make(db_gateway, FakeClassifier(verdicts=["yes", "yes"]))
+    pinned = make(db_gateway, FakeClassifier(tag="email", verdicts=["yes", "yes"]))
     first = await file(pinned, title="other group")
     await pinned.set_group_priority(first.ticket["group_id"], priority="low")
     assert (await pinned.get_ticket(first.ticket["id"]))["effective_priority"] == "normal"
@@ -208,3 +209,59 @@ async def test_tag_options_list_the_vocabulary_then_the_owners_custom_tags(db_ga
     values = [o["value"] for o in await service.tag_options("u-1")]
     assert values[-1] == "my-tag" and "email" in values
     assert "my-tag" not in [o["value"] for o in await service.tag_options("u-2")]
+
+
+
+async def test_report_metadata_is_bounded_and_uid_survives_rename(db_gateway):
+    service = make(db_gateway)
+    outcome = await file(service, reporter="", context={"chat_id": "x" * 201, "untrusted_extra": "discard"},
+                         verified_context={"account_id": "u-1"})
+    ticket = outcome.ticket
+    assert ticket["reporter"] == "u-1"
+    assert ticket["context"] == {"reported": {"chat_id": "x" * 200}, "verified": {"account_id": "u-1"}}
+    assert (await service.get_ticket(ticket["id"], owner="u-1"))["id"] == ticket["id"]
+    assert (await service.add_comment(ticket["id"], owner="u-1", author="new name", role="reporter",
+                                      body="An update"))["comments"][0]["author"] == "new name"
+    with pytest.raises(TicketNotFound):
+        await service.get_ticket(ticket["id"], owner="name-reuser")
+
+
+async def test_automatic_report_cap_resets_after_one_hour(db_gateway):
+    current = NOW
+    service = TicketService(TicketStore(db_gateway), load_ticket_config({"auto_hourly_cap": 1}), clock=lambda: current)
+    await file(service, source="ai_auto", title="First")
+    with pytest.raises(TicketError, match="Too many automatic reports"):
+        await file(service, source="ai_auto", title="Second")
+    current += timedelta(hours=1, seconds=1)
+    assert (await file(service, source="ai_auto", title="Second")).ticket["id"] == 2
+
+
+
+async def test_undecidable_tag_does_not_trigger_a_group_match(db_gateway):
+    service = make(db_gateway, FakeClassifier(tag=None, verdicts=["yes"]))
+    first = await file(service)
+    second = await file(service, title="Could be related")
+    assert second.ticket["group_id"] != first.ticket["group_id"]
+    assert second.ticket["tags"] == []
+
+
+
+async def test_purge_waits_for_an_in_flight_ticket(db_gateway):
+    import asyncio
+
+    class PausedClassifier(FakeClassifier):
+        async def pick_tag(self, caller, ticket, tags):
+            entered.set()
+            await release.wait()
+            return "email"
+
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    service = make(db_gateway, PausedClassifier())
+    creating = asyncio.create_task(file(service))
+    await entered.wait()
+    purging = asyncio.create_task(service.purge_owner("u-1"))
+    await asyncio.sleep(0)
+    release.set()
+    _, removed = await asyncio.gather(creating, purging)
+    assert removed == 1 and await service.list_tickets(owner="u-1") == []

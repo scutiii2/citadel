@@ -92,3 +92,10 @@ async def test_new_limits_apply_to_the_next_question():
     assert await classifier.same_issue(CALLER, NEW, OLD) == "uncertain"
     classifier.tune(min_confidence=0.5, timeout=1.0)
     assert await classifier.same_issue(CALLER, NEW, OLD) == "yes"
+
+
+
+async def test_an_out_of_range_confidence_is_not_a_verdict():
+    triage = FakeTriage({"kind": "yes_no", "answer": "yes", "confidence": 2, "uncertain": False})
+    classifier, _ = make(triage)
+    assert await classifier.same_issue(CALLER, NEW, OLD) == "uncertain"

@@ -47,3 +47,25 @@ async def test_a_bad_period_or_grouping_is_a_refusal_result(world):
     for days, group in ((0, "agent"), (91, "agent"), (7, "colour")):
         refused = await world.summary(ANA, days, group)
         assert refused["ok"] is False and refused["message"]
+
+
+
+async def test_a_shorter_period_excludes_old_rows(db_gateway):
+    from datetime import timedelta
+
+    from src.clock import utcnow
+
+    usage = UsageService(db_gateway, UsageSettings(), Pricing(PricingSettings()))
+    await usage.record(ANA.uid, "recent", "chat", None, [row("ember", "m1", 10)])
+    await usage.record(ANA.uid, "older", "chat", None, [row("ember", "m1", 100)])
+    old = utcnow() - timedelta(days=2)
+    earlier = next(doc for doc in db_gateway.records.values() if doc["turn_id"] == "older")
+    earlier.update(day=old.date().isoformat(), created_at=old.isoformat())
+    own = UsageTools(usage)
+    assert (await own.summary(ANA, 1, "day"))["total_tokens"] == 10
+    longer = await own.summary(ANA, 7, "day")
+    assert [entry["total_tokens"] for entry in longer["rows"]] == [100, 10]
+    assert await own.summary(BOB, 7, "agent") == {
+        "ok": True, "days": 7, "group_by": "agent", "requests": 0, "total_tokens": 0, "rows": [],
+        "message": "0 answers, 0 tokens in the last 7 days, by agent (your own usage).",
+    }

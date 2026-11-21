@@ -143,9 +143,11 @@ def read_answer(kind: Kind, response: str) -> dict[str, Any]:
         uncertain = bool(answer["uncertain"])
         if kind == "yes_no":
             yes = float(answer["noul"])
+            if not 0 <= yes <= 1:
+                raise ValueError("yes/no answer is outside its probability range")
             return _with_trace({
                 "kind": "yes_no", "answer": "yes" if yes >= 0.5 else "no", "yes": round(yes, 4),
-                "confidence": round(confidence, 4), "uncertain": uncertain,
+                "confidence": round(confidence, 4), "uncertain": uncertain or bool(answer.get("unknown")),
             }, answer)
         if kind == "score":
             legend = answer["legend"]

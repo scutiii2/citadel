@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
+from weakref import WeakValueDictionary
 
 from pathlib import Path
 
@@ -76,6 +77,7 @@ class TicketService:
         self._settings_path = settings_path
         self._classifier = classifier
         self._settings_lock = asyncio.Lock()
+        self._owner_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
         self._clock = clock or _utc_now
 
     async def tag_options(self, owner: str) -> list[dict[str, str]]:
@@ -129,55 +131,58 @@ class TicketService:
         owner = str(owner or "").strip()
         if not owner:
             raise TicketError("No signed-in reporter is known for this request, so a ticket cannot be filed.")
-        reporter = str(reporter or "").strip() or owner
-        if type not in rules.TYPES:
-            raise TicketError(f"The type must be one of: {', '.join(rules.TYPES)}.")
-        if source not in rules.SOURCES:
-            raise TicketError(f"The source must be one of: {', '.join(rules.SOURCES)}.")
-        title = _text(title, "title", TITLE_MAX)
-        description = _text(description, "description", DESCRIPTION_MAX)
-        reported = _reported_context(context)
-        if source != "user":  # written by a model from tool output: never store secrets
-            title, description = redact(title)[0], redact(description)[0]
+        async with self._owner_lock(owner):
+            reporter = str(reporter or "").strip() or owner
+            if type not in rules.TYPES:
+                raise TicketError(f"The type must be one of: {', '.join(rules.TYPES)}.")
+            if source not in rules.SOURCES:
+                raise TicketError(f"The source must be one of: {', '.join(rules.SOURCES)}.")
+            title = _text(title, "title", TITLE_MAX)
+            description = _text(description, "description", DESCRIPTION_MAX)
+            reported = _reported_context(context)
+            if source != "user":  # written by a model from tool output: never store secrets
+                title, description = redact(title)[0], redact(description)[0]
 
-        fingerprint = None
-        if source == "ai_auto":
-            fingerprint = rules.fingerprint(reported.get("tool_name"), reported.get("error_text") or title)
-            existing = await self._store.find_open_auto(owner, fingerprint)
-            if existing:
-                return await self._outcome(existing, duplicate=True)
+            fingerprint = None
+            if source == "ai_auto":
+                fingerprint = rules.fingerprint(reported.get("tool_name"), reported.get("error_text") or title)
+                existing = await self._store.find_open_auto(owner, fingerprint)
+                if existing:
+                    return await self._outcome(existing, duplicate=True)
 
-        draft = {"type": type, "title": title, "description": description}
-        try:
-            tag_list = rules.clean_tags(tags, self._config.tags, allow_custom=source == "user")
-        except ValueError as error:
-            raise TicketError(str(error)) from None
-        group_id = possible = None
-        if self._classifier is not None and caller is not None:
+            draft = {"type": type, "title": title, "description": description}
             try:
-                tagged = tag_list or await self._classifier_tag(caller, draft)
-                group_id, possible = await self._match_group(caller, draft, tagged)
-                tag_list = tagged
-            except ClassifierUnavailable:
-                logger.warning("Ticket classification skipped: Triage is unavailable.")
+                tag_list = rules.clean_tags(tags, self._config.tags, allow_custom=source == "user")
+            except ValueError as error:
+                raise TicketError(str(error)) from None
+            group_id = possible = None
+            if self._classifier is not None and caller is not None:
+                try:
+                    tagged = tag_list or await self._classifier_tag(caller, draft)
+                    if tagged:
+                        group_id, possible = await self._match_group(caller, draft, tagged)
+                        if possible is None:
+                            tag_list = tagged
+                except ClassifierUnavailable:
+                    logger.warning("Ticket classification skipped: Triage is unavailable.")
 
-        now = self._now()
-        try:
-            ticket_id, created, group_id = await self._store.insert_ticket(owner=owner, reporter=reporter, type=type, title=title, description=description,
-                source=source, tags=tag_list,
-                context={"reported": reported, "verified": _verified_context(verified_context)},
-                fingerprint=fingerprint, group_id=group_id, possible_group_id=possible, now=now.isoformat(),
-                auto_cap=self._config.auto_hourly_cap if source == "ai_auto" else None,
-                auto_since=(now - timedelta(hours=1)).isoformat(),
-            )
-        except AutoLimit:
-            raise TicketError(
-                f"Too many automatic reports from this account in the last hour "
-                f"(limit {self._config.auto_hourly_cap}); not filing another one."
-            ) from None
-        if created:
-            await self._reelevate(group_id)
-        return await self._outcome(ticket_id, duplicate=not created)
+            now = self._now()
+            try:
+                ticket_id, created, group_id = await self._store.insert_ticket(owner=owner, reporter=reporter, type=type, title=title, description=description,
+                    source=source, tags=tag_list,
+                    context={"reported": reported, "verified": _verified_context(verified_context)},
+                    fingerprint=fingerprint, group_id=group_id, possible_group_id=possible, now=now.isoformat(),
+                    auto_cap=self._config.auto_hourly_cap if source == "ai_auto" else None,
+                    auto_since=(now - timedelta(hours=1)).isoformat(),
+                )
+            except AutoLimit:
+                raise TicketError(
+                    f"Too many automatic reports from this account in the last hour "
+                    f"(limit {self._config.auto_hourly_cap}); not filing another one."
+                ) from None
+            if created:
+                await self._reelevate(group_id)
+            return await self._outcome(ticket_id, duplicate=not created)
 
     async def _outcome(self, ticket_id: int, *, duplicate: bool) -> CreateOutcome:
         ticket = await self._store.get_ticket(ticket_id)
@@ -351,5 +356,13 @@ class TicketService:
             await self._reelevate(group_id)
         return await self._store.get_group(group_id)
 
+    def _owner_lock(self, owner: str) -> asyncio.Lock:
+        lock = self._owner_locks.get(owner)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._owner_locks[owner] = lock
+        return lock
+
     async def purge_owner(self, owner: str) -> int:
-        return await self._store.purge_owner(owner)
+        async with self._owner_lock(owner):
+            return await self._store.purge_owner(owner)

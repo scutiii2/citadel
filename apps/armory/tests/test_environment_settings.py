@@ -67,9 +67,9 @@ def test_a_change_is_saved_used_at_once_and_reset_puts_the_default_back(client, 
 
 
 def test_a_setting_read_once_is_reported_as_needing_a_restart(client):
-    answer = client.put("/admin/environment", json={"laya_url": "http://legion:29611/mcp", "firecrawl_api_url": "http://s:1"})
+    answer = client.put("/admin/environment", json={"db_gateway_instance": "example-instance", "firecrawl_api_url": "http://s:1"})
 
-    assert answer.json()["restart"] == ["laya_url"]
+    assert answer.json()["restart"] == ["db_gateway_instance"]
 
 
 def test_secrets_are_never_returned(client, live):
@@ -94,10 +94,10 @@ def test_secrets_are_never_returned(client, live):
 def test_a_refused_change_saves_nothing(client, live, changes):
     before = live.firecrawl_api_url
 
-    answer = client.put("/admin/environment", json={"laya_url": "http://ok:1/mcp", **changes} if changes else changes)
+    answer = client.put("/admin/environment", json={"db_gateway_instance": "example-instance", **changes} if changes else changes)
 
     assert answer.status_code == 400 and answer.json()["error"]
-    assert live.firecrawl_api_url == before and live.laya_url == config.Settings().laya_url
+    assert live.firecrawl_api_url == before and live.db_gateway_instance == config.Settings().db_gateway_instance
     assert environment_settings.stored(live.settings_db_path) == {}
 
 

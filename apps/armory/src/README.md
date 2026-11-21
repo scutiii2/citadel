@@ -34,7 +34,7 @@ reads `from src.foo import bar`, matching chat_app's layout.
   `capability_routes.py` - plain HTTP routes (not MCP tools) mounted
   alongside the MCP surface: where extensions are listed/added/removed, where chat_app discovers
   slash commands, and where a capability is turned on/off live.
-- A capability's own always-on HTTP routes (tickets, memory, skills,
+- A capability's own always-on HTTP routes (memory, skills,
   Obsidian brains, media files) live in its folder as `routes.py`, wired
   in `run.py`; its stores and runtimes live in its `utils/`. A capability
   that does this lists `PROCESS_LIFETIME_MODULES = ("utils",)` in its

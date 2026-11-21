@@ -60,7 +60,7 @@ where that logic lives instead.
 
 Code only one capability uses does not live here: its stores, runtimes and
 HTTP routes sit in that capability's folder (`utils/`, `routes.py`), e.g.
-`capabilities/tickets/` or `capabilities/pdf_merger/utils/pdf_runtime.py`.
+`capabilities/pdf_merger/utils/pdf_runtime.py`.
 
 ## Adding a new services client
 

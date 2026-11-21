@@ -3,7 +3,7 @@
 The `.env` file and the built-in defaults still give the starting value; a stored value wins over both. Removing a
 stored value puts the `.env` or default value back. A secret (signing key, API key) is write-only: the view says
 whether one is set and never returns it. Part of a value is read once when a capability starts (the semantic index,
-the link signing key, Laya, the Treasury registration), so a change to those is saved at once and used from the next start.
+the link signing key and the Treasury registration), so a change to those is saved at once and used from the next start.
 """
 
 from __future__ import annotations
@@ -48,8 +48,6 @@ SPECS: tuple[Spec, ...] = (
          "For the Firecrawl capability. Optional on a self-hosted server.", secret=True),
     Spec("firecrawl_api_url", "Firecrawl address", "Web research and scraping", "url",
          "Blank: the hosted API. Set it for a self-hosted server."),
-    Spec("laya_url", "Laya address (tickets)", "Tickets", "url",
-         "MCP address of Legion's triage agent. Blank: tickets are not tagged.", restart=True),
     Spec("db_gateway_instance", "Treasury instance name", "Services Armory calls", "text",
          "The name Armory registers itself under in Treasury.", restart=True),
     Spec("db_gateway_connection", "Treasury connection", "Services Armory calls", "text",

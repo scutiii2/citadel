@@ -503,12 +503,8 @@ addresses only, never loopback, link-local or cloud-metadata ones).
   be read, is reported to the watcher as a live turn event
   `{type: "notice", notices: [{id, label, error}]}`. It is not saved in the chat.
 
-Tickets and groups live in mcp_server (Armory); portcullis stores no ticket data and
-only passes authenticated calls to Stronghold, which calls Armory with the internal token and session identity.
-Creates always send `source: "user"` and `verified_context` containing
-`via: "portcullis"` and the account's uid (a stable text) as `account_id`. Ticket ownership is
-keyed by username: renaming an account orphans its existing tickets in
-mcp_server's store. The verified account id is retained for a later ownership migration.
+Stronghold stores tickets and groups in Treasury. Portcullis forwards authenticated requests to Stronghold.
+Stronghold records the account’s stable uid as the ticket owner, so ownership survives a username change.
 
 Titles are 1-120 characters, descriptions 1-4000, comments 1-2000 and
 assignees at most 64. Invalid request fields and ids return `422`.

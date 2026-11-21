@@ -27,6 +27,11 @@ def test_the_server_offers_the_stack_brain_and_skill_tools(client):
         "tool_ticket_addComment", "tool_usage_summary",
     }
     assert all(tool.description for tool in listed)
+    support = {tool.name: tool for tool in listed if tool.name.startswith(("tool_ticket_", "tool_usage_"))}
+    assert {name for name, tool in support.items() if tool.annotations.readOnlyHint} == {
+        "tool_ticket_listMyTickets", "tool_ticket_getTicket", "tool_usage_summary",
+    }
+    assert all(tool.meta.get("display_label") and tool.meta.get("keywords") for tool in support.values())
     write = next(tool for tool in listed if tool.name == "tool_brain_write")
     assert "Never save" in write.description
     propose = next(tool for tool in listed if tool.name == "tool_skill_propose")

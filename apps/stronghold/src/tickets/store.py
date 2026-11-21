@@ -28,7 +28,7 @@ class CommentLimit(Exception):
 
 
 def _ticket(doc: Document, group: Document) -> Document:
-    result = {k: v for k, v in doc.items() if k not in {"fingerprint", "comments"}}
+    result = {k: v for k, v in doc.items() if k not in {"fingerprint", "comments", "title_group_id"}}
     return dict(result, group_priority=group["priority"], group_pinned=group["priority_pinned"],
                 effective_priority=rules.higher_priority(doc["priority"], group["priority"]))
 
@@ -57,13 +57,14 @@ class TicketStore:
         counter = await self._docs.get(COUNTERS, collection)
         last = counter["last"] if counter else 0
         for number in range(last + 1, last + 51):
+            # Reserve before publishing so a failed counter write cannot leave a ticket behind.
+            await self._docs.put(COUNTERS, collection, {"key": collection, "last": number})
             if await self._docs.create(collection, str(number), dict(doc, id=number)):
-                await self._docs.put(COUNTERS, collection, {"key": collection, "last": number})
                 return number
         raise DbGatewayError(f"Could not allocate an id in {collection}")
 
-    async def _new_group(self, title: str, now: str) -> int:
-        return await self._allocate(GROUPS, {"title": title[:120], "priority": "normal",
+    async def _new_group(self, now: str, title_ticket_id: int | None = None) -> int:
+        return await self._allocate(GROUPS, {"title_ticket_id": title_ticket_id, "priority": "normal",
                                             "priority_pinned": False, "created_at": now, "updated_at": now})
 
     async def _open_auto(self, owner: str, fingerprint: str) -> Document | None:
@@ -89,10 +90,11 @@ class TicketStore:
                         count += doc["created_at"] >= (auto_since or "")
                     if count >= auto_cap:
                         raise AutoLimit()
+            created_group = group_id is None
             if group_id is None:
-                group_id = await self._new_group(title, now)
+                group_id = await self._new_group(now)
             else:
-                group = await self.get_group(group_id)
+                group = await self._get_group(group_id)
                 if group is None:
                     raise DbGatewayError("Ticket group is missing")
                 await self._docs.put(GROUPS, str(group_id), dict(group, updated_at=now))
@@ -100,6 +102,8 @@ class TicketStore:
                        reporter=reporter, source=source, tags=tags, context=context, fingerprint=fingerprint,
                        possible_group_id=possible_group_id, created_at=now, updated_at=now, status="open",
                        priority="normal", assignee=None, closed_at=None, last_staff_activity_at=None, comments=[])
+            if created_group:
+                doc["title_group_id"] = group_id
             return await self._allocate(TICKETS, doc), True, group_id
 
     @staticmethod
@@ -157,9 +161,9 @@ class TicketStore:
             if doc is None:
                 return None
             if group_id is None:
-                group_id = await self._new_group(doc["title"], now)
+                group_id = await self._new_group(now, ticket_id)
             else:
-                group = await self.get_group(group_id)
+                group = await self._get_group(group_id)
                 if group is None:
                     return None
                 await self._docs.put(GROUPS, str(group_id), dict(group, updated_at=now))
@@ -170,7 +174,7 @@ class TicketStore:
     async def update_group(self, group_id: int, *, priority: str | None = None,
                            pinned: bool | None = None, now: str) -> bool:
         async with self._lock:
-            group = await self.get_group(group_id)
+            group = await self._get_group(group_id)
             if group is None:
                 return False
             if priority is not None:
@@ -182,7 +186,7 @@ class TicketStore:
 
     async def elevate_group(self, group_id: int, priority: str, now: str) -> bool:
         async with self._lock:
-            group = await self.get_group(group_id)
+            group = await self._get_group(group_id)
             if (group is None or group["priority_pinned"]
                     or rules.priority_rank(priority) <= rules.priority_rank(group["priority"])):
                 return False
@@ -200,7 +204,7 @@ class TicketStore:
         doc = await self._docs.get(TICKETS, str(ticket_id))
         if doc is None:
             return None
-        group = await self.get_group(doc["group_id"])
+        group = await self._get_group(doc["group_id"])
         return _ticket(doc, group) if group is not None else None
 
     async def _project(self, docs: list[Document], limit: int | None, priority: str | None = None) -> list[Document]:
@@ -211,7 +215,7 @@ class TicketStore:
         for doc in sorted(docs, key=lambda item: item["id"], reverse=True):
             group_id = doc["group_id"]
             if group_id not in groups:
-                groups[group_id] = await self.get_group(group_id)
+                groups[group_id] = await self._get_group(group_id)
             if groups[group_id] is not None:
                 ticket = _ticket(doc, groups[group_id])
                 if not priority or ticket["effective_priority"] == priority:
@@ -246,8 +250,35 @@ class TicketStore:
         doc = await self._docs.get(TICKETS, str(ticket_id))
         return doc["comments"] if doc is not None else []
 
-    async def get_group(self, group_id: int) -> Document | None:
+    async def _get_group(self, group_id: int) -> Document | None:
         return await self._docs.get(GROUPS, str(group_id))
+
+    async def _group_title(self, group: Document, members: list[Document] | None = None) -> Document:
+        # References keep authored titles in ticket documents, including after a move.
+        group_id = group["id"]
+        source_id = group["title_ticket_id"]
+        if source_id is None:
+            source = next((doc for doc in members or [] if doc.get("title_group_id") == group_id), None)
+            if source is None:
+                matches = await self._docs.query(TICKETS, {"title_group_id": group_id}, limit=1)
+                source = matches[0] if matches else None
+        else:
+            source = next((doc for doc in members or [] if doc["id"] == source_id), None)
+            if source is None:
+                source = await self._docs.get(TICKETS, str(source_id))
+        if source is None:
+            if members is None:
+                members = [doc async for doc in self._scan(TICKETS, group_id=group_id)]
+            source = min(members, key=lambda doc: doc["id"], default=None)
+        result = dict(group)
+        del result["title_ticket_id"]
+        return dict(result, title=source["title"][:120] if source is not None else "")
+
+    async def get_group(self, group_id: int) -> Document | None:
+        group = await self._get_group(group_id)
+        if group is None:
+            return None
+        return await self._group_title(group)
 
     async def group_counts(self, group_id: int, since: str) -> tuple[int, int]:
         total = recent = 0
@@ -272,6 +303,7 @@ class TicketStore:
             tags = sorted({value for doc in docs for value in doc["tags"]})
             if tag and tag not in tags:
                 continue
+            group = await self._group_title(group, docs)
             groups.append(dict(group, ticket_count=len(docs), recent_count=sum(doc["created_at"] >= since for doc in docs),
                                open_count=sum(doc["status"] not in _CLOSED for doc in docs),
                                last_activity=max(doc["updated_at"] for doc in docs), tags=tags))

@@ -8,7 +8,6 @@ what it does:
 - `web_research/` - web search and page read through Tavily (`/web ...`).
 - `media_downloader/` - public video/music/photo probes, queued downloads, status and signed file links (`/media ...`); photo carousels become numbered ZIPs.
 - `firecrawl/` - scrape and crawl through Firecrawl (`/scrape ...`).
-- `usage_report/` - token usage per agent, model or day (`/usage ...`).
 - `vault/` - read-only notes vault (`/vault ...`).
 - `obsidian/` - Local REST API vault listing, search and note read/write/append, with writes disabled by default (`/obsidian ...`).
 - `repo_reader/` - read-only git history and code (`/repo ...`).
@@ -17,7 +16,6 @@ what it does:
 - `email/` - shared outgoing email and threaded replies (`/email ...`).
 - `memory/` - per-user saved notes the model can search and forget (`/memory ...`).
 - `notes/` - the notes a user shared with agents on ember's Notes page, read-only (`/notes ...`).
-- `tickets/` - file bugs and feature suggestions, list and follow your own support tickets (`/ticket ...`).
 
 ## Shape of a capability
 

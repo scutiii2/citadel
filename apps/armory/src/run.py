@@ -121,7 +121,7 @@ async def _serve() -> None:
         # Where a caller fetches a file a tool offered it (via portcullis); a plain route checked against
         # service assertions and signed requester identity. See download_routes.py.
         install_download_routes(app)
-        # Each capability mounts its own always-on routes (memory, skills, obsidian, tickets), even when its tools are off.
+        # Each capability mounts its own always-on routes (memory, skills, obsidian), even when its tools are off.
         capability_loader.install_routes(app)
 
         # uvicorn.Server(...).serve(), not uvicorn.run(): run() calls asyncio.run() and would

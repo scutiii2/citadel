@@ -42,7 +42,7 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/notes/...` | Notes, tags, tag suggestions and generation. Portcullis exposes them as `/api/notes/...` after checking `chat.use` |
 | `/stack/...` | Short-term memory for a single chat. Portcullis exposes this under `/api/chats/{id}/stack`. |
 | `/memory/...` | Assistant memory. Portcullis exposes it as `/api/memory/...` after checking `chat.use` |
-| `/tickets/...`, `/ticket-admin/...` | Tickets (Armory keeps them) and the account's read receipts (Treasury, collection `ticket_seen`). Portcullis exposes them as `/api/tickets/...` (`tickets.create`) and `/api/admin/tickets...`, `/api/admin/ticket-groups...` (`tickets.manage`) |
+| `/tickets/...`, `/ticket-admin/...` | Support tickets, staff triage and the account's read receipts. Portcullis exposes them as `/api/tickets/...` (`tickets.create`) and `/api/admin/tickets...`, `/api/admin/ticket-groups...` (`tickets.manage`) |
 | `/triage/titles`, `/triage/ask` | Option titles from the `title-writer` agent and typed questions to the Triage Assistant (Laya); both count toward the token limits. Portcullis exposes them as `/api/triage/...` after checking `chat.use` |
 | `/attachments/...` | Text extraction (`text`), PDFs and tables stored by Armory (`pdf`, `table`), plus Stronghold calls for Scribe audio (`audio`, `dictate`, `dictate/partial`) or Reader documents (`document`). Portcullis forwards the JSON endpoints and dictation to Stronghold. Attachment previews retain the Armory content stream |
 | `/brains...` | Encrypted Personal Brain connections, browsing through Armory, Note publication and AI promotion suggestions. Portcullis exposes them as `/api/brains`. `POST /brains/resolve` authorizes shared access and resolves personal connections for Armory. Stronghold asks Portcullis for current account permissions and Armory for shared destination metadata |
@@ -58,6 +58,14 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
 | `/skills/...` | Learned skills kept in Stronghold’s Brain. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
 | `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `stack`, `brains`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
+
+## Support tickets
+
+Stronghold records tickets, groups, and counters in Treasury collections `tickets`, `ticket_groups`, and `ticket_counters`. It serves reporter and staff routes at `/tickets` and `/ticket-admin`. Deleting an account removes its tickets and read receipts.
+
+Stronghold asks Legion’s Triage Assistant for a tag and possible group. These calls count toward the reporter’s usage as kind `ticket`. Reports still file when Triage is unavailable. Ticket settings live in `settings.db`, table `ticket_settings`, and are served at `/ticket-admin/settings`.
+
+Legion can call `tool_ticket_createTicket`, `tool_ticket_listMyTickets`, `tool_ticket_getTicket`, `tool_ticket_addComment`, and `tool_usage_summary` through Stronghold’s MCP server. The usage tool reports the requesting account’s Treasury usage records. Ember’s Tickets and Usage pages replace the retired `/ticket` and `/usage` slash commands.
 
 ## MCP server
 
