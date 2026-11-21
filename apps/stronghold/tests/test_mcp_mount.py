@@ -21,7 +21,7 @@ def test_the_server_offers_the_stack_brain_and_skill_tools(client):
     listed = __import__("asyncio").run(client.app.state.mcp.list_tools())
     assert {tool.name for tool in listed} == {
         "tool_stack_add", "tool_stack_list", "tool_stack_remove", "tool_stack_pin",
-        "tool_brain_search", "tool_brain_read", "tool_brain_list", "tool_brain_write", "tool_brain_update",
+        "tool_brain_search", "tool_brain_read", "tool_brain_list", "tool_brain_write", "tool_brain_update", "tool_brain_propose",
         "tool_skill_search", "tool_skill_propose", "tool_skill_mark",
     }
     assert all(tool.description for tool in listed)
@@ -119,3 +119,26 @@ def test_a_signed_legion_call_can_write_a_brain_note_without_a_chat(client, auth
     response = client.get("/brain/search", params={"q": "oatmeal"})
     assert response.status_code == 200
     assert [hit["id"] for hit in response.json()["results"]] == [note["file"]["id"]]
+
+def test_signed_legion_proposes_in_an_owned_chat_without_creating_a_file(client, auth_stack):
+    assert put(client, CHAT).status_code == 200
+    legion = ServiceAuth(auth_stack["legion"], "stronghold")
+    started = rpc(client, legion, "initialize", INIT)
+    headers = {"Mcp-Session-Id": started.headers["Mcp-Session-Id"]}
+    assert rpc(client, legion, "notifications/initialized", {}, headers=headers, request_id=None).status_code == 202
+    item = client.post(f"/stack/{CHAT}/items", json={"text": "Prefers tea."}).json()
+    token = identity()["X-Citadel-Requester"]
+    arguments = {"title": "Tea", "body": "Prefers tea.", "item_ids": [item["id"]]}
+    params = {"name": "tool_brain_propose", "arguments": arguments}
+    wrong_chat = rpc(client, legion, "tools/call", {
+        **params, "_meta": {"requester_token": token, "chat_id": "missing"},
+    }, headers=headers)
+    assert result(wrong_chat)["structuredContent"]["ok"] is False
+    answer = rpc(client, legion, "tools/call", {
+        **params, "_meta": {"requester_token": token, "chat_id": CHAT},
+    }, headers=headers)
+    made = result(answer)["structuredContent"]
+    assert made["ok"] is True
+    proposals = client.portal.call(client.app.state.brain_proposals.pending, "u-1")
+    assert [row["id"] for row in proposals] == [made["proposal"]["id"]]
+    assert client.get("/brain/files").json()["files"] == []

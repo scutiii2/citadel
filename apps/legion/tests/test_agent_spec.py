@@ -361,7 +361,9 @@ def test_reviewer_cannot_use_skill_tools_and_ember_can():
     assert all(scope(ember).allows_explicitly(name) for name in stronghold)
     assert not any(scope(ember).allows(name) for name in skill_tools)  # Armory's copies are no longer offered to Ember
     brain = ["stronghold__tool_brain_search", "stronghold__tool_brain_read", "stronghold__tool_brain_list",
-             "stronghold__tool_brain_write", "stronghold__tool_brain_update", "stronghold__tool_stack_add"]
+             "stronghold__tool_brain_write", "stronghold__tool_brain_update", "stronghold__tool_brain_propose",
+             "stronghold__tool_stack_add"]
+    assert "stronghold__tool_brain_propose" in ember["instructions"]
     assert all(scope(ember).allows_explicitly(name) for name in brain)
     assert not any(scope(reviewer).allows_explicitly(name) for name in brain)
 

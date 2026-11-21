@@ -40,6 +40,7 @@ from src.brain.compaction import StackCompactor
 from src.brain.files import BrainFiles
 from src.brain.global_brain import GlobalBrain
 from src.brain.limits import brain_root, load_limits, load_long_term, load_sharing
+from src.brain.proposals import BrainProposals
 from src.brain.shares import BrainShares
 from src.brain.skills import SkillFiles
 from src.brain.stack import StackStore
@@ -163,6 +164,9 @@ def create_app(
         app.state.brain_shares = BrainShares(
             app.state.store, app.state.brain_files, app.state.skill_files, app.state.stacks, app.state.global_brain,
             await asyncio.to_thread(load_sharing, data_settings),
+        )
+        app.state.brain_proposals = BrainProposals(
+            app.state.store, app.state.brain_files, app.state.stacks,
         )
         app.state.compactor = StackCompactor(app.state.stacks, app.state.agent_gateway, app.state.agents)
         app.state.pricing = Pricing(settings.pricing)
