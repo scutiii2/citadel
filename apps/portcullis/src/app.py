@@ -46,10 +46,8 @@ from src.routes import (
     tickets as tickets_routes,
     logs,
     mcp,
-    memory,
     nav_preferences,
     account_tuning,
-    notes,
     server_info,
     app_policy_routes,
     stronghold_brain_settings,
@@ -244,10 +242,8 @@ def create_app(
     app.include_router(templates.router)
     app.include_router(nav_preferences.router)
     app.include_router(account_tuning.router)
-    app.include_router(notes.router)
     app.include_router(brains.router)
     app.include_router(brains.admin_router)
-    app.include_router(memory.router)
     app.include_router(skills.router)
     app.include_router(triage.router)
     app.include_router(account_agents.router)

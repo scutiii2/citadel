@@ -206,29 +206,13 @@ Only resolved or closed tickets may reopen. The core sets status to open, clears
 `closed_at` and adds a system comment in one transaction; other statuses return
 400, and foreign or unknown tickets return 404. The action is logged by id only.
 
-## Memory page API
+## Legacy notes and memory purges
 
-The separate Memory page uses the existing mcp_server memory store. These routes
-require a verified account with `chat.use`; the owner is always the authenticated
-account's internal uid. Browser-supplied owner fields are ignored.
+The Brain replaces private notes and assistant memory through routes such as `/api/brain/files` and `/api/brain/summary`. Both legacy account-deletion purges remain until Plan 22.
 
-| Method | Route | Behavior |
-| --- | --- | --- |
-| GET | `/api/memory` | All saved memories, newest first; `[{id, text, created_at}]`. |
-| POST | `/api/memory` | `{text}` creates a memory (201), or returns an identical existing memory. |
-| PUT | `/api/memory/{id}` | `{text, expected_text}` edits atomically; 409 for stale or duplicate text. |
-| DELETE | `/api/memory/{id}` | Deletes only an owned memory (204); 404 when missing. |
-
-Text is limited to 500 characters, whitespace is normalized, and the store holds
-at most 200 memories per account. Creation dates survive edits. Mutations log only
-the action, never memory text. No categories or source labels are inferred.
-portcullis checks the login and `chat.use`, then passes each request to Stronghold
-(`/memory/...`), which calls Armory's token-protected `/memory/owners/{uid}/notes`
-routes; all three services need service identity and public trust mounts and the memory capability
-must be enabled. Stronghold down returns 502 `Stronghold is unavailable`, Armory
-down returns 503, missing/disabled memory returns 404, and redirects are refused.
 Deleting an account purges its memories through Stronghold (best effort; a failure
-is logged as the error `admin.memory_purge`). Private `/api/notes` remains separate.
+is logged as the error `admin.memory_purge`).
+Deleting an account removes its notes through Stronghold (best effort: a failure is logged as the error `admin.notes_purge` and the deletion still succeeds).
 
 ## Skills page API
 
@@ -412,22 +396,8 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `GET` | `/api/nav-preferences` | any logged-in account | How this account arranges its nav rail: `{order, pinned, hidden}`, lists of page ids (route paths such as `/agents`). All empty means the default arrangement. |
 | `PUT` | `/api/nav-preferences` | any logged-in account | Replaces it with the same shape. At most 50 ids per list, each 1-64 characters (`422` otherwise). Repeats are dropped; `pinned` and `hidden` keep only ids in `order`, and a hidden page is never pinned. portcullis does not know the page list, so unknown ids are kept. Returns what was stored. |
 | `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. | Nav preferences and the account's switched-off agents are kept in db_gateway (one document per account, keyed by uid). While it is down, `GET` answers the default arrangement and saving gives `503`; account agents answer `503` for every call (an empty list would switch every agent back on). Migration `0023` drops the old tables, and refuses to run while any still holds rows: copy them to the gateway or empty them first. |
-| `GET` | `/api/notes` | `chat.use` | This account's private notes, newest edit first: `[{id, title, body, tags, agent_readable, last_editor, created_at, updated_at}]`. Kept by Stronghold in db_gateway, not in this database. |
-| `GET` | `/api/notes/tags` | `chat.use` | The tags this account already uses, most used first: `[{tag, count}]`. |
-| `POST` | `/api/notes/suggest-tags` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): which of this account's existing tags, not already in `tags`, Laya thinks fit. `{suggested, checked, skipped}`. Needs a running agent whose file uses the `laya` provider, else `503`. Laya answers alone (`local_only`: English, then typed-decisions; no fallback to Jev). |
-| `POST` | `/api/notes/generate-tag` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): `{tags}`, up to 3 new lowercase tags (not already on the note or used by the account) written by the `tag-writer` agent, a light-tier model that sees about 1,500 characters of the note and the account's tag names. An unusable reply gives `[]`. Nothing is saved. `503` when `tag-writer` is not running or does not answer. |
 | `POST` | `/api/triage/titles` | `chat.use` | `{descriptions}` (2-10 strings, 1-300 characters each): a one-word lowercase title for each, in order, written by the `title-writer` agent (one plain model call that sees only the descriptions). An unusable reply falls back to `option1`, `option2`...; a repeat gets a number. `503` when `title-writer` is not running or does not answer, `429` at the usage limit. Counted in usage as kind `triage_titles`; logged as the action `triage.titles` (the count of options only) and, on a `503`, as an error. |
 | `POST` | `/api/triage/ask` | `chat.use` | `{kind: "choice"\|"yes_no", text, question, options?, trace?}`: asks the Triage Assistant one typed question about `text` (1-4000 characters) directly, without the orchestrator. `choice` needs 2-10 `options` `{title, description}` (title: one word, unique ignoring case); `yes_no` takes none. Answer: `{kind: "yes_no", answer, yes, confidence, uncertain}` or `{kind: "choice", choice, probabilities, confidence, uncertain, also_check?, candidates?, unknown?, answered_by?, rounds?}` (`rounds` only with `trace: true`). `422` when Laya refuses the question (for example the text is too long), `503` when the Triage Assistant is not running or gives no usable answer, `429` at the usage limit. Counted in usage as kind `triage`; logged as the action `triage.ask` (the kind, the number of options and the pick, never the text or the question) and, on a `503`, as an error. |
-| `POST` | `/api/notes` | `chat.use` | `{title, body?, tags?, agent_readable?}` (title 1-200 characters after trimming, body up to 20,000; `422` otherwise). `201` with the note; `409` at 200 notes. |
-| `GET` / `PUT` / `DELETE` | `/api/notes/{id}` | `chat.use` | Read, replace (`{title, body?, tags?, agent_readable?, expected_updated_at?}`; a field left out is reset to its default) or delete one note. With `expected_updated_at` (the `updated_at` the editor opened) the save is refused with `412` `This note changed since you opened it` when the note was saved since, and nothing changes; to overwrite anyway, send the note's newer `updated_at`. The check is not atomic (db_gateway has no compare-and-set). Another account's note, or a malformed id, is `404`. `DELETE` is `204`. |
-
-Tags are trimmed and lowercased, repeats are dropped, and each is 1 to 30 characters of `a-z`, `0-9`, `-` and `_` (not starting with `-` or `_`); at most 10 per note, otherwise `422`. `agent_readable` (default off) marks a note agents may read; mcp_server's `notes` capability (read-only) is the only reader: it lists, searches and reads just the notes whose flag is on, for the asking account, straight from db_gateway. A note saved before tags existed reads as untagged and not agent-readable. `last_editor` is `"agent"` when mcp_server's notes tools saved the note last and `"user"` otherwise (older notes too); a create or save from the page always sets `"user"`, and a `last_editor` in a request body is ignored.
-
-The notes routes are answered by Stronghold (`apps/stronghold/src/notes`): portcullis checks the login and `chat.use`, then passes the request on. Notes are kept in Stronghold's database in Treasury. A malformed id is refused here with `404` and does not reach Stronghold. When Stronghold is down every notes route answers `502` `Stronghold is unavailable`. Stronghold owns personal Brain settings and publication records.
-
-Tag suggestions (Stronghold, `src/notes/tag_suggestions.py`): Stronghold finds the running agent whose definition uses the `laya` provider (`AgentDirectory.find_by_provider`) and sends it `ask` with a text and one yes/no question per candidate tag. The text is the first 700 characters of title and body, at most 8 candidates (the most used) are checked, 4 per call (a call Laya finds too long is retried one tag at a time), and the whole request has a 30 second limit. Only answers that are yes (0.5 or more) and not marked uncertain are returned, best first, at most 5. Laya runs locally, so the note text does not leave the machine; the agent logs a usage row for each call. The suggestions are rough (Laya's confidence is uncalibrated), so the page only offers them and never applies one.
-
-Every notes route answers `503` when Stronghold cannot reach db_gateway; the rest of the API is unaffected. Create, edit and delete are written to the action log without the note text, and so is each time the agent switch is turned on or off ("Let agents read a note", "Stopped agents reading a note"); Stronghold sends these lines through `POST /internal/accounts/{uid}/actions`, and a line is lost if that call fails. Deleting an account removes its notes through Stronghold (best effort: a failure is logged as the error `admin.notes_purge` and the deletion still succeeds).
 | `GET` | `/api/account-agents` | any logged-in account | The specialist agents this account switched off: `{disabled: [agent ids]}`. A new account has every agent on. `503` while db_gateway is down (an empty list would switch them all back on). |
 | `PUT` | `/api/account-agents/{agent_id}` | any logged-in account | `{enabled: bool}` switches one agent on or off for this account's chats (`agent_id` 1-64 characters of `A-Za-z0-9_.-`, else `422`). Same reply as `GET`. Repeating a change is a no-op; at most 200 agents per account (`409`). Logged as `account.agent_enable` / `account.agent_disable`. The entry agent leaves a switched-off specialist out of its roster and refuses to delegate to it. |
 | `GET` | `/api/user-extensions` | `chat.use` | This account's own MCP servers ("private extensions"): `[{id, label, description, url, header_names, enabled, status, error, tools}]`. `id` is a slug of the label, unique per account. `status` is `connected`, `error` or `unknown`, from `ai_agent`'s `probe_extension`, cached for 60 seconds; a disabled extension is not probed and reports `unknown`. Header **values** are never returned, only their names. |
@@ -746,7 +716,7 @@ src/
               text_extraction, config_validation, DeviceService, LoginRateLimiter, McpPolicy, McpProxy,
               permissions, DbGatewayClient (db_gateway), NotesService (notes)
   routes/     auth, account, admin, settings, chats, templates, shares, usage, mcp, server_info, logs,
-              attachments, config_issues, notes
+              attachments, config_issues
   utils/      config_loader
 scripts/   backup_db.py                         back up the database now
            migrate_db.py                        schema status / upgrade / new migration (see "Changing the schema")
@@ -804,7 +774,7 @@ connection must exist there (`data` is built in; see `apps/treasury/configs/READ
 (equality filters). A missing record is `None` or `False`. An unreachable gateway raises
 `DbGatewayUnavailable`, so only a feature that uses it fails; portcullis starts without the
 gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDbGateway`
-(the `db_gateway` fixture). The notes routes are the first user.
+(the `db_gateway` fixture).
 
 
 ## Obsidian brains
