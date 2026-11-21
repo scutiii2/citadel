@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import os
-import ast
 from pathlib import Path
 
 import pytest
@@ -327,35 +326,23 @@ def test_retired_agents_are_gone_and_merged_tools_are_covered():
     assert ops.tools.allows("tool_srv_startApp") and ops.tools.allows("tool_srv_listApps")
 
 
-def test_reviewer_cannot_use_memory_tools_but_keeps_everything_else():
+def test_reviewer_has_no_leftover_deny_for_removed_armory_tools():
     app_dir = Path(__file__).resolve().parents[1]
     spec = agent_spec.load_file(app_dir / "agents" / "reviewer.json")
-    tool_path = app_dir.parent / "armory" / "src" / "capabilities" / "memory" / "tool.py"
-    memory_tools = [
-        node.name for node in ast.parse(tool_path.read_text(encoding="utf-8")).body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("tool_")
-    ]
 
-    assert memory_tools  # the real tool names, so a rename cannot silently defeat the deny glob
-    assert not any(spec.tools.allows(name) for name in memory_tools)
+    assert spec.tools.deny == ()  # Armory's memory and skill tools are gone, so nothing is left to deny
     assert spec.tools.allow == ()  # still every other tool
     assert spec.tools.allows("tool_srv_listApps")
 
 
 def test_reviewer_cannot_use_skill_tools_and_ember_can():
     app_dir = Path(__file__).resolve().parents[1]
-    tool_path = app_dir.parent / "armory" / "src" / "capabilities" / "skills" / "tool.py"
-    skill_tools = [
-        node.name for node in ast.parse(tool_path.read_text(encoding="utf-8")).body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("tool_")
-    ]
-    assert set(skill_tools) == {"tool_skill_propose", "tool_skill_search", "tool_skill_mark"}
+    skill_tools = ["tool_skill_propose", "tool_skill_search", "tool_skill_mark"]
 
     # The tracked JSON text: a machine's agent_overrides.json may replace either agent.
     reviewer = json.loads((app_dir / "agents" / "reviewer.json").read_text(encoding="utf-8"))
     ember = json.loads((app_dir / "agents" / "ember.json").read_text(encoding="utf-8"))
     scope = lambda data: agent_spec.ToolScope(allow=tuple(data["tools"].get("allow", ())), deny=tuple(data["tools"].get("deny", ())))
-    assert not any(scope(reviewer).allows(name) for name in skill_tools)
     stronghold = [f"stronghold__{name}" for name in skill_tools]
     assert not any(scope(reviewer).allows_explicitly(name) for name in stronghold)
     assert all(scope(ember).allows_explicitly(name) for name in stronghold)

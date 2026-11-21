@@ -51,8 +51,6 @@ from src.mcp_tools.server import LegionOnlyMcp, build_server
 from src.document_store import DbGatewayClient, DbGatewayError, DbGatewayUnavailable, DocumentStore
 from src import log_privacy
 from src.keys import load_keys
-from src.memory import routes as memory_routes
-from src.memory.client import MemoryClient
 from src.notes import routes as notes_routes
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
@@ -135,7 +133,6 @@ def create_app(
         )
         app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
         armory_client = armory or http_catalog("armory")
-        app.state.memory = MemoryClient(armory_client, keyring)
         app.state.brain_gateway = BrainGateway(armory_client, keyring)
         app.state.ticket_unread = TicketUnread(app.state.store)
         app.state.limits = LimitsStore(app.state.store)
@@ -233,7 +230,6 @@ def create_app(
     app.include_router(instance_migration.router)
     app.include_router(chats_routes.router)
     app.include_router(chats_routes.folder_router)
-    app.include_router(memory_routes.router)
     app.include_router(notes_routes.router)
     app.include_router(skills_routes.router)
     app.include_router(templates_routes.router)

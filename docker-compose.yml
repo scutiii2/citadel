@@ -26,7 +26,7 @@ services:
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
       MCP_PORT: "29600"
-      # The notes tools read the notes the Notes page saves, which Stronghold keeps in its own database.
+      # The Treasury instance and connection Armory registers under.
       DB_GATEWAY_INSTANCE: armory
       DB_GATEWAY_CONNECTION: stronghold
     volumes:

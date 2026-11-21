@@ -1,6 +1,6 @@
 """Keeps account uids out of logged request lines.
 
-Stronghold calls Armory (`/memory/owners/<uid>`) and Portcullis (`/internal/accounts/<uid>/...`)
+Stronghold calls Portcullis (`/internal/accounts/<uid>/...`)
 with the uid in the path, and HTTPX logs every request URL at INFO.
 """
 

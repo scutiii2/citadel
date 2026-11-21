@@ -206,12 +206,10 @@ Only resolved or closed tickets may reopen. The core sets status to open, clears
 `closed_at` and adds a system comment in one transaction; other statuses return
 400, and foreign or unknown tickets return 404. The action is logged by id only.
 
-## Legacy notes and memory purges
+## Legacy notes purge
 
-The Brain replaces private notes and assistant memory through routes such as `/api/brain/files` and `/api/brain/summary`. Both legacy account-deletion purges remain until Plan 22.
+The Brain replaces private notes and assistant memory through routes such as `/api/brain/files` and `/api/brain/summary`. The legacy notes purge on account deletion remains until Plan 22b. The memory purge is gone (Plan 22).
 
-Deleting an account purges its memories through Stronghold (best effort; a failure
-is logged as the error `admin.memory_purge`).
 Deleting an account removes its notes through Stronghold (best effort: a failure is logged as the error `admin.notes_purge` and the deletion still succeeds).
 
 ## Skills page API

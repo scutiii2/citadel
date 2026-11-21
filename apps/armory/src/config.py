@@ -59,14 +59,9 @@ class Settings:
     # records. Relative to CWD, like uploads_dir.
     watchers_dir: Path = Path(_env("MCP_WATCHERS_DIR", str(DATA / "watchers")))
     email_audit_path: Path = Path(_env("MCP_EMAIL_AUDIT_PATH", str(DATA / "email" / "audit.db")))
-    # Per-user memory notes (capabilities/memory). Runtime state: gitignored.
-    memory_db_path: Path = Path(_env("MCP_MEMORY_DB_PATH", str(DATA / "memory" / "memory.db")))
-    # Per-user learned skills (capabilities/skills). Runtime state: gitignored.
-    skills_db_path: Path = Path(_env("MCP_SKILLS_DB_PATH", str(DATA / "skills" / "skills.db")))
     # Capability toggles and extensions that admin pages change (citadel_auth/settings_store.py).
     settings_db_path: Path = Path(_env("MCP_SETTINGS_DB_PATH", str(DATA / "settings.db")))
-    # db_gateway, where portcullis keeps per-account notes; the notes capability reads those shared with agents.
-    # The instance must list the connection; requests carry Armory service assertions.
+    # The Treasury instance and connection Armory registers itself under (run.py). The instance must list the connection.
     treasury_url: str = _env("TREASURY_URL", str(_APP.get("treasury_url") or "http://127.0.0.1:29602"))
     advertise_url: str | None = _APP.get("advertise_url") or None
     db_gateway_instance: str = _env("DB_GATEWAY_INSTANCE", "mcp_server")

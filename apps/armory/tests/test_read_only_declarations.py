@@ -24,9 +24,6 @@ READ_ONLY = {
     "vault": {"tool_vault_search", "tool_vault_listNotes", "tool_vault_readNote"},
     "repo": {"tool_repo_listRepos", "tool_repo_log", "tool_repo_diff", "tool_repo_grep"},
     "web": {"tool_web_search", "tool_web_readPage"},
-    "notes": {"tool_notes_listNotes", "tool_notes_searchNotes", "tool_notes_readNote"},
-    "memory": {"tool_mem_search"},
-    "skills": {"tool_skill_search"},
 }
 # Capabilities whose tools change something, spend credits or crawl, or run commands: none may declare it.
 # generator joined it when its tools gained email_to (they can send mail).
@@ -50,6 +47,10 @@ def loaded(tmp_path, monkeypatch):
     return {tool.name: tool for tool in asyncio.run(server.list_tools())}
 
 
+def test_no_memory_notes_or_skill_tool_is_registered(loaded):
+    assert not [name for name in loaded if name.startswith(("tool_mem_", "tool_notes_", "tool_skill"))]
+
+
 def declared(tool) -> bool:
     return bool(tool.annotations and tool.annotations.readOnlyHint is True)
 
@@ -66,7 +67,7 @@ def test_every_tool_of_a_read_only_capability_is_loaded_and_declared(loaded, cap
 
 
 def test_the_notes_write_tools_are_not_read_only(loaded):
-    for name in ("tool_obsidian_write", "tool_obsidian_append", "tool_pdf_merge", "tool_notes_createNote", "tool_notes_updateNote", "tool_notes_appendToNote", "tool_mem_save", "tool_mem_forget"):
+    for name in ("tool_obsidian_write", "tool_obsidian_append", "tool_pdf_merge"):
         assert name in loaded and not declared(loaded[name]), name
 
 

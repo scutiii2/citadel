@@ -40,7 +40,7 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `GET /health` | Open. `{"status": "ok"}` |
 | `GET /whoami` | Echoes the requester. Portcullis exposes it as `GET /api/stronghold/whoami` |
 | `/stack/...` | Short-term memory for a single chat. Portcullis exposes this under `/api/chats/{id}/stack`. |
-| `DELETE /notes/accounts/{uid}`, `DELETE /memory/accounts/{uid}` | Purge legacy private notes and assistant memory on account deletion until Plan 22. |
+| `DELETE /notes/accounts/{uid}` | Purges legacy private notes on account deletion until Plan 22b. |
 | `/tickets/...`, `/ticket-admin/...` | Support tickets, staff triage and the account's read receipts. Portcullis exposes them as `/api/tickets/...` (`tickets.create`) and `/api/admin/tickets...`, `/api/admin/ticket-groups...` (`tickets.manage`) |
 | `/triage/titles`, `/triage/ask` | Option titles from the `title-writer` agent and typed questions to the Triage Assistant (Laya); both count toward the token limits. Portcullis exposes them as `/api/triage/...` after checking `chat.use` |
 | `/attachments/...` | Text extraction (`text`), PDFs and tables stored by Armory (`pdf`, `table`), plus Stronghold calls for Scribe audio (`audio`, `dictate`, `dictate/partial`) or Reader documents (`document`). Portcullis forwards the JSON endpoints and dictation to Stronghold. Attachment previews retain the Armory content stream |
@@ -56,7 +56,7 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/usage/...` | Token usage and limits, kept in Treasury (collection `usage_records`). Portcullis exposes the reads as `/api/usage/...` and `/api/admin/usage/...`, and calls `POST /usage/check` and `POST /usage/records` around every agent call |
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
 | `/skills/...` | Learned skills kept in Stronghold’s Brain. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
-| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `stack`, `brains`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
+| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`notes`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `stack`, `brains`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
 
 ## Support tickets
 
@@ -179,7 +179,7 @@ Treasury keeps any JSON, so `src/schema` is Stronghold's schema. `models.py` has
 
 ## Notes and memory
 
-The Brain replaces the private-notes and assistant-memory user routes. Existing notes stay in Treasury's `notes` collection and memories stay in Armory. The account-deletion purge routes remain until Plan 22. Armory's notes tools still use the `stronghold` Treasury connection (`DB_GATEWAY_CONNECTION=stronghold`), and Obsidian publishing still uses `src/notes/store.py`.
+The Brain replaces the private-notes and assistant-memory user routes. Existing notes stay in Treasury's `notes` collection. The notes purge route remains until Plan 22b, and Obsidian publishing still uses `src/notes/store.py`. Armory no longer has notes, memory or skills tools (Plan 22); its old `memory.db` and `skills.db` stay on disk, unused.
 
 `src/agents/` is a copy of Portcullis's agent client. Change both until chats move here.
 
