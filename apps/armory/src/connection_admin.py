@@ -6,16 +6,57 @@ import re
 
 import httpx
 from starlette.applications import Starlette
-from starlette.requests import Request
+from starlette.requests import ClientDisconnect, Request
 from starlette.responses import JSONResponse, Response
 
-from src.citadel_auth import ServiceAuth
-from src.connection_routes import RouteError, read_body, read_json, requester_headers
+from src.citadel_auth import ServiceAuth, current_requester
 from src.service_catalog import require_internal_origin
 from src.services import extensions, service_auth
 from src.services.connections import REQUIRED, ConnectionStore, auth_headers, ready_status
 
 _BODY_LIMIT = 96 * 1024
+MAX_JSON = 1024 * 1024
+READ_SECONDS = 15
+
+
+class RouteError(Exception):
+    def __init__(self, status: int, detail: str):
+        super().__init__(detail)
+        self.status = status
+
+
+async def read_body(request: Request, limit: int) -> bytes:
+    try:
+        async with asyncio.timeout(READ_SECONDS):
+            body = bytearray()
+            async for chunk in request.stream():
+                if len(body) + len(chunk) > limit:
+                    raise RouteError(413, "Request is too large.")
+                body.extend(chunk)
+            return bytes(body)
+    except TimeoutError:
+        raise RouteError(408, "Request body timed out.") from None
+    except ClientDisconnect:
+        raise RouteError(400, "Request body was interrupted.") from None
+
+
+async def read_json(response: httpx.Response) -> dict:
+    data = bytearray()
+    async for chunk in response.aiter_bytes(chunk_size=65536):
+        if len(data) + len(chunk) > MAX_JSON:
+            raise ValueError("Response is too large.")
+        data.extend(chunk)
+    value = json.loads(data)
+    if not isinstance(value, dict):
+        raise ValueError("Response is not an object.")
+    return value
+
+
+def requester_headers() -> dict[str, str]:
+    who = current_requester()
+    if who is None or not who.username:
+        raise RouteError(401, "Requester identity is required.")
+    return {"X-Requester-Username": who.username, "X-Requester-Email": who.email, "X-Requester-Uid": who.uid}
 
 
 class ConnectionAdmin:

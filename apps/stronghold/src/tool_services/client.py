@@ -1,4 +1,4 @@
-"""Bard, Scribe and Reader over REST, from the connections Stronghold holds. Moved from Armory's connection_routes.py."""
+"""Bard, Scribe and Reader over REST, from the connections Stronghold holds. Armory no longer serves these routes."""
 
 from __future__ import annotations
 

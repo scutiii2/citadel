@@ -71,14 +71,12 @@ async def _serve() -> None:
         from src.capability_routes import install_capability_routes
         from src.command_routes import install_command_routes
         from src.connection_admin import install_connection_admin
-        from src.connection_routes import install_connection_routes
         from src.download_routes import install_download_routes
         from src.environment_routes import install_environment_routes
         from src.extension_routes import install_extension_routes
         from src.help_routes import install_help_routes
         from src.upload_routes import install_upload_routes
         from src.services.connections import ConnectionStore
-        from src.services.dictation import STREAM_FRAME_BYTES
 
         enabled_capabilities = [
             name for name in capability_registry.names() if capability_registry.is_enabled(name)
@@ -137,10 +135,8 @@ async def _serve() -> None:
 
         async with httpx.AsyncClient(trust_env=False) as client:
             connections = ConnectionStore(settings.settings_db_path)
-            install_connection_routes(app, connections, client)
             install_connection_admin(app, connections, client)
-            server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port,
-                                                   ws_max_size=STREAM_FRAME_BYTES, ws_max_queue=4))
+            server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))
             migration = asyncio.create_task(migrate(instance_brain, keyring, catalog)) if box is not None else None
             try:
                 await server.serve()
