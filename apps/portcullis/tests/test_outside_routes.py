@@ -152,3 +152,11 @@ def test_the_outside_route_is_the_only_one_a_client_key_opens(client):
     _id, key = make_client(client)
     for path in ("/api/chats", "/api/admin/outside-clients", "/api/usage", "/api/agent"):
         assert client.get(path, headers=auth(key)).status_code in (401, 403, 404)
+
+
+def test_a_422_never_echoes_the_question(client, fake_legion):
+    _id, key = make_client(client)
+    secret = "TOPSECRETQUESTION" * 600
+    response = client.post("/api/outside/legion/ask", json={"question": secret}, headers=auth(key))
+    assert response.status_code == 422 and "TOPSECRET" not in response.text
+    assert set(response.json()["detail"][0]) == {"loc", "msg", "type"}

@@ -48,6 +48,7 @@ from src.routes import (
     mcp,
     nav_preferences,
     outside,
+    outside_clients_admin,
     account_tuning,
     server_info,
     app_policy_routes,
@@ -268,6 +269,7 @@ def create_app(
     app.include_router(stronghold.router)
     app.include_router(internal_routes.router)
     app.include_router(outside.router)
+    app.include_router(outside_clients_admin.router)
 
     @app.exception_handler(CapabilityFailure)
     async def capability_failure(_request: Request, error: CapabilityFailure):
@@ -281,6 +283,9 @@ def create_app(
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError):
+        if request.url.path.startswith("/api/outside/"):  # never echo an outside client's text (input, ctx)
+            return JSONResponse(status_code=422, content={"detail": [
+                {"loc": e["loc"], "msg": e["msg"], "type": e["type"]} for e in error.errors()]})
         return await request_validation_exception_handler(request, error)
 
     @app.exception_handler(UsageUnavailable)

@@ -3,7 +3,8 @@
 Reads the `disabled_tools` value Portcullis sends on stdin (JSON), binds it the way Legion's run_chat does,
 and drives Legion's real recall, skill recall and skill learning paths plus mcp_upstream.call_tool against a
 fake upstream client that records every tool call. Prints JSON: the calls that reached the upstream and how
-each direct call ended. Imports no agent_config/server, so no .env is read or seeded and no model runs.
+each direct call ended. Imports no agent_config/server and runs no model. Importing Legion's mcp_upstream builds a keyring at import time,
+which may read Citadel's root `.env` through Legion's own helper (no value is printed). Run it with `-B`.
 """
 
 import asyncio

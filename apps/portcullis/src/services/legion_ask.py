@@ -35,8 +35,8 @@ class LegionAnswer:
 def _tokens(data: dict) -> int:
     usage = data.get("agent_usage")
     if isinstance(usage, list) and usage:
-        return sum(int(row.get("total_tokens") or 0) for row in usage if isinstance(row, dict))
-    return int(data.get("total_tokens") or 0)
+        return max(0, sum(max(0, int(row.get("total_tokens") or 0)) for row in usage if isinstance(row, dict)))
+    return max(0, int(data.get("total_tokens") or 0))
 
 
 class LegionAsk:

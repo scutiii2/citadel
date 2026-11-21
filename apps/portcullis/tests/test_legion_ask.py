@@ -77,6 +77,13 @@ def test_tokens_fall_back_to_the_total_and_then_to_zero(monkeypatch):
     assert ask("u", "q", []).tokens == 0
 
 
+def test_a_negative_token_count_never_reduces_the_spend(monkeypatch):
+    patch(monkeypatch, FakeSession(FakeResult({"response": "x", "agent_usage": [{"total_tokens": -50}, {"total_tokens": 10}]})))
+    assert ask("u", "q", []).tokens == 10
+    patch(monkeypatch, FakeSession(FakeResult({"response": "x", "total_tokens": -9})))
+    assert ask("u", "q", []).tokens == 0
+
+
 @pytest.mark.parametrize("session", [
     FakeSession(raises=RuntimeError("down")), FakeSession(FakeResult({}, error=True)),
     FakeSession(FakeResult({"response": "  "})), FakeSession(FakeResult(None)),
@@ -96,8 +103,8 @@ LEGION_PYTHON = next((p for p in (APPS / "legion/.venv/Scripts/python.exe", APPS
 
 def probe(disabled_tools):
     """Legion's real recall, skill recall, skill learning and call_tool, with a recording fake upstream."""
-    env = {**os.environ, "AI_AGENT_FILE": str(LEGION / "agents/ember.json")}
-    done = subprocess.run([str(LEGION_PYTHON), str(Path(__file__).with_name("legion_filter_probe.py"))], cwd=LEGION,
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "AI_AGENT_FILE": str(LEGION / "agents/ember.json")}
+    done = subprocess.run([str(LEGION_PYTHON), "-B", str(Path(__file__).with_name("legion_filter_probe.py"))], cwd=LEGION,
                           input=json.dumps(disabled_tools), capture_output=True, text=True, timeout=120, env=env)
     assert done.returncode == 0, done.stderr[-2000:]
     return json.loads(done.stdout.strip().splitlines()[-1])
