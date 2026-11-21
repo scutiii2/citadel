@@ -1,4 +1,4 @@
-"""Check that the stack gateways stay private to Legion.
+"""Check that the stack gateways stay private to Legion. Never reads a real .env.gateways: it uses a temp copy and a sentinel.
 
     python scripts/check_compose.py            checks the real compose files (needs Docker)
     python scripts/check_compose.py --self-test  checks check() on hand-made data (no Docker)
