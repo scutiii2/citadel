@@ -2,7 +2,9 @@
 
 Admin web app for Stronghold, built with Vue 3, TypeScript and Vite. It runs on port 26504 (`STRONGHOLD_ADMIN_PORT`) and talks only to [portcullis](../portcullis) over the same origin: its Vite server (and its nginx in Docker) forwards `/api` to Portcullis, so the browser holds no server URL or token.
 
-Pages: Usage, Analytics (logs, errors, chat activity, traffic), Tickets, Usage settings, and Tool services. Calls: `/api/admin/usage`, `/api/logs`, `/api/traffic/analytics`, `/api/admin/tickets`, `/api/admin/ticket-groups`, `/api/admin/stronghold-usage-settings`, `/api/admin/tool-services`. Usage and Tickets data comes from `stronghold`; logs and traffic are Portcullis's own.
+Pages: Usage, Analytics (logs, errors, chat activity, traffic), Tickets, Usage settings, Brain settings, and Tool services. Calls: `/api/admin/usage`, `/api/logs`, `/api/traffic/analytics`, `/api/admin/tickets`, `/api/admin/ticket-groups`, `/api/admin/stronghold-usage-settings`, `/api/admin/stronghold-brain-settings`, `/api/admin/tool-services`. Usage and Tickets data comes from `stronghold`; logs and traffic are Portcullis's own.
+
+**Brain settings** (`settings.manage`) shows the limits of short-term memory, long-term memory and sharing. Stronghold checks each value against its own ranges and applies changes immediately. Save sends only the fields you changed. The brain folder path is read-only.
 
 ## Tool services
 

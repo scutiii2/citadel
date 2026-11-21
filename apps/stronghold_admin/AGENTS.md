@@ -2,7 +2,7 @@
 
 Project note: `Brain/Projects/stronghold_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder), once it exists.
 
-Vue 3 + TypeScript admin app for Stronghold. All API calls go through Portcullis. Pages include Usage, Analytics, Tickets, and Usage settings (token limits and pricing, `/api/admin/stronghold-usage-settings`).
+Vue 3 + TypeScript admin app for Stronghold. All API calls go through Portcullis. Pages include Usage, Analytics, Tickets, Usage settings (token limits and pricing, `/api/admin/stronghold-usage-settings`), and Brain settings (memory and sharing limits, `/api/admin/stronghold-brain-settings`).
 
 ## Rules
 - Code is copied between the admin apps, not shared. Nothing here imports from another app. Apply a fix to a shared component (PageLayout, ToggleSwitch, BaseModal...) in every admin app that has a copy.

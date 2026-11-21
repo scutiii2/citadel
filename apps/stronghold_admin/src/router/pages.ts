@@ -40,6 +40,12 @@ export const STRONGHOLD_PAGES: StrongholdPage[] = [
     permission: "settings.manage",
   },
   {
+    to: "/brain-settings",
+    label: "Brain settings",
+    icon: ["M12 18V5", "M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4", "M17.6 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.6 1.5 4 4 0 0 0-2.8 5.6 4 4 0 0 0 .6 6.9A4 4 0 0 0 12 20a4 4 0 0 0 7.8-1 4 4 0 0 0 .6-6.9 4 4 0 0 0-2.8-5.6"],
+    permission: "settings.manage",
+  },
+  {
     to: "/tool-services",
     label: "Tool services",
     icon: ["M4 7h16", "M4 12h16", "M4 17h16", "M8 5v4", "M16 10v4", "M10 15v4"],

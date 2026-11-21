@@ -26,4 +26,15 @@ describe("router", () => {
     await router.push("/usage");
     expect(router.currentRoute.value.name).toBe("no-access");
   });
+  it("opens /brain-settings for an account with settings.manage", async () => {
+    const router = await freshRouter(["settings.manage"]);
+    await router.push("/brain-settings");
+    expect(router.currentRoute.value.name).toBe("brain-settings");
+  });
+  it("sends an account without settings.manage away from /brain-settings", async () => {
+    const router = await freshRouter(["usage.all.view"]);
+    expect(router.resolve("/brain-settings").meta.permission).toBe("settings.manage");
+    await router.push("/brain-settings");
+    expect(router.currentRoute.value.name).toBe("usage");
+  });
 });
