@@ -33,6 +33,7 @@ from src.chats.store import ChatStore
 from src.config import Settings, load_settings
 from src.brain import files_routes as brain_files_routes
 from src.brain import global_routes as brain_global_routes
+from src.brain import proposal_routes as brain_proposal_routes
 from src.brain import share_routes as brain_share_routes
 from src.brain import routes as stack_routes
 from src.brain import settings_routes as brain_settings_routes
@@ -216,6 +217,7 @@ def create_app(
     app.include_router(brain_global_routes.router)
     app.include_router(brain_share_routes.router)
     app.include_router(brain_share_routes.blocks_router)
+    app.include_router(brain_proposal_routes.router)
     app.include_router(brain_settings_routes.router)
     app.include_router(instance_migration.router)
     app.include_router(chats_routes.router)

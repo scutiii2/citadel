@@ -34,6 +34,7 @@ from src.routes import (
     attachments,
     bard,
     brain_files,
+    brain_proposals,
     brain_sharing,
     capability_files,
     internal as internal_routes,
@@ -238,6 +239,7 @@ def create_app(
     app.include_router(stack.router)
     app.include_router(brain_files.router)
     app.include_router(brain_sharing.router)
+    app.include_router(brain_proposals.router)
     app.include_router(chat_folders.router)
     app.include_router(templates.router)
     app.include_router(nav_preferences.router)

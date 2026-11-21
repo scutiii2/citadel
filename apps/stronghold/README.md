@@ -92,7 +92,9 @@ Stronghold stores one account’s notes under `<root>/accounts/<uid>/[folder/]<s
 
 For automatic notes, the first user edit to the title, body or tags saves a revert copy in `.originals/<id>.md`. Automatic notes return an editing warning. Agents can read every note in their account. They can edit automatic notes and manual notes the user marks `agent_editable`. Only users can move or delete notes or change that flag.
 
-Legion calls `tool_brain_search`, `tool_brain_read`, `tool_brain_list`, `tool_brain_write`, and `tool_brain_update` through signed `/mcp` requests. Each call needs a verified requester. Search uses BM25 over titles, tags and Markdown bodies. Stronghold creates the folder on first write.
+Legion calls `tool_brain_search`, `tool_brain_read`, `tool_brain_list`, `tool_brain_write`, `tool_brain_update`, and `tool_brain_propose` through signed `/mcp` requests. Each call needs a verified requester. Search uses BM25 over titles, tags and Markdown bodies. Stronghold creates the folder on first write.
+
+`tool_brain_propose` queues a draft for review on Ember’s Notes page. Stronghold serves review routes at `/brain/proposals`, which Portcullis forwards from `/api/brain/proposals`. Keep creates an agent-authored file. Decline clears the draft text.
 
 | Method and path | Input | Result |
 |---|---|---|
