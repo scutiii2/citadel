@@ -21,7 +21,7 @@ The internal Router chooses specialists and model tiers through that arrangement
 
 1. Copy `.env.example` to `.env`.
    - **Anthropic-protocol agents** (`llm.provider: "anthropic"`) call their models through
-     ConversationGateway (`AI/ModelProviders/ConversationGateway`, port 29407). Their keys are saved
+     ConversationGateway (`AI/ModelProviders/ConversationGateway`, port 29407, reached inside Docker as `http://conversation-gateway:29407`). Their keys are saved
      there, not here: on its `/admin/gateways.html` page save a gateway with the same id as the file in
      `gateways/anthropic/` (`claude`, `openrouter`, ...) and create an access token for Legion. Then
      set the gateway's address and that token on the Legion admin app's **Connections** page. Legion
@@ -62,7 +62,7 @@ Failover reads the gateway's error `kind` (`rate_limit`, `quota`, `auth`, `unava
 
 Laya is gateway `laya` of provider `decision`; Jev is gateway `jev`. Legion loads no model and holds
 no address or key for either: both are entries saved in DecisionGateway
-(`AI/ModelProviders/DecisionGateway`, port 29406) under those two ids. Set that service's address and
+(`AI/ModelProviders/DecisionGateway`, port 29406, reached inside Docker as `http://decision-gateway:29406`) under those two ids. Set that service's address and
 Legion's token on the Legion admin app's **Connections** page (kept in Treasury, like
 ConversationGateway's). Laya's strategy and window, and Jev's model and key, are set on the
 gateway entry there.
