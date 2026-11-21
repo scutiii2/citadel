@@ -203,6 +203,6 @@ class TriageQuestions:
             message = str(error)
             if _TOO_LONG in message or _INVALID in message:
                 raise TriageRejected(message) from error
-            logger.info("triage question failed: %s", error)
+            logger.info("triage question failed: %s", type(error).__name__)
             raise TriageUnavailable("the Triage Assistant did not answer") from error
         return AskOutcome(read_answer(kind, str(result.get("response") or "")), result)
