@@ -1,5 +1,6 @@
 # ZimaOS overlay for docker-compose.yml. Opens the admin web UIs to the LAN.
 # Needs Docker Compose 2.24+ (for !override).
+# The stack gateways publish nothing; add docker-compose.gateway-admin.yml as a third -f file to open their admin pages on 127.0.0.1 while setting up.
 # Start:  docker compose -f docker-compose.yml -f docker-compose.zima.yml up -d --build
 
 services:

@@ -16,6 +16,7 @@ __pycache__/
 # Configs (configs/*.json) are tracked and name secrets as ${VAR}; the values live in .env (never tracked,
 # each has a .env.example beside it). .secrets/ is the legacy folder run.py migrates into .env on first start.
 /apps/armory/.env
+/.env.gateways
 /apps/armory/.secrets/*
 !/apps/armory/.secrets/*.example
 

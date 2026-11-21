@@ -39,6 +39,7 @@ def make(path: Path) -> None:
 
 if __name__ == "__main__":
     make(ROOT / ".env")
+    make(ROOT / ".env.gateways")  # provider keys for the two stack gateways; all values stay empty
     for app in APPS:
         make(ROOT / "apps" / app / ".env")
     print("Read the generated passwords from the files; nothing was printed.")
