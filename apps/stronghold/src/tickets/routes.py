@@ -1,4 +1,4 @@
-"""/tickets: an account's own tickets, and /ticket-admin: every ticket, for staff. Armory keeps the tickets.
+"""/tickets: an account's own tickets, and /ticket-admin: every ticket, for staff. Stronghold stores tickets in Treasury.
 
 Portcullis serves these as /api/tickets (tickets.create) and /api/admin/tickets and
 /api/admin/ticket-groups (tickets.manage) after checking the login and the permission.
@@ -14,10 +14,11 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Res
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.agents.gateway import Caller
 from src.clock import utcnow
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
-from src.tickets.client import ArmoryTickets
+from src.tickets.service import TicketService
 from src.tickets.unread import TicketUnread
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
@@ -29,7 +30,7 @@ TicketPriority = Literal["low", "normal", "high", "urgent"]
 TicketId = Annotated[int, Path(ge=1)]
 
 
-def get_tickets(request: Request) -> ArmoryTickets:
+def get_tickets(request: Request) -> TicketService:
     return request.app.state.tickets
 
 
@@ -42,7 +43,7 @@ def get_platform(request: Request) -> PortcullisClient:
 
 
 def _reporter_ticket(ticket: dict[str, Any]) -> dict[str, Any]:
-    """Project explicitly: Armory's staff fields must never reach reporters."""
+    """Project explicitly: Staff fields must never reach reporters."""
     fields = ("id", "type", "title", "description", "status", "created_at", "updated_at", "closed_at")
     result = {key: ticket[key] for key in fields if key in ticket}
     if "comments" in ticket:
@@ -81,35 +82,39 @@ class CommentIn(BaseModel):
 
 @router.post("")
 async def create_ticket(body: TicketIn, who: Requester = Depends(current_requester),
-                        tickets: ArmoryTickets = Depends(get_tickets)) -> JSONResponse:
-    payload = {**body.model_dump(), "source": "user", "verified_context": {"via": "portcullis", "account_id": who.uid}}
-    result = await tickets.create(who, payload)
+                        tickets: TicketService = Depends(get_tickets)) -> JSONResponse:
+    outcome = await tickets.create(
+        **body.model_dump(), owner=who.uid, reporter=who.username, source="user",
+        verified_context={"via": "portcullis", "account_id": who.uid},
+        caller=Caller(who.username, who.email, who.uid),
+    )
+    result = {"ticket": outcome.ticket, "duplicate": outcome.duplicate, "group_size": outcome.group_size}
     return JSONResponse(_reporter_result(result), status_code=200 if result.get("duplicate") else 201)
 
 
 @router.get("")
 async def list_own_tickets(
     status_filter: Annotated[TicketStatus | None, Query(alias="status")] = None,
-    who: Requester = Depends(current_requester), tickets: ArmoryTickets = Depends(get_tickets),
+    who: Requester = Depends(current_requester), tickets: TicketService = Depends(get_tickets),
     unread: TicketUnread = Depends(get_unread),
 ) -> Any:
-    result = await tickets.list_own(who, status_filter)
+    result = {"tickets": await tickets.list_tickets(owner=who.uid, status=status_filter, limit=None)}
     unread_ids = await unread.unread_ids(who.uid, _activity(result["tickets"]))
     return {"tickets": [{**_reporter_ticket(ticket), "has_unread": ticket["id"] in unread_ids} for ticket in result["tickets"]]}
 
 
 @router.get("/unread-count")
-async def unread_ticket_count(who: Requester = Depends(current_requester), tickets: ArmoryTickets = Depends(get_tickets),
+async def unread_ticket_count(who: Requester = Depends(current_requester), tickets: TicketService = Depends(get_tickets),
                               unread: TicketUnread = Depends(get_unread)) -> Any:
-    result = await tickets.list_own(who, None)
+    result = {"tickets": await tickets.list_tickets(owner=who.uid, limit=None)}
     return {"count": len(await unread.unread_ids(who.uid, _activity(result["tickets"])))}
 
 
 @router.get("/{ticket_id}")
 async def get_own_ticket(ticket_id: TicketId, who: Requester = Depends(current_requester),
-                         tickets: ArmoryTickets = Depends(get_tickets), unread: TicketUnread = Depends(get_unread)) -> Any:
+                         tickets: TicketService = Depends(get_tickets), unread: TicketUnread = Depends(get_unread)) -> Any:
     fetched_at = utcnow()
-    result = await tickets.get_own(who, ticket_id)
+    result = {"ticket": await tickets.get_ticket(ticket_id, owner=who.uid)}
     await unread.mark_seen(who.uid, ticket_id, fetched_at)
     projected = _reporter_result(result)
     projected["ticket"]["has_unread"] = ticket_id in await unread.unread_ids(
@@ -119,30 +124,34 @@ async def get_own_ticket(ticket_id: TicketId, who: Requester = Depends(current_r
 
 @router.post("/{ticket_id}/comments")
 async def comment_own_ticket(ticket_id: TicketId, body: CommentIn, who: Requester = Depends(current_requester),
-                             tickets: ArmoryTickets = Depends(get_tickets)) -> Any:
-    return _reporter_result(await tickets.comment_own(who, ticket_id, body.body))
+                             tickets: TicketService = Depends(get_tickets)) -> Any:
+    ticket = await tickets.add_comment(ticket_id, author=who.username or who.uid, role="reporter",
+                                       body=body.body, owner=who.uid)
+    return _reporter_result({"ticket": ticket})
 
 
 @router.post("/{ticket_id}/close")
 async def close_own_ticket(ticket_id: TicketId, who: Requester = Depends(current_requester),
-                           tickets: ArmoryTickets = Depends(get_tickets)) -> Any:
-    return _reporter_result(await tickets.close_own(who, ticket_id))
+                           tickets: TicketService = Depends(get_tickets)) -> Any:
+    return _reporter_result({"ticket": await tickets.close_own(ticket_id, who.uid)})
 
 
 @router.post("/{ticket_id}/reopen")
 async def reopen_own_ticket(ticket_id: TicketId, who: Requester = Depends(current_requester),
-                            tickets: ArmoryTickets = Depends(get_tickets),
+                            tickets: TicketService = Depends(get_tickets),
                             platform: PortcullisClient = Depends(get_platform)) -> Any:
-    result = await tickets.reopen_own(who, ticket_id)
+    result = {"ticket": await tickets.reopen_own(ticket_id, who.uid)}
     await platform.log_action(who.uid, "tickets.reopen", f"Reopened ticket {ticket_id}")
     return _reporter_result(result)
 
 
 @router.delete("/accounts/{uid}", status_code=status.HTTP_204_NO_CONTENT)
 async def purge_account(uid: Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")],
-                        unread: TicketUnread = Depends(get_unread)) -> Response:
-    """The read receipts of a deleted account. Portcullis calls it when an administrator deletes the account."""
+                        unread: TicketUnread = Depends(get_unread),
+                        tickets: TicketService = Depends(get_tickets)) -> Response:
+    """Remove tickets and read receipts when Portcullis deletes an account."""
     await unread.purge_owner(uid)
+    await tickets.purge_owner(uid)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -183,64 +192,64 @@ async def list_all_tickets(
     group_id: Annotated[int | None, Query(ge=1)] = None,
     possible: bool = False,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
-    who: Requester = Depends(current_requester), tickets: ArmoryTickets = Depends(get_tickets),
+    who: Requester = Depends(current_requester), tickets: TicketService = Depends(get_tickets),
 ) -> Any:
     filters = {"status": status_filter, "type": type, "tag": tag, "priority": priority, "assignee": assignee,
-               "group_id": group_id, "possible": possible, "limit": limit}
-    return await tickets.list_all(who, filters)
+               "group_id": group_id, "possible_only": possible, "limit": limit}
+    return {"tickets": await tickets.list_tickets(**filters)}
 
 
 @admin_router.get("/stats")
-async def ticket_stats(who: Requester = Depends(current_requester), tickets: ArmoryTickets = Depends(get_tickets)) -> Any:
-    return await tickets.stats(who)
+async def ticket_stats(who: Requester = Depends(current_requester), tickets: TicketService = Depends(get_tickets)) -> Any:
+    return await tickets.stats()
 
 
 @admin_router.get("/settings")
-async def ticket_settings(who: Requester = Depends(current_requester), tickets: ArmoryTickets = Depends(get_tickets)) -> Any:
-    """The ticket settings Armory keeps: tags, elevation rules, Laya limits."""
-    return await tickets.settings(who)
+async def ticket_settings(who: Requester = Depends(current_requester), tickets: TicketService = Depends(get_tickets)) -> Any:
+    """Ticket tags, elevation rules and classification limits."""
+    return tickets.settings_document()
 
 
 @admin_router.patch("/settings")
 async def update_ticket_settings(
-    changes: dict[str, Any], who: Requester = Depends(current_requester), tickets: ArmoryTickets = Depends(get_tickets)
+    changes: dict[str, Any], who: Requester = Depends(current_requester), tickets: TicketService = Depends(get_tickets)
 ) -> Any:
-    """Armory validates the whole document; a refusal comes back as its own message."""
-    return await tickets.update_settings(who, changes)
+    """Validate the whole settings document before saving it."""
+    return await tickets.update_settings(changes)
 
 
 @admin_router.get("/tickets/{ticket_id}")
 async def get_any_ticket(ticket_id: TicketId, who: Requester = Depends(current_requester),
-                         tickets: ArmoryTickets = Depends(get_tickets)) -> Any:
-    return await tickets.get_any(who, ticket_id)
+                         tickets: TicketService = Depends(get_tickets)) -> Any:
+    return {"ticket": await tickets.get_ticket(ticket_id)}
 
 
 @admin_router.patch("/tickets/{ticket_id}")
 async def update_ticket(ticket_id: TicketId, body: TicketPatch, who: Requester = Depends(current_requester),
-                        tickets: ArmoryTickets = Depends(get_tickets),
+                        tickets: TicketService = Depends(get_tickets),
                         platform: PortcullisClient = Depends(get_platform)) -> Any:
     changes = body.model_dump(exclude_none=True)
     if not changes:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Nothing to change")
-    result = await tickets.update(who, ticket_id, changes)
+    result = {"ticket": await tickets.update_ticket(ticket_id, **changes)}
     await platform.log_action(who.uid, "tickets.update", f"Updated ticket {ticket_id} ({', '.join(sorted(changes))})")
     return result
 
 
 @admin_router.post("/tickets/{ticket_id}/comments")
 async def comment_any_ticket(ticket_id: TicketId, body: CommentIn, who: Requester = Depends(current_requester),
-                             tickets: ArmoryTickets = Depends(get_tickets),
+                             tickets: TicketService = Depends(get_tickets),
                              platform: PortcullisClient = Depends(get_platform)) -> Any:
-    result = await tickets.comment_staff(who, ticket_id, body.body)
+    result = {"ticket": await tickets.add_comment(ticket_id, author=who.username or who.uid, role="staff", body=body.body)}
     await platform.log_action(who.uid, "tickets.comment", f"Commented on ticket {ticket_id}")
     return result
 
 
 @admin_router.post("/tickets/{ticket_id}/move")
 async def move_ticket(ticket_id: TicketId, body: MoveIn, who: Requester = Depends(current_requester),
-                      tickets: ArmoryTickets = Depends(get_tickets),
+                      tickets: TicketService = Depends(get_tickets),
                       platform: PortcullisClient = Depends(get_platform)) -> Any:
-    result = await tickets.move(who, ticket_id, body.group_id)
+    result = {"ticket": await tickets.move_ticket(ticket_id, body.group_id)}
     target = f"group {body.group_id}" if body.group_id else "a new group"
     await platform.log_action(who.uid, "tickets.move", f"Moved ticket {ticket_id} to {target}")
     return result
@@ -252,19 +261,19 @@ async def list_ticket_groups(
     tag: Annotated[str | None, Query(max_length=50)] = None,
     priority: TicketPriority | None = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
-    who: Requester = Depends(current_requester), tickets: ArmoryTickets = Depends(get_tickets),
+    who: Requester = Depends(current_requester), tickets: TicketService = Depends(get_tickets),
 ) -> Any:
-    return await tickets.list_groups(who, {"status": status_filter, "tag": tag, "priority": priority, "limit": limit})
+    return {"groups": await tickets.list_groups(status=status_filter, tag=tag, priority=priority, limit=limit)}
 
 
 @admin_router.patch("/groups/{group_id}")
 async def update_ticket_group(group_id: TicketId, body: GroupPatch, who: Requester = Depends(current_requester),
-                              tickets: ArmoryTickets = Depends(get_tickets),
+                              tickets: TicketService = Depends(get_tickets),
                               platform: PortcullisClient = Depends(get_platform)) -> Any:
     changes = body.model_dump(exclude_none=True)
     if not changes:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Nothing to change")
-    result = await tickets.update_group(who, group_id, changes)
+    result = {"group": await tickets.set_group_priority(group_id, **changes)}
     if "priority" in changes:
         pinned = " (pinned)" if changes.get("pinned", True) else ""
         message = f"Set ticket group {group_id} priority to {changes['priority']}{pinned}"

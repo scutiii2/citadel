@@ -64,7 +64,11 @@ from src.shares import routes as shares_routes
 from src.shares.store import ShareStore
 from src.templates import routes as templates_routes
 from src.tickets import routes as tickets_routes
-from src.tickets.client import ArmoryTickets, TicketRefused, TicketUnavailable
+from src.tickets import settings as ticket_settings
+from src.tickets.classifier import TicketClassifier
+from src.tickets.service import TicketError, TicketNotFound, TicketService
+from src.tickets.store import TicketStore
+from src.triage.questions import TriageQuestions
 from src.tickets.unread import TicketUnread
 from src.tool_services import routes as tool_services_routes
 from src.tool_services.client import ToolServices
@@ -133,7 +137,6 @@ def create_app(
         armory_client = armory or http_catalog("armory")
         app.state.memory = MemoryClient(armory_client, keyring)
         app.state.brain_gateway = BrainGateway(armory_client, keyring)
-        app.state.tickets = ArmoryTickets(armory_client, keyring)
         app.state.ticket_unread = TicketUnread(app.state.store)
         app.state.limits = LimitsStore(app.state.store)
         app.state.legion = LegionTuning(legion or http(""), app.state.agents, keyring)
@@ -172,6 +175,14 @@ def create_app(
         app.state.compactor = StackCompactor(app.state.stacks, app.state.agent_gateway, app.state.agents)
         app.state.pricing = Pricing(settings.pricing)
         app.state.usage = UsageService(app.state.store, settings.usage, app.state.pricing)
+        ticket_config = await asyncio.to_thread(ticket_settings.load, data_settings)
+        app.state.tickets = TicketService(
+            TicketStore(app.state.store), ticket_config,
+            TicketClassifier(TriageQuestions(app.state.agent_gateway, app.state.agents), app.state.usage,
+                             min_confidence=ticket_config.laya_min_confidence,
+                             timeout=ticket_config.laya_timeout_seconds),
+            settings_path=data_settings,
+        )
         app.state.turns = TurnRegistry(
             app.state.chats, app.state.usage, app.state.agent_gateway, settings.usage, PlatformLogs(app.state.platform),
             pricing=app.state.pricing, directory=app.state.agents, keyring=keyring,
@@ -240,13 +251,13 @@ def create_app(
     async def brain_error(_request: Request, error: BrainError):
         return JSONResponse({"detail": str(error)}, status_code=error.status)
 
-    @app.exception_handler(TicketRefused)
-    async def ticket_refused(_request: Request, error: TicketRefused):
-        return JSONResponse({"detail": str(error)}, status_code=404 if error.status == 404 else 400)
+    @app.exception_handler(TicketError)
+    async def ticket_refused(_request: Request, error: TicketError):
+        return JSONResponse({"detail": str(error)}, status_code=400)
 
-    @app.exception_handler(TicketUnavailable)
-    async def tickets_down(_request: Request, _error: TicketUnavailable):
-        return JSONResponse({"detail": "armory is unreachable"}, status_code=502)
+    @app.exception_handler(TicketNotFound)
+    async def ticket_missing(_request: Request, error: TicketNotFound):
+        return JSONResponse({"detail": str(error)}, status_code=404)
 
     @app.exception_handler(DbGatewayUnavailable)
     async def storage_down(_request: Request, _error: DbGatewayUnavailable):
