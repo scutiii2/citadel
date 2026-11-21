@@ -10,6 +10,8 @@ Ember Windows app: the `ember_web` UI (Vue 3, TypeScript, Vite) in a Tauri 2 she
 - `<img>` and `<audio>` cannot send a header, so image attachments and Bard audio are fetched and shown as `blob:` URLs (`mediaUrl`).
 - In a plain browser (`pnpm dev`, port 26506, `/api` proxied to Portcullis) it behaves like `ember_web` (cookie, same origin).
 
+- **Global** follows **Shares** in navigation. Signed-in accounts can browse and search global files and active skills. Accounts with `brain.global.write` can also manage files and skills and review shares sent to the global brain.
+
 ## Run and build
 
 - `pnpm install`, then `pnpm dev` (browser) or `pnpm tauri dev` (window). Needs Rust (<https://rustup.rs>) for `tauri`.

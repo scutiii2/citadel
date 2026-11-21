@@ -62,6 +62,13 @@ export const NAV_PAGES: NavPage[] = [
   description: "Copies of files, skills and memory items sent to you and by you.",
   permission: "chat.use",
 },
+  {
+    to: "/global",
+    label: "Global",
+    icon: ["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20", "M2 12h20", "M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"],
+    description: "The shared brain everyone and every agent can read: files and skills, reviewed by people who may write it.",
+    permission: "chat.use",
+  },
   { to: "/brains", label: "Brains", icon: ["M4 4h7v16H4z", "M13 4h7v16h-7z"], description: "Browse durable shared and personal knowledge.", permission: "" },
   {
     to: "/generator",

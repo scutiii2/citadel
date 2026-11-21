@@ -9,6 +9,7 @@ import type { Share, ShareKind } from "../../sharing/api/SharingClient";
 import { globalClient } from "../api/GlobalClient";
 import GlobalReview from "./GlobalReview.vue";
 
+const emit = defineEmits<{ added: [destination: "notes" | "skills"] }>();
 const auth = useAuthStore();
 const shares = ref<Share[]>([]);
 const reviewing = ref<Share | null>(null);
@@ -55,7 +56,7 @@ function finished(message: string): void {
   <div class="global-queue">
     <p v-if="notice" class="feedback" role="status"><span aria-hidden="true">✓</span> {{ notice }}</p>
     <StateMessage v-if="loading" kind="loading">Loading the review queue…</StateMessage>
-    <StateMessage v-else-if="error" kind="error" class="load-state" @retry="load">Could not load the queue. {{ error }}</StateMessage>
+    <StateMessage v-else-if="error" kind="error" class="load-state" @retry="load"><span class="warning" aria-hidden="true">⚠</span> Could not load the queue. {{ error }}</StateMessage>
     <StateMessage v-else-if="!shares.length" kind="empty">Nothing is waiting for review.</StateMessage>
     <ul v-else class="share-list">
       <li v-for="share in shares" :key="share.id">
@@ -65,7 +66,8 @@ function finished(message: string): void {
         </ListRow>
       </li>
     </ul>
-    <GlobalReview v-if="reviewing" :share="reviewing" @close="reviewing = null" @done="finished" @decided="load" />
+    <GlobalReview v-if="reviewing" :share="reviewing" @close="reviewing = null" @done="finished" @decided="load"
+      @approved="emit('added', reviewing.kind === 'skill' ? 'skills' : 'notes')" />
   </div>
 </template>
 
@@ -76,4 +78,5 @@ function finished(message: string): void {
 .feedback { margin: 0 0 12px; }
 .global-queue .load-state { color: var(--text); }
 .load-state :deep(button) { min-height: 44px; }
+.warning { color: var(--warning); }
 </style>

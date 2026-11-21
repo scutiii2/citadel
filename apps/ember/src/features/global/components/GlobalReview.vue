@@ -12,7 +12,7 @@ import { isDecidedShareError } from "../../sharing/stores/sharing";
 
 /** Review another account’s share as plain text. Closing drops the preview and landing fields. */
 const props = defineProps<{ share: Share }>();
-const emit = defineEmits<{ close: []; done: [message: string]; decided: [] }>();
+const emit = defineEmits<{ close: []; done: [message: string]; decided: []; approved: [] }>();
 
 const KIND: Record<ShareKind, string> = { file: "File", section: "Section of a file", skill: "Skill", stack_item: "Short-term memory item" };
 
@@ -69,7 +69,7 @@ function markDecided(): void {
   emit("decided");
 }
 
-async function answer(work: () => Promise<unknown>, message: string): Promise<void> {
+async function answer(work: () => Promise<unknown>, message: string, approving = false): Promise<void> {
   if (closed || busy.value || !detail.value || !auth.hasPermission("brain.global.write")) return;
   busy.value = true;
   error.value = "";
@@ -77,6 +77,7 @@ async function answer(work: () => Promise<unknown>, message: string): Promise<vo
     await work();
     if (!closed) {
       clear();
+      if (approving) emit("approved");
       emit("done", message);
     }
   } catch (err) {
@@ -92,7 +93,7 @@ async function answer(work: () => Promise<unknown>, message: string): Promise<vo
 function approve(): void {
   if (!canApprove.value) return;
   const landing = isSkill.value ? { title: title.value.trim() } : { title: title.value.trim(), folder: cleanFolder.value };
-  void answer(() => globalClient.approve(props.share.id, landing), "Added to the global brain.");
+  void answer(() => globalClient.approve(props.share.id, landing), "Added to the global brain.", true);
 }
 function reject(): void {
   void answer(() => globalClient.reject(props.share.id), "Rejected.");
@@ -100,7 +101,7 @@ function reject(): void {
 </script>
 
 <template>
-  <BaseModal :open="visible" title="Review a global share" wide @close="close">
+  <BaseModal :open="visible" title="Review a global share" wide @close="!busy && close()">
     <div v-if="visible" class="review">
       <p class="meta">From <strong>{{ share.sender }}</strong> · {{ KIND[share.kind] }} · {{ formatUtc(share.created_at) }}</p>
       <p v-if="loadError" class="error" role="alert"><span class="warning" aria-hidden="true">⚠</span> {{ loadError }}</p>

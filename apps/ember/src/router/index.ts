@@ -95,6 +95,7 @@ export const router = createRouter({
       meta: { permission: "chat.use" },
     },
     { path: "/shares", name: "shares", component: () => import("../features/sharing/SharesView.vue"), meta: { permission: "chat.use" } },
+    { path: "/global", name: "global", component: () => import("../features/global/GlobalView.vue"), meta: { permission: "chat.use" } },
     {
       path: "/generator",
       name: "generator",

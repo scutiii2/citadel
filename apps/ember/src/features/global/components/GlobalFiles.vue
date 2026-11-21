@@ -115,13 +115,13 @@ function finished(message: string): void {
     </div>
     <p v-if="note" role="status" class="feedback"><span aria-hidden="true">✓</span> {{ note }}</p>
     <template v-if="query.trim()">
-      <StateMessage v-if="searchError" kind="error" class="load-state" @retry="search">Could not search files. {{ searchError }}</StateMessage>
+      <StateMessage v-if="searchError" kind="error" class="load-state" @retry="search"><span class="warning" aria-hidden="true">⚠</span> Could not search files. {{ searchError }}</StateMessage>
       <StateMessage v-else-if="hits === null" kind="loading">Searching files…</StateMessage>
       <StateMessage v-else-if="!hits.length" kind="empty">No files match your search.</StateMessage>
     </template>
     <template v-else>
       <StateMessage v-if="status === 'loading'" kind="loading">Loading files…</StateMessage>
-      <StateMessage v-else-if="status === 'error'" kind="error" class="load-state" @retry="load">Could not load files. {{ error }}</StateMessage>
+      <StateMessage v-else-if="status === 'error'" kind="error" class="load-state" @retry="load"><span class="warning" aria-hidden="true">⚠</span> Could not load files. {{ error }}</StateMessage>
       <StateMessage v-else-if="!files.length" kind="empty">{{ folder ? "No files in this folder." : "No files yet." }}</StateMessage>
     </template>
     <ul v-if="query.trim() ? hits?.length : status === 'ready' && files.length" class="file-list">
@@ -149,4 +149,5 @@ function finished(message: string): void {
 .feedback { margin: 0; color: var(--text); }
 .meta { color: var(--muted); }
 .global-files .load-state { color: var(--text); }
+.warning { color: var(--warning); }
 </style>

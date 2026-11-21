@@ -149,7 +149,7 @@ function remove(): void {
     <p v-if="notice" class="feedback" role="status"><span aria-hidden="true">✓</span> {{ notice }}</p>
     <p v-if="actionError && !editing" class="feedback" role="alert"><span class="warning" aria-hidden="true">⚠</span> {{ actionError }}</p>
     <StateMessage v-if="loading" kind="loading">Loading skills…</StateMessage>
-    <StateMessage v-else-if="loadError" class="load-state" kind="error" @retry="load">Could not load skills. {{ loadError }}</StateMessage>
+    <StateMessage v-else-if="loadError" class="load-state" kind="error" @retry="load"><span class="warning" aria-hidden="true">⚠</span> Could not load skills. {{ loadError }}</StateMessage>
     <template v-else>
       <StateMessage v-if="!matches.length" kind="empty">{{ query.trim() ? "No skills match your search." : "No skills yet." }}</StateMessage>
       <section v-for="section in sections" :key="section.status" :aria-label="section.title">

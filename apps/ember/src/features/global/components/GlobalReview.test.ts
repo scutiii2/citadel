@@ -85,6 +85,7 @@ describe("GlobalReview", () => {
     await flushPromises();
     expect(client.approve).toHaveBeenCalledWith("s1", { title: "New", folder: "docs" });
     expect(w.emitted("done")?.[0][0]).toContain("Added");
+    expect(w.emitted("approved")).toHaveLength(1);
   });
 
   it("approves a skill with only the title", async () => {
