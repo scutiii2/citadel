@@ -47,8 +47,9 @@ The supervisor watches this directory and the overrides file and reconciles
 validated changes.
 
 `mathematician.json` defines the delegable mathematics specialist on port 29620.
-It permits only `tool_math_*` and the standard ticket support tool. Analyst also
-permits math tools for attached-table formulas. Ember routes using the live
+It permits `tool_math_*` and Stronghold’s `stronghold__tool_ticket_createTicket`.
+Data Analyst also permits math tools for attached-table formulas and reads the
+requester’s token usage with `stronghold__tool_usage_summary`. Ember routes using the live
 roster; Reviewer independently checks math through its existing permitted tools.
 Armory's Mathematics capability must be enabled for math tools to be offered.
 

@@ -24,7 +24,7 @@ from src.providers import model_tiers, reasoning_effort
 _log = logging.getLogger(__name__)
 
 # Tools every specialist gets for reporting problems; they do not make a specialist useful.
-SUPPORT_TOOLS = ("tool_ticket_*",)
+SUPPORT_TOOLS = ("stronghold__tool_ticket_*",)
 
 
 def own_tools(entry: RosterEntry) -> list[str]:

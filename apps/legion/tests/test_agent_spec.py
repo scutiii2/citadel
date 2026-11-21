@@ -323,7 +323,7 @@ def test_retired_agents_are_gone_and_merged_tools_are_covered():
         assert not (app_dir / "agents" / f"{retired}.json").exists()
     analyst = agent_spec.load_file(app_dir / "agents" / "data-analyst.json")
     ops = agent_spec.load_file(app_dir / "agents" / "server-ops.json")
-    assert analyst.tools.allows("tool_usage_summary")
+    assert analyst.tools.allows("stronghold__tool_usage_summary")
     assert ops.tools.allows("tool_srv_startApp") and ops.tools.allows("tool_srv_listApps")
 
 

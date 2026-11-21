@@ -16,7 +16,7 @@ from src.providers.decision import settings, strategy, questions
 from src.providers.decision.contract import DecisionError
 from src.providers.base_provider import ChatCancelled, ChatResult
 
-RESEARCHER = RosterEntry("researcher", "Researcher", "Web research: look up facts.", tool_allow=("tool_web_search", "tool_ticket_createTicket"))
+RESEARCHER = RosterEntry("researcher", "Researcher", "Web research: look up facts.", tool_allow=("tool_web_search", "stronghold__tool_ticket_createTicket"))
 SERVER = RosterEntry("server-ops", "Server Ops", "x" * 400, tool_allow=("tool_srv_*",))
 PLANNER = RosterEntry("planner", "Planner", "Planning multi-step requests.")
 ROSTER = [RESEARCHER, SERVER, PLANNER]

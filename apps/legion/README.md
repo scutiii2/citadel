@@ -243,7 +243,7 @@ needs the updated files and Armory workers before the new capability is usable.
 `server-ops` also covers app monitoring (the former `scheduler` / App Monitor agent, port 9114, now removed). It reports
 watched status, and starting an app also starts its owner notifications through ServerWatcher. URL/port monitoring and
 recurring schedules are unavailable. `data-analyst` (label "Analyst") also answers token-usage questions through
-`tool_usage_summary` (the former `usage-analyst`, port 9108). The `planner` agent is retired: Ember plans with its own
+`stronghold__tool_usage_summary` (the former `usage-analyst`, port 9108). The `planner` agent is retired: Ember plans with its own
 `update_plan` tool. An `agent:scheduler`, `agent:planner` or `agent:usage-analyst` entry in a user's saved agent switches no longer matches
 any agent. Restart the supervisor to load the updated definitions.
 

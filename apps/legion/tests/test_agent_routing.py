@@ -77,11 +77,11 @@ def test_specialists_carry_their_published_tiers(monkeypatch):
 def test_is_usable_needs_one_own_tool_besides_the_support_tool():
     from src.agents.agent_spec import RosterEntry
 
-    web = RosterEntry("researcher", "R", "", tool_allow=("tool_web_search", "tool_ticket_createTicket"))
-    assert not agent_routing.is_usable(web, ["tool_mem_search", "tool_ticket_createTicket"])
+    web = RosterEntry("researcher", "R", "", tool_allow=("tool_web_search", "stronghold__tool_ticket_createTicket"))
+    assert not agent_routing.is_usable(web, ["tool_mem_search", "stronghold__tool_ticket_createTicket"])
     assert agent_routing.is_usable(web, ["tool_web_search"])
     assert agent_routing.is_usable(RosterEntry("planner", "P", ""), [])
-    assert agent_routing.is_usable(RosterEntry("t", "T", "", tool_allow=("tool_ticket_createTicket",)), [])
+    assert agent_routing.is_usable(RosterEntry("t", "T", "", tool_allow=("stronghold__tool_ticket_createTicket",)), [])
     pdf = RosterEntry("pdf", "P", "", tool_allow=("pdf_merger__*",))
     assert agent_routing.is_usable(pdf, ["pdf_merger__merge"])
 
@@ -103,7 +103,7 @@ def _roster_ids(monkeypatch, live, blocked=()):
     """The roster ids for a turn where mcp_server offers `live` and the user switched off `blocked`."""
     monkeypatch.setattr(agent_routing, "_live_tool_names", lambda: live)
     monkeypatch.setattr(agent_routing, "specialists", lambda: [
-        agent_spec.RosterEntry("researcher", "Researcher", "", tool_allow=("tool_web_search", "tool_ticket_createTicket")),
+        agent_spec.RosterEntry("researcher", "Researcher", "", tool_allow=("tool_web_search", "stronghold__tool_ticket_createTicket")),
         agent_spec.RosterEntry("notes", "Notes", "", tool_allow=("tool_notes_*",)),
         agent_spec.RosterEntry("poet", "Poet", ""),
     ])
@@ -148,3 +148,11 @@ def test_roster_leaves_out_a_specialist_the_user_switched_off(monkeypatch):
 def test_roster_keeps_tool_less_specialists_when_only_tools_are_blocked(monkeypatch):
     assert _roster_ids(monkeypatch, LIVE, blocked=("*",)) == ["poet"]
     assert _roster_ids(monkeypatch, None, blocked=("agent:poet",)) == ["researcher", "notes"]
+
+
+def test_the_stronghold_ticket_tool_is_a_support_tool_not_an_own_tool():
+    from src.agents.agent_spec import RosterEntry
+
+    entry = RosterEntry("researcher", "R", "", tool_allow=("tool_web_search", "stronghold__tool_ticket_createTicket"))
+    assert agent_routing.own_tools(entry) == ["tool_web_search"]
+    assert agent_routing.is_usable(RosterEntry("t", "T", "", tool_allow=("stronghold__tool_ticket_createTicket",)), [])
