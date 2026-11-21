@@ -1,9 +1,11 @@
 """/brains: connections, permissions asked per request, Armory's resolve call, browsing, review and purge."""
 
+import asyncio
 import json
 
 import httpx
 from src.citadel_auth import ServiceAuth
+from src.notes.store import NotesService
 from tests import auth_helpers
 from tests.auth_helpers import requester
 
@@ -168,14 +170,15 @@ def test_test_connection_sends_armory_a_candidate_with_the_key(client, armory):
     assert json.loads(armory.requests[-1].content)["candidate"]["api_key"] == "private-brain-key"
 
 
-def make_note(client, title="Private procedure"):
-    return client.post("/notes", json={"title": title, "body": "Durable private instructions"}).json()
+def make_note(db_gateway):
+    note = asyncio.run(NotesService(db_gateway, "u-1").create("Private procedure", "Durable private instructions"))
+    return {"id": note.id}
 
 
-def test_ai_review_consent_usage_dismiss_and_invalid_output(client, armory, agent):
+def test_ai_review_consent_usage_dismiss_and_invalid_output(client, armory, agent, db_gateway):
     armory_ok(armory)
     client.put(PERSONAL, json=SAVE)
-    note = make_note(client)
+    note = make_note(db_gateway)
     payload = {"note_ids": [note["id"]]}
     assert client.post("/brains/suggestions/review", json=payload).status_code == 400
     assert not agent.interprets
@@ -195,10 +198,10 @@ def test_ai_review_consent_usage_dismiss_and_invalid_output(client, armory, agen
     assert [r["kind"] for r in client.get("/usage/records").json()] == ["brain_suggestions"] * 2  # both calls counted
 
 
-def test_review_agent_failure_is_a_503(client, armory, agent):
+def test_review_agent_failure_is_a_503(client, armory, agent, db_gateway):
     armory_ok(armory)
     client.put(PERSONAL, json=SAVE)
-    note = make_note(client)
+    note = make_note(db_gateway)
     agent.fail = "down"
     body = {"note_ids": [note["id"]], "explicit_private": [note["id"]]}
     answer = client.post("/brains/suggestions/review", json=body)
@@ -210,10 +213,10 @@ def test_dismiss_of_another_accounts_suggestion_is_404(client, db_gateway):
     assert client.post("/brains/suggestions/s1/dismiss", json={}).status_code == 404
 
 
-def test_promote_review_and_reconcile(client, armory):
+def test_promote_review_and_reconcile(client, armory, db_gateway):
     armory_ok(armory)
     destination = client.put(PERSONAL, json=SAVE).json()
-    note = make_note(client)
+    note = make_note(db_gateway)
     review = client.get(f"/brains/notes/{note['id']}/review").json()
     store = {}
 

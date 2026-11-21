@@ -39,9 +39,8 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 |---|---|
 | `GET /health` | Open. `{"status": "ok"}` |
 | `GET /whoami` | Echoes the requester. Portcullis exposes it as `GET /api/stronghold/whoami` |
-| `/notes/...` | Notes, tags, tag suggestions and generation. Portcullis exposes them as `/api/notes/...` after checking `chat.use` |
 | `/stack/...` | Short-term memory for a single chat. Portcullis exposes this under `/api/chats/{id}/stack`. |
-| `/memory/...` | Assistant memory. Portcullis exposes it as `/api/memory/...` after checking `chat.use` |
+| `DELETE /notes/accounts/{uid}`, `DELETE /memory/accounts/{uid}` | Purge legacy private notes and assistant memory on account deletion until Plan 22. |
 | `/tickets/...`, `/ticket-admin/...` | Support tickets, staff triage and the account's read receipts. Portcullis exposes them as `/api/tickets/...` (`tickets.create`) and `/api/admin/tickets...`, `/api/admin/ticket-groups...` (`tickets.manage`) |
 | `/triage/titles`, `/triage/ask` | Option titles from the `title-writer` agent and typed questions to the Triage Assistant (Laya); both count toward the token limits. Portcullis exposes them as `/api/triage/...` after checking `chat.use` |
 | `/attachments/...` | Text extraction (`text`), PDFs and tables stored by Armory (`pdf`, `table`), plus Stronghold calls for Scribe audio (`audio`, `dictate`, `dictate/partial`) or Reader documents (`document`). Portcullis forwards the JSON endpoints and dictation to Stronghold. Attachment previews retain the Armory content stream |
@@ -180,7 +179,7 @@ Treasury keeps any JSON, so `src/schema` is Stronghold's schema. `models.py` has
 
 ## Notes and memory
 
-`/notes/...` are an account's private notes, kept in Treasury (collection `notes`). Armory's notes tools read the same collection for the notes an account shared with agents, so Armory must use the `stronghold` connection (`DB_GATEWAY_CONNECTION=stronghold`). Tag suggestions ask the Laya agent; tag generation asks the `tag-writer` agent. `/memory/...` is the assistant memory, which Armory keeps; Stronghold scopes every call to the requester.
+The Brain replaces the private-notes and assistant-memory user routes. Existing notes stay in Treasury's `notes` collection and memories stay in Armory. The account-deletion purge routes remain until Plan 22. Armory's notes tools still use the `stronghold` Treasury connection (`DB_GATEWAY_CONNECTION=stronghold`), and Obsidian publishing still uses `src/notes/store.py`.
 
 `src/agents/` is a copy of Portcullis's agent client. Change both until chats move here.
 

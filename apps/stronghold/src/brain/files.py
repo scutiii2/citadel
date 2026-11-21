@@ -26,10 +26,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from src.brain.limits import LONG_TERM_RANGES, LongTermLimits
-from src.brain.records import EDITORS, TITLE_MAX, Record, RecordError, clean_folder, parse, path_id, render, reserved_name, slug
+from src.brain.records import (
+    EDITORS, TITLE_MAX, Record, RecordError, clean_folder, normalize_tags, parse, path_id, render, reserved_name, slug,
+)
 from src.brain.search import Bm25Index, make_snippet
 from src.clock import utcnow
-from src.notes.store import normalize_tags
 
 ORIGINALS = ".originals"
 _UID = re.compile(r"[A-Za-z0-9_-]{1,64}")

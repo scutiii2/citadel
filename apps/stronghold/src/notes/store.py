@@ -13,6 +13,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
+from src.brain.records import MAX_TAGS, TAG_MAX, normalize_tags
 from src.clock import utcnow
 from src.document_store import DocumentStore
 
@@ -20,10 +21,7 @@ COLLECTION = "notes"
 MAX_NOTES = 200
 TITLE_MAX = 200
 BODY_MAX = 20_000
-TAG_MAX = 30
-MAX_TAGS = 10
 _NOTE_ID = re.compile(r"[0-9a-f]{32}")
-_TAG = re.compile(r"[a-z0-9][a-z0-9_-]*")
 _PURGE_PAGE = 500
 _PURGE_MAX_PAGES = 20
 
@@ -38,21 +36,6 @@ class NoteLimit(Exception):
 
 class NoteChanged(Exception):
     """The stored note is newer than the version the caller opened."""
-
-
-def normalize_tags(raw: list[str]) -> list[str]:
-    """Trimmed, lowercase tags without repeats, in the order given. Raises ValueError
-    for a tag that is empty, too long or has characters other than a-z, 0-9, - and _."""
-    tags: list[str] = []
-    for item in raw:
-        tag = item.strip().lower()
-        if not tag or len(tag) > TAG_MAX or not _TAG.fullmatch(tag):
-            raise ValueError(f"A tag is 1 to {TAG_MAX} characters: letters, digits, - and _")
-        if tag not in tags:
-            tags.append(tag)
-    if len(tags) > MAX_TAGS:
-        raise ValueError(f"A note can have at most {MAX_TAGS} tags")
-    return tags
 
 
 @dataclass(frozen=True)

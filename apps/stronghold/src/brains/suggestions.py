@@ -5,9 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from src.brain.records import normalize_tags
 from src.brains.connections import BrainError, brain_path
 from src.brains.promotions import note_hash, text_hash
-from src.notes.store import NoteNotFound, normalize_tags
+from src.notes.store import NoteNotFound
 
 COLLECTION = "brain_suggestions"
 
