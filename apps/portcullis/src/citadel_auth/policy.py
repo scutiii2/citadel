@@ -14,7 +14,7 @@ class Rule:
 POLICY = {
     "stronghold": {
         "portcullis": Rule(("/",), True),
-        "armory": Rule(("/brains/resolve", "/brains/instance-migration", "/notes", "/memory", "/skills", "/tickets"), True),
+        "armory": Rule(("/brains/resolve", "/brains/instance-migration", "/notes"), True),
         "legion": Rule(("/mcp",), True),
     },
     "armory": {

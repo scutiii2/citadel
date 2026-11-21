@@ -142,6 +142,16 @@ def test_policy_rows(audience, caller, path, forward):
     assert not allowed(audience, "unknown", path)
 
 
+@pytest.mark.parametrize("path", ["/memory/x", "/skills/x", "/tickets/x"])
+def test_armory_may_no_longer_call_stronghold_memory_skills_or_tickets(path):
+    assert not allowed("stronghold", "armory", path)
+
+
+@pytest.mark.parametrize("path", ["/notes/x", "/brains/resolve", "/brains/instance-migration"])
+def test_armory_may_still_call_stronghold_for_the_obsidian_chain(path):
+    assert allowed("stronghold", "armory", path)
+
+
 def test_policy_denies_unlisted_routes_and_prefix_lookalikes():
     assert not allowed("stronghold", "armory", "/brains/resolve-admin")
     assert not allowed("armory", "portcullis", "/brains/destination")
