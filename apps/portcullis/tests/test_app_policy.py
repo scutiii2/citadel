@@ -16,6 +16,7 @@ def test_the_defaults_are_listed_and_a_change_is_saved_for_the_next_start(client
     assert (first["session_hours"], first["default_role"], first["require_email_verification"]) == (12, "Member", True)
     assert first["rate_limit"]["max_attempts"] == 5 and (first["backup"]["keep"], first["backup"]["every_hours"]) == (14, 24)
     assert first["stored"] == []
+    assert first["outside_ip_filter"] == {"allow_list": [], "deny_list": []}
 
     saved = admin.put("/api/admin/app-config", json={"session_hours": 4, "rate_limit": {"max_attempts": 3}})
 
@@ -31,7 +32,8 @@ def test_the_defaults_are_listed_and_a_change_is_saved_for_the_next_start(client
 def test_what_was_saved_is_what_the_next_start_loads(client_factory, monkeypatch) -> None:
     admin = as_admin(client_factory())
     admin.put("/api/admin/app-config", json={
-        "default_role": " Guest ", "ip_filter": {"deny_list": ["10.0.0.0/8"]}, "backup": {"keep": 3},
+        "default_role": " Guest ", "ip_filter": {"deny_list": ["10.0.0.0/8"]},
+        "outside_ip_filter": {"allow_list": ["203.0.113.0/24"]}, "backup": {"keep": 3},
         "fingerprint": {"signals": ["user_agent"]}, "headers": {"hsts_max_age": 60},
     })
     settings = admin.app.state.settings
@@ -42,6 +44,7 @@ def test_what_was_saved_is_what_the_next_start_loads(client_factory, monkeypatch
     assert reloaded["default_role"] == "Guest" and reloaded["backup"]["keep"] == 3
     assert reloaded["security"]["trusted_proxies"] == ["127.0.0.1"]
     assert reloaded["security"]["ip_filter"] == {"allow_list": [], "deny_list": ["10.0.0.0/8"]}
+    assert reloaded["security"]["outside_ip_filter"] == {"allow_list": ["203.0.113.0/24"], "deny_list": []}
     assert reloaded["security"]["fingerprint"] == {"enabled": True, "signals": ["user_agent"]}
     assert reloaded["security"]["headers"] == {"enabled": True, "hsts_max_age": 60}
     assert settings.default_role == "Member"
@@ -64,6 +67,7 @@ def test_a_bad_change_is_refused_and_saves_nothing(client_factory) -> None:
         {"default_role": " "}, {"require_email_verification": "yes"},
         {"rate_limit": {"scope": "everyone"}}, {"rate_limit": {"max_attempts": 0}}, {"rate_limit": {"nope": 1}}, {"rate_limit": []},
         {"ip_filter": {"deny_list": ["not-an-address"]}}, {"ip_filter": {"allow_list": "10.0.0.1"}},
+        {"outside_ip_filter": {"deny_list": ["not-an-address"]}}, {"outside_ip_filter": {"allow_list": "10.0.0.1"}},
         {"headers": {"hsts_max_age": -1}}, {"fingerprint": {"signals": []}}, {"fingerprint": {"signals": ["cookie"]}},
         {"backup": {"keep": 0}}, {"backup": {"every_hours": 1.5}},
     ):
@@ -82,3 +86,17 @@ def test_the_policy_routes_need_settings_manage(client_factory, email) -> None:
 
     assert member.get("/api/admin/app-config").status_code == 403
     assert member.put("/api/admin/app-config", json={"session_hours": 1}).status_code == 403
+
+
+def test_the_outside_lists_are_saved_validated_and_reset(client_factory) -> None:
+    admin = as_admin(client_factory())
+
+    saved = admin.put("/api/admin/app-config", json={"outside_ip_filter": {"allow_list": ["203.0.113.0/24"]}})
+    assert saved.status_code == 200
+    assert saved.json()["outside_ip_filter"] == {"allow_list": ["203.0.113.0/24"], "deny_list": []}
+
+    refused = admin.put("/api/admin/app-config", json={"outside_ip_filter": {"deny_list": ["nope"]}})
+    assert refused.status_code == 400 and "Outside deny list" in refused.json()["detail"]
+
+    reset = admin.put("/api/admin/app-config", json={"outside_ip_filter": None})
+    assert reset.json()["outside_ip_filter"] == {"allow_list": [], "deny_list": []} and reset.json()["stored"] == []
