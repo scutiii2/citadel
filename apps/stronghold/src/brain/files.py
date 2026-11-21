@@ -383,7 +383,7 @@ class BrainFiles:
         return [Hit(records[doc_id], score, make_snippet(records[doc_id].body, query)) for doc_id, score in ranked[:wanted]]
 
     async def create(self, uid: str, *, title: str, body: str, tags: Iterable[str] = (), folder: str = "",
-                     actor: str = "user", shared_from: str = "") -> Record:
+                     actor: str = "user", shared_from: str = "", record_id: uuid.UUID | None = None) -> Record:
         if actor not in EDITORS:
             raise BrainError(400, "Unknown editor.")
         if shared_from and actor != "user":
@@ -392,9 +392,12 @@ class BrainFiles:
         async with self._open(uid) as (home, account):
             if account.purged:
                 raise BrainError(404, "No such account.")
+            # A proposal uses its own id so a retry after a partial Keep reuses the file.
+            if record_id is not None and (existing := account.entries.get(record_id.hex)) is not None:
+                return existing.record
             now = _now()
             source = "manual" if actor == "user" else "automatic"
-            record = Record(uuid.uuid4().hex, title, body, folder, tag_tuple, "shared" if shared_from else source,
+            record = Record((record_id or uuid.uuid4()).hex, title, body, folder, tag_tuple, "shared" if shared_from else source,
                             actor, False, False, 1, now, now, shared_from)
             text = render(record)
             size = len(text.encode("utf-8"))
