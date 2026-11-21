@@ -1,7 +1,7 @@
 import { useAuthStore } from "../../stores/auth";
 import { createPinia, setActivePinia } from "pinia";
 import { mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DownloadCards from "./DownloadCards.vue";
 
 const card = (extra = {}) => ({ filename: "report.csv", bytes: 2048, href: "/api/server/download?path=x", label: "EXPORT", ...extra });
@@ -59,4 +59,63 @@ it("does not offer server downloads without files.download", () => {
   useAuthStore().account!.permissions = [];
   const wrapper = mount(DownloadCards, { props: { downloads: [card()] } });
   expect(wrapper.find("a.file").exists()).toBe(false);
+});
+
+describe("time left", () => {
+  const NOW = Date.UTC(2026, 10, 22, 12, 0, 0);
+  const at = (minutes: number) => NOW / 1000 + minutes * 60;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows the minutes left", () => {
+    const wrapper = mount(DownloadCards, { props: { downloads: [card({ expiresAt: at(25) })] } });
+
+    expect(wrapper.find(".left").text()).toBe("Expires in 25 min");
+    expect(wrapper.find("a.file").exists()).toBe(true);
+  });
+
+  it("counts down as time passes", async () => {
+    const wrapper = mount(DownloadCards, { props: { downloads: [card({ expiresAt: at(25) })] } });
+
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+    expect(wrapper.find(".left").text()).toBe("Expires in 15 min");
+  });
+
+  it("says Expired and turns the link off after the time passes", async () => {
+    const wrapper = mount(DownloadCards, { props: { downloads: [card({ expiresAt: at(1) })] } });
+
+    await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
+
+    expect(wrapper.find(".left").text()).toBe("Expired");
+    expect(wrapper.find("a.file").exists()).toBe(false);
+    expect(wrapper.find(".file.expired").attributes("aria-disabled")).toBe("true");
+  });
+
+  it("shows a card already past its time as expired", () => {
+    const wrapper = mount(DownloadCards, { props: { downloads: [card({ expiresAt: at(-5) })] } });
+
+    expect(wrapper.find(".left").text()).toBe("Expired");
+    expect(wrapper.find("a.file").exists()).toBe(false);
+  });
+
+  it("shows no time for a card without an expiry", () => {
+    const wrapper = mount(DownloadCards, { props: { downloads: [card()] } });
+
+    expect(wrapper.find(".left").exists()).toBe(false);
+  });
+
+  it("stops its timer when the card goes away", () => {
+    const wrapper = mount(DownloadCards, { props: { downloads: [card({ expiresAt: at(25) })] } });
+
+    wrapper.unmount();
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

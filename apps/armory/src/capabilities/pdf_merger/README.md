@@ -48,7 +48,7 @@ Armory settings read its normal environment configuration. Caps and lifetimes ar
 | `PDF_MERGER_SIGNING_KEY` | Stable HMAC signing secret. If absent, Armory warns and generates an ephemeral key; links stop working after a process restart. |
 | Service authentication | Requires a signed Ed25519 service assertion and a Portcullis-signed requester token for account operations. |
 
-Default tuning keeps files for 6 hours, sweeps every 10 minutes, and signs download links for 60 minutes. Limits cover 100 MiB per engine input file, 500 MiB per account, 50 plan segments, 2,000 output pages, 80 megapixels per image, and two simultaneous merges. The HTTP upload limit still applies first.
+Default tuning keeps files for 1 hour, sweeps every 10 minutes, and signs download links for 60 minutes. Limits cover 100 MiB per engine input file, 500 MiB per account, 50 plan segments, 2,000 output pages, 80 megapixels per image, and two simultaneous merges. The HTTP upload limit still applies first.
 
 `mcp_wait_seconds` must be greater than zero and no more than 100. The job timeout is the smaller of the configured job timeout and this wait. Positive, finite limits and valid expiry intervals are checked before the runtime starts.
 

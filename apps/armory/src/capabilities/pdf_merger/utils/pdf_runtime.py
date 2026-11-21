@@ -86,7 +86,7 @@ def validate_tuning(raw):
     wait = float(raw.get("mcp_wait_seconds", 100))
     if not 0 < wait <= 100:
         raise ValueError("mcp_wait_seconds must be between 0 and 100")
-    ttl = float(raw.get("file_ttl_hours", 6)) * 3600
+    ttl = float(raw.get("file_ttl_hours", 1)) * 3600
     sweep = float(raw.get("sweep_interval_minutes", 10)) * 60
     link = float(raw.get("download_link_minutes", 60)) * 60
     if any(not math.isfinite(v) or v < 1 for v in (ttl, sweep, link)):

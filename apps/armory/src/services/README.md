@@ -33,7 +33,7 @@ where that logic lives instead.
   (`notification`, `approval`) for `send_email()`; see
   `email/templates/README.md` for placeholders and how to add one.
 - **`downloads.py`** - `DownloadRegistry`: files a tool offers its caller
-  for download, held in memory for 10 minutes under a random id and bound
+  for download, held in memory for 1 hour under a random id and bound
   to the asking account (never a path on disk). A tool calls
   `registry.offer(...)` and puts `marker(...)` in its result's
   `download_markers`; `download_routes.py` serves the file. Read its

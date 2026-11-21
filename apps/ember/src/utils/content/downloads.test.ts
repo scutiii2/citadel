@@ -34,6 +34,25 @@ describe("downloadHref", () => {
   });
 });
 
+describe("parseDownloads expiry", () => {
+  const expiring = '[[DOWNLOAD filename="wo.txt" bytes="5" url="/server/download?path=x" label="LOGS" expires="1700003600"]]';
+
+  it("reads the expiry in unix seconds", () => {
+    expect(parseDownloads(expiring).downloads).toEqual([
+      { filename: "wo.txt", bytes: 5, href: "/api/server/download?path=x", label: "LOGS", expiresAt: 1700003600 },
+    ]);
+  });
+
+  it("keeps a marker without an expiry working", () => {
+    expect(parseDownloads(plain).downloads[0].expiresAt).toBeUndefined();
+  });
+
+  it("hides and accepts a marker that carries an expiry", () => {
+    expect(hideDownloadMarkers(`Done ${expiring}`).trim()).toBe("Done");
+    expect(downloadMarkersOf(JSON.stringify({ download_markers: [expiring] }))).toEqual([expiring]);
+  });
+});
+
 describe("parseDownloads", () => {
   it("takes a marker out of the text and makes a card", () => {
     expect(parseDownloads(`Done.\n\n${plain}`)).toEqual({

@@ -12,9 +12,11 @@ export interface DownloadCard {
   href: string | null;
   /** A short tag above the card, e.g. "EXPORT". */
   label: string;
+  /** Unix seconds when the file goes away; absent when the marker names no expiry. */
+  expiresAt?: number;
 }
 
-const MARKER = /\[\[DOWNLOAD filename="([^"]*)" bytes="(\d+)" url="([^"]*)"(?: label="([^"]*)")?\]\]/g;
+const MARKER = /\[\[DOWNLOAD filename="([^"]*)" bytes="(\d+)" url="([^"]*)"(?: label="([^"]*)")?(?: expires="(\d+)")?\]\]/g;
 
 // The route a marker may point at: mcp_server's own "/server/download" is
 // reached through ember_api. Nothing else - a model must not be able to put
@@ -33,8 +35,10 @@ export function downloadHref(url: string): string | null {
 /** The text without its markers, and one card for each. */
 export function parseDownloads(text: string): { text: string; downloads: DownloadCard[] } {
   const downloads: DownloadCard[] = [];
-  const rest = text.replace(MARKER, (_match, filename: string, bytes: string, url: string, label?: string) => {
-    downloads.push({ filename, bytes: Number(bytes), href: downloadHref(url), label: label || "DOWNLOAD" });
+  const rest = text.replace(MARKER, (_match, filename: string, bytes: string, url: string, label?: string, expires?: string) => {
+    const card: DownloadCard = { filename, bytes: Number(bytes), href: downloadHref(url), label: label || "DOWNLOAD" };
+    if (expires) card.expiresAt = Number(expires);
+    downloads.push(card);
     return "";
   });
   return { text: downloads.length ? rest.trim() : text, downloads };

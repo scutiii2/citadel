@@ -17,7 +17,7 @@ TABLE = "tuning"
 
 DEFAULTS: dict[str, dict[str, Any]] = {
     "pdf_merger": {
-        "file_ttl_hours": 6,
+        "file_ttl_hours": 1,
         "sweep_interval_minutes": 10,
         "download_link_minutes": 60,
         "mcp_wait_seconds": 100,
@@ -32,7 +32,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         },
     },
     "media_downloader": {
-        "file_ttl_hours": 6,
+        "file_ttl_hours": 1,
         "sweep_interval_minutes": 10,
         "download_link_minutes": 60,
         "limits": {

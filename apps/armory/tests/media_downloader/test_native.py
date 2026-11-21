@@ -204,7 +204,7 @@ def test_native_config_uses_the_defaults_when_nothing_is_saved(tmp_path, monkeyp
     monkeypatch.setattr(media_downloads, "settings", replace(media_downloads.settings, settings_db_path=path, media_public_base_url="https://armory.example", media_signing_key="test-only-key"))
     config, max_caller = media_downloads.load_media_settings()
     assert config.limits.max_file_bytes == 500 * 1024 * 1024
-    assert config.file_ttl_seconds == 21600 and config.download_link_seconds == 3600
+    assert config.file_ttl_seconds == 3600 and config.download_link_seconds == 3600
     assert config.public_base_url == "https://armory.example" and max_caller == 2
 
 

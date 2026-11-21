@@ -41,7 +41,7 @@ class Settings:
     web_origin: str = "http://127.0.0.1:5175"
     store_dir: Path = CACHE / "media_downloader" / "store"
     log_dir: Path = DATA / "media_downloader" / "logs"
-    file_ttl_seconds: int = 6 * 3600
+    file_ttl_seconds: int = 3600
     sweep_interval_seconds: int = 600
     download_link_seconds: int = 3600
     signing_key: bytes = b""

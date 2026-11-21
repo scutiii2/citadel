@@ -29,7 +29,7 @@ def validate_tuning(raw):
         minimum = 0 if field.name == "max_queued_downloads" else 1
         if not math.isfinite(value) or value < minimum:
             raise ValueError(f"invalid {field.name}")
-    ttl = float(raw.get("file_ttl_hours", 6)) * 3600
+    ttl = float(raw.get("file_ttl_hours", 1)) * 3600
     sweep = float(raw.get("sweep_interval_minutes", 10)) * 60
     link = float(raw.get("download_link_minutes", 60)) * 60
     caller_jobs = raw.get("limits", {}).get("max_caller_downloads", 2)

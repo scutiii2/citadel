@@ -40,7 +40,7 @@ const percent = computed(() =>
       </template>
       <template v-else-if="plan.status === 'done' && plan.result">
         Done · {{ plan.result.name }} ({{ formatBytes(plan.result.size) }})
-        <DownloadCards :downloads="[{filename:plan.result.name, bytes:plan.result.size, href:downloadUrl(plan.result.file_id), label:'MERGED PDF'}]" />
+        <DownloadCards :downloads="[{filename:plan.result.name, bytes:plan.result.size, href:downloadUrl(plan.result.file_id), label:'MERGED PDF', expiresAt:plan.result.expires_at || undefined}]" />
         <CopyButton :text="plan.result.file_id" label="Copy merged file ID" />
       </template>
       <span v-else-if="plan.status === 'error'" class="error" role="alert">{{ plan.error }}</span>

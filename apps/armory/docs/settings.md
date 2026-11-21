@@ -20,7 +20,7 @@ PDF merging (`pdf_merger`):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `file_ttl_hours` | 6 | How long an uploaded or merged file is kept. |
+| `file_ttl_hours` | 1 | How long an uploaded or merged file is kept. |
 | `sweep_interval_minutes` | 10 | How often expired files are removed. |
 | `download_link_minutes` | 60 | How long a signed download link works. |
 | `mcp_wait_seconds` | 100 | How long a tool call waits for a merge before it answers "still running" (at most 100). |
@@ -34,7 +34,7 @@ Video downloads (`media_downloader`):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `file_ttl_hours` | 6 | How long a finished download is kept. |
+| `file_ttl_hours` | 1 | How long a finished download is kept. |
 | `sweep_interval_minutes` | 10 | How often expired files are removed. |
 | `download_link_minutes` | 60 | How long a signed download link works. |
 | `limits.max_file_mb`, `limits.max_duration_minutes`, `limits.max_session_mb` | 500, 120, 2048 | Size and length caps for one file and for one account's stored files. |

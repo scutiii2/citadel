@@ -12,7 +12,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 
-TTL_SECONDS = 600
+TTL_SECONDS = 3600
 MAX_ENTRIES = 50
 MAX_FILE_BYTES = 5 * 1024 * 1024
 MAX_TOTAL_BYTES = 50 * 1024 * 1024
@@ -33,6 +33,7 @@ class Download:
     filename: str
     data: bytes
     expires_at: float
+    expires_unix: int  # wall-clock seconds for the marker; expires_at uses the registry's own clock
 
     @property
     def size(self) -> int:
@@ -75,6 +76,7 @@ class DownloadRegistry:
             filename=safe_filename(filename),
             data=data,
             expires_at=self._clock() + self._ttl,
+            expires_unix=int(time.time() + self._ttl),
         )
         with self._lock:
             self._drop_expired()
@@ -118,7 +120,7 @@ def marker(download: Download, label: str = "DOWNLOAD") -> str:
         raise ValueError(f"not a label: {label!r}")
     return (
         f'[[DOWNLOAD filename="{download.filename}" bytes="{download.size}" '
-        f'url="/server/download?path={download.id}" label="{label}"]]'
+        f'url="/server/download?path={download.id}" label="{label}" expires="{download.expires_unix}"]]'
     )
 
 

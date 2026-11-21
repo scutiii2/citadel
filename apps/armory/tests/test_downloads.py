@@ -72,8 +72,8 @@ class TestExpiry:
         clock.now += 1
         assert registry.get(entry.id, "alice") is None
 
-    def test_the_default_is_ten_minutes(self) -> None:
-        assert downloads.TTL_SECONDS == 600
+    def test_the_default_is_one_hour(self) -> None:
+        assert downloads.TTL_SECONDS == 3600
 
     def test_an_expired_entry_frees_its_space(self, clock: Clock) -> None:
         registry = make(clock, ttl_seconds=10)
@@ -189,11 +189,17 @@ class TestMarker:
 
         text = marker(entry, "LOGS")
 
-        # The same pattern as ember_web/src/utils/downloads.ts.
-        pattern = r'\[\[DOWNLOAD filename="([^"]*)" bytes="(\d+)" url="([^"]*)"(?: label="([^"]*)")?\]\]'
+        # The same pattern as ember/src/utils/content/downloads.ts.
+        pattern = r'\[\[DOWNLOAD filename="([^"]*)" bytes="(\d+)" url="([^"]*)"(?: label="([^"]*)")?(?: expires="(\d+)")?\]\]'
         match = re.fullmatch(pattern, text)
         assert match is not None
-        assert match.groups() == ("web-logs.log", "31204", f"/server/download?path={entry.id}", "LOGS")
+        assert match.groups()[:4] == ("web-logs.log", "31204", f"/server/download?path={entry.id}", "LOGS")
+
+    def test_the_marker_names_the_expiry_in_unix_seconds(self, clock: Clock, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(downloads.time, "time", lambda: 5000.0)
+        entry = make(clock).offer("alice", "a.log", b"x")
+
+        assert marker(entry).endswith(' expires="8600"]]')
 
     def test_the_link_is_the_route_the_page_accepts(self, clock: Clock) -> None:
         entry = make(clock).offer("alice", "a.log", b"x")

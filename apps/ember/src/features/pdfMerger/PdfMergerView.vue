@@ -53,7 +53,7 @@ onBeforeRouteLeave(stop)
         <SourceList />
         <p v-if="!files.sources.length" class="muted small">Your source files will appear here.</p>
         <DropZone ref="dropZone" @files="files.upload($event)" />
-        <RetentionNote class="retention">Files are kept for 6 hours.<br>Save your merged PDF before it expires.</RetentionNote>
+        <RetentionNote class="retention">Files are kept for 1 hour.<br>Save your merged PDF before it expires.</RetentionNote>
       </aside>
       <footer class="output-area">
         <label class="output-label" for="pdf-output-name">Output file</label>
