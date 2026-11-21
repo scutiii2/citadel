@@ -47,6 +47,7 @@ from src.routes import (
     logs,
     mcp,
     nav_preferences,
+    outside,
     account_tuning,
     server_info,
     app_policy_routes,
@@ -74,6 +75,8 @@ from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
 from src.services import uid_log_filter, service_auth
 from src.services.otp_service import OtpService
+from src.services.legion_ask import LegionAsk
+from src.services.outside_guard import ClientRateLimiter, OutsideGuard
 from src.services.secret_box import SecretBox, ensure_secrets_key
 from src.services.public_rate_limiter import PublicReadLimiter
 from src.services.server_tools import McpServerTools, ServerTools
@@ -174,6 +177,8 @@ def create_app(
         app.state.traffic = recorder
         recorder.start()
         app.state.share_limiter = PublicReadLimiter()
+        app.state.outside_guard = OutsideGuard(ClientRateLimiter())
+        app.state.legion_ask = LegionAsk()
         from src.services.pricing import Pricing
 
         app.state.pricing = Pricing()
@@ -262,6 +267,7 @@ def create_app(
     app.include_router(capability_files.router)
     app.include_router(stronghold.router)
     app.include_router(internal_routes.router)
+    app.include_router(outside.router)
 
     @app.exception_handler(CapabilityFailure)
     async def capability_failure(_request: Request, error: CapabilityFailure):
