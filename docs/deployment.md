@@ -247,8 +247,8 @@ Portcullis calls Stronghold's product routes. Legion connects to Stronghold's si
 - **Storage**: Treasury, connection `stronghold` (`stronghold.db` in `.data/treasury/`). the `stronghold` connection is built in; Stronghold registers its own instance.
 - **Keys**: `.data/stronghold/keys.json` is made on first start. It holds the key that encrypts saved calendar links and the web push key pair. Back the folder up. Without the file, saved links must be entered again and browsers must subscribe to push again.
 - **Settings**: `docker/configs/stronghold/app.json` (the `calendar` block). The `calendar` block in Portcullis's config and `EMBER_VAPID_*` in its `.env` are no longer read.
-- **Notes shared with agents**: Armory's notes tools read Stronghold's database. Compose sets `DB_GATEWAY_INSTANCE=armory` and `DB_GATEWAY_CONNECTION=stronghold` for Armory, as the starting values, and Armory registers instance `armory` with that connection itself. A value saved on the Settings page of Armory Admin wins over them.
-- Stronghold reads Legion's agent registry from `.data/legion/` (mounted read-only) and calls Armory for the assistant memory.
+- **Armory's Treasury registration**: Compose sets `DB_GATEWAY_INSTANCE=armory` and `DB_GATEWAY_CONNECTION=stronghold` for Armory, as the starting values, and Armory registers instance `armory` with that connection itself. Armory no longer has notes tools (Plan 22). A value saved on the Settings page of Armory Admin wins over them.
+- Stronghold reads Legion's agent registry from `.data/legion/` (mounted read-only).
 - **Token limits and prices**: `usage.six_hour_token_limit`, `usage.weekly_token_limit` and the `pricing` block are in `docker/configs/stronghold/app.json` (Stronghold keeps usage). A limit set in Portcullis's config is ignored.
 - Stronghold calls Portcullis's `/internal` routes with signed service assertions (account standing, admin switches, email, Errors log). Its address comes from Treasury’s catalog.
 
@@ -264,7 +264,7 @@ version so Legion's `ask` tool accepts the chat ID Stronghold sends.
 
 Deploy Stronghold and Legion from the same repo version. Ember needs the `stronghold__tool_brain_*`, `stronghold__tool_skill_*` and `stronghold__tool_stack_*` allow globs. If the machine's `agent_overrides.json` replaces `ember.json`, apply the same allow list and notes instructions to the override.
 
-Keep Armory's `skills` capability offline. Stronghold stores new skill files in `.skills/` inside each account's Brain folder, so include that folder in backups. Citadel no longer reads or purges the old Armory skill data. Agents can propose those skills again, and Plan 20f will support recreating them by hand.
+Armory no longer has a `skills` capability (Plan 22). Stronghold stores new skill files in `.skills/` inside each account's Brain folder, so include that folder in backups. Citadel no longer reads or purges the old Armory skill data. Agents can propose those skills again, and Plan 20f will support recreating them by hand.
 
 ### Global brain rollout
 
@@ -280,7 +280,7 @@ Before using read aloud, dictation, audio attachments, or document attachments, 
 2. Enter the same per-caller tool tokens used before the move. Add backups in order and supply per-address tokens where needed. Save and use **Test** to check the saved addresses and credentials.
 3. Confirm read aloud, live dictation, and attachments. The Portcullis reverse proxy must pass WebSocket upgrades and allow connections to stay open for at least 270 seconds. The Config issues page identifies missing configurations.
 
-Armory's REST façade and Connections page remain until Plan 22. Citadel's speech, dictation, and attachment features use the new Stronghold configuration. Stronghold only streams Bard files whose origin it recorded, so clips created before cutover or through Bard's MCP tool return 404. Legion chooses MCP origins independently. Separate Scribe or Reader backing stores can make files uploaded to a REST backup unavailable to an agent using a different origin.
+Armory's REST façade and dictation relay are gone (Plan 22). Its Connections page remains because extensions are still stored as connection records there. Citadel's speech, dictation, and attachment features use the new Stronghold configuration. Stronghold only streams Bard files whose origin it recorded, so clips created before cutover or through Bard's MCP tool return 404. Legion chooses MCP origins independently. Separate Scribe or Reader backing stores can make files uploaded to a REST backup unavailable to an agent using a different origin.
 
 ## DecisionGateway
 
