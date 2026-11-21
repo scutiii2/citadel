@@ -24,6 +24,8 @@ class Scope:
 @dataclass(frozen=True)
 class Account:
     uid: str
+    username: str = ""
+    email: str = ""
 
 
 def _request_context():
@@ -78,4 +80,4 @@ async def resolve_account(app):
     """For account-wide tools (long-term memory): the verified account, no chat id needed."""
     caller, token, _extras = _credentials()
     async with _verified(app, caller, token) as who:
-        yield Account(who.uid)
+        yield Account(who.uid, getattr(who, "username", "") or who.uid, getattr(who, "email", "") or "")

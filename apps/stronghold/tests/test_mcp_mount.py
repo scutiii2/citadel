@@ -23,6 +23,8 @@ def test_the_server_offers_the_stack_brain_and_skill_tools(client):
         "tool_stack_add", "tool_stack_list", "tool_stack_remove", "tool_stack_pin",
         "tool_brain_search", "tool_brain_read", "tool_brain_list", "tool_brain_write", "tool_brain_update", "tool_brain_propose",
         "tool_skill_search", "tool_skill_propose", "tool_skill_mark",
+        "tool_ticket_createTicket", "tool_ticket_listMyTickets", "tool_ticket_getTicket",
+        "tool_ticket_addComment", "tool_usage_summary",
     }
     assert all(tool.description for tool in listed)
     write = next(tool for tool in listed if tool.name == "tool_brain_write")
@@ -142,3 +144,36 @@ def test_signed_legion_proposes_in_an_owned_chat_without_creating_a_file(client,
     proposals = client.portal.call(client.app.state.brain_proposals.pending, "u-1")
     assert [row["id"] for row in proposals] == [made["proposal"]["id"]]
     assert client.get("/brain/files").json()["files"] == []
+
+
+def test_ticket_and_usage_tools_use_the_signed_account_and_return_refusals(client, auth_stack, db_gateway, monkeypatch):
+    legion = ServiceAuth(auth_stack["legion"], "stronghold")
+    started = rpc(client, legion, "initialize", INIT)
+    headers = {"Mcp-Session-Id": started.headers["Mcp-Session-Id"]}
+    assert rpc(client, legion, "notifications/initialized", {}, headers=headers, request_id=None).status_code == 202
+    ana = identity()["X-Citadel-Requester"]
+    bob = identity("u-2", "bob", "bob@example.com")["X-Citadel-Requester"]
+
+    def call(name, arguments, token=None):
+        params = {"name": name, "arguments": arguments}
+        if token is not None:
+            params["_meta"] = {"requester_token": token}
+        reply = result(rpc(client, legion, "tools/call", params, headers=headers))
+        assert not reply.get("isError")
+        return reply["structuredContent"]
+
+    arguments = {"type": "bug", "title": "Can't sign in", "description": "The page timed out."}
+    assert call("tool_ticket_createTicket", arguments)["ok"] is False
+    made = call("tool_ticket_createTicket", arguments, ana)
+    assert made["ok"] is True
+    assert db_gateway.records["tickets", str(made["id"])]["owner"] == "u-1"
+    assert call("tool_ticket_getTicket", {"ticket_id": made["id"]}, bob)["ok"] is False
+    assert call("tool_ticket_getTicket", {"ticket_id": made["id"]}, ana)["ok"] is True
+    assert call("tool_usage_summary", {"days": 0}, ana) == {"ok": False, "message": "Invalid tool call."}
+    assert call("tool_usage_summary", {}, ana)["requests"] == 0
+
+    async def down(*args, **kwargs):
+        raise DbGatewayUnavailable("storage failure")
+
+    monkeypatch.setattr(db_gateway, "query", down)
+    assert call("tool_ticket_listMyTickets", {}, ana) == {"ok": False, "message": "Storage is unavailable."}
