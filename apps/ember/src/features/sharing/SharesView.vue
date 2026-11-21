@@ -102,13 +102,13 @@ async function unblock(uid: string): Promise<void> {
   <PageLayout class="shares info-content" title="Shares" description="Copies of files, skills and memory items: what was sent to you and what you sent.">
     <p v-if="notice" class="notice" role="status">
       {{ notice }}
-      <RouterLink v-if="destination" :to="{ name: destination }">{{ destination === "skills" ? "Go to Skills" : "Go to Notes" }}</RouterLink>
+      <RouterLink v-if="destination" class="notice-link" :to="{ name: destination }">{{ destination === "skills" ? "Go to Skills" : "Go to Notes" }}</RouterLink>
     </p>
     <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
     <StateMessage v-if="store.status === 'idle' || store.status === 'loading'" kind="loading">Loading …</StateMessage>
     <StateMessage v-else-if="store.status === 'error'" kind="error" @retry="store.load()">Could not load your shares: {{ store.error }}</StateMessage>
     <template v-else>
-      <p v-if="store.error" class="error" role="alert">Could not refresh: {{ store.error }}</p>
+      <StateMessage v-if="store.error" kind="error" @retry="store.load()">Could not refresh: {{ store.error }}</StateMessage>
 
       <section aria-label="Waiting for you" class="block">
         <h3>Waiting for you</h3>
@@ -178,6 +178,7 @@ async function unblock(uid: string): Promise<void> {
 .block { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
 .block h3 { margin: 0; }
 .hint, .notice { margin: 0; font-size: .85em; }
+.notice-link { display: inline-flex; align-items: center; }
 .rows { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
 .what { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
@@ -187,7 +188,7 @@ async function unblock(uid: string): Promise<void> {
 .add input { flex: 1; min-width: 0; }
 @media (max-width: 767px) {
   .row { flex-direction: column; align-items: stretch; }
-  .row button, .add button, .shares :deep(.state button), .withdraw-confirm :deep(.actions button) { min-height: 44px; min-width: 44px; }
+  .row button, .add button, .notice-link, .shares :deep(.state button), .withdraw-confirm :deep(.actions button) { min-height: 44px; min-width: 44px; }
   .add input { min-height: 44px; font-size: max(1em, 16px); }
 }
 </style>

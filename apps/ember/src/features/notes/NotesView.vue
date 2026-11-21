@@ -9,6 +9,8 @@ import { ApiError } from "../../api/http";
 import { useAuthStore } from "../../stores/auth";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { errorMessage } from "../../utils/errors";
+import ShareDialog, { type ShareTarget } from "../sharing/components/ShareDialog.vue";
+import { headingsOf } from "../sharing/utils/headings";
 import { brainClient, folderProblem, normalizeFolder, type BrainFile, type FileChanges } from "./api/BrainClient";
 import FileEditor from "./components/FileEditor.vue";
 import FileList from "./components/FileList.vue";
@@ -43,6 +45,7 @@ const formError = ref("");
 const notice = ref("");
 const query = ref("");
 const folder = ref<string | null>(null);
+const shareTarget = ref<ShareTarget | null>(null);
 
 const busy = computed(() => saving.value || removing.value || reverting.value || opening.value);
 const sameTags = (a: string[], b: string[]) => a.length === b.length && a.every((tag, i) => tag === b[i]);
@@ -63,6 +66,20 @@ const dirty = computed(
 const canSave = computed(() => (selected.value === NEW || opened.value !== null) && form.title.trim() !== "" && dirty.value && !busy.value && conflict.value === null && problem.value === "");
 const canRevert = computed(() => opened.value?.edited === true && !dirty.value && !busy.value && conflict.value === null);
 const revertHint = computed(() => (opened.value?.edited && dirty.value ? "Save or discard your changes first." : ""));
+const canShare = computed(() => opened.value !== null && !dirty.value && !busy.value && conflict.value === null);
+const shareHint = computed(() => {
+  if (conflict.value) return "Resolve the file conflict before sharing.";
+  if (dirty.value) return "Save your changes first. A share sends the saved file.";
+  if (busy.value) return "Wait for the file change to finish before sharing.";
+  return "";
+});
+
+function share(): void {
+  const file = opened.value;
+  if (file && canShare.value) {
+    shareTarget.value = { kind: "file", fileId: file.id, label: file.title, headings: headingsOf(file.body) };
+  }
+}
 
 const maxChars = computed(() => store.summary?.max_record_chars ?? 20_000);
 const knownTags = computed(() => {
@@ -130,6 +147,7 @@ function fillEditor(file: BrainFile | null, startFolder = ""): void {
 
 async function show(target: string | null): Promise<void> {
   if (!auth.account) return;
+  shareTarget.value = null;
   const previous = selected.value;
   const run = ++openRun;
   selected.value = target;
@@ -298,6 +316,7 @@ function resetPage(): void {
   openError.value = formError.value = notice.value = "";
   discardTarget.value = undefined;
   confirmDelete.value = confirmRevert.value = false;
+  shareTarget.value = null;
   answerLeave(false);
   query.value = "";
   folder.value = null;
@@ -385,7 +404,10 @@ watch(() => auth.account?.id, () => {
               :folder-problem="problem"
               :can-revert="canRevert"
               :revert-hint="revertHint"
+              :can-share="canShare"
+              :share-hint="shareHint"
               :disabled="busy"
+              @share="share"
               @revert="confirmRevert = true"
               @remove="confirmDelete = true"
             />
@@ -409,6 +431,7 @@ watch(() => auth.account?.id, () => {
       </ListEditorLayout>
     </div>
 
+    <ShareDialog v-if="shareTarget" :open="true" :target="shareTarget" @close="shareTarget = null" />
     <ConfirmModal
       :open="confirmDelete"
       title="Delete this file?"

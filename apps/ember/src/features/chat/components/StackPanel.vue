@@ -20,6 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   add: [text: string];
   pin: [id: number, pinned: boolean];
+  share: [id: number];
   remove: [id: number];
   compact: [];
   retry: [];
@@ -81,6 +82,7 @@ defineExpose({ clearDraft: (): void => { draft.value = ""; } });
       </div>
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-if="error" class="error" role="alert" data-test="stack-error">{{ error }}</p>
+      <p v-if="busy && view.items.length" class="hint" role="status">Wait for the memory change to finish before sharing.</p>
       <ul v-if="view.items.length" class="items">
         <li v-for="item in view.items" :key="item.id" data-test="stack-item">
           <button
@@ -96,6 +98,9 @@ defineExpose({ clearDraft: (): void => { draft.value = ""; } });
               <span v-if="sourceLabel(item)">{{ sourceLabel(item) }}</span>
             </span>
           </span>
+          <button type="button" class="icon-btn" data-test="share" aria-label="Share item" title="Share item" :disabled="busy" @click="emit('share', item.id)">
+            <svg class="line-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M6.5 5.5 10 2l3.5 3.5M10 2v8M6 6H3v8h10V9" /></svg>
+          </button>
           <button type="button" class="icon-btn" data-test="remove" aria-label="Remove item" :disabled="busy" @click="emit('remove', item.id)">
             <svg class="line-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
           </button>

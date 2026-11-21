@@ -16,6 +16,23 @@ function mountPanel(props: Partial<InstanceType<typeof StackPanel>["$props"]> = 
 }
 
 describe("StackPanel", () => {
+  it("each item has a Share button that names no text and asks to share that item", async () => {
+    const w = mountPanel();
+    const buttons = w.findAll("[data-test=share]");
+    expect(buttons).toHaveLength(3);
+    expect(buttons[1]!.attributes("aria-label")).toBe("Share item");
+    await buttons[1]!.trigger("click");
+    expect(w.emitted("share")).toEqual([[2]]);
+  });
+
+  it("keeps Share off while a change is running", () => {
+    const w = mountPanel({ pending: true });
+    const buttons = w.findAll("[data-test=share]");
+    expect(buttons).toHaveLength(3);
+    for (const button of buttons) expect(button.attributes("disabled")).toBeDefined();
+    expect(w.text()).toContain("Wait for the memory change to finish before sharing.");
+  });
+
   it("lists the items with their source, and marks a pinned one with text as well as an icon", () => {
     const w = mountPanel();
     const rows = w.findAll("[data-test=stack-item]");

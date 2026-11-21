@@ -9,6 +9,7 @@ import StateMessage from "../../components/ui/status/StateMessage.vue";
 import DangerZone from "../../components/ui/status/DangerZone.vue";
 import CharacterCount from "../../components/ui/status/CharacterCount.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import ShareDialog, { type ShareTarget } from "../sharing/components/ShareDialog.vue";
 import { useDeleteConfirm } from "../../composables/useDeleteConfirm";
 import { useListLoad } from "../../composables/useListLoad";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
@@ -55,6 +56,7 @@ const { deleting, removing, removeError, ask: askDelete, confirm: remove } = use
 );
 
 const editing = ref<Skill | null>(null);
+const shareTarget = ref<ShareTarget | null>(null);
 const listScroll = ref<HTMLElement | null>(null);
 const searchField = ref<InstanceType<typeof SearchField> | null>(null);
 const draft = ref<SkillText>({ title: "", when_to_use: "", steps: "", tools: "" });
@@ -72,6 +74,7 @@ const guard = useUnsavedGuard({
 const discardOpen = guard.open;
 function showEditor(skill: Skill | null): void {
   const previousId = editing.value?.id;
+  shareTarget.value = null;
   editing.value = skill;
   if (skill) draft.value = { title: skill.title, when_to_use: skill.when_to_use, steps: skill.steps, tools: skill.tools };
   editError.value = "";
@@ -169,6 +172,9 @@ async function saveEdit(): Promise<void> {
             <details>
               <summary>Manage skill <span aria-hidden="true">›</span></summary>
               <div class="manage-actions">
+                <button type="button" class="link-btn share-action" :disabled="busy || dirty" @click="shareTarget = { kind: 'skill', skillId: editing.id, label: editing.title }">Share a copy…</button>
+                <p v-if="dirty" class="muted">Save your changes first. A share sends the saved skill.</p>
+                <p v-else-if="busy" class="muted">Wait for the skill change to finish before sharing.</p>
                 <button v-if="editing.status === 'proposed'" type="button" class="link-btn danger" :disabled="busy" :aria-busy="busyId === editing.id" @click="move(editing, 'retired', 'Skill rejected.')">Reject</button>
                 <button v-if="editing.status === 'active'" type="button" class="link-btn" :disabled="busy" :aria-busy="busyId === editing.id" @click="move(editing, 'retired', 'Skill retired.')">Retire</button>
                 <button v-if="editing.status === 'retired'" type="button" class="link-btn" :disabled="busy" :aria-busy="busyId === editing.id" @click="move(editing, 'proposed', 'Skill sent back for review.')">Send back for review</button>
@@ -182,6 +188,7 @@ async function saveEdit(): Promise<void> {
       <template #actions><button type="button" class="pill-btn ghost" :disabled="busy" @click="askEdit(null)">Cancel</button></template>
       <template #placeholder><StateMessage kind="empty" title="Review a skill">Choose a skill to read its steps or edit it. Approve the ones you want Ember to use.</StateMessage></template>
     </ListEditorLayout>
+    <ShareDialog v-if="shareTarget" :open="true" :target="shareTarget" @close="shareTarget = null" />
     <ConfirmModal :open="deleting !== null" title="Delete this skill?" :message="removeError || 'Ember will no longer know it. This cannot be undone.'" confirm-label="Delete skill" danger :busy="removing" @confirm="remove" @close="!removing && (deleting = null)" />
     <ConfirmModal :open="discardOpen" title="Discard your changes?" message="This skill has changes you have not saved." confirm-label="Discard" danger @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
   </PageLayout>
@@ -219,6 +226,10 @@ summary > span > span { margin-left: 12px; }
 .secondary-tools details[open] > summary { color: var(--accent); }
 .tools-field { margin-bottom: 16px; }
 .manage-actions { padding-bottom: 12px; }
+.manage-actions p { margin: 4px 0 8px; font-size: .85em; }
+@media (max-width: 767px) {
+  .share-action { min-width: 44px; min-height: 44px; }
+}
 .secondary-tools :deep(.danger-panel) { margin-bottom: 16px; }
 .action-error { margin: 0 0 12px; font-size: .85em; }
 @media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }

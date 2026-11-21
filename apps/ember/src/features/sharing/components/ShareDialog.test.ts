@@ -145,6 +145,17 @@ describe("ShareDialog", () => {
     expect(w.emitted("close")).toHaveLength(1);
   });
 
+  it("closes the native modal before a conditional parent removes it", async () => {
+    const nativeClose = vi.spyOn(HTMLDialogElement.prototype, "close");
+    const w = await mountDialog();
+    const dialog = w.get("dialog[open]").element;
+    w.unmount();
+    wrapper = null;
+    expect(nativeClose).toHaveBeenCalledOnce();
+    expect(dialog.hasAttribute("open")).toBe(false);
+    nativeClose.mockRestore();
+  });
+
   it("drops a late send result when the account changes", async () => {
     let finish!: (share: Share) => void;
     client.create.mockReturnValueOnce(new Promise<Share>((resolve) => { finish = resolve; }));

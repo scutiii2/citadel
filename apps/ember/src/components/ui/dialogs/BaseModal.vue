@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 /** A modal dialog the parent opens and closes with `open`. It closes itself on
  * Escape, on the × and on a click outside the panel, by asking the parent
@@ -8,6 +8,14 @@ const props = defineProps<{ open: boolean; title: string; wide?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 const dialog = ref<HTMLDialogElement | null>(null);
+let unmounting = false;
+
+onBeforeUnmount(() => {
+  unmounting = true;
+  // A conditional parent can remove the dialog before the open watcher runs.
+  // Close it while connected so the browser can return focus to the opener.
+  if (dialog.value?.open) dialog.value.close?.();
+});
 
 watch(
   () => props.open,
@@ -23,7 +31,7 @@ watch(
  * already set `open` to false it asked for that, so it must not hear it back:
  * it may be switching to another dialog, and the echo would shut that one. */
 function onNativeClose(): void {
-  if (props.open) emit("close");
+  if (props.open && !unmounting) emit("close");
 }
 
 /** A click on the backdrop lands on the <dialog> itself, not on its content. */

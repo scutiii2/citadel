@@ -11,6 +11,7 @@ function mountEditor(props: Record<string, unknown> = {}) {
     props: {
       title: "Tea", body: "Green", tags: [], tagText: "", folder: "", agentEditable: false,
       file: manual, folders: [], knownTags: [], maxChars: 20_000, folderProblem: "", canRevert: false, revertHint: "", disabled: false,
+      canShare: true, shareHint: "",
       ...handlers, ...props,
     },
     attachTo: document.body,
@@ -19,6 +20,21 @@ function mountEditor(props: Record<string, unknown> = {}) {
 }
 
 describe("FileEditor", () => {
+  it("offers Share for a saved file and asks the page to open the dialog", async () => {
+    const w = mountEditor();
+    const button = w.findAll("button").find((b) => b.text() === "Share a copy…")!;
+    expect(button.attributes("disabled")).toBeUndefined();
+    await button.trigger("click");
+    expect(w.emitted("share")).toHaveLength(1);
+  });
+
+  it("keeps Share off, with the reason, until the file is saved and unchanged", () => {
+    const w = mountEditor({ canShare: false, shareHint: "Save your changes first. A share sends the saved file." });
+    expect(w.findAll("button").find((b) => b.text() === "Share a copy…")!.attributes("disabled")).toBeDefined();
+    expect(w.text()).toContain("Save your changes first.");
+    expect(mountEditor({ file: null }).text()).not.toContain("Share a copy…");
+  });
+
   it("shows the title and the text with their limits", () => {
     const w = mountEditor({ maxChars: 500 });
     expect((w.get('input[aria-label="Title"]').element as HTMLInputElement).value).toBe("Tea");

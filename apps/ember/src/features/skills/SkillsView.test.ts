@@ -7,6 +7,10 @@ vi.mock("./api/SkillsClient", () => ({
   skillsClient: { list: vi.fn(), setStatus: vi.fn(), update: vi.fn(), remove: vi.fn() },
   SKILL_LIMITS: { title: 80, when_to_use: 300, steps: 1200, tools: 200 },
 }));
+vi.mock("../sharing/components/ShareDialog.vue", () => ({
+  default: { props: ["open", "target"], template: '<div data-test="share-dialog">{{ target.kind }} {{ target.skillId }}</div>' },
+}));
+
 const client = vi.mocked(skillsClient);
 const skill = (id: number, status: Skill["status"], extra: Partial<Skill> = {}): Skill => ({
   id, title: `Skill ${id}`, when_to_use: "an app is hung", steps: "stop it, then start it", tools: "tool_srv_stopApp",
@@ -34,6 +38,23 @@ async function setup(skills: Skill[]) {
 const button = (text: string) => wrapper.findAll("button").find((b) => b.text() === text)!;
 
 describe("SkillsView", () => {
+  it("shares a saved skill", async () => {
+    await setup([skill(1, "active")]);
+    await wrapper.get('button[aria-label="Edit skill Skill 1"]').trigger("click");
+    expect(button("Share a copy…").attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="share-dialog"]').exists()).toBe(false);
+    await button("Share a copy…").trigger("click");
+    expect(wrapper.get('[data-test="share-dialog"]').text()).toBe("skill 1");
+  });
+
+  it("keeps Share off, with the reason, while the draft is unsaved", async () => {
+    await setup([skill(1, "active")]);
+    await wrapper.get('button[aria-label="Edit skill Skill 1"]').trigger("click");
+    await wrapper.get('textarea[aria-label="Title"]').setValue("Changed title");
+    expect(button("Share a copy…").attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("Save your changes first.");
+  });
+
   it("groups skills by status and says nothing is used before approval", async () => {
     await setup([skill(1, "proposed"), skill(2, "active", { successes: 2 }), skill(3, "retired")]);
     expect(wrapper.text()).toContain("Nothing is used until you approve it");

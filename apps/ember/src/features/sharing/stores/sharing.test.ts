@@ -143,6 +143,15 @@ describe("changes", () => {
     expect(client.inbox).toHaveBeenCalledTimes(1);
   });
 
+  it("refreshes stale lists when the server says a share was already decided", async () => {
+    const { store } = setup();
+    await store.load();
+    client.inbox.mockResolvedValueOnce([share("b")]);
+    client.decline.mockRejectedValueOnce(new ApiError(409, "That share is already decided."));
+    await expect(store.decline("a")).rejects.toMatchObject({ status: 409 });
+    expect(store.inbox.map((item) => item.id)).toEqual(["b"]);
+  });
+
   it("block and unblock call the server and look again", async () => {
     const { store } = setup();
     await store.load();

@@ -129,6 +129,22 @@ describe("SharesView", () => {
     expect(w.get('[role="alert"]').text()).toBe("That share is already decided.");
   });
 
+  it("offers retry when refreshing after a successful withdrawal fails", async () => {
+    const w = await setup({ sent: [share("s1")] });
+    await buttonIn(section(w, "Sent by you"), "Withdraw").trigger("click");
+    await flushPromises();
+    client.revoke.mockResolvedValueOnce(share("s1", { status: "revoked" }));
+    client.sent.mockRejectedValueOnce(new ApiError(503, "Storage is unavailable"));
+    confirm()!.click();
+    await flushPromises();
+    expect(w.text()).toContain("Share withdrawn.");
+    client.sent.mockResolvedValue([share("s1", { status: "revoked" })]);
+    await w.get('[role="alert"] button').trigger("click");
+    await flushPromises();
+    expect(w.find('[role="alert"]').exists()).toBe(false);
+    expect(buttonIn(section(w, "Sent by you"), "Withdraw")).toBeUndefined();
+  });
+
   it("blocks an account by username and shows the server's one refusal as it came", async () => {
     const w = await setup();
     client.block.mockRejectedValueOnce(new ApiError(404, "No such recipient."));

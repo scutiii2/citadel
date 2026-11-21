@@ -22,6 +22,8 @@ const props = defineProps<{
   canRevert: boolean;
   /** Why Restore original is off, or "". */
   revertHint: string;
+  canShare: boolean;
+  shareHint: string;
   disabled: boolean;
 }>();
 
@@ -31,7 +33,7 @@ const tags = defineModel<string[]>("tags", { required: true });
 const tagText = defineModel<string>("tagText", { required: true });
 const folder = defineModel<string>("folder", { required: true });
 const agentEditable = defineModel<boolean>("agentEditable", { required: true });
-defineEmits<{ revert: []; remove: [] }>();
+defineEmits<{ revert: []; remove: []; share: [] }>();
 
 const uid = useId();
 const titleField = ref<HTMLInputElement | null>(null);
@@ -110,6 +112,14 @@ defineExpose({
           <p class="muted hint">You changed this file. The text from before your first change is kept.</p>
           <div><button type="button" class="chip" :disabled="!canRevert || disabled" @click="$emit('revert')">Restore original</button></div>
           <p v-if="revertHint" class="muted hint">{{ revertHint }}</p>
+        </div>
+      </details>
+      <details v-if="file" class="share-tools">
+        <summary><span>Share</span><span aria-hidden="true">›</span></summary>
+        <div class="field">
+          <p class="muted hint">Send a copy of the saved file, or one section of it, to another account or to the global brain. They decide whether to keep it.</p>
+          <div><button type="button" class="chip" :disabled="!canShare || disabled" @click="$emit('share')">Share a copy…</button></div>
+          <p v-if="shareHint" class="muted hint">{{ shareHint }}</p>
         </div>
       </details>
       <details v-if="file" class="manage-tools">

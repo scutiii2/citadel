@@ -2,6 +2,7 @@
 import { computed, onActivated, onBeforeUnmount, onDeactivated, ref, useId, useTemplateRef, watch } from "vue";
 import { useOutsideClose } from "../../../composables/useOutsideClose";
 import { useAuthStore } from "../../../stores/auth";
+import ShareDialog, { type ShareTarget } from "../../sharing/components/ShareDialog.vue";
 import { useStackStore } from "../stores/stack";
 import StackPanel from "./StackPanel.vue";
 
@@ -15,6 +16,7 @@ const auth = useAuthStore();
 const active = ref(true);
 const panelId = useId();
 const open = ref(false);
+const shareTarget = ref<ShareTarget | null>(null);
 const box = useTemplateRef<HTMLElement>("box");
 const button = useTemplateRef<HTMLButtonElement>("button");
 const panel = useTemplateRef<InstanceType<typeof StackPanel>>("panel");
@@ -25,13 +27,19 @@ const level = computed(() => (view.value?.full ? "full" : view.value?.warn ? "wa
 const countText = computed(() => (view.value ? `${view.value.used}/${view.value.limit}` : ""));
 
 function close(): void {
+  shareTarget.value = null;
   open.value = false;
 }
 
 function closeOnEscape(event: KeyboardEvent): void {
-  if (event.key !== "Escape") return;
-  open.value = false;
+  if (event.key !== "Escape" || event.repeat || shareTarget.value) return;
+  close();
   button.value?.focus();
+}
+
+function shareItem(itemId: number): void {
+  if (!props.chatId || !open.value || shown.value?.pending || shown.value?.compacting) return;
+  shareTarget.value = { kind: "stack_item", chatId: props.chatId, itemId, label: "a short-term memory item" };
 }
 
 watch(open, (isOpen) => {
@@ -74,7 +82,7 @@ async function add(text: string): Promise<void> {
   <div v-if="chatId && shown" ref="box" class="stack-box">
     <button
       ref="button" type="button" class="stack-button" :class="level" data-test="stack-button" aria-haspopup="dialog" :aria-expanded="open" :aria-controls="open ? panelId : undefined"
-      title="Short-term memory: the short facts saved for this chat" @click="open = !open"
+      title="Short-term memory: the short facts saved for this chat" @click="open ? close() : (open = true)"
     >
       <svg v-if="level" class="line-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 11.5h-13zM8 6.5v3M8 11.5v.5" /></svg>
       Memory
@@ -97,10 +105,12 @@ async function add(text: string): Promise<void> {
       :locked="locked"
       @add="add"
       @pin="(id, pinned) => store.setPinned(chatId!, id, pinned)"
+      @share="shareItem"
       @remove="(id) => store.remove(chatId!, id)"
       @compact="store.compact(chatId!)"
       @retry="store.load(chatId!)"
     />
+    <ShareDialog v-if="shareTarget" :open="true" :target="shareTarget" @close="shareTarget = null" />
   </div>
 </template>
 

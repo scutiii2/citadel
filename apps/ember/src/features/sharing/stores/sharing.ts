@@ -1,8 +1,13 @@
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
+import { ApiError } from "../../../api/http";
 import { useAuthStore } from "../../../stores/auth";
 import { errorMessage } from "../../../utils/errors";
 import { sharingClient, type Block, type Landing, type NewShare, type Share } from "../api/SharingClient";
+
+export function isDecidedShareError(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 409 && err.message === "That share is already decided.";
+}
 
 /** What the account sent, what waits for its answer and whom it blocked, as the server holds them. The text of a
  * share is not kept here (the review dialog asks for it). Everything is private: `forget()` and a change of account
@@ -40,9 +45,15 @@ export const useSharingStore = defineStore("sharing", () => {
   /** Runs a change. Errors go to the caller, who shows the server's reason. */
   async function change<T>(work: () => Promise<T>): Promise<T> {
     const started = epoch;
-    const result = await work();
-    if (started === epoch && status.value !== "idle") await load();
-    return result;
+    const refresh = () => started === epoch && status.value !== "idle" ? load() : undefined;
+    try {
+      const result = await work();
+      await refresh();
+      return result;
+    } catch (err) {
+      if (isDecidedShareError(err)) await refresh();
+      throw err;
+    }
   }
 
   const create = (share: NewShare) => change(() => sharingClient.create(share));

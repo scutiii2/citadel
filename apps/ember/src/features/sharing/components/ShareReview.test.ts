@@ -76,6 +76,7 @@ describe("ShareReview", () => {
     expect(w.text()).toContain("Kill it");
     expect(w.text()).toContain("ps");
     expect(w.find('input[aria-label="Folder"]').exists()).toBe(false);
+    expect(w.get('input[aria-label="Title"]').attributes("maxlength")).toBe("80");
   });
 
   it("explains why it cannot be read, and changes nothing", async () => {
@@ -83,6 +84,16 @@ describe("ShareReview", () => {
     const { w } = await review();
     expect(w.get('[role="alert"]').text()).toBe("No such share.");
     expect(button(w, "Keep a copy").attributes("disabled")).toBeDefined();
+  });
+
+  it("explains a remote decision and only offers to close", async () => {
+    client.get.mockResolvedValueOnce(detail({ status: "revoked", body: "" }));
+    const { w } = await review();
+    expect(w.text()).toContain("This share is no longer waiting for an answer.");
+    expect(button(w, "Keep a copy")).toBeUndefined();
+    expect(button(w, "Decline")).toBeUndefined();
+    expect(w.find("pre").exists()).toBe(false);
+    expect(client.inbox).toHaveBeenCalledOnce();
   });
 
   it("keeps a copy with the title and folder the person chose", async () => {
@@ -121,6 +132,16 @@ describe("ShareReview", () => {
     await flushPromises();
     expect(w.get('[role="alert"]').text()).toBe("You have reached the limit of 500 files.");
     expect(w.emitted("done")).toBeUndefined();
+  });
+
+  it("stops offering answers if the share is withdrawn after the preview opens", async () => {
+    client.accept.mockRejectedValueOnce(new ApiError(409, "That share is already decided."));
+    const { w } = await review();
+    await button(w, "Keep a copy").trigger("click");
+    await flushPromises();
+    expect(w.get('[role="alert"]').text()).toBe("That share is already decided.");
+    expect(button(w, "Keep a copy")).toBeUndefined();
+    expect(w.find("pre").exists()).toBe(false);
   });
 
   it("declines an incoming share", async () => {

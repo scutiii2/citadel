@@ -12,6 +12,14 @@ vi.mock("../api/StackClient", () => ({
   stackClient: { view: vi.fn(), add: vi.fn(), setPinned: vi.fn(), remove: vi.fn(), compact: vi.fn() },
 }));
 
+vi.mock("../../sharing/components/ShareDialog.vue", () => ({
+  default: {
+    props: ["open", "target"],
+    emits: ["close"],
+    template: '<dialog open data-test="share-dialog" @cancel.prevent="$emit(\'close\')">{{ target.kind }} {{ target.chatId }} {{ target.itemId }}<button class="stub-close" @click="$emit(\'close\')">x</button></dialog>',
+  },
+}));
+
 const client = vi.mocked(stackClient);
 const item = (id: number, text: string, pinned = false): StackItem => ({ id, text, pinned, source: "agent", at: "2026-01-01T00:00:00Z" });
 const view = (items: StackItem[], extra: Partial<StackView> = {}): StackView => ({ items, used: items.length, limit: 40, warn: false, full: false, ...extra });
@@ -38,6 +46,25 @@ afterEach(() => {
 });
 
 describe("StackMenu", () => {
+  it("sharing an item opens the dialog for that chat and item; Escape does not close the panel behind it", async () => {
+    const w = await mountMenu();
+    await w.get("[data-test=stack-button]").trigger("click");
+    await flushPromises();
+    await w.findAll("[data-test=share]")[1]!.trigger("click");
+    expect(w.get('[data-test="share-dialog"]').text()).toContain("stack_item c-1 2");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await flushPromises();
+    expect(w.find("[data-test=stack-panel]").exists()).toBe(true);
+    await w.get('[data-test="share-dialog"]').trigger("cancel");
+    expect(w.find('[data-test="share-dialog"]').exists()).toBe(false);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await flushPromises();
+    expect(w.find("[data-test=stack-panel]").exists()).toBe(false);
+    expect(client.add).not.toHaveBeenCalled();
+    expect(client.remove).not.toHaveBeenCalled();
+    expect(client.setPinned).not.toHaveBeenCalled();
+  });
+
   it("keeps the panel open on a press inside it", async () => {
     const w = await mountMenu();
     await w.get("[data-test=stack-button]").trigger("click");

@@ -32,12 +32,12 @@ const error = ref("");
 const done = ref<Share | null>(null);
 let run = 0; // an answer that arrives after the dialog was closed or reopened is dropped
 
-function reset(): void {
+function reset(pickHeading = false): void {
   run++;
   mode.value = "account";
   username.value = "";
   what.value = "file";
-  heading.value = props.target?.kind === "file" ? (props.target.headings[0] ?? "") : "";
+  heading.value = pickHeading && props.target?.kind === "file" ? (props.target.headings[0] ?? "") : "";
   sending.value = false;
   error.value = "";
   done.value = null;
@@ -45,17 +45,15 @@ function reset(): void {
 function close(): void {
   dismissed.value = true;
   reset();
-  heading.value = "";
   emit("close");
 }
 watch(() => props.open, (isOpen) => {
   dismissed.value = !isOpen;
-  reset();
-  if (!isOpen) heading.value = "";
+  reset(isOpen);
 }, { immediate: true, flush: "sync" });
-watch(() => props.target, () => { if (visible.value) reset(); }, { flush: "sync" });
+watch(() => props.target, () => { if (visible.value) reset(true); }, { flush: "sync" });
 watch(() => auth.account?.id, close, { flush: "sync" });
-onBeforeUnmount(() => { run++; });
+onBeforeUnmount(() => reset());
 
 const headings = computed(() => (props.target?.kind === "file" ? props.target.headings : []));
 const valid = computed(() => mode.value === "global" || username.value.trim() !== "");
@@ -115,7 +113,7 @@ async function send(): Promise<void> {
           <label><input v-model="mode" type="radio" name="who" value="global" /> The global brain</label>
         </fieldset>
         <p v-if="mode === 'global'" class="note" role="note">Global shares are reviewed first. If approved, every account and every agent can read the text. Do not share private data.</p>
-        <p v-else class="note" role="note">They see the text and choose whether to keep it. Tags and links to your private files are removed. You can withdraw it from Shares until they answer.</p>
+        <p v-else class="note" role="note">They see the text and choose whether to keep it. The server removes tags and private Markdown links. Check the text for private paths before sending. You can withdraw it from Shares until they answer.</p>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
         <div class="buttons">
           <button type="button" class="pill-btn ghost" :disabled="sending" @click="close">Cancel</button>

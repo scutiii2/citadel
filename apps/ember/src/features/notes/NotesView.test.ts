@@ -13,6 +13,13 @@ vi.mock("./api/BrainClient", async (importOriginal) => ({
   brainClient: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), revert: vi.fn(), remove: vi.fn(), search: vi.fn(), summary: vi.fn() },
 }));
 
+vi.mock("../sharing/components/ShareDialog.vue", () => ({
+  default: {
+    props: ["open", "target"],
+    template: '<div data-test="share-dialog">{{ target.kind }} {{ target.fileId }} {{ target.headings.join("|") }}</div>',
+  },
+}));
+
 const client = vi.mocked(brainClient);
 
 const row = (id: string, title: string, extra: Partial<BrainFileRow> = {}): BrainFileRow => ({
@@ -73,6 +80,23 @@ async function open(w: VueWrapper, id: string) {
 }
 
 describe("NotesView", () => {
+  it("shares the saved file, listing its headings for a section", async () => {
+    client.get.mockResolvedValue(full("a", "Tea", "# Brewing\nSteep.\n## Storage\nDry."));
+    const w = await setup([row("a", "Tea")]);
+    await open(w, "a");
+    await buttonByText(w, "Share a copy…")!.trigger("click");
+    expect(w.get('[data-test="share-dialog"]').text()).toBe("file a Brewing|Storage");
+  });
+
+  it("does not offer to share while there are unsaved changes", async () => {
+    client.get.mockResolvedValue(full("a", "Tea", "Body"));
+    const w = await setup([row("a", "Tea")]);
+    await open(w, "a");
+    await text(w).setValue("Edited");
+    expect(buttonByText(w, "Share a copy…")!.attributes("disabled")).toBeDefined();
+    expect(w.text()).toContain("Save your changes first.");
+  });
+
   it("lists the server's files and shows the quota", async () => {
     const w = await setup([row("a", "Tea"), row("b", "Plan")]);
     expect(rows(w).map((r) => r.text())[0]).toContain("Tea");
