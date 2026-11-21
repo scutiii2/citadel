@@ -485,6 +485,105 @@ field names only, after upstream success, never titles, descriptions or comments
 Manual ticket creation has no additional rate limiter; mcp_server limits
 automatic reports. Add manual limits later if abuse appears.
 
+## Outside clients
+
+A program outside the Citadel can call Legion's entry agent with its own key through one door. It has no account, cookie or
+chat; the key opens nothing else (not `/api/chats`, not any admin route), and a signed-in session cannot use the door.
+
+### The door: `POST /api/outside/legion/ask`
+
+```
+curl -H "Authorization: Bearer ock_..." -H "Content-Type: application/json" \
+     -d '{"question":"Say hello","history":[{"role":"user","content":"earlier"}]}' \
+     http://<host>:29601/api/outside/legion/ask
+```
+
+Body: `question` (1 to 8000 characters), optional `history` (up to 20 turns of `{role: user|assistant, content}`); other fields
+are refused. Answer: `{answer, usage: {total_tokens, budget_remaining}, request_id}`.
+
+| Status | Meaning |
+|---|---|
+| `200` | The answer; its tokens were recorded. |
+| `401` | Wrong, missing, disabled or deleted key: one identical text for all of them. |
+| `403` | The client may not use this service, or its address is outside the client's `ip_allow`, or the address is refused by the main deny list or the outside IP lists. |
+| `422` | Malformed body. The error lists `loc`, `msg` and `type` only, never the submitted text. |
+| `429` + `Retry-After` | Client rate limit, or the token budget is used up. |
+| `503` | Legion or the entry agent is down, the budget cannot be read, or the tokens could not be recorded (the answer is then withheld). Nothing is counted. |
+
+Every check that cannot decide refuses (fail closed).
+
+### Key and client record
+
+The key is `ock_` plus 43 URL-safe characters. It is shown once, on create and on rotate; Portcullis keeps only its
+SHA-256 and the 8-character prefix (`key_prefix`). It never appears in logs, errors or the audit log.
+
+A client is `{id, uid, name, key_prefix, services, ip_allow, rate_per_minute, enabled, created_at, last_used_at, budget}`:
+`name` 1 to 60 of letters, digits, space, `-_.`, unique ignoring case; `services` is `["legion"]` by default (the only
+service today); `ip_allow` a list of addresses or networks (empty = any address the IP lists let in); `rate_per_minute`
+1 to 600 (default 10); `budget_tokens` 1 to 100000000 (required on create); `budget_days` 1 to 366 (default 30).
+
+### Budget
+
+Tokens are summed over a rolling window of `budget_days` from the client's audit events. The budget is checked before a
+call and the call's tokens are added after it, so one call can overshoot the cap by its own size. If the record cannot be
+written, the answer is withheld. `budget` in a client view is `{tokens, days, used, remaining, resets_at}`
+(`resets_at`: when the oldest counted call leaves the window, `null` if none).
+
+### Audit log
+
+Each call or refusal is one event: `at, service, action (call|refused), reason, status, tokens, ip`. Reasons:
+`invalid_key`, `disabled`, `service_not_allowed`, `ip_not_allowed`, `rate_limited`, `budget_exhausted`,
+`budget_unavailable`, `upstream`. It holds no question or answer text and no key. Refusals of unknown keys are not
+audited (no client to attach them to).
+
+### IP lists
+
+Two lists, `security.outside_ip_filter.allow_list` and `deny_list`, apply only to `/api/outside/*` (set them in the
+Portcullis settings; like other policy values they apply from the next start). On that path the main deny list applies
+too, but the main allow list does not (it is for people); an empty outside allow list admits any address. A client's own
+`ip_allow` narrows this further.
+
+### Admin routes (`settings.manage`)
+
+All under `/api/admin/outside-clients`; each change is logged in the activity log as `outside_client.create|update|rotate|delete`
+with the client's id, name and changed field names, never a key.
+
+| Method | Path | Returns |
+|---|---|---|
+| `POST` | `/` `{name, budget_tokens, services?, rate_per_minute?, budget_days?, ip_allow?}` | `201 {client, key}`; the only time the key is shown. |
+| `GET` | `/` | `{clients: [...]}`, never a key or hash. |
+| `GET` | `/{id}` | The client plus `events` (newest 50; `limit` 1 to 200, `before_id` pages back). |
+| `PATCH` | `/{id}` any of `name, services, ip_allow, rate_per_minute, budget_tokens, budget_days, enabled` | The client. |
+| `POST` | `/{id}/rotate-key` | `{client, key}`; the old key stops working. |
+| `DELETE` | `/{id}` | `204`; its events go too. |
+
+Errors: `404` unknown id, `400` with the reason in words, `422` malformed body (unknown fields such as `key` are refused).
+
+```
+curl -b cookies -H "Content-Type: application/json" -d '{"name":"Docs bot","budget_tokens":50000}' \
+     http://<host>:29601/api/admin/outside-clients
+```
+
+### No tools, no memory
+
+Each call is stateless and reaches no tool. Portcullis asks Legion with no extensions, `approval_mode=deny`,
+`allowed_tools=[]`, no plan and no questions back, and with `disabled_tools=["*"]`. The last one matters most: deny
+and the empty allow list only gate the model's own tool loop, while Legion's memory recall, skill recall and skill
+learning call the upstream directly; `"*"` is Legion's filter wildcard, checked first, and delegates inherit it. This was
+proven by a probe against Legion's real filter (`tests/legion_filter_probe.py`, run by `tests/test_legion_ask.py`), not
+against a live Legion ask. The only context is the `history` the client sends.
+
+### Known gaps
+
+- Not built: a Stronghold level (a client with its own memory namespace), a Portcullis Admin screen for clients, per-client
+  tool access, a per-call token ceiling.
+- Refusals of unknown keys are not audited or counted; a flood of bad keys is limited only by the IP lists and traffic counters.
+- IPv4-mapped IPv6 addresses (`::ffff:a.b.c.d`) do not match IPv4 entries in either IP filter (pre-existing).
+- A call refused for budget still uses a rate slot.
+- A missing token count from Legion is counted as 0 (and a warning is logged).
+- If the entry agent were ever switched to plan or architect mode, delegation would run: delegates still get
+  `disabled_tools ["*"]` and deny, but model calls happen. Keep the entry agent out of those modes.
+
 ## Security model
 
 - **Sessions:** a random 256-bit token in an `HttpOnly`, `SameSite=Strict`
