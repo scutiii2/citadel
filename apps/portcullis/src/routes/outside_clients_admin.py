@@ -64,8 +64,9 @@ async def _session(request: Request):
 
 
 @router.post("", status_code=201)
-async def create(body: CreateBody, session=Depends(_session), account: Account = Depends(require_manage),
-                 logs: LogWriter = Depends(get_log_writer)) -> Any:
+async def create(body: CreateBody, response: Response, session=Depends(_session),
+                 account: Account = Depends(require_manage), logs: LogWriter = Depends(get_log_writer)) -> Any:
+    response.headers["Cache-Control"] = "no-store"
     clients = OutsideClients(session)
     try:
         made, key = await clients.create(**body.model_dump())
@@ -110,8 +111,9 @@ async def update(client_id: int, body: UpdateBody, session=Depends(_session),
 
 
 @router.post("/{client_id}/rotate-key")
-async def rotate(client_id: int, session=Depends(_session), account: Account = Depends(require_manage),
-                 logs: LogWriter = Depends(get_log_writer)) -> Any:
+async def rotate(client_id: int, response: Response, session=Depends(_session),
+                 account: Account = Depends(require_manage), logs: LogWriter = Depends(get_log_writer)) -> Any:
+    response.headers["Cache-Control"] = "no-store"
     clients = OutsideClients(session)
     await _found(clients, client_id)
     found, key = await clients.rotate_key(client_id)

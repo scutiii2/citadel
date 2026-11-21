@@ -48,7 +48,11 @@ def patch(monkeypatch, session):
         return Context()
 
     monkeypatch.setattr(legion_ask, "mcp_session", fake_session)
-    monkeypatch.setattr(legion_ask, "identity_headers", lambda username, email, uid, **kw: {"X-Citadel-Requester": f"token-for-{uid}"})
+    def fake_identity(username, email, uid, **kw):
+        seen["identity"] = (username, email, uid)
+        return {"X-Citadel-Requester": f"token-for-{uid}"}
+
+    monkeypatch.setattr(legion_ask, "identity_headers", fake_identity)
     return seen
 
 
@@ -68,6 +72,8 @@ def test_the_call_is_stateless_and_carries_the_clients_identity(monkeypatch):
     assert arguments["request_id"] == answer.request_id and answer.request_id
     assert seen["url"] == "http://legion/mcp" and seen["headers"]["X-Citadel-Requester"] == "token-for-oc_abc123def456"
     assert (answer.text, answer.tokens) == ("Hello!", 42)
+    # ":" is not allowed in account usernames, so no account can share this requester name
+    assert seen["identity"] == ("outside:oc_abc123def456", "", "oc_abc123def456")
 
 
 def test_tokens_fall_back_to_the_total_and_then_to_zero(monkeypatch):
@@ -87,6 +93,7 @@ def test_a_negative_token_count_never_reduces_the_spend(monkeypatch):
 @pytest.mark.parametrize("session", [
     FakeSession(raises=RuntimeError("down")), FakeSession(FakeResult({}, error=True)),
     FakeSession(FakeResult({"response": "  "})), FakeSession(FakeResult(None)),
+    FakeSession(FakeResult({"response": "⏹️ Cancelled.", "cancelled": True})),
 ])
 def test_any_failure_or_empty_answer_is_unavailable(monkeypatch, session):
     patch(monkeypatch, session)

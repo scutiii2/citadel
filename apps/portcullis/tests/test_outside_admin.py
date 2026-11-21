@@ -34,6 +34,14 @@ def test_create_shows_the_key_once_and_never_the_hash(client):
     assert listed[0]["key_prefix"] == body["key"][:8] and listed[0]["budget"]["used"] == 0 and listed[0]["budget"]["remaining"] == 5000
 
 
+def test_a_response_that_shows_a_key_is_never_cached(client):
+    login_admin(client)
+    created = client.post(BASE, json={"name": "Docs bot", "budget_tokens": 5000})
+    assert created.headers["cache-control"] == "no-store"
+    rotated = client.post(f"{BASE}/{created.json()['client']['id']}/rotate-key", json={})
+    assert rotated.status_code == 200 and rotated.headers["cache-control"] == "no-store"
+
+
 def test_bad_input_is_400_in_words_or_422(client):
     login_admin(client)
     assert client.post(BASE, json={"name": "x"}).status_code == 422  # budget is required

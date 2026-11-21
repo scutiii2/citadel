@@ -150,8 +150,20 @@ def test_a_session_cookie_or_account_login_does_not_open_the_door(client):
 
 def test_the_outside_route_is_the_only_one_a_client_key_opens(client):
     _id, key = make_client(client)
-    for path in ("/api/chats", "/api/admin/outside-clients", "/api/usage", "/api/agent"):
-        assert client.get(path, headers=auth(key)).status_code in (401, 403, 404)
+    for method, path in (("get", "/api/chats"), ("get", "/api/chat-folders"), ("get", "/api/admin/outside-clients"),
+                         ("get", "/api/admin/app-config"), ("post", "/api/chat-folders"), ("post", "/api/admin/outside-clients")):
+        send = getattr(client, method)
+        extra = {"json": {"name": "x", "budget_tokens": 5}} if method == "post" else {}
+        assert send(path, **extra).status_code == 401, path  # the route exists and is cookie-protected
+        assert send(path, headers=auth(key), **extra).status_code == 401, path  # the ock_ key buys nothing there
+
+
+def test_a_session_or_desktop_token_does_not_open_the_door(client):
+    token = client.post("/api/auth/login", json={"username": ADMIN_USERNAME, "password": ADMIN_PASSWORD},
+                        headers={"X-Ember-Client": "desktop"}).json()["session_token"]
+    client.cookies.clear()
+    assert client.get("/api/auth/me", headers=auth(token)).status_code == 200  # the token is real
+    assert client.post("/api/outside/legion/ask", json=BODY, headers=auth(token)).status_code == 401
 
 
 def test_a_422_never_echoes_the_question(client, fake_legion):

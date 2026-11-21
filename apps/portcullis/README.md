@@ -506,7 +506,9 @@ are refused. Answer: `{answer, usage: {total_tokens, budget_remaining}, request_
 | `200` | The answer; its tokens were recorded. |
 | `401` | Wrong, missing, disabled or deleted key: one identical text for all of them. |
 | `403` | The client may not use this service, or its address is outside the client's `ip_allow`, or the address is refused by the main deny list or the outside IP lists. |
-| `422` | Malformed body. The error lists `loc`, `msg` and `type` only, never the submitted text. |
+| `413` | Body over 1 MiB (answered before the key is checked; not audited). |
+| `415` | Content type is not `application/json` (answered before the key is checked; not audited). |
+| `422` | Malformed body. The error lists `loc`, `msg` and `type` only, never the submitted text. It is answered before the key is checked, so it is not audited. |
 | `429` + `Retry-After` | Client rate limit, or the token budget is used up. |
 | `503` | Legion or the entry agent is down, the budget cannot be read, or the tokens could not be recorded (the answer is then withheld). Nothing is counted. |
 
@@ -525,7 +527,8 @@ service today); `ip_allow` a list of addresses or networks (empty = any address 
 ### Budget
 
 Tokens are summed over a rolling window of `budget_days` from the client's audit events. The budget is checked before a
-call and the call's tokens are added after it, so one call can overshoot the cap by its own size. If the record cannot be
+call and the call's tokens are added after it, so the overshoot is bounded by the calls in flight at once (up to
+`rate_per_minute` within the 120 s ask window), not by one call. If the record cannot be
 written, the answer is withheld. `budget` in a client view is `{tokens, days, used, remaining, resets_at}`
 (`resets_at`: when the oldest counted call leaves the window, `null` if none).
 
@@ -571,12 +574,16 @@ Each call is stateless and reaches no tool. Portcullis asks Legion with no exten
 and the empty allow list only gate the model's own tool loop, while Legion's memory recall, skill recall and skill
 learning call the upstream directly; `"*"` is Legion's filter wildcard, checked first, and delegates inherit it. This was
 proven by a probe against Legion's real filter (`tests/legion_filter_probe.py`, run by `tests/test_legion_ask.py`), not
-against a live Legion ask. The only context is the `history` the client sends.
+against a live Legion ask. Legion sees the client as requester uid `oc_<12 hex>` with username `outside:<uid>` (`:` is not
+allowed in account usernames, so it can never equal an account) and an empty email. The only context is the `history` the client sends.
 
 ### Known gaps
 
 - Not built: a Stronghold level (a client with its own memory namespace), a Portcullis Admin screen for clients, per-client
   tool access, a per-call token ceiling.
+- The client IP comes from `X-Forwarded-For` only when the peer is loopback (a `trusted_proxies` entry), so every loopback
+  proxy in front of Portcullis must append to that header, not pass it through, or a client can pick its own address
+  (which defeats the IP lists and a client's `ip_allow`).
 - Refusals of unknown keys are not audited or counted; a flood of bad keys is limited only by the IP lists and traffic counters.
 - IPv4-mapped IPv6 addresses (`::ffff:a.b.c.d`) do not match IPv4 entries in either IP filter (pre-existing).
 - A call refused for budget still uses a rate slot.

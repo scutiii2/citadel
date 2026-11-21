@@ -83,7 +83,7 @@ class OutsideGuard:
             used, resets_at = await clients.spent(client)
         except Exception:
             await self._refuse(clients, client, service, ip, 503, "budget_unavailable", "The budget cannot be checked right now.")
-        # shortcut: the cap is checked before the call, so one call can overshoot; add a per-call token ceiling from Legion's limits if that matters.
+        # shortcut: the cap is checked before the call and recorded after it, so the overshoot is bounded by the calls in flight (up to rate_per_minute within the ask window), not one call; add a per-call token ceiling from Legion's limits if that matters.
         if used >= client.budget_tokens:
             await self._refuse(clients, client, service, ip, 429, "budget_exhausted", "The token budget is used up.",
                                _seconds_until(resets_at))

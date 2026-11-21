@@ -82,6 +82,33 @@ def test_triage_strategy_column_starts_empty_and_reverses(tmp_path: Path) -> Non
     assert differences(make_database(tmp_path)) == []
 
 
+def test_outside_client_tables_reverse_and_come_back(tmp_path: Path) -> None:
+    from alembic import command
+
+    run_with(make_database(tmp_path))
+    path = tmp_path / "ember.db"
+
+    def tables() -> set[str]:
+        with closing(sqlite3.connect(path)) as conn:
+            return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+
+    assert {"outside_clients", "outside_client_events"} <= tables()
+
+    async def downgrade():
+        database = make_database(tmp_path)
+        runner = MigrationRunner(database.engine)
+        try:
+            async with database.engine.connect() as conn:
+                await conn.run_sync(lambda sync: command.downgrade(runner._config(sync), "0026"))
+        finally:
+            await database.dispose()
+
+    asyncio.run(downgrade())
+    assert not {"outside_clients", "outside_client_events"} & tables()
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    assert differences(make_database(tmp_path)) == []
+
+
 def test_second_brain_column_reverses_and_defaults_off(tmp_path: Path) -> None:
     from alembic import command
 

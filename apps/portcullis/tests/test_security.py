@@ -192,6 +192,12 @@ def test_config_rejects_unknown_scope() -> None:
         SecuritySettings.from_config({"rate_limit": {"scope": "everyone"}})
 
 
+def test_config_reads_the_outside_ip_lists() -> None:
+    settings = SecuritySettings.from_config({"outside_ip_filter": {"allow_list": ["203.0.113.0/24"], "deny_list": ["198.51.100.7"]}})
+    assert settings.outside_ip_allow_list == ("203.0.113.0/24",) and settings.outside_ip_deny_list == ("198.51.100.7",)
+    assert SecuritySettings.from_config({}).outside_ip_allow_list == ()
+
+
 def test_websocket_scope_gets_https_state_and_ip_filter():
     import asyncio
 

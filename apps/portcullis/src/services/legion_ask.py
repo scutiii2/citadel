@@ -52,13 +52,14 @@ class LegionAsk:
         }
         try:
             async with asyncio.timeout(ASK_SECONDS):
-                async with mcp_session(url, identity_headers(client.name, "", client.uid), _TIMEOUT) as session:
+                async with mcp_session(url, identity_headers(f"outside:{client.uid}", "", client.uid), _TIMEOUT) as session:
                     result = await session.call_tool("ask", arguments)
         except Exception as error:  # noqa: BLE001 - includes the SDK's ExceptionGroup wrappers and the timeout
             raise LegionUnavailable(f"Legion is unavailable: {type(error).__name__}") from None
         data = result.structuredContent if not result.isError else None
         text = data.get("response") if isinstance(data, dict) else None
-        if not isinstance(text, str) or not text.strip():
+        # Legion answers a cancelled run with a "Cancelled." text, which is not an answer.
+        if not isinstance(text, str) or not text.strip() or data.get("cancelled"):
             raise LegionUnavailable("Legion gave no answer")
         try:
             tokens = _tokens(data)
