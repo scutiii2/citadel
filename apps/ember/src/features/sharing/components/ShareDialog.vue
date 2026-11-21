@@ -128,6 +128,7 @@ async function send(): Promise<void> {
 
 <style scoped>
 .share-form, .result { display: flex; flex-direction: column; gap: 14px; }
+.share-form .error { color: var(--text); }
 p { margin: 0; overflow-wrap: anywhere; }
 .group { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .group legend { padding: 0 6px; font-size: .85em; color: var(--muted); }

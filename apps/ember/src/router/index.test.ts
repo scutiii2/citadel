@@ -68,6 +68,18 @@ describe("shared chat route", () => {
   });
 });
 
+describe("Shares route", () => {
+  it("opens for a signed-in account with chat permission", async () => {
+    me.mockResolvedValue(ACCOUNT);
+    await router.push("/shares");
+    expect(router.currentRoute.value.name).toBe("shares");
+  });
+
+  it("requires chat permission", () => {
+    expect(router.resolve("/shares").meta.permission).toBe("chat.use");
+  });
+});
+
 describe("removed page links", () => {
   it("opens chat for an old Watchers link", async () => {
     me.mockResolvedValue({ ...ACCOUNT, permissions: [...ACCOUNT.permissions, "watchers.view"] });

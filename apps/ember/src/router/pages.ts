@@ -55,6 +55,13 @@ export const NAV_PAGES: NavPage[] = [
     description: "Review the how-tos Ember proposed. Nothing is used until you approve it.",
     permission: "chat.use",
   },
+  {
+  to: "/shares",
+  label: "Shares",
+  icon: ["M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8", "m16 6-4-4-4 4", "M12 2v13"],
+  description: "Copies of files, skills and memory items sent to you and by you.",
+  permission: "chat.use",
+},
   { to: "/brains", label: "Brains", icon: ["M4 4h7v16H4z", "M13 4h7v16h-7z"], description: "Browse durable shared and personal knowledge.", permission: "" },
   {
     to: "/generator",
