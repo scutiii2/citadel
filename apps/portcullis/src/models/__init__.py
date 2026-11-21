@@ -10,6 +10,7 @@ from src.models.known_device import KnownDevice
 from src.models.log_entry import LogEntry
 from src.models.login_attempt import LoginAttempt
 from src.models.otp import EmailVerificationCode, InviteCode
+from src.models.outside_client import OutsideClient, OutsideClientEvent
 from src.models.role import Permission, Role
 from src.models.shared_chat import SharedChat
 from src.models.traffic_bucket import TrafficBucket
@@ -28,6 +29,8 @@ __all__ = [
     "KnownDevice",
     "LogEntry",
     "LoginAttempt",
+    "OutsideClient",
+    "OutsideClientEvent",
     "Permission",
     "Role",
     "SharedChat",

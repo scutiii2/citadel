@@ -17,8 +17,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0026"
-NEXT = "0027"
+HEAD = "0027"
+NEXT = "0028"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -44,8 +44,15 @@ def drop_second_brain(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE chats DROP COLUMN save_to_second_brain")
 
 
+def drop_outside_clients(conn: sqlite3.Connection) -> None:
+    """Undo migration 0027 on a database built from the current models."""
+    conn.execute("DROP TABLE IF EXISTS outside_client_events")
+    conn.execute("DROP TABLE IF EXISTS outside_clients")
+
+
 def drop_triage_strategy(conn: sqlite3.Connection) -> None:
     """Undo migration 0026 on a database built from the current models."""
+    drop_outside_clients(conn)
     if "triage_strategy" in {row[1] for row in conn.execute("PRAGMA table_info(accounts)")}:
         conn.execute("ALTER TABLE accounts DROP COLUMN triage_strategy")
 
@@ -484,7 +491,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*", "0025*", "0026*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*", "0025*", "0026*", "0027*"))
         calls: list[int] = []
 
         async def backup() -> None:
