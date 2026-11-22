@@ -53,7 +53,10 @@ async def drive() -> dict:
 
 
 def main() -> None:
-    disabled = json.load(sys.stdin)
+    given = json.load(sys.stdin)
+    # A plain list is the filter; {"disabled": [...], "extra": [...]} also names more tools to call directly.
+    disabled, extra = (given["disabled"], given["extra"]) if isinstance(given, dict) else (given, [])
+    TOOLS.extend(extra)
     mcp_upstream.client = Upstream()
     mcp_upstream.internal_auth.requester_meta = lambda: None
     skill_reflection._draft = draft

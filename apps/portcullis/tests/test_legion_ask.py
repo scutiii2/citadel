@@ -56,8 +56,8 @@ def patch(monkeypatch, session):
     return seen
 
 
-def ask(url, question, history):
-    return asyncio.run(LegionAsk().ask(url, FakeClient(), question, history))
+def ask(url, question, history, memory=False):
+    return asyncio.run(LegionAsk().ask(url, FakeClient(), question, history, memory=memory))
 
 
 def test_the_call_is_stateless_and_carries_the_clients_identity(monkeypatch):
@@ -108,11 +108,11 @@ LEGION_PYTHON = next((p for p in (APPS / "legion/.venv/Scripts/python.exe", APPS
                                   LEGION / ".venv/Scripts/python.exe", LEGION / ".venv/bin/python") if p.exists()), None)
 
 
-def probe(disabled_tools):
+def probe(disabled_tools, extra=()):
     """Legion's real recall, skill recall, skill learning and call_tool, with a recording fake upstream."""
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "AI_AGENT_FILE": str(LEGION / "agents/ember.json")}
     done = subprocess.run([str(LEGION_PYTHON), "-B", str(Path(__file__).with_name("legion_filter_probe.py"))], cwd=LEGION,
-                          input=json.dumps(disabled_tools), capture_output=True, text=True, timeout=120, env=env)
+                          input=json.dumps({"disabled": disabled_tools, "extra": list(extra)} if extra else disabled_tools), capture_output=True, text=True, timeout=120, env=env)
     assert done.returncode == 0, done.stderr[-2000:]
     return json.loads(done.stdout.strip().splitlines()[-1])
 
@@ -132,3 +132,22 @@ def test_legion_refuses_every_tool_the_outside_ask_could_reach(monkeypatch):
     assert result["upstream_calls"] == []
     assert set(result["direct"].values()) == {"PermissionError"} and len(result["direct"]) == 4
     assert result["recall_unchanged"] and result["skills_unchanged"] and result["proposed"] is False
+
+
+@pytest.mark.skipif(LEGION_PYTHON is None, reason="Legion's virtual environment is not installed")
+def test_legion_lets_only_the_five_brain_tools_through_the_stronghold_level_filter(monkeypatch):
+    session = FakeSession(FakeResult({"response": "x"}))
+    patch(monkeypatch, session)
+    ask("u", "q", [], memory=True)
+    sent = session.calls[0][1]["disabled_tools"]
+    allowed = set(legion_ask.STRONGHOLD_ALLOWED)
+    others = ["stronghold__tool_brain_propose", "stronghold__tool_ticket_createTicket",
+              "stronghold__tool_usage_summary", "armory__tool_web_search"]
+
+    result = probe(sent, others + sorted(allowed))
+    assert set(result["upstream_calls"]) == allowed
+    assert all(result["direct"][name] == "PermissionError" for name in others)
+    assert all(result["direct"][name] == "ran" for name in allowed)
+    assert result["direct"]["stronghold__tool_skill_search"] == "PermissionError"
+    assert result["direct"]["stronghold__tool_skill_propose"] == "PermissionError"
+    assert result["skills_unchanged"] and result["proposed"] is False

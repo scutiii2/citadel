@@ -547,7 +547,8 @@ not offer them (`list_tools`) and refuses a call to one the model names anyway.
 A delegated agent is told the same list. `status()` reports `tool_filter: true`
 so portcullis can refuse an agent that would ignore the option.
 `disabled_tools: ["*"]` blocks every built-in, shared-extension, and private-extension
-tool when the Ember account lacks `tools.execute`. `status()` also reports
+tool when the Ember account lacks `tools.execute`.
+A name that starts with `!` is an exception: `["*", "!stronghold__tool_brain_search"]` blocks everything except that one tool, for the model's own calls and for Legion's memory recall alike. An exception for a tool that is not blocked changes nothing, and a delegate gets the same list. Portcullis uses it for outside clients at the Stronghold level (five Brain tools). `status()` also reports
 `tool_filter_all: true`; portcullis and delegates refuse older agents without it
 before starting a restricted turn. The filter follows nested delegation.
 
