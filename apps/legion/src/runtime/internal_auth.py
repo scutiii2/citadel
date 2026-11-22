@@ -30,7 +30,6 @@ class Requester:
     username: str = ""
     email: str = ""
     uid: str = ""
-    brain_scope: str = ""
     requester_token: str = field(default="", repr=False)
     chat_id: str = ""
 
@@ -99,9 +98,6 @@ def requester_meta() -> dict | None:
     if not token:
         return None
     meta = {"requester_token": token}
-    scope = current_requester().brain_scope
-    if scope in {"instance", "personal"}:
-        meta["brain_scope"] = scope
     chat = current_requester().chat_id
     if _CHAT_ID.fullmatch(chat or ""):
         meta["chat_id"] = chat
@@ -110,11 +106,7 @@ def requester_meta() -> dict | None:
 
 def outbound_headers() -> dict[str, str]:
     token = requester_token()
-    headers = {"X-Citadel-Requester": token} if token else {}
-    scope = current_requester().brain_scope
-    if scope in {"instance", "personal"}:
-        headers["X-Brain-Destination"] = scope
-    return headers
+    return {"X-Citadel-Requester": token} if token else {}
 
 
 @asynccontextmanager
@@ -133,9 +125,7 @@ async def mcp_requester():
         requester = Requester.from_verified()
         if who is not None:
             _remember(who.uid, token)
-            scope = extras.get("brain_scope") or getattr(request, "headers", {}).get("X-Brain-Destination", "")
-            requester = Requester(who.username, who.email, who.uid,
-                scope if scope in {"instance", "personal"} else "", token)
+            requester = Requester(who.username, who.email, who.uid, requester_token=token)
         handle = bind_requester(requester)
         try:
             yield requester

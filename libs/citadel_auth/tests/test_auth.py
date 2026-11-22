@@ -123,7 +123,6 @@ async def test_unreadable_trust_fails_closed(stack, monkeypatch):
     ("armory", "portcullis", "/pdf/ui/files", True),
     ("armory", "portcullis", "/tickets/tags", True),
     ("armory", "stronghold", "/upload/pdf", True),
-    ("armory", "stronghold", "/ticket-admin/tickets", True),
     ("treasury", "portcullis", "/instances", False),
     ("treasury", "stronghold", "/instances", False),
     ("treasury", "legion", "/instances", False),
@@ -257,3 +256,12 @@ def test_the_other_stronghold_and_armory_paths_still_pass():
 
     assert allowed("stronghold", "legion", "/mcp") and allowed("stronghold", "portcullis", "/brains/x")
     assert allowed("armory", "stronghold", "/upload/pdf") and allowed("armory", "legion", "/mcp")
+
+
+@pytest.mark.parametrize("path", ["/skills/x", "/memory/x", "/tickets/x", "/ticket-admin/x", "/connections/x"])
+def test_stronghold_may_not_call_armory_for_routes_armory_no_longer_has(path):
+    assert not allowed("armory", "stronghold", path)
+
+
+def test_stronghold_may_still_call_armory_for_mcp_and_uploads():
+    assert allowed("armory", "stronghold", "/upload/pdf") and allowed("armory", "stronghold", "/mcp")

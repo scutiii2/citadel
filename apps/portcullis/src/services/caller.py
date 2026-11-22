@@ -10,4 +10,3 @@ class Caller:
     username: str
     email: str
     uid: str = ""
-    brain_scope: str = ""

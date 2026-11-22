@@ -13,20 +13,6 @@ _uid: ContextVar[str] = ContextVar("requester_uid", default="")
 
 
 
-def _from_request_meta(field: str) -> str:
-    """Read only non-identity narrowing hints from unsigned MCP metadata."""
-    if field != "brain_scope":
-        return ""
-    from mcp.server.lowlevel.server import request_ctx
-
-    try:
-        meta = request_ctx.get().meta
-    except LookupError:
-        return ""
-    value = (meta.model_extra or {}).get(field) if meta is not None else None
-    return value if isinstance(value, str) else ""
-
-
 def current_username() -> str:
     requester = current_requester()
     return requester.username if requester else _username.get()
