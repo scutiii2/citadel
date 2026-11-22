@@ -6,7 +6,7 @@ Tick each box and write the date and a few words next to a failure. Source plans
 
 ## 0. Prepare (10 minutes)
 
-- [ ] Copy Portcullis's database file, Stronghold's `settings.db` and Armory's `settings.db` to a backup folder.
+- [ ] This is a fresh install: start with empty data folders (no old database, no old `settings.db`). No backup or migration of old data is needed.
 - [ ] `git log --oneline -3` on `main` shows `dbe61f22` or later. Rebuild every image from `main`.
 - [ ] Have three accounts ready: an administrator, a normal member (A) and a second member (B). Give one delegated admin only `tool_services.manage`.
 - [ ] Do the user steps first: remove `OBSIDIAN_*` and `MCP_VAULT_DIR` from `apps/armory/.env.example` line 6 and your local `.env`.
@@ -29,9 +29,9 @@ Tick each box and write the date and a few words next to a failure. Source plans
 
 ## 2. Migrations and the permission rename [Plans 22b, 22e]
 
-- [ ] Run Portcullis on a copy of the real database: migrations `0027` to `0028` and on to `0029` apply; run the downgrade to `0027` and upgrade again; no error. [22b, 22e]
-- [ ] After `0029`: Roles page lists `tool_services.manage` ("Manage tool services") and no `extensions.manage`; every role that held the old permission still holds the new one (check Administrator, Operator, Power User). [22e]
-- [ ] The Power User role text reads "Member access plus tool services management." [22e]
+- [ ] Start Portcullis on an empty database: it logs "created" and reaches revision `0030` with no error (every migration runs from scratch). [22b, 22e, 27]
+- [ ] Roles page lists `tool_services.manage` ("Manage tool services") and no `extensions.manage`; every role that held the old permission still holds the new one (check Administrator, Operator, Tool Services Manager). [22e]
+- [ ] The starter roles are listed with the new names: `Tool Services Manager` (text "Member access plus tool services management.") and no `Power User`; `Operator` text says "tool services". [22e, 27]
 - [ ] Log in as the delegated admin with only `tool_services.manage`: Ember shows the admin link, Stronghold Admin shows Tool services, and the Bard, Scribe and Reader forms save and test. [22e]
 - [ ] Armory Admin with an account that has neither `capabilities.manage` nor another admin permission shows the no-access page naming only `capabilities.manage`. [22e]
 
