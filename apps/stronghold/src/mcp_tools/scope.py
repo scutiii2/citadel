@@ -9,6 +9,12 @@ from dataclasses import dataclass
 from src.citadel_auth import AuthError, requester_context
 
 _CHAT_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+OUTSIDE_PREFIX = "oc_"
+
+
+def is_outside(uid: str) -> bool:
+    """True for the synthetic UID Portcullis assigns to an outside client."""
+    return uid.startswith(OUTSIDE_PREFIX)
 
 
 class ScopeError(Exception):
@@ -67,17 +73,21 @@ async def _verified(app, caller, token):
 async def resolve_scope(app):
     caller, token, extras = _credentials()
     chat_id = extras.get("chat_id")
-    if not isinstance(chat_id, str) or not _CHAT_ID.fullmatch(chat_id):
-        raise ScopeError("This call is not tied to a chat.")
     async with _verified(app, caller, token) as who:
+        if is_outside(who.uid):
+            raise ScopeError("Not available to outside clients.")
+        if not isinstance(chat_id, str) or not _CHAT_ID.fullmatch(chat_id):
+            raise ScopeError("This call is not tied to a chat.")
         if not await app.state.chats.exists(who.uid, chat_id):
             raise ScopeError("This chat does not belong to the asking account.")
         yield Scope(who.uid, chat_id)
 
 
 @asynccontextmanager
-async def resolve_account(app):
+async def resolve_account(app, *, outside_ok: bool = False):
     """For account-wide tools (long-term memory): the verified account, no chat id needed."""
     caller, token, _extras = _credentials()
     async with _verified(app, caller, token) as who:
+        if is_outside(who.uid) and not outside_ok:
+            raise ScopeError("Not available to outside clients.")
         yield Account(who.uid, getattr(who, "username", "") or who.uid, getattr(who, "email", "") or "")

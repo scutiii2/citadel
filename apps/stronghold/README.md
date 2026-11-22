@@ -140,6 +140,8 @@ A skill stops appearing in search after at least three failures when failures ou
 
 The global brain stores Markdown files and skills under `<brain root>/_global/`, beside `accounts/`. Back up both directories. Signed-in chat users can read global files and active skills. `brain.global.write` controls file changes, skill management and share review. Administrators receive it at startup.
 
+The `oc_` uid prefix is reserved for Portcullis outside clients. An `oc_` uid may call only `tool_brain_search`, `tool_brain_read`, `tool_brain_list`, `tool_brain_write` and `tool_brain_update`, on its own folder; every other tool refuses it ("Not available to outside clients.") and it never reads or lists the global brain.
+
 Portcullis serves the session routes under `/api/brain`. Use `/global/files`, `/global/search`, `/global/summary` and `/global/skills` to read global content. Use `/shares` to send a file, section, skill or short-term item, `/shares/sent` and `/shares/inbox` to list shares, and `/blocks` to manage blocked accounts. Reviewers use `/global/shares`.
 
 A share freezes the selected content. It drops file tags and converts private Markdown links, images and wiki links to plain labels. Public HTTP, HTTPS and mailto text links remain. HTML links and bare paths stay as written. Unknown, inactive, self and blocking recipients return the same response.
