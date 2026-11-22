@@ -8,11 +8,11 @@ from pydantic import BaseModel
 from src.deps import current_account, get_stronghold, require_permission
 from src.models import Account
 from src.routes.stronghold import pass_on
-from src.services.permissions import EXTENSIONS_MANAGE
+from src.services.permissions import TOOL_SERVICES_MANAGE
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 
 router = APIRouter(prefix="/api", tags=["connections"])
-manage = require_permission(EXTENSIONS_MANAGE)
+manage = require_permission(TOOL_SERVICES_MANAGE)
 REQUIRED = ("bard", "scribe", "reader")
 
 

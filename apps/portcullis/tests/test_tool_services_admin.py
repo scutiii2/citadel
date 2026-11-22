@@ -35,7 +35,7 @@ def test_admin_request_reaches_stronghold(client, upstream, method, suffix, body
     assert requester(sent)["username"] == "root"
 
 
-def test_admin_requests_need_extensions_manage(client, email, upstream):
+def test_admin_requests_need_tool_services_manage(client, email, upstream):
     make_member(client, email)
     login(client, "alice")
     upstream.requests.clear()

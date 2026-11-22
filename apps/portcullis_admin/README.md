@@ -40,7 +40,6 @@ scoped by port, so the same portcullis session cookie is sent.
 | Page | Needs |
 |---|---|
 | Capabilities (`/capabilities`) | `capabilities.manage` |
-| Extensions (`/extensions`) | `extensions.manage` |
 | Agents (`/agents`) | `agents.manage` |
 | Tickets (`/tickets`) | `tickets.manage` |
 | Config issues (`/config-issues`) | `config.issues.view`; not a rail tab: a red or amber alert with a count shows in the rail, and the page opens, only while there are issues |
@@ -234,8 +233,8 @@ access through the one-time API migration; role editors list the new permissions
 
 Administration uses `accounts.view`, `accounts.manage`, `accounts.delete`,
 `roles.view`, `roles.manage`, `roles.assign`, `invites.manage`, and
-`settings.manage`. Shared capability controls use `capabilities.manage`; shared
-extension management remains `extensions.manage`. The all-account usage report
+`settings.manage`. Shared capability controls use `capabilities.manage`;
+tool services management uses `tool_services.manage`. The all-account usage report
 uses `usage.all.view`. Navigation and controls follow these permissions, and the
 API enforces every action. Delegated administrators can only grant or change
 roles within their own permissions.

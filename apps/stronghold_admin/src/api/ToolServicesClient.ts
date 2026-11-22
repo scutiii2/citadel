@@ -30,7 +30,7 @@ export interface ToolSaveBody {
   addresses?: { address: string; name?: string; header_value?: string }[];
 }
 
-/** portcullis's /api/admin/tool-services (needs extensions.manage), passed on to Stronghold. No token is ever returned. */
+/** portcullis's /api/admin/tool-services (needs tool_services.manage), passed on to Stronghold. No token is ever returned. */
 export const toolServicesClient = {
   list: async () => (await apiRequest<{ services: ToolService[] }>("GET", "/api/admin/tool-services")).services,
   lookup: (address: string) => apiRequest<OriginLookup>("POST", "/api/admin/tool-services/lookup", { address }),

@@ -8,7 +8,7 @@ Pages: Usage, Analytics (logs, errors, chat activity, traffic), Tickets, Usage s
 
 ## Tool services
 
-Open **Tool services** with `extensions.manage` to configure Bard, Scribe, and Reader. Enter an address first. Treasury fills the known service name, or you can name a new address. Add backups under the same Treasury service. Set a connection token and enter an address token where that origin uses different credentials. Empty token fields keep the saved values.
+Open **Tool services** with `tool_services.manage` to configure Bard, Scribe, and Reader. Enter an address first. Treasury fills the known service name, or you can name a new address. Add backups under the same Treasury service. Set a connection token and enter an address token where that origin uses different credentials. Empty token fields keep the saved values.
 
 Save applies the draft. **Test** checks the saved configuration and shows a result for each origin. **Remove connection** asks for confirmation and clears Stronghold's record. Treasury keeps the addresses.
 

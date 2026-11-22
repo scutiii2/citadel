@@ -127,7 +127,7 @@ def test_restart_updates_known_permission_descriptions_and_creates_missing_rows(
         async with client.app.state.database.sessions() as session:
             permission = await session.scalar(select(Permission).where(Permission.name == "roles.manage"))
             permission.description = "Manage accounts, roles, invites and mcp_server extensions"
-            await session.execute(delete(Permission).where(Permission.name == "extensions.manage"))
+            await session.execute(delete(Permission).where(Permission.name == "tool_services.manage"))
             session.add(Permission(name="retired.permission", description="Leave this description alone"))
             await session.commit()
 
@@ -136,7 +136,7 @@ def test_restart_updates_known_permission_descriptions_and_creates_missing_rows(
     assert login(restarted).status_code == 200
     permissions = {p["name"]: p["description"] for p in restarted.get("/api/admin/permissions").json()}
     assert permissions["roles.manage"] == "Create, edit and delete roles and change their permissions"
-    assert permissions["extensions.manage"] == "Add and remove mcp_server extensions (other MCP servers offered to every client)"
+    assert permissions["tool_services.manage"] == "Add, test and remove the Bard, Scribe and Reader connections in Stronghold Admin"
 
     async def retired_description() -> str:
         async with restarted.app.state.database.sessions() as session:

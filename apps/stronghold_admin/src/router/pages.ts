@@ -49,6 +49,6 @@ export const STRONGHOLD_PAGES: StrongholdPage[] = [
     to: "/tool-services",
     label: "Tool services",
     icon: ["M4 7h16", "M4 12h16", "M4 17h16", "M8 5v4", "M16 10v4", "M10 15v4"],
-    permission: "extensions.manage",
+    permission: "tool_services.manage",
   },
 ];

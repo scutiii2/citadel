@@ -21,7 +21,7 @@ export const router = createRouter({
     { path: "/tickets", name: "tickets", component: () => import("../views/TicketsAdminView.vue"), meta: { permission: "tickets.manage" } },
     { path: "/usage-settings", name: "usage-settings", component: () => import("../views/UsageSettingsView.vue"), meta: { permission: "settings.manage" } },
     { path: "/brain-settings", name: "brain-settings", component: () => import("../views/BrainSettingsView.vue"), meta: { permission: "settings.manage" } },
-    { path: "/tool-services", name: "tool-services", component: () => import("../views/ToolServicesView.vue"), meta: { permission: "extensions.manage" } },
+    { path: "/tool-services", name: "tool-services", component: () => import("../views/ToolServicesView.vue"), meta: { permission: "tool_services.manage" } },
     { path: "/login", name: "login", component: () => import("../views/LoginView.vue"), meta: { guestOnly: true } },
     { path: "/no-access", name: "no-access", component: () => import("../views/NoAccessView.vue") },
     { path: "/:pathMatch(.*)*", redirect: "/" },

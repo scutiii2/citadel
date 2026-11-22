@@ -60,7 +60,7 @@ const labels: Record<string, string> = {
   "tools.view": "Browse tools", "tools.execute": "Run tools", "extensions.personal.manage": "Manage personal extensions",
   "accounts.view": "View accounts", "accounts.manage": "Manage accounts", "accounts.delete": "Delete accounts",
   "roles.view": "View roles", "roles.manage": "Manage roles & permissions", "roles.assign": "Assign roles", "invites.manage": "Manage invites",
-  "settings.manage": "Manage workspace settings", "capabilities.manage": "Manage shared capabilities", "extensions.manage": "Manage shared extensions",
+  "settings.manage": "Manage workspace settings", "capabilities.manage": "Manage shared capabilities", "tool_services.manage": "Manage tool services",
   "usage.all.view": "View all account usage", "logs.view": "View activity logs", "logs.errors.view": "View error logs",
   "logs.chat.view": "View chat logs", "logs.chat.prompts.view": "View agent prompts in chat logs", "config.issues.view": "View configuration issues", "traffic.view": "View network traffic",
 };
@@ -69,7 +69,7 @@ const groups = computed(() => {
     { label: "Chat & files", names: ["chat.use", "chat.share", "files.upload", "files.download"] },
     { label: "Tools & personal extensions", names: ["tools.view", "tools.execute", "extensions.personal.manage"] },
     { label: "Accounts & access", names: ["accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage"] },
-    { label: "Workspace & monitoring", names: ["settings.manage", "capabilities.manage", "extensions.manage", "usage.all.view", "logs.view", "logs.errors.view", "logs.chat.view", "logs.chat.prompts.view", "config.issues.view", "traffic.view"] },
+    { label: "Workspace & monitoring", names: ["settings.manage", "capabilities.manage", "tool_services.manage", "usage.all.view", "logs.view", "logs.errors.view", "logs.chat.view", "logs.chat.prompts.view", "config.issues.view", "traffic.view"] },
   ];
   const known = new Set(definitions.flatMap((g) => g.names));
   definitions.push({ label: "Other permissions", names: props.permissions.filter((p) => !known.has(p.name)).map((p) => p.name) });

@@ -341,10 +341,10 @@ def test_used_invite_cannot_be_revoked(client: TestClient, email: FakeEmailSende
 
 def test_extensions_permission_bootstrap_and_descriptions(client: TestClient) -> None:
     as_admin(client)
-    assert "extensions.manage" in role_by_name(client, "Administrator")["permissions"]
+    assert "tool_services.manage" in role_by_name(client, "Administrator")["permissions"]
     assert role_by_name(client, "Member")["permissions"] == sorted(DEFAULT_ROLE_PERMISSIONS)
     permissions = {p["name"]: p["description"] for p in client.get("/api/admin/permissions").json()}
-    assert permissions["extensions.manage"] == "Add and remove mcp_server extensions (other MCP servers offered to every client)"
+    assert permissions["tool_services.manage"] == "Add, test and remove the Bard, Scribe and Reader connections in Stronghold Admin"
     assert permissions["roles.manage"] == "Create, edit and delete roles and change their permissions"
 
 

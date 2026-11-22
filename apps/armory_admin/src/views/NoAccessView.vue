@@ -8,7 +8,7 @@ const auth = useAuthStore();
 <template>
   <AuthCard
     title="No access"
-    subtitle="Armory administration needs capabilities.manage or extensions.manage. Ask an admin to give your account a role that has it, and verify your email in Ember."
+    subtitle="Armory administration needs capabilities.manage. Ask an admin to give your account a role that has it, and verify your email in Ember."
   >
     <button type="button" @click="auth.logout()">Log out</button>
   </AuthCard>

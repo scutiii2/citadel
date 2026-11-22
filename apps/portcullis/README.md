@@ -266,7 +266,7 @@ Portcullis sends Bard speech and voices, Scribe dictation and audio attachments,
 
 `GET /api/connection-status` returns configuration readiness from Stronghold. `GET /api/config-issues` lists unavailable configurations under **Stronghold Tool services**.
 
-Each admin route requires `extensions.manage` and forwards to the same path on Stronghold without the `/api` prefix.
+Each admin route requires `tool_services.manage` and forwards to the same path on Stronghold without the `/api` prefix.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -584,7 +584,7 @@ allowed in account usernames, so it can never equal an account) and an empty ema
 - **Permissions:** `chat.use`, `chat.share`, `tools.view`, `tools.execute`, `files.upload`, `files.download`,
   `accounts.view`, `accounts.manage`, `accounts.delete`, `roles.view`, `roles.manage`, `roles.assign`,
   `invites.manage`, `settings.manage`, `capabilities.manage`, `usage.all.view`,
-  `extensions.personal.manage`, `extensions.manage`,
+  `extensions.personal.manage`, `tool_services.manage`,
   `logs.view`, `logs.errors.view`, `logs.chat.view`, `logs.chat.prompts.view`, `config.issues.view`,
   `traffic.view`, `tickets.create`, `tickets.manage` (`src/services/permissions.py`). The Administrator role always holds all
   of them (new ones are added to it on startup). New registrations get `default_role` (config, default `Member`:
@@ -593,7 +593,7 @@ allowed in account usernames, so it can never equal an account) and an empty ema
   role. An account with an unverified email holds no permissions at all, unless
   `require_email_verification` is `false` in config. Even then it never holds a staff permission
   (`STAFF_PERMISSIONS` in `permissions.py`: `accounts.*`, `roles.*`, `invites.manage`, `settings.manage`,
-  `capabilities.manage`, `extensions.manage`, `agents.manage`, `logs.*`, `config.issues.view`, `traffic.view`,
+  `capabilities.manage`, `tool_services.manage`, `agents.manage`, `logs.*`, `config.issues.view`, `traffic.view`,
   `usage.all.view`, `tickets.manage`), and a role holding one cannot be assigned to it (`409`).
 - **Starter roles:** migration `0019` creates `Viewer`, `Support`, `Moderator`, `Auditor`, `Power User` and `Operator` once,
   with preset permissions (none holds `roles.manage`, `roles.assign`, `accounts.delete` or any `logs.chat.*`). An existing

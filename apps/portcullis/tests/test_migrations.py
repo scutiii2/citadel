@@ -17,8 +17,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0028"
-NEXT = "0029"
+HEAD = "0029"
+NEXT = "0030"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -134,6 +134,51 @@ def test_second_brain_columns_and_publish_permission_are_removed_and_come_back(t
         assert conn.execute("SELECT COUNT(*) FROM permissions WHERE name = 'brain.instance.publish'").fetchone()[0] == 1
     assert run_with(make_database(tmp_path)) == "upgraded"
     assert differences(make_database(tmp_path)) == []
+
+
+def test_0029_renames_extensions_manage_and_keeps_every_role_grant(tmp_path: Path) -> None:
+    from alembic import command
+
+    run_with(make_database(tmp_path))
+    path = tmp_path / "ember.db"
+
+    def state() -> tuple[set[str], set[str], str]:
+        with closing(sqlite3.connect(path)) as conn:
+            names = {row[0] for row in conn.execute("SELECT name FROM permissions")}
+            holders = {row[0] for row in conn.execute(
+                "SELECT r.name FROM role_permission rp JOIN roles r ON r.id = rp.role_id "
+                "JOIN permissions p ON p.id = rp.permission_id WHERE p.name IN ('extensions.manage', 'tool_services.manage')"
+            )}
+            power = conn.execute("SELECT description FROM roles WHERE name = 'Power User'").fetchone()[0]
+        return names, holders, power
+
+    def move_to(target: str) -> None:
+        async def go():
+            database = make_database(tmp_path)
+            runner = MigrationRunner(database.engine)
+            try:
+                async with database.engine.connect() as conn:
+                    await conn.run_sync(lambda sync: command.downgrade(runner._config(sync), target))
+            finally:
+                await database.dispose()
+        asyncio.run(go())
+
+    names, holders, power = state()
+    assert "tool_services.manage" in names and "extensions.manage" not in names
+    assert {"Power User", "Operator"} <= holders
+    assert power == "Member access plus tool services management."
+
+    move_to("0028")
+    old_names, old_holders, old_power = state()
+    assert "extensions.manage" in old_names and "tool_services.manage" not in old_names
+    assert old_holders == holders
+    assert old_power == "Member access plus shared extension management."
+
+    with closing(sqlite3.connect(path)) as conn:  # an edited description is left alone both ways
+        conn.execute("UPDATE roles SET description = 'mine' WHERE name = 'Power User'")
+        conn.commit()
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    assert state()[1] == holders and state()[2] == "mine"
 
 
 def clear_access(conn: sqlite3.Connection) -> None:
@@ -519,7 +564,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*", "0025*", "0026*", "0027*", "0028*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*", "0025*", "0026*", "0027*", "0028*", "0029*"))
         calls: list[int] = []
 
         async def backup() -> None:
@@ -755,7 +800,7 @@ def test_starter_roles_are_seeded_once_and_edits_stick(tmp_path: Path) -> None:
     for name in ("Viewer", "Support", "Moderator", "Auditor", "Power User", "Operator"):
         assert name in seeded
     assert seeded["Viewer"] == {"chat.use", "tools.view"}
-    assert "extensions.manage" in seeded["Power User"] and "tickets.create" in seeded["Power User"]
+    assert "tool_services.manage" in seeded["Power User"] and "tickets.create" in seeded["Power User"]
     for name in ("Viewer", "Support", "Moderator", "Auditor", "Power User", "Operator"):
         assert not {p for p in seeded[name] if p.startswith(("logs.chat", "roles."))} - {"roles.view"}
 
