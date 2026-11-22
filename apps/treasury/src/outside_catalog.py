@@ -144,6 +144,22 @@ def add_origin(db: Path, origin: object, name: object, consumer: str) -> dict:
         return _row(service_id, groups, origins, users)
 
 
+def discover_origin(db: Path, name: str, url: str) -> bool:
+    """Fill a missing gateway group without changing an existing label or origin."""
+    clean, _ = split_origin(url)
+    label = _clean_name(name)
+    with _transaction(db, write=True) as connection:
+        groups, origins, _ = _state(connection)
+        service_id = next((key for key, group in groups.items() if group["name"] == label), None)
+        if any(o["origin"] == clean or o["service_id"] == service_id for o in origins.values()):
+            return False
+        if service_id is None:
+            service_id = uuid.uuid4().hex
+            _put(connection, GROUPS_TABLE, service_id, {"name": label})
+        _put(connection, ORIGINS_TABLE, uuid.uuid4().hex, {"service_id": service_id, "origin": clean})
+        return True
+
+
 def rename_group(db: Path, service_id: str, name: object) -> dict:
     label = _clean_name(name)
     with _transaction(db, write=True) as connection:

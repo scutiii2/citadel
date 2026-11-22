@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, current_caller, data_dir, from_env, settings_store
 from src.backends.base import UnsupportedOperation
-from src import connection_admin, outside_catalog, ready, service_catalog
+from src import connection_admin, discovery, outside_catalog, ready, service_catalog
 from src.registry import InstanceManager, RawSqlDisabled, UnknownConnection, UnknownInstance
 
 OUTSIDE_CONSUMERS = frozenset({"legion", "stronghold"})
@@ -77,13 +77,20 @@ class InstanceBody(BaseModel):
 OWNED_INSTANCES = {"portcullis": {"portcullis", "ember"}, "armory": {"armory", "mcp_server"}}
 
 
-def create_app(manager: InstanceManager, keyring: Keyring | None = None, settings_db: Path | None = None) -> FastAPI:
+def create_app(manager: InstanceManager, keyring: Keyring | None = None, settings_db: Path | None = None, *,
+               discovery_enabled: bool = False) -> FastAPI:
     keyring = keyring if keyring is not None else from_env("treasury", data_dir=data_dir(Path(__file__).resolve().parent.parent))
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await keyring.ensure_identity()
-        yield
-        await manager.close()
+        task = asyncio.create_task(discovery.run(settings_db)) if discovery_enabled and settings_db is not None else None
+        try:
+            yield
+        finally:
+            if task is not None:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            await manager.close()
 
     app = FastAPI(title="db_gateway", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.add_middleware(ServiceAuthMiddleware, keyring=keyring, audience="treasury")
@@ -109,6 +116,10 @@ def create_app(manager: InstanceManager, keyring: Keyring | None = None, setting
     @app.get("/ready")
     async def readiness() -> dict:
         return await ready.report()
+
+    @app.get("/discovery")
+    async def discovery_result() -> dict:
+        return discovery.last_result()
 
     @app.get("/instances")
     async def instances() -> dict[str, list[str]]:

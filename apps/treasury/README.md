@@ -132,3 +132,7 @@ Use a throwaway Postgres database and the Firestore emulator, never a real proje
 ## Adding a database type
 Implement `DatabaseBackend` (`src/backends/base.py`) and add one entry to `BACKEND_TYPES` in
 `src/backends/factory.py`.
+
+## Discovery
+
+Treasury runs a discovery round about once a minute and fills missing catalog addresses after a successful health check. `GET /discovery` uses the same signed authentication and lists found, registered, and missed names. Existing service registrations and pins take priority. The private gateways appear as missed unless reachable from Treasury.
