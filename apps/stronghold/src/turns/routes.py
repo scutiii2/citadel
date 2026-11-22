@@ -73,7 +73,6 @@ class Trusted(BaseModel):
 
     forced_approval: bool = True
     tools_execute: bool = False
-    extension_ids: list[str] = Field(default_factory=list, max_length=500)
 
 
 class TurnRequest(BaseModel):
@@ -258,7 +257,6 @@ async def start_turn(
             plan=body.plan,
             plan_lean=body.plan_lean,
             exact_context=body.exact_context,
-            enabled_extensions=tuple(trusted.extension_ids),
             ask_before_tools=body.ask_before_tools or forced,
             allowed_tools=() if forced else tuple(dict.fromkeys(body.allowed_tools)),
             allow_read_only=body.allow_read_only and body.ask_before_tools and not forced,

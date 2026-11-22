@@ -66,7 +66,7 @@ def test_the_call_is_stateless_and_carries_the_clients_identity(monkeypatch):
     answer = ask("http://legion/mcp", "Hi", [{"role": "user", "content": "earlier"}])
     name, arguments = session.calls[0]
     assert name == "ask" and arguments["question"] == "Hi" and arguments["history"] == [{"role": "user", "content": "earlier"}]
-    assert arguments["enabled_extensions"] == [] and arguments["approval_mode"] == "deny" and arguments["allowed_tools"] == []
+    assert "enabled_extensions" not in arguments and arguments["approval_mode"] == "deny" and arguments["allowed_tools"] == []
     assert arguments["plan"] is False and arguments["ask_user"] is False and not arguments.get("private_extensions")
     assert arguments["disabled_tools"] == ["*"] and "plan_lean" not in arguments and "depth" not in arguments
     assert arguments["request_id"] == answer.request_id and answer.request_id

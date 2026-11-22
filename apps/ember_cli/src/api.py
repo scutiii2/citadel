@@ -189,7 +189,7 @@ class EmberClient:
         allowed_tools: list[str] | None = None,
     ) -> int:
         """Saves the question and starts the answer. Returns the sequence to watch events after."""
-        body: dict[str, Any] = {"question": question, "agent_id": agent_id, "caveman": False, "enabled_extensions": []}
+        body: dict[str, Any] = {"question": question, "agent_id": agent_id, "caveman": False}
         if title:
             body["title"] = title
         if ask_before_tools:

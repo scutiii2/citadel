@@ -355,7 +355,7 @@ def anthropic_turn(monkeypatch, policy, recorder, dispatch, request_id=REQUEST):
     client = _anthropic_rounds()
     monkeypatch.setattr(anthropic_provider, "_get_client", lambda: client)
     monkeypatch.setattr(anthropic_provider, "_dispatch", dispatch)
-    monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda enabled_extensions=None, roster=(): [])
+    monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda roster=(): [])
 
     async def scenario():
         token = approvals.bind(policy)
@@ -427,7 +427,7 @@ def test_anthropic_delegate_tool_is_gated_too(monkeypatch) -> None:
     client = _anthropic_rounds(tool_name=delegation.TOOL_NAME)
     monkeypatch.setattr(anthropic_provider, "_get_client", lambda: client)
     monkeypatch.setattr(anthropic_provider, "_dispatch", dispatch)
-    monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda enabled_extensions=None, roster=(): [])
+    monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda roster=(): [])
     rec = Recorder("deny")
 
     async def scenario():
@@ -550,7 +550,7 @@ def test_run_chat_refuses_an_unknown_mode_before_starting_anything() -> None:
     from src.agents import agent_config
 
     with pytest.raises(ValueError, match="approval_mode"):
-        run(agent_config.run_chat("q", [], [], request_id=REQUEST, approval_mode="whenever"))
+        run(agent_config.run_chat("q", [], request_id=REQUEST, approval_mode="whenever"))
 
     assert not cancellation.is_cancelled(REQUEST)
 
@@ -565,7 +565,7 @@ def test_run_chat_binds_the_policy_for_the_turn_and_removes_it_after() -> None:
         return _result()
 
     with patch.object(agent_config._PROVIDER_MODULE, "run_chat", fake_provider_run_chat):
-        run(agent_config.run_chat("q", [], [], request_id=REQUEST, approval_mode="ask", allowed_tools=["tool_x"]))
+        run(agent_config.run_chat("q", [], request_id=REQUEST, approval_mode="ask", allowed_tools=["tool_x"]))
 
     assert (seen[0].mode, seen[0].allowed_tools) == ("ask", {"tool_x"})
     assert approvals.current().mode == "off"

@@ -307,7 +307,7 @@ def anthropic_turn(monkeypatch, recorder, dispatch, enabled=True, approval_mode=
     client = _anthropic_client(ASK_ARGUMENTS)
     monkeypatch.setattr(anthropic_provider, "_get_client", lambda: client)
     monkeypatch.setattr(anthropic_provider, "_dispatch", dispatch)
-    monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda enabled_extensions=None, roster=(): [])
+    monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda roster=(): [])
 
     async def scenario():
         policy = questions.bind(questions.QuestionPolicy(enabled))
@@ -370,10 +370,10 @@ def test_anthropic_stop_while_a_question_is_open_cancels_the_turn(monkeypatch) -
 
 def test_anthropic_offers_the_schema_only_when_enabled() -> None:
     with patch("src.providers.language.anthropic_provider.list_tools", return_value=[]):
-        off = anthropic_provider._tool_schemas([], ())
+        off = anthropic_provider._tool_schemas(())
         token = questions.bind(questions.QuestionPolicy(True))
         try:
-            on = anthropic_provider._tool_schemas([], ())
+            on = anthropic_provider._tool_schemas(())
         finally:
             questions.reset(token)
 
@@ -448,10 +448,10 @@ def test_openai_refuses_the_tool_when_it_was_not_offered(monkeypatch) -> None:
 
 def test_openai_offers_the_schema_only_when_enabled() -> None:
     with patch("src.providers.language.openai_provider.list_tools", return_value=[]):
-        off = openai_provider._tool_schemas([], ())
+        off = openai_provider._tool_schemas(())
         token = questions.bind(questions.QuestionPolicy(True))
         try:
-            on = openai_provider._tool_schemas([], ())
+            on = openai_provider._tool_schemas(())
         finally:
             questions.reset(token)
 
@@ -492,9 +492,9 @@ def test_run_chat_enables_the_policy_for_a_top_level_turn_only() -> None:
         return _result()
 
     with patch.object(agent_config._PROVIDER_MODULE, "run_chat", fake_provider_run_chat):
-        run(agent_config.run_chat("q", [], [], request_id=REQUEST, ask_user=True))
-        run(agent_config.run_chat("q", [], [], request_id=REQUEST, ask_user=False))
-        run(agent_config.run_chat("q", [], [], request_id=REQUEST, depth=1, ask_user=True))
+        run(agent_config.run_chat("q", [], request_id=REQUEST, ask_user=True))
+        run(agent_config.run_chat("q", [], request_id=REQUEST, ask_user=False))
+        run(agent_config.run_chat("q", [], request_id=REQUEST, depth=1, ask_user=True))
 
     assert seen == [True, False, False]
     assert questions.current().enabled is False

@@ -195,7 +195,7 @@ def test_run_chat_binds_the_check_only_for_ask_mode_with_the_option_on():
 
     with patch.object(agent_config._PROVIDER_MODULE, "run_chat", fake_provider_run_chat):
         for mode, allow in (("ask", True), ("ask", False), ("off", True), ("deny", True)):
-            run(agent_config.run_chat("q", [], [], request_id=REQUEST, approval_mode=mode, allow_read_only=allow))
+            run(agent_config.run_chat("q", [], request_id=REQUEST, approval_mode=mode, allow_read_only=allow))
 
     has_check = [policy.read_only_check is not None for policy in seen]
     assert has_check == [True, False, False, False]

@@ -178,40 +178,15 @@ export class SlashCommandRunner {
     }
   }
 
-  /** Built-in commands of the capabilities in `enabledCapabilities` (null: all
-   * of them) plus the tools of `enabledExtensions`; extensions are left out
-   * (not failed) when the tool list can't be read. */
-  async list(
-    enabledExtensions: readonly string[] = [],
-    enabledCapabilities: readonly string[] | null = null,
-  ): Promise<CommandInfo[]> {
+  /** Built-in commands of the capabilities in `enabledCapabilities` (null: all of them). */
+  async list(enabledCapabilities: readonly string[] | null = null): Promise<CommandInfo[]> {
     const all = await this.builtIns();
-    const builtIns = enabledCapabilities ? all.filter((c) => enabledCapabilities.includes(c.capability)) : all;
-    if (!enabledExtensions.length) return builtIns;
-    const taken = new Set(builtIns.map((c) => c.capability));
-    const enabled = new Set(enabledExtensions);
-    let tools: ToolInfo[] = [];
-    try {
-      tools = [...(await this.toolMap()).values()];
-    } catch {
-      return builtIns;
-    }
-    const fromExtensions: CommandInfo[] = [];
-    for (const t of tools) {
-      const at = t.name.indexOf(EXTENSION_SEPARATOR);
-      if (at <= 0) continue;
-      const capability = t.name.slice(0, at);
-      if (!enabled.has(capability) || taken.has(capability)) continue;
-      const name = t.name.slice(at + EXTENSION_SEPARATOR.length);
-      fromExtensions.push({ capability, name, description: t.description.split("\n")[0] ?? "", tool_name: t.name });
-    }
-    return [...builtIns, ...fromExtensions];
+    return enabledCapabilities ? all.filter((c) => enabledCapabilities.includes(c.capability)) : all;
   }
 
   /** The result as Markdown for the chat. */
   async run(
     text: string,
-    enabledExtensions: readonly string[] = [],
     enabledCapabilities: readonly string[] | null = null,
   ): Promise<string> {
     try {
@@ -221,7 +196,7 @@ export class SlashCommandRunner {
       if (enabledCapabilities && builtIn && !enabledCapabilities.includes(parsed.capability)) {
         throw new CommandError(`"${parsed.capability}" isn't added to your account. Enable it on the Capabilities page.`);
       }
-      const commands = await this.list(enabledExtensions, enabledCapabilities);
+      const commands = await this.list(enabledCapabilities);
       const ofCapability = commands.filter((c) => c.capability === parsed.capability);
       if (parsed.command === "help") {
         // mcp_server only has help for its own capabilities.

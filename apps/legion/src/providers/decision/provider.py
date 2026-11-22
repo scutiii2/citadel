@@ -141,7 +141,7 @@ def prepare() -> None:
 
 async def run_chat(
     question: str, history: list[dict[str, Any]], model: str | None,
-    enabled_extensions: list[str], request_id: str | None = None, depth: int = 0,
+    request_id: str | None = None, depth: int = 0,
     on_event: Any = None, caveman: bool = False,
 ) -> ChatResult:
     from src.agents import agent_spec

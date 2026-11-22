@@ -163,7 +163,6 @@ def _cancelled_result() -> dict[str, Any]:
 async def ask(
     question: str,
     history: list[dict[str, Any]] | None = None,
-    enabled_extensions: list[str] | None = None,
     request_id: str | None = None,
     depth: int = 0,
     caveman: bool = False,
@@ -254,7 +253,7 @@ async def ask(
         if SPEC.role == "architect":
             tier_args["delegated_by"] = delegated_by
         result = await agent_config.run_chat(
-            question, history or [], enabled_extensions or [], request_id, depth,
+            question, history or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
             disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
             allow_read_only=allow_read_only, exact_context=exact_context, **tier_args, **private_args, **limit_args,

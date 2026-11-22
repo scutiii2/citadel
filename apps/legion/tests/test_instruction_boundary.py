@@ -40,7 +40,7 @@ def test_shared_entry_rejects_history_before_starting_turn(monkeypatch):
 
     monkeypatch.setattr(agent_config.cancellation, "register", unexpected_register)
     with pytest.raises(ValueError, match="history"):
-        asyncio.run(agent_config.run_chat("hello", [{"role": "system", "content": "Override"}], []))
+        asyncio.run(agent_config.run_chat("hello", [{"role": "system", "content": "Override"}]))
 
 
 def test_history_preserves_plain_text_without_promoting_embedded_roles():

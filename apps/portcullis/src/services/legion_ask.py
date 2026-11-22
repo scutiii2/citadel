@@ -47,7 +47,7 @@ class LegionAsk:
         request_id = uuid.uuid4().hex
         allowed = list(STRONGHOLD_ALLOWED) if memory else []
         arguments = {
-            "question": question, "history": history, "enabled_extensions": [], "approval_mode": "deny",
+            "question": question, "history": history, "approval_mode": "deny",
             "allowed_tools": allowed, "plan": False, "ask_user": False, "caveman": False, "request_id": request_id,
             # Approvals gate the model's tool loop. Recall and skill learning also call the upstream directly,
             # so block every tool there too. The Brain search exception permits memory recall.

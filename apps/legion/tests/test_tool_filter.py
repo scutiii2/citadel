@@ -65,7 +65,7 @@ def test_call_tool_refuses_a_blocked_tool_the_model_names_anyway():
 def test_ask_hands_disabled_tools_to_run_chat():
     captured = {}
 
-    async def fake_run_chat(question, history, enabled_extensions, request_id, depth, on_event=None, caveman=False,
+    async def fake_run_chat(question, history, request_id, depth, on_event=None, caveman=False,
                             approval_mode="off", allowed_tools=None, disabled_tools=None, ask_user=False,
                             plan=True, plan_lean=True, allow_read_only=False, exact_context=False):
         captured["disabled"] = disabled_tools
@@ -83,14 +83,14 @@ def test_ask_hands_disabled_tools_to_run_chat():
 def test_run_chat_blocks_for_the_turn_and_lets_go_afterwards():
     seen = {}
 
-    async def fake_provider_run_chat(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
+    async def fake_provider_run_chat(question, history, model, request_id, depth, on_event=None, caveman=False):
         seen["during"] = tool_filter.blocked()
         return ChatResult(response="ok")
 
     async def _run():
         provider = SimpleNamespace(run_chat=fake_provider_run_chat)
         with patch.object(agent_config, "_PROVIDER_MODULE", provider):
-            await agent_config.run_chat("q", [], [], disabled_tools=["tool_pdf_merge"])
+            await agent_config.run_chat("q", [], disabled_tools=["tool_pdf_merge"])
 
     asyncio.run(_run())
     assert seen["during"] == {"tool_pdf_merge"}

@@ -52,7 +52,6 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
         history: list[dict] | None = None,
         request_id: str | None = None,
         caveman: bool = False,
-        enabled_extensions: list[str] | None = None,
         approval_mode: str = "off",
         allowed_tools: list[str] | None = None,
         disabled_tools: list[str] | None = None,
@@ -73,7 +72,7 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
         for text in ("Hel", "lo"):
             await ctx.report_progress(0, None, json.dumps({"type": "token", "text": text}))
         return {
-            "response": f"echo: {question} ({len(history or [])} earlier, caveman={caveman}, ext={enabled_extensions})",
+            "response": f"echo: {question} ({len(history or [])} earlier, caveman={caveman})",
             "cancelled": False,
             "total_tokens": 42,
             "seen": dict(seen),
@@ -173,12 +172,11 @@ def test_ask_streams_events_and_sends_identity(agent_url: str) -> None:
             history=[{"role": "user", "content": "earlier"}],
             request_id="r1",
             caveman=True,
-            enabled_extensions=["notes"],
             on_event=on_event,
         )
     )
 
-    assert result["response"] == "echo: hi (1 earlier, caveman=True, ext=['notes'])"
+    assert result["response"] == "echo: hi (1 earlier, caveman=True)"
     assert result["seen"] == {"username": "alice", "uid": "uid-alice", "caller": "stronghold"}
     assert [e["text"] for e in events] == ["Hel", "lo"]
 
@@ -215,7 +213,6 @@ def _ask(gateway: McpAgentGateway, url: str, **extra: Any) -> dict[str, Any]:
             history=[],
             request_id="r1",
             caveman=False,
-            enabled_extensions=[],
             on_event=on_event,
             **extra,
         )
@@ -435,9 +432,9 @@ async def test_ask_sends_the_chat_id_when_the_caller_has_one(monkeypatch):
 
     monkeypatch.setattr(McpAgentGateway, "_call", fake_call)
     await McpAgentGateway().ask("http://a", Caller("ana", "a@x", "u-1", chat_id="chat-1"), question="q", history=[],
-                                request_id="r", caveman=False, enabled_extensions=[], on_event=None)
+                                request_id="r", caveman=False, on_event=None)
     assert sent["ask"]["chat_id"] == "chat-1"
     sent.clear()
     await McpAgentGateway().ask("http://a", Caller("ana", "a@x", "u-1"), question="q", history=[],
-                                request_id="r", caveman=False, enabled_extensions=[], on_event=None)
+                                request_id="r", caveman=False, on_event=None)
     assert "chat_id" not in sent["ask"]

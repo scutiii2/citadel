@@ -144,7 +144,7 @@ def test_plan_mode_keeps_runtime_recall_and_bypasses_entry_routing(monkeypatch, 
     monkeypatch.setattr(skill_recall, "with_skills", skills)
     provider = SimpleNamespace(run_chat=AsyncMock(return_value=ChatResult(response="ok")), DEFAULT_MODEL="model")
     monkeypatch.setattr(agent_config, "_PROVIDER_MODULE", provider)
-    result = asyncio.run(agent_config.run_chat("q", [], []))
+    result = asyncio.run(agent_config.run_chat("q", []))
     assert result.response == "ok"
     memory.assert_awaited_once()
     skills.assert_awaited_once()
@@ -159,7 +159,7 @@ def test_architect_does_not_enter_generic_provider_loop(monkeypatch, plan_spec):
     monkeypatch.setattr(pipeline, "run", run)
     monkeypatch.setattr(agent_config._PROVIDER_MODULE, "run_chat",
                         AsyncMock(side_effect=AssertionError("architect entered generic provider loop")))
-    result = asyncio.run(agent_config.run_chat("brief", [], []))
+    result = asyncio.run(agent_config.run_chat("brief", []))
     assert result.response == "assembled"
     run.assert_awaited_once()
     assert run.call_args.args[0].kind == "code" and run.call_args.args[1] == "brief"

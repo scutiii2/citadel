@@ -152,7 +152,7 @@ def test_a_choice_question_is_sent_to_laya_and_the_answer_comes_back(
                             "criteria": {"database": "SQL and storage", "network": "Connections"}}},
         "local_only": True,  # Laya answers alone: no fallback to Jev
     }
-    assert call["history"] == [] and call["enabled_extensions"] == []
+    assert call["history"] == [] and "enabled_extensions" not in call
 
 
 def test_a_yes_no_question_is_a_noul_question(client: TestClient, agent: FakeAgent, tmp_path: Path, monkeypatch) -> None:

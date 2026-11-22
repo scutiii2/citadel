@@ -252,11 +252,11 @@ def test_discard_account_stops_all_its_turns(client: TestClient, agent: TurnAgen
 
 
 def test_the_trusted_block_sets_extensions_and_tool_approval(client: TestClient, agent: TurnAgent) -> None:
-    start(client, new_id(), trusted={"forced_approval": False, "tools_execute": True, "extension_ids": ["files"]},
+    start(client, new_id(), trusted={"forced_approval": False, "tools_execute": True},
           ask_before_tools=True, allowed_tools=["a", "a", "b"], allow_read_only=True)
     wait_until(lambda: agent.asks)
     asked = agent.asks[0]
-    assert asked["enabled_extensions"] == ["files"] and asked["approval_mode"] == "ask"
+    assert "enabled_extensions" not in asked and asked["approval_mode"] == "ask"
     assert asked["allowed_tools"] == ["a", "b"] and asked["allow_read_only"] is True and asked["disabled_tools"] == []
 
 

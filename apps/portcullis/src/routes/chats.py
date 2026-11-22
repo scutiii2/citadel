@@ -536,14 +536,11 @@ async def start_turn(
     """Starts answering in Stronghold, which saves the question and keeps going (and saves the answer)
     even if the browser leaves; watch it via /events. The `trusted` block is Portcullis's alone: a
     `trusted` key sent by the browser never reaches Stronghold."""
-    # Shared extensions are gone (Plan 22c); the list stays in the contract, empty.
-    extension_ids: list[str] = []
     payload = {
         **body.model_dump(exclude={"agent_id"}),
         "trusted": {
             "forced_approval": await app_settings.get_bool(FORCE_TOOL_APPROVAL),
             "tools_execute": TOOLS_EXECUTE in account.permission_names,
-            "extension_ids": extension_ids,
         },
     }
     answer = await stronghold.forward("POST", f"/turns/{chat_id}", account, json=payload)

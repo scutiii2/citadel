@@ -230,7 +230,7 @@ def run_chat(monkeypatch, routed):
     provider = AsyncMock(return_value=ChatResult(response="from the model"))
     monkeypatch.setattr(agent_config._PROVIDER_MODULE, "run_chat", provider)
     monkeypatch.setattr(agent_config.router_routing, "route_turn", AsyncMock(return_value=(routed, None, "")))
-    return asyncio.run(agent_config.run_chat("q", [], [])), provider
+    return asyncio.run(agent_config.run_chat("q", [])), provider
 
 
 def test_a_routed_turn_never_runs_the_agents_own_model(monkeypatch):

@@ -25,7 +25,7 @@ def run(coro):
 def test_ask_passes_private_extensions_only_when_given():
     seen = []
 
-    async def fake_run_chat(question, history, enabled_extensions, request_id, depth, on_event=None, caveman=False,
+    async def fake_run_chat(question, history, request_id, depth, on_event=None, caveman=False,
                             approval_mode="off", allowed_tools=None, disabled_tools=None, **more):
         seen.append({k: v for k, v in more.items() if k == "private_extensions"})
         return ChatResult(response="done")
@@ -65,7 +65,7 @@ def test_status_reports_private_extension_support():
 def run_with_provider(raw, *, account="a@x", prefetch=None, approval_mode="off"):
     seen = {}
 
-    async def fake_provider(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
+    async def fake_provider(question, history, model, request_id, depth, on_event=None, caveman=False):
         seen["turn"] = private_turn.current()
         seen["prefixes"] = approvals.current().ask_prefixes
         seen["mode"] = approvals.current().mode
@@ -81,7 +81,7 @@ def run_with_provider(raw, *, account="a@x", prefetch=None, approval_mode="off")
         try:
             with patch.object(agent_config, "_PROVIDER_MODULE", SimpleNamespace(run_chat=fake_provider)), \
                  patch("src.tools.mcp_client.mcp_upstream.prefetch_private", new=fake_prefetch):
-                return await agent_config.run_chat("q", [], [], approval_mode=approval_mode, private_extensions=raw)
+                return await agent_config.run_chat("q", [], approval_mode=approval_mode, private_extensions=raw)
         finally:
             internal_auth.reset_requester(token)
 

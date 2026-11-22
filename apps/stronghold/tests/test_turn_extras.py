@@ -115,12 +115,12 @@ def test_a_suggestion_is_skipped_when_the_limit_cannot_be_checked(client: TestCl
 
 def test_chat_turns_are_traced_and_agent_failures_logged(client: TestClient, agent: TurnAgent, platform) -> None:
     chat_id = new_id()
-    start(client, chat_id, "What is up?", trusted={"extension_ids": ["notes"]})
+    start(client, chat_id, "What is up?", trusted={})
     events(client, chat_id)
     wait_until(lambda: traces(platform))
     (trace,) = traces(platform)
     assert trace["message"].startswith(f"What is up? → {AGENT_ID}/claude-test, ")
-    assert '"enabled_extensions": [\n    "notes"\n  ]' in trace["details"] and '"response": "Hello!"' in trace["details"]
+    assert '"enabled_extensions"' not in trace["details"] and '"response": "Hello!"' in trace["details"]
 
     agent.fail = "provider rate limited"
     other = new_id()

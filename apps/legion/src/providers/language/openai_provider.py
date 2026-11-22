@@ -116,9 +116,7 @@ has_api_key = _OpenAI.has_api_key
 is_available = _OpenAI.is_available
 
 
-def _tool_schemas(
-    enabled_extensions: list[str] | None = None, roster: Sequence[RosterEntry] = ()
-) -> list[dict[str, Any]]:
+def _tool_schemas(roster: Sequence[RosterEntry] = ()) -> list[dict[str, Any]]:
     # display_label rides along on every schema dict returned here, same as
     # anthropic_provider._tool_schemas - NOT a real Responses API tools=
     # field, so run_chat pops it back off before sending schemas to the API.
@@ -131,7 +129,7 @@ def _tool_schemas(
             "parameters": tool.inputSchema or {"type": "object", "properties": {}},
             "display_label": (tool.meta or {}).get("display_label") if hasattr(tool, "meta") else None,
         }
-        for tool in ([] if plan_mode else list_tools(enabled_extensions))
+        for tool in ([] if plan_mode else list_tools())
     ]
     # Only an orchestrator has a roster, so only it can delegate.
     if roster and not plan_mode:
@@ -254,7 +252,6 @@ async def run_chat(
     question: str,
     history: list[dict[str, Any]],
     model: str | None = None,
-    enabled_extensions: list[str] | None = None,
     request_id: str | None = None,
     depth: int = 0,
     on_event: OnEvent | None = None,
@@ -273,7 +270,7 @@ async def run_chat(
     messages.append({"role": "user", "content": question})
     tools_used: list[str] = []
     tool_calls: list[ToolCallRecord] = []
-    schemas = _tool_schemas(enabled_extensions, roster)
+    schemas = _tool_schemas(roster)
     # display_label isn't a real Responses API tools= field (see
     # _tool_schemas) - pop it into this name->label lookup here, once,
     # rather than sending it to the API or re-deriving it per call below.

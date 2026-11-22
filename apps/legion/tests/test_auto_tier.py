@@ -143,7 +143,7 @@ def run_turn(monkeypatch, tiers, chosen, *, depth=0, model_tier=None, history=()
     monkeypatch.setattr(model_tiers, "own_tiers", lambda: tiers)
     models = []
 
-    async def provider(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
+    async def provider(question, history, model, request_id, depth, on_event=None, caveman=False):
         models.append(model)
         return ChatResult(response="x")
 
@@ -159,7 +159,7 @@ def run_turn(monkeypatch, tiers, chosen, *, depth=0, model_tier=None, history=()
         return None, None, ""
     monkeypatch.setattr(agent_config.router_routing, "route_turn", fake_router)
     result = asyncio.run(agent_config.run_chat(
-        "write the report", list(history), [], depth=depth, **({"model_tier": model_tier} if model_tier else {}),
+        "write the report", list(history), depth=depth, **({"model_tier": model_tier} if model_tier else {}),
     ))
     return result, models, picker
 

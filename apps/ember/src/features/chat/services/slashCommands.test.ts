@@ -77,14 +77,14 @@ describe("capabilities the account has not added", () => {
   it("leaves their commands out of the list", async () => {
     const runner = new SlashCommandRunner();
 
-    expect((await runner.list([], null)).map((c) => c.capability)).toEqual(["files"]);
-    expect((await runner.list([], ["files"])).map((c) => c.capability)).toEqual(["files"]);
-    expect(await runner.list([], [])).toEqual([]);
-    expect(await runner.list([], ["other"])).toEqual([]);
+    expect((await runner.list(null)).map((c) => c.capability)).toEqual(["files"]);
+    expect((await runner.list(["files"])).map((c) => c.capability)).toEqual(["files"]);
+    expect(await runner.list([])).toEqual([]);
+    expect(await runner.list(["other"])).toEqual([]);
   });
 
   it("refuses to run one, and says where to add it", async () => {
-    const out = await new SlashCommandRunner().run("/files export", [], []);
+    const out = await new SlashCommandRunner().run("/files export", []);
 
     expect(out).toBe('❌ "files" isn\'t added to your account. Enable it on the Capabilities page.');
     expect(runTool).not.toHaveBeenCalled();
@@ -93,6 +93,6 @@ describe("capabilities the account has not added", () => {
   it("still runs the ones that are added", async () => {
     runTool.mockResolvedValue({ text: "done", isError: false });
 
-    expect(await new SlashCommandRunner().run("/files export", [], ["files"])).toBe("done");
+    expect(await new SlashCommandRunner().run("/files export", ["files"])).toBe("done");
   });
 });

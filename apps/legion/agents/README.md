@@ -35,10 +35,7 @@ internal service strategy is gateway config, read on each call. A router's
 A tool from an outside MCP connection uses the name `<server-id>__<tool>`.
 Add a matching `tools.allow` glob such as `bard__*` to offer it to the agent.
 An empty allow list leaves outside connection tools hidden, and `tools.deny` still wins.
-Legion applies `enabled_extensions` only to Armory’s proxied extensions.
 Outside tools follow the normal approval policy, including in Auto mode.
-A Legion connection with the same ID takes the place of Armory’s proxied extension
-in the offered catalog while that connection lists tools.
 
 Keep deployment credentials outside tracked definitions. See `../README.md`
 for the field descriptions and examples.

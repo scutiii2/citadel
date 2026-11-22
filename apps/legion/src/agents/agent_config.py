@@ -115,7 +115,6 @@ def _read_only_check():
 async def run_chat(
     question: str,
     history: list[dict[str, Any]],
-    enabled_extensions: list[str],
     request_id: str | None = None,
     depth: int = 0,
     on_event: Any = None,
@@ -199,7 +198,6 @@ async def run_chat(
     delegated_usage, usage_token = delegation.bind_usage()
     attachment_token = delegation.bind_attachments(question, history)
     caveman_token = delegation.bind_caveman(caveman)
-    extensions_token = delegation.bind_enabled_extensions(enabled_extensions)
     approval_token = approvals.bind(policy)
     question_token = questions.bind(questions.QuestionPolicy(ask_user and depth == 0))
     filter_token = tool_filter.bind(disabled_tools or ())
@@ -255,7 +253,7 @@ async def run_chat(
             provider_question = await skill_recall.with_skills(question, provider_question, on_event)
         if inspect.iscoroutinefunction(_PROVIDER_MODULE.run_chat):
             result = await _PROVIDER_MODULE.run_chat(
-                provider_question, history, resolution.model, enabled_extensions, request_id, depth,
+                provider_question, history, resolution.model, request_id, depth,
                 on_event=on_event, caveman=caveman,
             )
             result.delegated_usage = delegated_usage
@@ -267,7 +265,7 @@ async def run_chat(
             # converts openai_provider the same way Task 3 did anthropic_provider).
             result = await anyio.to_thread.run_sync(
                 lambda: _PROVIDER_MODULE.run_chat(
-                    provider_question, history, resolution.model, enabled_extensions, request_id, depth,
+                    provider_question, history, resolution.model, request_id, depth,
                     caveman=caveman,
                 )
             )
@@ -289,7 +287,6 @@ async def run_chat(
         tool_filter.reset(filter_token)
         questions.reset(question_token)
         approvals.reset(approval_token)
-        delegation.reset_enabled_extensions(extensions_token)
         delegation.reset_caveman(caveman_token)
         delegation.reset_attachments(attachment_token)
         delegation.reset_usage(usage_token)

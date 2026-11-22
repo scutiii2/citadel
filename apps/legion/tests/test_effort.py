@@ -183,7 +183,7 @@ from src.providers.base_provider import ChatResult  # noqa: E402
 
 
 def _fake_provider(seen):
-    async def _fake(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
+    async def _fake(question, history, model, request_id, depth, on_event=None, caveman=False):
         seen["effort"] = llm_options._effort_override.get()
         return ChatResult(response="x")
 
@@ -195,7 +195,7 @@ def test_run_chat_binds_the_resolved_effort_for_the_turn_only(monkeypatch):
     seen = {}
     monkeypatch.setattr(agent_config._PROVIDER_MODULE, "run_chat", _fake_provider(seen))
 
-    result = asyncio.run(agent_config.run_chat("hi", [], [], reasoning_effort="high"))
+    result = asyncio.run(agent_config.run_chat("hi", [], reasoning_effort="high"))
 
     assert seen["effort"] == "low"
     assert result.reasoning_effort == "low"
@@ -208,7 +208,7 @@ def test_run_chat_without_a_request_binds_nothing(monkeypatch):
     seen = {}
     monkeypatch.setattr(agent_config._PROVIDER_MODULE, "run_chat", _fake_provider(seen))
 
-    result = asyncio.run(agent_config.run_chat("hi", [], []))
+    result = asyncio.run(agent_config.run_chat("hi", []))
 
     assert seen["effort"] is None
     assert (result.reasoning_effort, result.effort_note) == (None, "")
@@ -219,7 +219,7 @@ def test_run_chat_within_the_cap_runs_at_the_requested_effort(monkeypatch):
     seen = {}
     monkeypatch.setattr(agent_config._PROVIDER_MODULE, "run_chat", _fake_provider(seen))
 
-    result = asyncio.run(agent_config.run_chat("hi", [], [], reasoning_effort="low"))
+    result = asyncio.run(agent_config.run_chat("hi", [], reasoning_effort="low"))
 
     assert seen["effort"] == "low"
     assert (result.reasoning_effort, result.effort_note) == ("low", "")

@@ -33,7 +33,7 @@ def test_a_stronghold_call_allows_only_the_five_tools_and_uses_the_same_budget(c
     assert uid.startswith("oc_") and username == f"outside:{uid}" and email == ""
     assert sent["disabled_tools"] == ["*", *[f"!{tool}" for tool in TOOLS]]
     assert sent["approval_mode"] == "deny" and sent["allowed_tools"] == TOOLS
-    assert sent["enabled_extensions"] == [] and not sent["plan"] and not sent["ask_user"]
+    assert "enabled_extensions" not in sent and not sent["plan"] and not sent["ask_user"]
 
     refused = client.post(ROUTE, json={"question": "What is my cat's name?"}, headers=auth(key))
     assert refused.status_code == 429 and len(session.calls) == 1

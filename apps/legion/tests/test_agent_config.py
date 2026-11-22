@@ -209,18 +209,18 @@ def test_run_chat_registers_and_clears_cancellation_around_the_call(monkeypatch)
 
         captured_args = {}
 
-        async def _fake_run_chat(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
+        async def _fake_run_chat(question, history, model, request_id, depth, on_event=None, caveman=False):
             calls.append(("run_chat", request_id))
-            captured_args["args"] = (question, history, model, enabled_extensions, request_id, depth)
+            captured_args["args"] = (question, history, model, request_id, depth)
             return ChatResult(response="fake-result")
 
         monkeypatch.setattr(reloaded._PROVIDER_MODULE, "run_chat", _fake_run_chat)
 
-        result = await reloaded.run_chat("hi", [], ["reference"], "req-1", depth=1)
+        result = await reloaded.run_chat("hi", [], "req-1", depth=1)
 
         assert result.response == "fake-result"
         assert calls == [("register", "req-1"), ("run_chat", "req-1"), ("clear", "req-1")]
-        assert captured_args["args"] == ("hi", [], None, ["reference"], "req-1", 1)
+        assert captured_args["args"] == ("hi", [], None, "req-1", 1)
 
     asyncio.run(_run())
 
@@ -240,13 +240,13 @@ def test_run_chat_defaults_depth_to_zero(monkeypatch):
     async def _run():
         captured = {}
 
-        async def _fake_run_chat(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
+        async def _fake_run_chat(question, history, model, request_id, depth, on_event=None, caveman=False):
             captured["depth"] = depth
             return ChatResult(response="fake-result")
 
         monkeypatch.setattr(reloaded._PROVIDER_MODULE, "run_chat", _fake_run_chat)
 
-        await reloaded.run_chat("hi", [], [])
+        await reloaded.run_chat("hi", [])
 
         assert captured["depth"] == 0
 
@@ -275,7 +275,7 @@ def test_run_chat_still_clears_cancellation_when_the_provider_raises(monkeypatch
         monkeypatch.setattr(reloaded._PROVIDER_MODULE, "run_chat", _boom)
 
         with pytest.raises(RuntimeError, match="boom"):
-            await reloaded.run_chat("hi", [], [], "req-1")
+            await reloaded.run_chat("hi", [], "req-1")
 
         assert cleared == ["req-1"]
 
@@ -318,7 +318,7 @@ def test_run_chat_awaits_async_provider_and_forwards_on_event(monkeypatch):
             async def on_event(e):
                 events_seen.append(e)
 
-            result = await reloaded.run_chat("q", [], [], on_event=on_event)
+            result = await reloaded.run_chat("q", [], on_event=on_event)
 
             assert result is fake_result
             module.run_chat.assert_awaited_once()
@@ -346,8 +346,8 @@ def test_run_chat_falls_back_to_thread_for_sync_provider(monkeypatch):
         fake_result = ChatResult(response="sync result")
         sync_provider_called = []
 
-        def _sync_run_chat(question, history, model, enabled_extensions, request_id, depth, caveman=False):
-            sync_provider_called.append((question, history, model, enabled_extensions, request_id, depth))
+        def _sync_run_chat(question, history, model, request_id, depth, caveman=False):
+            sync_provider_called.append((question, history, model, request_id, depth))
             return fake_result
 
         with patch.object(reloaded, "_PROVIDER_MODULE") as module:
@@ -355,11 +355,11 @@ def test_run_chat_falls_back_to_thread_for_sync_provider(monkeypatch):
             module.run_chat = _sync_run_chat
 
             # on_event is silently dropped for sync providers (Phase 3 will fix this)
-            result = await reloaded.run_chat("q", [], ["ext"], request_id="r1", depth=2, on_event=lambda e: None)
+            result = await reloaded.run_chat("q", [], request_id="r1", depth=2, on_event=lambda e: None)
 
             assert result is fake_result
             assert len(sync_provider_called) == 1
-            assert sync_provider_called[0] == ("q", [], None, ["ext"], "r1", 2)
+            assert sync_provider_called[0] == ("q", [], None, "r1", 2)
 
     asyncio.run(_run())
 
@@ -387,7 +387,7 @@ def test_run_chat_still_registers_and_clears_cancellation_for_async_provider(mon
         with patch.object(reloaded, "_PROVIDER_MODULE") as module:
             module.run_chat = AsyncMock(return_value=fake_result)
 
-            result = await reloaded.run_chat("q", [], [], request_id="req-1")
+            result = await reloaded.run_chat("q", [], request_id="req-1")
 
             assert result is fake_result
             assert calls == [("register", "req-1"), ("clear", "req-1")]
@@ -419,7 +419,7 @@ def test_run_chat_still_clears_cancellation_when_async_provider_raises(monkeypat
             module.run_chat = _boom
 
             with pytest.raises(RuntimeError, match="boom"):
-                await reloaded.run_chat("hi", [], [], "req-1")
+                await reloaded.run_chat("hi", [], "req-1")
 
             assert cleared == ["req-1"]
 
@@ -441,17 +441,17 @@ def test_run_chat_passes_the_resolved_tier_model_to_the_provider(monkeypatch):
     monkeypatch.setattr(reloaded.model_tiers, "own_tiers", lambda: [TierInfo("light", "haiku", "q"), TierInfo("heavy", "opus", "h")])
     seen = {}
 
-    async def _fake_run_chat(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
+    async def _fake_run_chat(question, history, model, request_id, depth, on_event=None, caveman=False):
         seen["model"] = model
         return ChatResult(response="x")
 
     monkeypatch.setattr(reloaded._PROVIDER_MODULE, "run_chat", _fake_run_chat)
 
-    result = asyncio.run(reloaded.run_chat("hi", [], [], model_tier="heavy"))
+    result = asyncio.run(reloaded.run_chat("hi", [], model_tier="heavy"))
     assert seen["model"] == "opus"
     assert (result.model_tier, result.model_note) == ("heavy", "")
 
-    result = asyncio.run(reloaded.run_chat("hi", [], [], model_tier="standard"))
+    result = asyncio.run(reloaded.run_chat("hi", [], model_tier="standard"))
     assert seen["model"] == "haiku"
     assert result.model_tier == "light"
     assert "ran on light" in result.model_note
@@ -470,13 +470,13 @@ def test_run_chat_without_a_tier_keeps_the_pinned_model(monkeypatch):
     reloaded = importlib.reload(agent_config)
     seen = {}
 
-    async def _fake_run_chat(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
+    async def _fake_run_chat(question, history, model, request_id, depth, on_event=None, caveman=False):
         seen["model"] = model
         return ChatResult(response="x")
 
     monkeypatch.setattr(reloaded._PROVIDER_MODULE, "run_chat", _fake_run_chat)
 
-    result = asyncio.run(reloaded.run_chat("hi", [], []))
+    result = asyncio.run(reloaded.run_chat("hi", []))
     assert seen["model"] == "pinned-model"
     assert result.model_tier is None
 
@@ -502,7 +502,7 @@ def _recall_setup(monkeypatch, *, recall_on):
     monkeypatch.setattr(reloaded.memory_recall, "_search", search)
     seen = {}
 
-    async def _fake_run_chat(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False):
+    async def _fake_run_chat(question, history, model, request_id, depth, on_event=None, caveman=False):
         seen["question"] = question
         return ChatResult(response="ok")
 
@@ -520,7 +520,7 @@ def test_run_chat_gives_the_provider_the_recalled_notes_when_recall_is_on(monkey
         reloaded.delegation, "bind_attachments", lambda question, history: attachment_questions.append(question) or real_bind(question, history)
     )
 
-    asyncio.run(reloaded.run_chat("hi", [], []))
+    asyncio.run(reloaded.run_chat("hi", []))
 
     assert searches == ["hi"]
     assert seen["question"].startswith(reloaded.memory_recall.LABEL)
@@ -533,7 +533,7 @@ def test_run_chat_leaves_the_question_alone_when_recall_is_off(monkeypatch):
 
     reloaded, searches, seen = _recall_setup(monkeypatch, recall_on=False)
 
-    asyncio.run(reloaded.run_chat("hi", [], []))
+    asyncio.run(reloaded.run_chat("hi", []))
 
     assert searches == [] and seen["question"] == "hi"
 
@@ -543,7 +543,7 @@ def test_run_chat_does_not_recall_for_a_delegated_agent(monkeypatch):
 
     reloaded, searches, seen = _recall_setup(monkeypatch, recall_on=True)
 
-    asyncio.run(reloaded.run_chat("hi", [], [], depth=1))
+    asyncio.run(reloaded.run_chat("hi", [], depth=1))
 
     assert searches == [] and seen["question"] == "hi"
 
@@ -583,7 +583,7 @@ def test_a_cancelled_request_does_not_run_the_recall_search(monkeypatch):
     reloaded, provider = _recall_chat(monkeypatch, recall_calls, cancel_first=True)
 
     with pytest.raises(reloaded.ChatCancelled):
-        asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+        asyncio.run(reloaded.run_chat("hi", [], "req-1"))
 
     assert recall_calls == []
     provider.assert_not_awaited()
@@ -595,7 +595,7 @@ def test_recall_runs_once_per_turn_and_only_changes_the_provider_question(monkey
     recall_calls = []
     reloaded, provider = _recall_chat(monkeypatch, recall_calls)
 
-    asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+    asyncio.run(reloaded.run_chat("hi", [], "req-1"))
 
     assert recall_calls == ["hi"]
     provider.assert_awaited_once()
@@ -622,7 +622,7 @@ def test_skills_search_the_original_question_and_wrap_the_notes_prompt(monkeypat
     skill_calls = []
     reloaded, provider = _skill_chat(monkeypatch, skill_calls)
 
-    asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+    asyncio.run(reloaded.run_chat("hi", [], "req-1"))
 
     assert skill_calls == [("hi", "NOTES hi")]
     assert provider.call_args.args[0] == "SKILLS NOTES hi"
@@ -634,7 +634,7 @@ def test_skills_work_without_memory_recall(monkeypatch):
     skill_calls = []
     reloaded, provider = _skill_chat(monkeypatch, skill_calls, memory_recall_on=False)
 
-    asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+    asyncio.run(reloaded.run_chat("hi", [], "req-1"))
 
     assert skill_calls == [("hi", "hi")]
     assert provider.call_args.args[0] == "SKILLS hi"
@@ -654,7 +654,7 @@ def test_a_finished_top_level_turn_is_handed_to_skill_reflection(monkeypatch):
     scheduled = []
     reloaded, provider = _learning_chat(monkeypatch, scheduled)
 
-    result = asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+    result = asyncio.run(reloaded.run_chat("hi", [], "req-1"))
 
     assert len(scheduled) == 1
     question, handed, request_id = scheduled[0]
@@ -667,7 +667,7 @@ def test_skill_reflection_is_off_unless_the_agent_asks_for_it(monkeypatch):
     scheduled = []
     reloaded, provider = _learning_chat(monkeypatch, scheduled, learning=False)
 
-    asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+    asyncio.run(reloaded.run_chat("hi", [], "req-1"))
 
     assert scheduled == []
 
@@ -678,7 +678,7 @@ def test_a_delegated_turn_is_never_handed_to_skill_reflection(monkeypatch):
     scheduled = []
     reloaded, provider = _learning_chat(monkeypatch, scheduled)
 
-    asyncio.run(reloaded.run_chat("hi", [], [], "req-2", depth=1))
+    asyncio.run(reloaded.run_chat("hi", [], "req-2", depth=1))
 
     assert scheduled == []
 
@@ -689,7 +689,7 @@ def test_a_delegated_turn_does_not_search_skills(monkeypatch):
     skill_calls = []
     reloaded, provider = _skill_chat(monkeypatch, skill_calls)
 
-    asyncio.run(reloaded.run_chat("hi", [], [], "req-1", depth=1))
+    asyncio.run(reloaded.run_chat("hi", [], "req-1", depth=1))
 
     assert skill_calls == [] and provider.call_args.args[0] == "hi"
 
@@ -701,7 +701,7 @@ def test_a_cancelled_request_does_not_search_skills(monkeypatch):
     reloaded, provider = _skill_chat(monkeypatch, skill_calls, cancel_first=True)
 
     with pytest.raises(reloaded.ChatCancelled):
-        asyncio.run(reloaded.run_chat("hi", [], [], "req-2"))
+        asyncio.run(reloaded.run_chat("hi", [], "req-2"))
 
     assert skill_calls == []
     provider.assert_not_awaited()
@@ -713,7 +713,7 @@ def test_a_delegated_turn_does_not_recall(monkeypatch):
     recall_calls = []
     reloaded, provider = _recall_chat(monkeypatch, recall_calls)
 
-    asyncio.run(reloaded.run_chat("hi", [], [], "req-1", depth=1))
+    asyncio.run(reloaded.run_chat("hi", [], "req-1", depth=1))
 
     assert recall_calls == []
     assert provider.call_args.args[0] == "hi"
@@ -752,7 +752,7 @@ def test_a_turns_caveman_flag_is_visible_to_delegation_only_during_the_turn(monk
     monkeypatch.setattr(agent_config._PROVIDER_MODULE, "run_chat", provider)
     monkeypatch.setattr(agent_config.auto_route, "try_route", AsyncMock(return_value=None))
 
-    asyncio.run(agent_config.run_chat("q", [], [], caveman=True))
-    asyncio.run(agent_config.run_chat("q", [], []))
+    asyncio.run(agent_config.run_chat("q", [], caveman=True))
+    asyncio.run(agent_config.run_chat("q", []))
 
     assert seen == [True, False] and delegation._caveman.get() is False

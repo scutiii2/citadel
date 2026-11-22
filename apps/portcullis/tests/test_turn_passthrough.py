@@ -44,7 +44,7 @@ def test_the_start_is_answered_in_the_browsers_shape(client: TestClient, upstrea
 def test_the_trusted_block_is_added_for_an_admin(client: TestClient, upstream) -> None:
     as_admin(client)
     start(client, new_id())
-    assert last_start(upstream)["trusted"] == {"forced_approval": False, "tools_execute": True, "extension_ids": []}
+    assert last_start(upstream)["trusted"] == {"forced_approval": False, "tools_execute": True}
 
 
 def test_a_trusted_key_from_the_browser_never_reaches_stronghold(client: TestClient, upstream) -> None:
@@ -52,7 +52,7 @@ def test_a_trusted_key_from_the_browser_never_reaches_stronghold(client: TestCli
     start(client, new_id(), trusted={"forced_approval": False, "tools_execute": True, "extension_ids": ["evil"]},
           enabled_extensions=["../etc"])
     sent = last_start(upstream)
-    assert sent["trusted"]["extension_ids"] == [] and "enabled_extensions" not in sent
+    assert "extension_ids" not in sent["trusted"] and "enabled_extensions" not in sent
 
 
 def test_the_administrators_forced_approval_is_sent(client: TestClient, upstream) -> None:
@@ -66,7 +66,7 @@ def test_extensions_are_empty_when_mcp_server_cannot_list_them(client: TestClien
     as_admin(client)
     upstream.handler = lambda request: httpx.Response(503, json={"error": "down"})
     assert start(client, new_id()).status_code == 202
-    assert last_start(upstream)["trusted"]["extension_ids"] == []
+    assert "extension_ids" not in last_start(upstream)["trusted"]
 
 
 def test_a_refusal_from_stronghold_comes_back_unchanged(client: TestClient, upstream) -> None:

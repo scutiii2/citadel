@@ -649,8 +649,7 @@ operation verifies Portcullis's requester token, including per-tool MCP metadata
 - **What only Portcullis decides** (the `trusted` block of `POST /api/chats/{id}/turns`, filled here
   and overwriting anything the browser sends): `forced_approval` (`force_tool_approval` in
   `app_settings`, switched by an admin with `PUT /api/admin/settings/force_tool_approval`),
-  `tools_execute` (the account's `tools.execute` permission), `extension_ids` (always empty since Plan 22c;
-  the browser cannot name one). Stronghold's defaults
+  `tools_execute` (the account's `tools.execute` permission), and no extension list (the turn body carries none). Stronghold's defaults
   are the safe side: approval forced, no tool execution, no extensions, no auto-save.
   Typed commands (`/tool`) call Armory directly with no agent and are not affected.
 - **Regenerate / edit** (`truncate_to` on `POST /api/chats/{id}/turns`): the

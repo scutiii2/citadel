@@ -57,7 +57,6 @@ class AgentGateway(Protocol):
         history: list[dict[str, str]],
         request_id: str,
         caveman: bool,
-        enabled_extensions: list[str],
         on_event: EventHandler,
         approval_mode: str = "off",
         allowed_tools: list[str] | None = None,
@@ -137,7 +136,6 @@ class McpAgentGateway:
         history,
         request_id,
         caveman,
-        enabled_extensions,
         on_event,
         approval_mode="off",
         allowed_tools=None,
@@ -155,8 +153,6 @@ class McpAgentGateway:
             "history": history,
             "request_id": request_id,
             "caveman": caveman,
-            # Which extensions' tools the agent may use; none by default.
-            "enabled_extensions": enabled_extensions,
         }
         if approval_mode != "off":
             # Fail closed: an ai_agent that predates this option would ignore

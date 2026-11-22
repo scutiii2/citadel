@@ -1,7 +1,7 @@
 """ai_agent's connection to mcp_server - a thin, sync-friendly wrapper
 around src/mcp_client/sync_wrapper.py's SyncMcpClient, giving the provider files
 (src/llm/anthropic_provider.py, src/llm/openai_provider.py) the same
-call_tool(name, args) -> str / list_tools(enabled_extensions) -> list
+call_tool(name, args) -> str / list_tools() -> list
 shape chat_app's own services/mcp_client.py gives them today.
 
 Connected once at process startup (see server.py's main()) and reused
@@ -91,46 +91,28 @@ def connect(url_override: str | None = None) -> None:
     )
 
 
-def _tool_is_enabled(name: str, enabled: set[str]) -> bool:
-    """Mirrors chat_app's mcp_client._tool_is_enabled, applied to the
-    tool's name AFTER stripping this module's own "main__" registry
-    prefix - a proxied extension tool arrives as "main__{ext_id}__{tool}",
-    mcp_server's own built-ins as "main__{tool}" with no further "__"."""
-    ext_id, sep, _ = name.partition("__")
-    if not sep:
-        return True
-    return ext_id in enabled
-
-
 def _other_server(name: str) -> bool:
     """A registry tool of a connection other than `main` (for example `bard__tool_bard_speak`)."""
     return "__" in name and not name.startswith((_PREFIX, private_turn.TOOL_PREFIX))
 
 
-def list_tools(enabled_extensions: list[str] | None = None) -> list[Any]:
+def list_tools() -> list[Any]:
     """Live tool catalog from every connected server.
 
-    Armory-proxied tools require an enabled extension. Outside connections
-    require explicit agent scope. Users can switch off either for their turn.
+    Outside connections require explicit agent scope. Users can switch off a tool for their turn.
     """
     tools = client.list_tools()
     _remember_read_only(tools)
-    enabled = set(enabled_extensions or [])
     scope = agent_spec.current().tools
-    connected = {tool.name.partition("__")[0] for tool in tools if _other_server(tool.name)}
     result = []
     for tool in tools:
         short = unprefixed(tool.name)
         if _other_server(tool.name):
-            # An administrator's connection: only an explicit tools.allow offers it, whatever `enabled_extensions` says.
+            # An administrator's connection: only an explicit tools.allow offers it.
             if scope.allows_explicitly(short) and not tool_filter.is_blocked(short):
                 result.append(tool)
             continue
         if not tool.name.startswith(_PREFIX):
-            continue
-        if "__" in short and short.partition("__")[0] in connected:
-            continue  # a Legion connection of this id replaces Armory's proxied extension of the same name
-        if not _tool_is_enabled(short, enabled):
             continue
         if not scope.allows(short):
             continue

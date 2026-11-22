@@ -63,7 +63,7 @@ def test_ask_returns_the_result_shape_chat_app_expects():
         with patch("src.server.agent_config.run_chat", new_callable=AsyncMock, return_value=fake_result) as fake_run_chat, \
              patch("src.server.agent_config.status", return_value=fake_status):
             result = await server.ask(
-                "hello", history=[{"role": "user", "content": "prior"}], enabled_extensions=["reference"],
+                "hello", history=[{"role": "user", "content": "prior"}],
                 request_id="req-1", depth=1,
             )
 
@@ -72,7 +72,7 @@ def test_ask_returns_the_result_shape_chat_app_expects():
         # that an on_event callable was passed, separately.
         fake_run_chat.assert_awaited_once()
         call_args, call_kwargs = fake_run_chat.call_args
-        assert call_args == ("hello", [{"role": "user", "content": "prior"}], ["reference"], "req-1", 1)
+        assert call_args == ("hello", [{"role": "user", "content": "prior"}], "req-1", 1)
         assert callable(call_kwargs["on_event"])
         assert result == {
             "response": "hi there",
@@ -140,7 +140,7 @@ def test_ask_defaults_none_arguments_to_empty():
 
         fake_run_chat.assert_awaited_once()
         call_args, call_kwargs = fake_run_chat.call_args
-        assert call_args == ("hello", [], [], None, 0)
+        assert call_args == ("hello", [], None, 0)
         assert callable(call_kwargs["on_event"])
 
     asyncio.run(_run())
@@ -171,7 +171,7 @@ def test_ask_relays_events_via_ctx_report_progress():
     0/None - chat_app cares only about the message payload, not a
     percentage), and pass it through to run_chat as on_event=..."""
     async def _run():
-        async def fake_run_chat(question, history, enabled_extensions, request_id, depth, on_event=None, caveman=False, approval_mode="off", allowed_tools=None, disabled_tools=None, ask_user=False, plan=True, plan_lean=True, allow_read_only=False, exact_context=False):
+        async def fake_run_chat(question, history, request_id, depth, on_event=None, caveman=False, approval_mode="off", allowed_tools=None, disabled_tools=None, ask_user=False, plan=True, plan_lean=True, allow_read_only=False, exact_context=False):
             await on_event({"type": "step_start", "id": "1", "tool": "x"})
             return ChatResult(response="done")
 
@@ -198,7 +198,7 @@ def test_ask_on_event_is_a_noop_without_ctx():
     client that doesn't support progress), on_event must not blow up -
     it should just do nothing."""
     async def _run():
-        async def fake_run_chat(question, history, enabled_extensions, request_id, depth, on_event=None, caveman=False, approval_mode="off", allowed_tools=None, disabled_tools=None, ask_user=False, plan=True, plan_lean=True, allow_read_only=False, exact_context=False):
+        async def fake_run_chat(question, history, request_id, depth, on_event=None, caveman=False, approval_mode="off", allowed_tools=None, disabled_tools=None, ask_user=False, plan=True, plan_lean=True, allow_read_only=False, exact_context=False):
             await on_event({"type": "step_start", "id": "1", "tool": "x"})
             return ChatResult(response="done")
 
@@ -436,3 +436,10 @@ def test_ask_reports_the_tier_models_context_window_only_when_tiered():
 
     asyncio.run(_run())
 
+
+
+def test_the_ask_tool_has_no_enabled_extensions_argument():
+    tools = asyncio.run(server.mcp.list_tools())
+    ask = next(tool for tool in tools if tool.name == "ask")
+    assert "enabled_extensions" not in ask.inputSchema["properties"]
+    assert "private_extensions" in ask.inputSchema["properties"]

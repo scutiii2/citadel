@@ -199,7 +199,7 @@ class TriageQuestions:
         try:
             result = await self._gateway.ask(
                 agent.url, caller, question=build_request(kind, text, question, options, trace, levels), history=[],
-                request_id=uuid.uuid4().hex, caveman=False, enabled_extensions=[], on_event=_ignore_event,
+                request_id=uuid.uuid4().hex, caveman=False, on_event=_ignore_event,
             )
         except AgentCallError as error:
             message = str(error)

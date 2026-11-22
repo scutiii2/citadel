@@ -167,7 +167,7 @@ class TestCalls:
 
         assert sequence == 7
         assert (server.last.method, server.last.url.path) == ("POST", "/api/chats/c1/turns")
-        assert server.body() == {"question": "What?", "agent_id": "a1", "caveman": False, "enabled_extensions": [], "title": "What?"}
+        assert server.body() == {"question": "What?", "agent_id": "a1", "caveman": False, "title": "What?"}
 
     async def test_a_turn_in_an_existing_chat_has_no_title(self) -> None:
         server = Server(reply({"sequence": 0}, 202))

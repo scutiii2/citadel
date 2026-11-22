@@ -43,7 +43,7 @@ def _run_chat(monkeypatch, *, cache: bool, usage: SimpleNamespace):
     monkeypatch.setattr(anthropic_provider, "_prompt_cache_enabled", lambda: cache)
     monkeypatch.setattr(
         anthropic_provider, "_tool_schemas",
-        lambda enabled_extensions=None, roster=(): [_schema("first"), _schema("last")],
+        lambda roster=(): [_schema("first"), _schema("last")],
     )
     result = asyncio.run(anthropic_provider.run_chat("hi", []))
     return result, client.messages.stream.call_args.kwargs
@@ -139,7 +139,7 @@ def test_each_round_of_a_tool_loop_carries_one_history_breakpoint_on_its_last_me
     monkeypatch.setattr(anthropic_provider, "_get_client", lambda: client)
     monkeypatch.setattr(anthropic_provider, "_prompt_cache_enabled", lambda: True)
     monkeypatch.setattr(anthropic_provider, "_dispatch", lambda name, args, depth: "2 apps running")
-    monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda enabled_extensions=None, roster=(): [_schema("t")])
+    monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda roster=(): [_schema("t")])
 
     asyncio.run(anthropic_provider.run_chat("status?", []))
 

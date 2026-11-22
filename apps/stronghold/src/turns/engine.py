@@ -94,8 +94,6 @@ class TurnOptions:
     plan_lean: bool = True
     # Count the context window's parts with the provider's token counter (ai_agent falls back to an estimate).
     exact_context: bool = False
-    # Extensions whose tools the agent may use (none by default).
-    enabled_extensions: tuple[str, ...] = ()
     # Ask the user before each tool runs, except the tools they already
     # allowed for this chat.
     ask_before_tools: bool = False
@@ -606,7 +604,6 @@ class TurnRegistry:
                 history=summarization.history_for_agent(earlier),
                 request_id=turn.request_id,
                 caveman=turn.options.caveman,
-                enabled_extensions=list(turn.options.enabled_extensions),
                 on_event=on_event,
                 approval_mode="ask" if turn.options.ask_before_tools else "off",
                 allowed_tools=list(turn.options.allowed_tools),
@@ -776,7 +773,6 @@ class TurnRegistry:
             "status": status,
             "model": message.get("model"),
             "total_tokens": message.get("total_tokens"),
-            "enabled_extensions": list(turn.options.enabled_extensions),
         }
         if not turn.stack_tool_used:
             details["response"] = str(message.get("content", ""))[:TRACE_RESPONSE_MAX]
