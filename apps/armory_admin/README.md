@@ -2,7 +2,7 @@
 
 Admin web app for Armory, built with Vue 3, TypeScript and Vite. It runs on port 26503 (`ARMORY_ADMIN_PORT`) and talks only to [portcullis](../portcullis) over the same origin: its Vite server (and its nginx in Docker) forwards `/api` to Portcullis, so the browser holds no server URL or token.
 
-Capabilities manages tool availability. Connections manages required and optional shared tool connections. Brain manages the Instance Brain under `settings.manage`. The browser calls `/api/admin/brain` through Portcullis, which makes signed calls to Armory.
+Capabilities manages tool availability. Connections manages required and optional shared tool connections.
 
 ## Run
 

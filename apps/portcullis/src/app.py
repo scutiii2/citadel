@@ -15,7 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from src.citadel_auth import ServiceCatalog, CatalogTransport, logical_url, advertised_url
 from src.citadel_auth.treasury import register_in_background
-from src.routes import brains, stronghold
+from src.routes import stronghold
 
 from src.config import Settings
 from src.db import Database
@@ -251,8 +251,6 @@ def create_app(
     app.include_router(templates.router)
     app.include_router(nav_preferences.router)
     app.include_router(account_tuning.router)
-    app.include_router(brains.router)
-    app.include_router(brains.admin_router)
     app.include_router(skills.router)
     app.include_router(triage.router)
     app.include_router(account_agents.router)

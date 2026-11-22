@@ -17,7 +17,6 @@ export const router = createRouter({
     { path: "/", redirect: "/capabilities" },
     { path: "/capabilities", name: "capabilities", component: () => import("../views/CapabilitiesAdminView.vue"), meta: { permission: "capabilities.manage" } },
     { path: "/connections", alias: "/extensions", name: "connections", component: () => import("../views/ConnectionsView.vue"), meta: { permission: "extensions.manage" } },
-    { path: "/brain", name: "brain", component: () => import("../views/BrainView.vue"), meta: { permission: "settings.manage" } },
     { path: "/tickets", name: "tickets", component: () => import("../views/TicketSettingsView.vue"), meta: { permission: "tickets.manage" } },
     { path: "/settings", name: "settings", component: () => import("../views/EnvironmentSettingsView.vue"), meta: { permission: "capabilities.manage" } },
     { path: "/limits", name: "limits", component: () => import("../views/LimitsView.vue"), meta: { permission: "capabilities.manage" } },

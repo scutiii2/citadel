@@ -46,7 +46,7 @@ def test_the_trusted_block_is_added_for_an_admin(client: TestClient, upstream) -
     upstream.handler = lambda request: httpx.Response(200, json=[{"id": "notes"}, {"id": "wiki_2"}, {"label": "no id"}])
     start(client, new_id())
     assert last_start(upstream)["trusted"] == {
-        "forced_approval": False, "tools_execute": True, "extension_ids": ["notes", "wiki_2"], "second_brain_available": {}}
+        "forced_approval": False, "tools_execute": True, "extension_ids": ["notes", "wiki_2"]}
 
 
 def test_a_trusted_key_from_the_browser_never_reaches_stronghold(client: TestClient, upstream) -> None:
@@ -71,19 +71,10 @@ def test_extensions_are_empty_when_mcp_server_cannot_list_them(client: TestClien
     assert last_start(upstream)["trusted"]["extension_ids"] == []
 
 
-def test_auto_save_asks_whether_the_brain_is_available(client: TestClient, upstream) -> None:
-    as_admin(client)
-    upstream.handler = lambda request: httpx.Response(200, json=[{"name": "obsidian", "enabled": True, "tools": ["tool_obsidian_write"]}])
-    start(client, new_id(), save_to_second_brain=True)
-    assert last_start(upstream)["trusted"]["second_brain_available"] == {"instance": True}
-    start(client, new_id(), "no save")
-    assert last_start(upstream)["trusted"]["second_brain_available"] == {}
-
-
 def test_a_refusal_from_stronghold_comes_back_unchanged(client: TestClient, upstream) -> None:
     as_admin(client)
     upstream.turns.start_status = 409
-    assert start(client, new_id(), save_to_second_brain=True).status_code == 409
+    assert start(client, new_id()).status_code == 409
 
 
 def test_a_stronghold_that_is_down_is_a_bad_gateway(client: TestClient, upstream) -> None:

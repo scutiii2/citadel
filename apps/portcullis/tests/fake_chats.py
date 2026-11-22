@@ -124,8 +124,7 @@ class FakeChats:
             if len(self._mine(uid)) + 1 > MAX_CHATS_PER_ACCOUNT:
                 return _answer(413, {"detail": f"At most {MAX_CHATS_PER_ACCOUNT} chats per account - delete some first"})
             chat = self.chats[(uid, chat_id)] = {
-                "owner": uid, "chat_id": chat_id, "folder_id": None, "pinned": False, "save_to_second_brain": False,
-                "second_brain_scope": "instance", "created_at": now}
+                "owner": uid, "chat_id": chat_id, "folder_id": None, "pinned": False, "created_at": now}
         chat.update(title=body["title"], agent_id=body.get("agent_id"), messages=messages,
                     message_count=len(messages), updated_at=now)
         return _answer(200, self._full(chat))
@@ -142,7 +141,7 @@ class FakeChats:
         new_id, now = str(uuid.uuid4()), self._now()
         chat = self.chats[(uid, new_id)] = {
             "owner": uid, "chat_id": new_id, "title": title, "agent_id": source["agent_id"], "folder_id": source["folder_id"],
-            "pinned": False, "save_to_second_brain": False, "second_brain_scope": "instance",
+            "pinned": False,
             "messages": messages[:upto + 1], "message_count": upto + 1, "created_at": now, "updated_at": now}
         return _answer(201, self._full(chat))
 

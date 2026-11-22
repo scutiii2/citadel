@@ -94,32 +94,6 @@ without increasing the established 20-row chat-message breakdown limit; prompt
 text and credentials are excluded from routing metadata.
 
 
-## Second brain auto-save
-
-Migration `0024` adds `chats.save_to_second_brain`, default false. It appears in
-chat list/detail/turn responses and persists per chat across devices. PATCH
-`/api/chats/{id}` accepts `{save_to_second_brain: bool}`; a turn may set it with
-the same field. Omission uses the saved preference; a new chat defaults off.
-
-GET `/api/chats/second-brain` returns `{available: bool}` for the signed-in
-account. Enabling requires `chat.use`, `tools.execute`, an account subscription
-to `obsidian`, and an online Armory capability exposing `tool_obsidian_write`.
-The server checks these itself; disabling the write tool refuses an explicit
-auto-save request. Unknown/foreign chats remain 404. Capability/storage outages
-fail closed. No new permissions or role grants are introduced.
-
-When enabled, portcullis asks the agent to summarize the current exchange and
-write `Conversations/<UTC date>-<question slug>-<unique suffix>.md` with `date`,
-`chat_id` and `tags` frontmatter, using `overwrite=false`. The stored user
-question stays unchanged. Saving uses the normal agent tool/approval flow and
-Armory's `allow_write` guard. The option requests an agent action; it cannot
-guarantee an external write if the agent does not perform it, approval is denied,
-or Obsidian is unavailable. The agent is instructed to confirm only a successful
-write and explain failures. With the option off, no auto-save instruction is
-added; an explicit user request to save still works. This vault is shared by
-callers of this Armory instance, so do not enable this for private transcripts
-that should stay inside a single account.
-
 ## Native capability workspace API
 
 Media groups use fixed `/api/media-downloader/packages` GET/POST routes, GET
@@ -206,11 +180,6 @@ Only resolved or closed tickets may reopen. The core sets status to open, clears
 `closed_at` and adds a system comment in one transaction; other statuses return
 400, and foreign or unknown tickets return 404. The action is logged by id only.
 
-## Legacy notes purge
-
-The Brain replaces private notes and assistant memory through routes such as `/api/brain/files` and `/api/brain/summary`. The legacy notes purge on account deletion remains until Plan 22b. The memory purge is gone (Plan 22).
-
-Deleting an account removes its notes through Stronghold (best effort: a failure is logged as the error `admin.notes_purge` and the deletion still succeeds).
 
 ## Skills page API
 
@@ -673,7 +642,7 @@ operation verifies Portcullis's requester token, including per-tool MCP metadata
   and overwriting anything the browser sends): `forced_approval` (`force_tool_approval` in
   `app_settings`, switched by an admin with `PUT /api/admin/settings/force_tool_approval`),
   `tools_execute` (the account's `tools.execute` permission), `extension_ids` (every extension
-  Armory lists; the browser cannot name one) and `second_brain_available`. Stronghold's defaults
+  Armory lists; the browser cannot name one). Stronghold's defaults
   are the safe side: approval forced, no tool execution, no extensions, no auto-save.
   Typed commands (`/tool`) call Armory directly with no agent and are not affected.
 - **Regenerate / edit** (`truncate_to` on `POST /api/chats/{id}/turns`): the
@@ -879,35 +848,6 @@ connection must exist there (`data` is built in; see `apps/treasury/configs/READ
 `DbGatewayUnavailable`, so only a feature that uses it fails; portcullis starts without the
 gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDbGateway`
 (the `db_gateway` fixture).
-
-
-## Obsidian brains
-
-Authenticated `/api/brains` routes manage personal vault connections and Notes
-promotion. Stronghold keeps personal connections and asks Portcullis for current
-permissions. Armory stores the Instance Brain connection. See [operations and storage](../../../docs/obsidian-brains.md).
-
-| Route | Responsibility |
-| --- | --- |
-| `GET/PUT /api/brains/connections/personal` | Personal settings read and revision-checked explicit save. |
-| `GET/PUT /api/admin/brain`, `POST /test`, `GET /status`, `POST /disable` under that path | Signed proxy to Armory for the shared connection. Requires `settings.manage`. |
-| `POST /api/brains/connections/personal/test` | Bounded read-only candidate test; no activation or publication. |
-| `GET /api/brains/destinations` | Authorized destination labels, revisions and write availability. |
-| `POST /api/brains/browse` | Signed-in browse/read/status/scoped hybrid search, independent of Supermarket opt-in. |
-| (Stronghold) `POST /brains/resolve` | Service-authenticated personal snapshots and shared authorization for Armory. |
-| `GET /api/brains/notes/{id}/review` | Owned Note content/hash/revision for publication review. |
-| `GET /api/brains/promotions` | Owned publication receipts and changed-source state. |
-| `POST /api/brains/notes/{id}/promote` | Recoverable, create-only reviewed publication; preserves the source Note. |
-| `POST /api/brains/promotions/{id}/reconcile` | Confirm a pending write by content hash without another write. |
-| `GET /api/brains/suggestions` | Current, authorized, non-dismissed AI proposals. |
-| `POST /api/brains/suggestions/review` | Explicit AI review, private-note consent, 20 Notes/40,000 characters, usage limits/accounting. |
-| `POST /api/brains/suggestions/{id}/dismiss` | Owned, content/destination-specific dismissal. |
-
-Migration `0025` grants `brain.instance.publish` to Administrator only and preserves
-existing chat auto-save destinations as `instance`. Chat summaries/updates/turns
-carry additive `second_brain_scope` (`instance|personal`); loss of access disables
-auto-save with a visible notice. Personal keys use SecretBox encryption in
-db_gateway. Account deletion purges personal Brain records.
 
 
 ## Internal API

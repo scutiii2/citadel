@@ -18,7 +18,7 @@ _TURN = re.compile(r"^/turns/([A-Za-z0-9-]{8,64})(/[a-z]+)?$")
 
 def chat_doc(chat_id: str, messages: list[dict[str, Any]] | None = None, **extra: Any) -> dict[str, Any]:
     doc = {"chat_id": chat_id, "title": "Chat", "agent_id": "claude-agent", "message_count": len(messages or []),
-           "folder_id": None, "pinned": False, "save_to_second_brain": False, "second_brain_scope": "instance",
+           "folder_id": None, "pinned": False,
            "created_at": "2026-01-01T00:00:00", "updated_at": "2026-01-01T00:00:01", **extra}
     return {**doc, "messages": messages} if messages is not None else doc
 

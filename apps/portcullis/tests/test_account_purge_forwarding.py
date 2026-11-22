@@ -1,4 +1,4 @@
-"""Deleting an account tells Stronghold to delete its legacy notes (best effort)."""
+"""Deleting an account tells Stronghold to delete its long-term Brain files (best effort)."""
 
 from __future__ import annotations
 
@@ -16,10 +16,10 @@ from tests.test_registration import as_admin
 
 
 def purges(upstream: FakeUpstream) -> list[httpx.Request]:
-    return [r for r in upstream.requests if r.method == "DELETE" and r.url.path.startswith("/notes/accounts/")]
+    return [r for r in upstream.requests if r.method == "DELETE" and r.url.path.startswith("/brain/accounts/")]
 
 
-def test_deleting_an_account_purges_its_notes_once(client: TestClient, email: FakeEmailSender, upstream: FakeUpstream, caplog) -> None:
+def test_deleting_an_account_purges_its_brain_files_once(client: TestClient, email: FakeEmailSender, upstream: FakeUpstream, caplog) -> None:
     alice = make_member(client, email, "alice")
     as_admin(client)
     uid = uids(client)["alice"]
@@ -29,10 +29,12 @@ def test_deleting_an_account_purges_its_notes_once(client: TestClient, email: Fa
     assert client.delete(f"/api/admin/accounts/{alice}").status_code == 204
 
     sent = purges(upstream)
-    assert [r.url.path for r in sent] == [f"/notes/accounts/{uid}"]
+    assert [r.url.path for r in sent] == [f"/brain/accounts/{uid}"]
+    assert not any(r.method == "DELETE" and r.url.path.startswith(("/notes/accounts/", "/brains/accounts/"))
+                   for r in upstream.requests)
     assert assertion(sent[0])["iss"] == "portcullis"
     assert uid not in caplog.text
-    assert "/notes/accounts/[redacted]" in caplog.text
+    assert "/brain/accounts/[redacted]" in caplog.text
 
 
 def test_the_internal_token_is_sent_when_configured(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
@@ -57,7 +59,7 @@ def test_a_failing_purge_never_blocks_the_deletion(client: TestClient, email: Fa
         raise httpx.ConnectError(f"transport failed for {request.url}", request=request)
 
     handlers = [
-        lambda request: httpx.Response(502, json={"detail": "Notes were not purged"}),
+        lambda request: httpx.Response(502, json={"detail": "Long-term memory was not purged"}),
         lambda request: httpx.Response(307, headers={"location": "http://third-party.invalid" + request.url.path}),
         broken,
     ]
@@ -73,8 +75,8 @@ def test_a_failing_purge_never_blocks_the_deletion(client: TestClient, email: Fa
         assert len(sent) == 1 and sent[0].url.port == 29650
         errors = client.get("/api/logs/error", params={"actor": root}).json()
         if name != "bob":  # a redirect is not followed and is not an error status
-            notes_error = next(entry for entry in errors if entry["source"] == "admin.notes_purge")
-            assert f"deleted account '{name}'" in notes_error["message"]
+            brain_error = next(entry for entry in errors if entry["source"] == "admin.brain_purge")
+            assert f"deleted account '{name}'" in brain_error["message"]
         assert identities[name] not in str(errors)
         assert identities[name] not in caplog.text
 

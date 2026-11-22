@@ -61,6 +61,18 @@ def test_chats_are_private_per_account(client_factory, email: FakeEmailSender) -
 # --- CRUD ---------------------------------------------------------------------
 
 
+def test_legacy_brain_routes_and_chat_fields_are_gone(client: TestClient) -> None:
+    as_admin(client)
+    for route in ("/api/brains/destinations", "/api/admin/brain", "/api/chats/second-brain"):
+        assert client.get(route).status_code == 404
+
+    chat_id = new_id()
+    chat_path = f"/api/chats/{chat_id}"
+    for response in (put(client, chat_id), client.patch(chat_path, json={"pinned": True}), client.get(chat_path)):
+        assert response.status_code == 200
+        assert not {"save_to_second_brain", "second_brain_scope"} & response.json().keys()
+
+
 def test_put_creates_then_replaces(client: TestClient) -> None:
     as_admin(client)
     chat_id = new_id()
