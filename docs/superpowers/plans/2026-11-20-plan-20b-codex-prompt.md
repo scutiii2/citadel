@@ -1,0 +1,34 @@
+# Prompt for Codex: Plan 20b (long-term Markdown brain)
+
+Copy everything below the line into Codex, started in `D:\User\Documents\Programming\Applications\Citadel`.
+
+---
+
+You are implementing Plan 20b in the Citadel repo (backends `portcullis`, `stronghold`, `legion`, `armory`, `treasury` under `apps/`; shared library `libs/citadel_auth`).
+
+Read these first, in order, fully:
+1. `AGENTS.md` (repo root) and the `AGENTS.md` of each app you touch (`apps/stronghold`, `apps/portcullis`).
+2. `docs/superpowers/plans/2026-11-20-plan-20b-long-term-brain.md`. It holds the goal, global constraints, file map, six assumptions to check and eight tasks with test code and implementation code. Follow it step by step; it is a script, not only a design.
+3. Background only: `docs/superpowers/specs/2026-11-20-service-scopes-design.md` (section "Brain (Stronghold)"), `docs/superpowers/plans/2026-11-20-scope-roadmap.md`, `docs/superpowers/plans/2026-11-20-plan-20a-stronghold-mcp-short-term-memory.md` (the short-term half this plan sits beside and reuses).
+4. The code you will touch, before you edit it: `apps/stronghold/src/api.py`, `src/brain/limits.py`, `src/brain/stack.py`, `src/brain/routes.py` (the route-class pattern Task 5 copies), `src/mcp_tools/scope.py`, `src/mcp_tools/server.py`, `src/mcp_tools/stack_tools.py`, `src/notes/store.py` (`normalize_tags`), `src/clock.py`, `src/usage/settings_routes.py` and `src/usage/admin_settings.py` (the live-settings pattern Task 6 copies), `tests/conftest.py`, `tests/test_mcp_scope.py`, `tests/test_mcp_mount.py`, `tests/test_stack_routes.py`; `apps/portcullis/src/routes/stack.py`, `routes/stronghold_usage_settings.py`, `routes/notes.py`, `routes/stronghold.py`, `src/services/stronghold_forwarder.py`, `src/routes/admin.py` (account purge list around line 315), `src/app.py`, `tests/test_stack_routes.py`.
+
+Task: Stronghold keeps an account's long-term memory as Markdown files in a confined folder, with records (source, edited flag, revertable original, revision), BM25 keyword search, an agent read-only rule, five new MCP tools and a live settings route; Portcullis proxies the user routes and purges the folder on account deletion. Build Tasks 1 to 8 of the plan.
+
+How to work:
+- Run `git status` and `git log --oneline -5` first. Plan 20a (`b237829a` or later) must be on `main`; if not, stop and report. Create branch `plan-20b-long-term-brain` from `main`. One commit per task, with the commit messages the plan gives, each ending with the line `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
+- Before changing anything, run the Stronghold and Portcullis suites once and record pass counts and existing failures in the plan file under the "Baseline" heading (it is already placed before Task 1). Known baselines: Stronghold 855 passed; Portcullis 990 passed with two known failures on `main`, `tests/test_secret_box.py::test_an_invalid_key_in_env_stops_startup` and `tests/test_traffic.py::test_the_default_recorder_saves_to_the_database_on_shutdown` (both reject `http://127.0.0.1:0`). Name them; they are not yours. If a baseline differs, record the real number.
+- Write each failing test first, run it, see it fail for the stated reason, then implement. Use the test and implementation code in the plan. If a snippet does not fit the real code, fix the snippet, keep the behaviour the test states, and record the change in the plan file under "Changes found during work". The plan lists six assumptions (a) to (f) to check at build time; check each and record the result there, including whether the two symlink tests ran or skipped.
+- Task 4 has numbers that depend on the real rendered file size (the byte-quota test). Run it, adjust the one number as the plan says, and record it.
+- Task 7 replaces `src/mcp_tools/scope.py` in full: keep every check and message of the Plan 20a `resolve_scope` unchanged, and keep `tests/test_mcp_scope.py` green. It also renames the generic tool error text; grep `tests/` for the old text first and record the result.
+- Task 8: the action-log assertion in the Portcullis settings test must follow how an existing Portcullis test checks an action log entry; record which approach you used. Never leave `...` in a committed test.
+- This plan changes nothing in `libs/citadel_auth` and must not edit any copied `src/citadel_auth/` folder. If you find you must, stop and report why.
+- Use `uv` (not pip) and `pnpm` (not npm). Python tests run from inside each app folder: `uv run pytest -q -p no:cacheprovider` (fall back to `uv run --no-sync python -m pytest ...` if `uv run` fails). The full Portcullis run takes about 10 minutes: run it in the background and write its output to a file. Add no dependency.
+- Never read, print or write `.env*`, `secrets/` or key files. Task 8 adds one commented line to `apps/stronghold/.env.example`; that file holds no secrets and is the only env file you touch.
+- Never add a reduced-motion setting, media query or test.
+- File text (title, body, tags, folder) must never appear in a log line, an audit entry, an error text or a test snapshot. The audit line names the action only (`brain.agent_edit`).
+- Keep each file's existing line endings (CRLF in most source files). Edit with your editor tools, not shell heredocs with escapes (unreliable on this Windows machine).
+- Do not push and do not publish. Do not weaken a test that fails for a reason outside your change; stop and report instead.
+- Do not add behaviour beyond the plan: no Ember or admin UI, no agent proposals, no global brain, shares or skills, no vectors, no recall into the prompt, no removal of Stronghold's Treasury notes or its `/notes`, `/memory`, `/skills` routes, no Armory change, no numeric error codes, no migration of old data. If you think something is missing, note it in your report instead of building it.
+- If the plan and the code disagree, grep for the real users, follow the code, and record the finding. Ask only if you would have to weaken a rule in the plan's "Global Constraints" (no caller-supplied path reaches the disk, every path confined to the account folder, agents never delete or move files or change `agent_editable`, user files read-only for agents by default, Stronghold starts and `/health` answers with the brain folder missing or unwritable, nothing calls a model).
+
+When done, report per task: commit hash, what changed, test commands with pass counts compared with the baseline, the result of each of the six assumption checks, the list of existing tests whose expectations changed, anything not verified (a real Legion agent calling `stronghold__tool_brain_write` over the signed Streamable HTTP connection, the brain folder on a mounted Docker volume, behaviour on a network drive are known gaps), the "Changes found during work" list, and the vault notes under `D:\User\Documents\Programming\Brain` that need an update (do not edit that repo).
