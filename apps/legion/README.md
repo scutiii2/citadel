@@ -730,3 +730,21 @@ Normal calls retain their previous metadata shape when no destination is bound.
 See [Obsidian brains](../../docs/obsidian-brains.md).
 
 Treasury bootstrap address lives in tracked `configs/config_app.json` as `treasury_url`; `TREASURY_URL` overrides it. Legion entry agents register their base address in Treasury’s catalog. Treasury Admin, Services controls address pins; Legion Admin no longer edits Treasury’s address.
+
+## Liveness, readiness, and tool failures
+
+`GET /health` is public and answers `{"status":"ok"}` while the process runs.
+`GET /ready` requires a signed Citadel service assertion. Authorized calls return
+HTTP 200 with dependency addresses and states (`configured`, `reachable`,
+`unreachable`, `not_configured`) even during an outage.
+
+| Code | Failure | Retryable |
+|---|---|---|
+| 1000 | `TOOL_INTERNAL` | No |
+| 1001 | `DEP_NOT_CONFIGURED` | No |
+| 1002 | `DEP_UNAVAILABLE` | Yes |
+| 1003 | `DEP_TIMEOUT` | Yes |
+| 1004 | `DEP_AUTH_REJECTED` | No |
+| 1005 | `DEP_ERROR` | Maybe |
+
+Legion stops a repeated call with the same arguments when its previous failure was non-retryable.

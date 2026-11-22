@@ -27,7 +27,7 @@ The spec covers independent subsystems, so it is built as separate plans. Each p
 | 22b | Obsidian chain removal: Armory `obsidian` and `vault` capabilities and Brain admin page, Stronghold `/brains` (personal connections, publishing, promotions, instance migration, `/notes` purge and the legacy notes store), Portcullis `/api/brains` and `/api/admin/brain`, Ember Brains page, chat `save_to_second_brain` fields | 22 | Plan 15 |
 | 23 | Gateway instances in the Citadel compose, `llm_net`, named key passing, Legion-only token | none | `983d0623` |
 | 24 | Portcullis outside-client records, allow/deny list on the IP filter, per-client budget as a fail-closed guard | none | none |
-| 25 | Start rule everywhere: error codes 1000 to 1005, `/ready`, `depends_on` as hints, Treasury discovery | any | none |
+| 25 | [Written](2026-11-22-plan-25-start-rule.md) Start rule everywhere: error codes 1000 to 1005 (shared library, Stronghold and Armory tools, Legion loop guard), `/health` and `/ready` in all five services with a Portcullis admin aggregate route (no screen), `depends_on` kept as hints by a compose check, Treasury discovery by probing compose names | any | none |
 
 Order: 16, 17, then 18 and 19 and 23 and 24 may run in parallel (different services). 20a to 20d follow 18. 22 comes last of the data moves. 25 may run alongside.
 

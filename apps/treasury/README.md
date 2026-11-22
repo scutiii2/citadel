@@ -136,3 +136,19 @@ Implement `DatabaseBackend` (`src/backends/base.py`) and add one entry to `BACKE
 ## Discovery
 
 Treasury runs a discovery round about once a minute and fills missing catalog addresses after a successful health check. `GET /discovery` uses the same signed authentication and lists found, registered, and missed names. Existing service registrations and pins take priority. The private gateways appear as missed unless reachable from Treasury.
+
+## Liveness, readiness, and tool failures
+
+`GET /health` is public and answers `{"status":"ok"}` while the process runs.
+`GET /ready` requires a signed Citadel service assertion. Authorized calls return
+HTTP 200 with dependency addresses and states (`configured`, `reachable`,
+`unreachable`, `not_configured`) even during an outage.
+
+| Code | Failure | Retryable |
+|---|---|---|
+| 1000 | `TOOL_INTERNAL` | No |
+| 1001 | `DEP_NOT_CONFIGURED` | No |
+| 1002 | `DEP_UNAVAILABLE` | Yes |
+| 1003 | `DEP_TIMEOUT` | Yes |
+| 1004 | `DEP_AUTH_REJECTED` | No |
+| 1005 | `DEP_ERROR` | Maybe |

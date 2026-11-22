@@ -1,4 +1,4 @@
-"""Check that the stack gateways stay private to Legion. Never reads a real .env.gateways: it uses a temp copy and a sentinel.
+"""Check gateway isolation and start-order hints without reading deployment env files.
 
     python scripts/check_compose.py            checks the real compose files (needs Docker)
     python scripts/check_compose.py --self-test  checks check() on hand-made data (no Docker)
@@ -9,35 +9,36 @@ from __future__ import annotations
 import copy
 import json
 import os
-import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 GATEWAYS = ("conversation-gateway", "decision-gateway")
-SENTINEL = "CHECK_COMPOSE_SENTINEL"  # written into a throwaway .env.gateways; compose copies env_file values into environment
 ADMIN_OVERLAY = ["docker-compose.yml", "docker-compose.gateway-admin.yml"]
 
 
 def load(files: list[str]) -> dict:
     """`docker compose config` as JSON, with throwaway admin passwords in the child environment only."""
-    env = {**os.environ, "CONVERSATION_GATEWAY_ADMIN_PASSWORD": "x", "DECISION_GATEWAY_ADMIN_PASSWORD": "x"}
-    # Compose JSON drops env_file and inlines its values, so read a copy of the files next to a sentinel .env.gateways.
-    with tempfile.TemporaryDirectory() as tmp:
-        for f in files:
-            shutil.copy(ROOT / f, tmp)
-        (Path(tmp) / ".env.gateways").write_text(f"{SENTINEL}=1\n", encoding="utf-8")
-        args = ["docker", "compose", "--project-directory", tmp, *[a for f in files for a in ("-f", str(Path(tmp) / f))], "config", "--format", "json"]
-        done = subprocess.run(args, cwd=tmp, env=env, capture_output=True, text=True, check=False)
+    env = {**os.environ, "COMPOSE_DISABLE_ENV_FILE": "1",
+           "CONVERSATION_GATEWAY_ADMIN_PASSWORD": "x", "DECISION_GATEWAY_ADMIN_PASSWORD": "x"}
+    env.pop("COMPOSE_ENV_FILES", None)
+    args = ["docker", "compose", *[arg for file in files for arg in ("-f", file)],
+            "config", "--no-env-resolution", "--format", "json"]
+    done = subprocess.run(args, cwd=ROOT, env=env, capture_output=True, text=True, check=False)
     if done.returncode:
         raise RuntimeError(done.stderr.strip().splitlines()[-1] if done.stderr.strip() else "docker compose config failed")
     return json.loads(done.stdout)
 
 
 def _loads_gateways_env(service: dict) -> bool:
-    return SENTINEL in (service.get("environment") or {})
+    for entry in service.get("env_file", []):
+        path = entry["path"] if isinstance(entry, dict) else entry
+        if Path(path).name == ".env.gateways":
+            return True
+    return False
 
 
 def check(default: dict, overlay: dict) -> list[str]:
@@ -79,13 +80,36 @@ def check(default: dict, overlay: dict) -> list[str]:
             out.append(f"volumes: {name} mentions .env.gateways in volumes or environment")
     if set(legion.get("depends_on") or {}) & set(GATEWAYS):
         out.append("depends_on: legion must not depend on a gateway")
+    for name, service in services.items():
+        depends = service.get("depends_on")
+        if isinstance(depends, dict) and any(
+            options.get("condition", "service_started") != "service_started" for options in depends.values()
+        ):
+            out.append(f"depends_on: {name} requires more than a start-order hint")
     if default.get("networks", {}).get("llm_net", {}).get("internal"):
         out.append("networks: llm_net must not be internal")
     return out
 
 
+def _mapping(node):
+    if isinstance(node, yaml.MappingNode):
+        return {key.value: value for key, value in node.value}
+    return {}
+
+
+def check_source(text: str) -> list[str]:
+    """Inspect the YAML shape before Compose normalizes it, including tagged overlays."""
+    document = _mapping(yaml.compose(text, Loader=yaml.SafeLoader))
+    problems = []
+    for name, service in _mapping(document.get("services")).items():
+        depends_on = _mapping(service).get("depends_on")
+        if depends_on is not None and not isinstance(depends_on, yaml.SequenceNode):
+            problems.append(f"depends_on: {name} must be a plain list for a start-order hint")
+    return problems
+
+
 def _good() -> tuple[dict, dict]:
-    gw = lambda: {"networks": {"llm_net": None}, "environment": {SENTINEL: "1"}, "volumes": []}
+    gw = lambda: {"networks": {"llm_net": None}, "env_file": [{"path": ".env.gateways"}], "volumes": []}
     default = {"services": {"conversation-gateway": gw(), "decision-gateway": gw(),
                             "legion": {"networks": {"core": None, "llm_net": None}, "depends_on": {"armory": {}}},
                             "armory": {"networks": {"core": None}, "environment": {"A": "1"}}},
@@ -97,6 +121,8 @@ def _good() -> tuple[dict, dict]:
 def self_test() -> None:
     default, overlay = _good()
     assert check(default, overlay) == []
+    assert check_source("services: {armory: {ports: !override [], depends_on: [treasury]}}") == []
+    assert check_source("services: {armory: {depends_on: {legion: {condition: service_healthy}}}}")
 
     def broken(mutate, word, over=False):
         d, o = copy.deepcopy(default), copy.deepcopy(overlay)
@@ -109,10 +135,12 @@ def self_test() -> None:
     broken(lambda d: d["services"]["decision-gateway"]["networks"].update(core=None), "networks")
     broken(lambda d: d["services"]["armory"]["networks"].update(llm_net=None), "llm_net must be attached")
     broken(lambda d: d["services"]["legion"]["networks"].pop("core"), "legion must be on")
-    broken(lambda d: d["services"]["armory"]["environment"].update({SENTINEL: "1"}), "env_file")
+    broken(lambda d: d["services"]["armory"].update(env_file=[{"path": ".env.gateways"}]), "env_file")
     broken(lambda d: d["services"]["conversation-gateway"]["volumes"].append({"target": "/citadel.env"}), "volumes")
     broken(lambda d: d["services"]["armory"].update(volumes=[{"source": "/x/.env.gateways"}]), "volumes")
     broken(lambda d: d["services"]["legion"]["depends_on"].update({"decision-gateway": {}}), "depends_on")
+    broken(lambda d: d["services"]["armory"].update(depends_on={"legion": {"condition": "service_healthy"}}),
+           "start-order hint")
     broken(lambda d: d["networks"]["llm_net"].update(internal=True), "internal")
     broken(lambda o: o["services"]["decision-gateway"]["ports"][0].update(host_ip="0.0.0.0"), "admin overlay", over=True)
     print("self-test passed")
@@ -124,6 +152,8 @@ if __name__ == "__main__":
         sys.exit(0)
     try:
         problems = check(load(["docker-compose.yml"]), load(ADMIN_OVERLAY))
+        for filename in sorted(ROOT.glob("docker-compose*.yml")):
+            problems.extend(check_source(filename.read_text(encoding="utf-8")))
     except FileNotFoundError:
         print("docker not found; install Docker or use --self-test")
         sys.exit(2)

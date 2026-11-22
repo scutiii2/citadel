@@ -41,6 +41,7 @@ services:
       - trust_portcullis:/trust/portcullis:ro
       # server_manager (Docker apps list/start/stop/logs) talks to the host daemon.
       - /var/run/docker.sock:/var/run/docker.sock
+    # Start-order hint only. No service waits for a peer to be healthy.
     depends_on: [treasury]
     networks: [core]
 

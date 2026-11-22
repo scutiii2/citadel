@@ -359,4 +359,22 @@ Other root variables, such as `CITADEL_DATA_DIR`, never reach a service's settin
 
 ## Security
 
-The gateways are reachable only from Legion's network (`llm_net`); no host port is published unless you add the setup overlay, which binds `127.0.0.1` only. Provider keys sit in `.env.gateways`, which only the two gateway containers load. The root `.env` is mounted into every service, which is why keys are not kept there. `python scripts/check_compose.py` checks these rules.
+The gateways are reachable only from Legion's network (`llm_net`); no host port is published unless you add the setup overlay, which binds `127.0.0.1` only. Provider keys sit in `.env.gateways`, which only the two gateway containers load. The root `.env` is mounted into every service, which is why keys are not kept there. Run `uv run --project libs/citadel_auth python scripts/check_compose.py` from the Citadel root to check these rules.
+
+## Liveness, readiness, and tool failures
+
+`GET /health` is public and answers `{"status":"ok"}` while the process runs.
+`GET /ready` requires a signed Citadel service assertion. Authorized calls return
+HTTP 200 with dependency addresses and states (`configured`, `reachable`,
+`unreachable`, `not_configured`) even during an outage.
+
+| Code | Failure | Retryable |
+|---|---|---|
+| 1000 | `TOOL_INTERNAL` | No |
+| 1001 | `DEP_NOT_CONFIGURED` | No |
+| 1002 | `DEP_UNAVAILABLE` | Yes |
+| 1003 | `DEP_TIMEOUT` | Yes |
+| 1004 | `DEP_AUTH_REJECTED` | No |
+| 1005 | `DEP_ERROR` | Maybe |
+
+Citadel services start independently of their peers. Compose uses `depends_on` lists as start-order hints. Readiness reports are diagnostic and guarded actions continue to fail closed. Portcullis exposes an aggregate at `GET /api/admin/ready` for `settings.manage`; the admin screen is pending. Treasury discovers missing addresses through known Compose names and public health checks. Only Legion can reach the two gateways on `llm_net`.

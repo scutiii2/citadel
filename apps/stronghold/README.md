@@ -184,3 +184,21 @@ The Brain replaces the private-notes and assistant-memory user routes. Existing 
 `src/agents/` is a copy of Portcullis's agent client. Change both until chats move here.
 
 `TREASURY_URL` overrides the `treasury_url` bootstrap address in `configs/config_app.json`. Internal peers resolve through Treasury’s catalog at request time.
+
+## Liveness, readiness, and tool failures
+
+`GET /health` is public and answers `{"status":"ok"}` while the process runs.
+`GET /ready` requires a signed Citadel service assertion. Authorized calls return
+HTTP 200 with dependency addresses and states (`configured`, `reachable`,
+`unreachable`, `not_configured`) even during an outage.
+
+| Code | Failure | Retryable |
+|---|---|---|
+| 1000 | `TOOL_INTERNAL` | No |
+| 1001 | `DEP_NOT_CONFIGURED` | No |
+| 1002 | `DEP_UNAVAILABLE` | Yes |
+| 1003 | `DEP_TIMEOUT` | Yes |
+| 1004 | `DEP_AUTH_REJECTED` | No |
+| 1005 | `DEP_ERROR` | Maybe |
+
+Treasury failures in storage-backed MCP calls return numbered messages. Usage and permission checks still fail closed.
