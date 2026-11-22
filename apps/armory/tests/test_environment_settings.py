@@ -40,24 +40,23 @@ def row(body: dict, field: str) -> dict:
 def test_stored_values_win_over_the_defaults_and_bad_ones_are_skipped(tmp_path):
     path = tmp_path / "settings.db"
     settings_store.put(path, "environment", "firecrawl_api_url", "http://firecrawl:3002")
-    settings_store.put(path, "environment", "vault_dir", "/data/vault")
-    settings_store.put(path, "environment", "obsidian_timeout", -1)
+    settings_store.put(path, "environment", "workspace_dir", "/data/work")
+    settings_store.put(path, "environment", "no_such_number", -1)
     settings_store.put(path, "environment", "no_such_setting", "x")
 
     result = environment_settings.overlay(config.Settings(), path)
 
     assert result.firecrawl_api_url == "http://firecrawl:3002"
-    assert result.vault_dir == Path("/data/vault")
-    assert result.obsidian_timeout == config.Settings().obsidian_timeout
+    assert result.workspace_dir == Path("/data/work")
 
 
 def test_a_change_is_saved_used_at_once_and_reset_puts_the_default_back(client, live):
     default = config.Settings().firecrawl_api_url
 
-    saved = client.put("/admin/environment", json={"firecrawl_api_url": " http://firecrawl:3002 ", "obsidian_allow_write": True})
+    saved = client.put("/admin/environment", json={"firecrawl_api_url": " http://firecrawl:3002 ", "workspace_dir": "/data/work"})
 
     assert saved.status_code == 200 and saved.json()["restart"] == []
-    assert live.firecrawl_api_url == "http://firecrawl:3002" and live.obsidian_allow_write is True
+    assert live.firecrawl_api_url == "http://firecrawl:3002" and live.workspace_dir == Path("/data/work")
     assert row(saved.json(), "firecrawl_api_url")["stored"] is True
     assert environment_settings.stored(live.settings_db_path)["firecrawl_api_url"] == "http://firecrawl:3002"
 
@@ -73,7 +72,7 @@ def test_a_setting_read_once_is_reported_as_needing_a_restart(client):
 
 
 def test_secrets_are_never_returned(client, live):
-    answer = client.put("/admin/environment", json={"media_signing_key": "s3cret-key", "obsidian_api_key": "k"})
+    answer = client.put("/admin/environment", json={"media_signing_key": "s3cret-key", "tavily_api_key": "k"})
 
     assert "s3cret-key" not in answer.text and "s3cret-key" not in client.get("/admin/environment").text
     assert row(answer.json(), "media_signing_key") == {
@@ -85,9 +84,8 @@ def test_secrets_are_never_returned(client, live):
 @pytest.mark.parametrize("changes", [
     {"firecrawl_api_url": "ftp://x"},
     {"firecrawl_api_url": "http://user:pw@host"},
-    {"obsidian_timeout": 0},
-    {"obsidian_verify_tls": "yes"},
-    {"vault_dir": "  "},
+    {"workspace_dir": "  "},
+    {"obsidian_timeout": 5},
     {"made_up": "x"},
     {},
 ])

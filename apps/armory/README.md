@@ -82,7 +82,7 @@ see [`src/resources/README.md`](src/resources/README.md).
 Runtime state is not kept in this folder. It lives in the Citadel root, one folder per service:
 
 - **`.data/armory/`** - databases (`email/`; old `memory/` and `skills/` files stay on disk, unused), `uploads/`, `watchers/`, `pdf_merger/store/` and `logs/` (`server.log` plus one file per error reference id).
-- **`.cache/armory/`** - files Armory can make again: the Obsidian index and `media_downloader/store/`.
+- **`.cache/armory/`** - files Armory can make again: `media_downloader/store/`.
 
 `CITADEL_DATA_DIR` and `CITADEL_CACHE_DIR` in the root `.env` move the two roots; each `MCP_*_DIR` / `MCP_*_PATH` setting still overrides one path. Configuration stays in the tracked `configs/` folders.
 

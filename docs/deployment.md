@@ -48,8 +48,7 @@ Anything you edit inside a running container is lost on rebuild. Keep changes in
 ## 2. ZimaOS
 
 ZimaOS is Linux with Docker and Compose, so the same compose file works. The overlay `docker-compose.zima.yml` does
-two things for the box: it publishes the five admin web ports (26500, 26501, 26503 to 26505) on all interfaces so the LAN can reach them; each login page is the only protection, so keep the box off the public internet, and it mounts the
-Obsidian vault into `armory`. It needs Compose 2.24 or newer (`docker compose version`).
+one thing for the box: it publishes the five admin web ports (26500, 26501, 26503 to 26505) on all interfaces so the LAN can reach them; each login page is the only protection, so keep the box off the public internet. It needs Compose 2.24 or newer (`docker compose version`).
 
 Without the overlay the UIs stay on `127.0.0.1` and are not reachable from the LAN. Deployment sets
 `COMPOSE_FILE=docker-compose.yml:docker-compose.zima.yml` in the server's root `.env`, so a plain

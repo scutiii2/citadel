@@ -32,8 +32,6 @@ async def _serve() -> None:
     """Everything from "connect to extensions" to "serve forever" runs in this one coroutine under a single asyncio.run().
     Extension connections are bound to the loop they were opened in; separate loops break proxied calls ("Attempted to exit cancel scope in a different task")."""
     import asyncio
-    import logging
-    import sqlite3
     import httpx
     import uvicorn
 
@@ -63,10 +61,6 @@ async def _serve() -> None:
         except Exception as error:  # noqa: BLE001 - a banner line must never block startup
             resource_count = f"unknown ({error})"
 
-        from src.capabilities.obsidian import brain_admin
-        from src.capabilities.obsidian.utils import brain_resolver
-        from src.capabilities.obsidian.utils.instance_brain import InstanceBrainStore, load_box
-        from src.capabilities.obsidian.utils.instance_migration import migrate
         from src.capability_routes import install_capability_routes
         from src.command_routes import install_command_routes
         from src.connection_admin import install_connection_admin
@@ -110,7 +104,7 @@ async def _serve() -> None:
         # Where chat_app's Capabilities page toggles built-in capabilities live, rescans src/capabilities/ and reloads code on going online.
         # A plain route: a model must not change what it can do. See capability_routes.py.
         install_capability_routes(app, capability_loader)
-        # Where Armory Admin edits the deployment values (addresses, link keys, Obsidian, folders); saved in settings.db. See environment_routes.py.
+        # Where Armory Admin edits the deployment values (addresses, link keys, folders); saved in settings.db. See environment_routes.py.
         install_environment_routes(app)
         # Where chat_app proxies a file dropped into a command-form modal; a plain route checked against
         # service assertions. See upload_routes.py.
@@ -118,31 +112,16 @@ async def _serve() -> None:
         # Where a caller fetches a file a tool offered it (via portcullis); a plain route checked against
         # service assertions and signed requester identity. See download_routes.py.
         install_download_routes(app)
-        # Each capability mounts its own always-on routes (obsidian), even when its tools are off.
+        # Each capability mounts its own always-on routes, even when its tools are off.
         capability_loader.install_routes(app)
 
         # uvicorn.Server(...).serve(), not uvicorn.run(): run() calls asyncio.run() and would
         # nest a second event loop inside this one.
-        try:
-            box = await asyncio.to_thread(load_box, keyring.identity_dir, settings.settings_db_path)
-        except (OSError, ValueError, sqlite3.Error):
-            logging.getLogger(__name__).error("Instance Brain encryption is unavailable. Check the Armory identity backup.")
-            box = None
-        instance_brain = InstanceBrainStore(settings.settings_db_path, box)
-        brain_resolver.instance_store = instance_brain
-        brain_admin.install(app, instance_brain)
-
         async with httpx.AsyncClient(trust_env=False) as client:
             connections = ConnectionStore(settings.settings_db_path)
             install_connection_admin(app, connections, client)
             server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))
-            migration = asyncio.create_task(migrate(instance_brain, keyring, catalog)) if box is not None else None
-            try:
-                await server.serve()
-            finally:
-                if migration is not None:
-                    migration.cancel()
-                    await asyncio.gather(migration, return_exceptions=True)
+            await server.serve()
     finally:
         await catalog.stop()
         registration.cancel()

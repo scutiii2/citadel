@@ -25,7 +25,7 @@ def service_identity(auth_stack, monkeypatch):
     import sys
     from src.services import service_auth
     monkeypatch.setattr(service_auth, "keyring", auth_stack["armory"])
-    for name in ("src.services.extensions", "src.capabilities.obsidian.utils.brain_resolver"):
+    for name in ("src.services.extensions",):
         module = sys.modules.get(name)
         if module is not None and hasattr(module, "keyring"):
             monkeypatch.setattr(module, "keyring", auth_stack["armory"])

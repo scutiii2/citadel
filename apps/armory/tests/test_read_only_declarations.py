@@ -18,10 +18,8 @@ CAPABILITIES = pathlib.Path(__file__).resolve().parents[1] / "src" / "capabiliti
 # capability id -> the tools that declare readOnlyHint
 READ_ONLY = {
     "math": {"tool_math_solve", "tool_math_batch", "tool_math_continue", "tool_math_table", "tool_math_matrix", "tool_math_calculus"},
-    "obsidian": {"tool_obsidian_list", "tool_obsidian_search", "tool_obsidian_read", "tool_obsidian_semanticSearch"},
     "media": {"tool_media_probe", "tool_media_status", "tool_media_listFiles", "tool_media_packages"},
     "pdf": {"tool_pdf_inspect", "tool_pdf_listFiles"},
-    "vault": {"tool_vault_search", "tool_vault_listNotes", "tool_vault_readNote"},
     "repo": {"tool_repo_listRepos", "tool_repo_log", "tool_repo_diff", "tool_repo_grep"},
     "web": {"tool_web_search", "tool_web_readPage"},
 }
@@ -66,8 +64,8 @@ def test_every_tool_of_a_read_only_capability_is_loaded_and_declared(loaded, cap
         assert declared(loaded[name]), name
 
 
-def test_the_notes_write_tools_are_not_read_only(loaded):
-    for name in ("tool_obsidian_write", "tool_obsidian_append", "tool_pdf_merge"):
+def test_the_pdf_write_tool_is_not_read_only(loaded):
+    for name in ("tool_pdf_merge",):
         assert name in loaded and not declared(loaded[name]), name
 
 

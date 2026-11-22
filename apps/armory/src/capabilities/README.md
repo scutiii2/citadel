@@ -8,8 +8,6 @@ what it does:
 - `web_research/` - web search and page read through Tavily (`/web ...`).
 - `media_downloader/` - public video/music/photo probes, queued downloads, status and signed file links (`/media ...`); photo carousels become numbered ZIPs.
 - `firecrawl/` - scrape and crawl through Firecrawl (`/scrape ...`).
-- `vault/` - read-only notes vault (`/vault ...`).
-- `obsidian/` - Local REST API vault listing, search and note read/write/append, with writes disabled by default (`/obsidian ...`).
 - `repo_reader/` - read-only git history and code (`/repo ...`).
 - `tables/` - questions about an attached CSV or Excel file (`/data ...`).
 - `math/` - direct/recursive equations, assumptions, cases, certificates, units, batch/table formulas, result continuation, matrices, calculus, and strict LaTeX (`/math ...`).

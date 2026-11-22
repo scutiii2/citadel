@@ -9,7 +9,6 @@ from src.capabilities.server_manager import tool as server_manager_tool  # noqa:
 from src.capabilities.generator import tool as generator_tool  # noqa: F401
 from src.capabilities.web_research import tool as web_research_tool  # noqa: F401
 from src.capabilities.firecrawl import tool as firecrawl_tool  # noqa: F401
-from src.capabilities.vault import tool as vault_tool  # noqa: F401
 from src.capabilities.repo_reader import tool as repo_reader_tool  # noqa: F401
 from src.capabilities.tables import tool as tables_tool  # noqa: F401
 from src.capabilities.email import tool as email_tool  # noqa: F401
