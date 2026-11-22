@@ -1,4 +1,3 @@
-import { extensionsClient } from "../../capabilities/api/ExtensionsClient";
 import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +9,6 @@ import { withAttachments } from "../../../utils/content/attachments";
 import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "./chat";
 
-vi.mock("../../capabilities/api/ExtensionsClient", () => ({ extensionsClient: { list: vi.fn() } }));
 vi.mock("../api/ChatsClient", () => ({
   chatsClient: {
     list: vi.fn(),
@@ -91,7 +89,6 @@ async function openChat(messages: ChatMessage[]) {
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
-  vi.mocked(extensionsClient.list).mockResolvedValue([]);
   client.startTurn.mockResolvedValue({ chat: { ...summary("c1"), running: true }, sequence: 5 });
   client.search.mockResolvedValue([]);
   client.remove.mockResolvedValue(undefined);

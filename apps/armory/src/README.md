@@ -30,9 +30,9 @@ reads `from src.foo import bar`, matching chat_app's layout.
   decorated function's module path.
 - `errors.py` - turns an unexpected exception into a safe-to-display
   message plus a logged reference id.
-- `extension_routes.py`, `command_routes.py`,
+- `command_routes.py`,
   `capability_routes.py` - plain HTTP routes (not MCP tools) mounted
-  alongside the MCP surface: where extensions are listed/added/removed, where chat_app discovers
+  alongside the MCP surface: where chat_app discovers
   slash commands, and where a capability is turned on/off live.
 - A capability's own always-on HTTP routes (media files) live in its folder as `routes.py`, wired
   in `run.py`; its stores and runtimes live in its `utils/`. A capability

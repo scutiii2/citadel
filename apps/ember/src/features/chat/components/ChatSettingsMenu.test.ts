@@ -11,7 +11,6 @@ const BASE = {
   forceToolApproval: false,
   chime: true,
   allowedCount: 0,
-  enabledExtensions: [] as string[],
   attention: false,
 };
 
@@ -159,22 +158,6 @@ describe("ChatSettingsMenu", () => {
     expect(reset.text()).toBe("2 tools allowed - reset");
     await reset.trigger("click");
     expect(w.emitted("clear-allowed")).toHaveLength(1);
-  });
-
-  it("names the enabled extensions and links to the page", async () => {
-    const w = open({ enabledExtensions: ["pdf", "fs"] });
-    await gear(w).trigger("click");
-
-    const link = w.get("a.extensions");
-    expect(link.text()).toBe("Extensions: pdf, fs");
-    expect(link.attributes("href")).toBe("/capabilities?tab=extensions");
-  });
-
-  it("says extensions are off when none are enabled", async () => {
-    const w = open();
-    await gear(w).trigger("click");
-
-    expect(w.get("a.extensions").text()).toBe("Extensions: off");
   });
 
   it("marks the gear only when something needs attention", () => {

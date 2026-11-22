@@ -43,10 +43,8 @@ def test_the_start_is_answered_in_the_browsers_shape(client: TestClient, upstrea
 
 def test_the_trusted_block_is_added_for_an_admin(client: TestClient, upstream) -> None:
     as_admin(client)
-    upstream.handler = lambda request: httpx.Response(200, json=[{"id": "notes"}, {"id": "wiki_2"}, {"label": "no id"}])
     start(client, new_id())
-    assert last_start(upstream)["trusted"] == {
-        "forced_approval": False, "tools_execute": True, "extension_ids": ["notes", "wiki_2"]}
+    assert last_start(upstream)["trusted"] == {"forced_approval": False, "tools_execute": True, "extension_ids": []}
 
 
 def test_a_trusted_key_from_the_browser_never_reaches_stronghold(client: TestClient, upstream) -> None:

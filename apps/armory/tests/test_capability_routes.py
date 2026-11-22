@@ -1,4 +1,4 @@
-"""Tests for GET /capabilities, POST /capabilities/refresh and PATCH /capabilities/{name}, with the Starlette TestClient pattern of test_extension_routes.py.
+"""Tests for GET /capabilities, POST /capabilities/refresh and PATCH /capabilities/{name}, with the Starlette TestClient pattern of test_command_routes.py.
 Each test builds a real FastMCP, registers fake capabilities via capability_registry.capturing(), and gives the routes a CapabilityLoader on a temp config path."""
 
 from __future__ import annotations

@@ -17,12 +17,6 @@ export const ARMORY_PAGES: ArmoryPage[] = [
     permission: "capabilities.manage",
   },
   {
-    to: "/connections",
-    label: "Connections",
-    icon: ["M12 2v6", "M8 8h8v4a4 4 0 0 1-8 0z", "M12 16v6"],
-    permission: "extensions.manage",
-  },
-  {
     to: "/tickets",
     label: "Ticket settings",
     icon: ["M4 9V6h16v3a2 2 0 0 0 0 6v3H4v-3a2 2 0 0 0 0-6z", "M10 8v8"],

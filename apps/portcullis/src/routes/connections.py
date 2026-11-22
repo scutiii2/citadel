@@ -1,17 +1,13 @@
 """Tool connection readiness and password-free admin responses through Portcullis."""
 
 import json
-from typing import Any, Literal
-from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Path, Request, Response
 from pydantic import BaseModel
 
 from src.deps import current_account, get_stronghold, require_permission
 from src.models import Account
-from src.routes.server_info import _call, get_server_info
 from src.routes.stronghold import pass_on
-from src.services.mcp_server_info import McpServerInfo
 from src.services.permissions import EXTENSIONS_MANAGE
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 
@@ -52,36 +48,6 @@ async def readiness(stronghold: StrongholdForwarder, account: Account) -> dict[s
 async def connection_status(account: Account = Depends(current_account),
                             stronghold: StrongholdForwarder = Depends(get_stronghold)) -> dict[str, Readiness]:
     return await readiness(stronghold, account)
-
-
-@router.get("/admin/connections")
-async def list_connections(account: Account = Depends(manage), info: McpServerInfo = Depends(get_server_info)):
-    return await _call(info.request("GET", "/admin/connections", account))
-
-
-@router.post("/admin/connections", status_code=201)
-async def create_connection(body: dict[str, Any], account: Account = Depends(manage),
-                            info: McpServerInfo = Depends(get_server_info)):
-    return await _call(info.request("POST", "/admin/connections", account, json=body))
-
-
-@router.patch("/admin/connections/{name}")
-async def update_connection(body: dict[str, Any], name: str = Path(pattern=r"^[a-z0-9_]{1,60}$"),
-                            account: Account = Depends(manage), info: McpServerInfo = Depends(get_server_info)):
-    return await _call(info.request("PATCH", f"/admin/connections/{quote(name, safe='')}", account, json=body))
-
-
-@router.delete("/admin/connections/{name}", status_code=204)
-async def remove_connection(name: str = Path(pattern=r"^[a-z0-9_]{1,60}$"),
-                            account: Account = Depends(manage), info: McpServerInfo = Depends(get_server_info)):
-    await _call(info.request("DELETE", f"/admin/connections/{quote(name, safe='')}", account))
-    return Response(status_code=204)
-
-
-@router.post("/admin/connections/{name}/test/{transport}")
-async def test_connection(transport: Literal["mcp", "rest"], name: str = Path(pattern=r"^[a-z0-9_]{1,60}$"),
-                          account: Account = Depends(manage), info: McpServerInfo = Depends(get_server_info)):
-    return await _call(info.request("POST", f"/admin/connections/{quote(name, safe='')}/test/{transport}", account))
 
 
 @router.get("/admin/tool-services")

@@ -16,6 +16,7 @@ from src.citadel_auth import advertised_url
 from src.service_catalog import catalog
 from src.citadel_auth.treasury import register_in_background  # noqa: E402
 from src.services.service_auth import install_auth, keyring  # noqa: E402
+from src.services.tool_handlers import install_tool_handlers  # noqa: E402
 from src.utils.logging_setup import configure_logging  # noqa: E402
 from src.server import mcp  # noqa: E402
 
@@ -29,13 +30,9 @@ capability_loader.startup()
 
 
 async def _serve() -> None:
-    """Everything from "connect to extensions" to "serve forever" runs in this one coroutine under a single asyncio.run().
-    Extension connections are bound to the loop they were opened in; separate loops break proxied calls ("Attempted to exit cancel scope in a different task")."""
+    """Everything from registering to "serve forever" runs in this one coroutine under a single asyncio.run()."""
     import asyncio
-    import httpx
     import uvicorn
-
-    from src.services import extensions
 
     await keyring.ensure_identity()
     catalog.start("armory", advertised_url(settings.host, settings.port, settings.advertise_url))
@@ -43,12 +40,8 @@ async def _serve() -> None:
     registration = register_in_background(
         keyring, settings.treasury_url, settings.db_gateway_instance, [settings.db_gateway_connection])
 
-    extensions_task = None
+    install_tool_handlers(mcp)
     try:
-        extensions_task = asyncio.create_task(
-            extensions.install_extensions(mcp, settings.settings_db_path, retry_interval=60),
-            name="Armory extensions",
-        )
         tool_names = sorted(t.name for t in await mcp.list_tools())
 
         # Both calls are needed (verified against mcp==1.28.0): templated URIs appear only in
@@ -63,13 +56,10 @@ async def _serve() -> None:
 
         from src.capability_routes import install_capability_routes
         from src.command_routes import install_command_routes
-        from src.connection_admin import install_connection_admin
         from src.download_routes import install_download_routes
         from src.environment_routes import install_environment_routes
-        from src.extension_routes import install_extension_routes
         from src.help_routes import install_help_routes
         from src.upload_routes import install_upload_routes
-        from src.services.connections import ConnectionStore
 
         enabled_capabilities = [
             name for name in capability_registry.names() if capability_registry.is_enabled(name)
@@ -82,7 +72,6 @@ async def _serve() -> None:
             f"  Tools    : {len(tool_names)}",
             *(f"    - {name}" for name in tool_names),
             f"  Resources: {resource_count}",
-            "  Extensions: connecting in the background",
         ]
         banner.append("  /mcp auth : signed Ed25519 service assertion required")
 
@@ -95,8 +84,6 @@ async def _serve() -> None:
 
         app = mcp.streamable_http_app()
         install_auth(app)
-        # Where a human or chat_app's sidebar checks what's connected; a plain route, not a tool. See extension_routes.py.
-        install_extension_routes(app)
         # Where chat_app discovers which built-in tools are invocable as "/" commands; a plain route. See command_routes.py.
         install_command_routes(app)
         # Where chat_app answers "/<capability> help ..."; a plain route returning structured data. See help_routes.py.
@@ -117,20 +104,12 @@ async def _serve() -> None:
 
         # uvicorn.Server(...).serve(), not uvicorn.run(): run() calls asyncio.run() and would
         # nest a second event loop inside this one.
-        async with httpx.AsyncClient(trust_env=False) as client:
-            connections = ConnectionStore(settings.settings_db_path)
-            install_connection_admin(app, connections, client)
-            server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))
-            await server.serve()
+        server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))
+        await server.serve()
     finally:
         await catalog.stop()
         registration.cancel()
-        if extensions_task is not None:
-            extensions_task.cancel()
-            await asyncio.gather(extensions_task, return_exceptions=True)
         await asyncio.gather(registration, return_exceptions=True)
-        # Extension subprocesses stay owned by the registry until shutdown.
-        await extensions.shutdown_extensions()
 
 
 def main() -> None:

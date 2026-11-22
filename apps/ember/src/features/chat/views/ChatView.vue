@@ -71,7 +71,6 @@ const {
   contextPanel,
   contextAccuracy,
   commands,
-  enabledExtensions,
   approvalMode,
   askBeforeTools,
   forceToolApproval,
@@ -502,7 +501,6 @@ useChatShortcuts({
               :force-tool-approval="forceToolApproval"
               :chime="chime"
               :allowed-count="allowedCount"
-              :enabled-extensions="enabledExtensions"
               :attention="pendingApprovals.length > 0"
               @update:caveman="chat.setCaveman"
               @update:independent="chat.setIndependent"

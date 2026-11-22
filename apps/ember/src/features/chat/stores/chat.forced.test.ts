@@ -1,4 +1,3 @@
-import { extensionsClient } from "../../capabilities/api/ExtensionsClient";
 import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +9,6 @@ import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "./chat";
 import { makeAccount } from "../../../testing/account";
 
-vi.mock("../../capabilities/api/ExtensionsClient", () => ({ extensionsClient: { list: vi.fn() } }));
 vi.mock("../api/ChatsClient", () => ({
   chatsClient: {
     list: vi.fn(),
@@ -67,7 +65,6 @@ async function storeWith(forced: boolean | Error) {
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
-  vi.mocked(extensionsClient.list).mockResolvedValue([]);
   watch.mockImplementation(async (_id, _after, onEvent) => {
     emit = onEvent;
     return "aborted";

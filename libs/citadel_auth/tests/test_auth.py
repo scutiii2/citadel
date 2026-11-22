@@ -263,5 +263,14 @@ def test_stronghold_may_not_call_armory_for_routes_armory_no_longer_has(path):
     assert not allowed("armory", "stronghold", path)
 
 
+@pytest.mark.parametrize("path", ["/extensions", "/extensions/x", "/connections", "/connections/x"])
+def test_portcullis_may_not_call_armory_for_the_removed_proxy_routes(path):
+    assert not allowed("armory", "portcullis", path)
+
+
+def test_portcullis_may_still_call_armory_for_its_other_routes():
+    assert allowed("armory", "portcullis", "/capabilities") and allowed("armory", "portcullis", "/commands/help")
+
+
 def test_stronghold_may_still_call_armory_for_mcp_and_uploads():
     assert allowed("armory", "stronghold", "/upload/pdf") and allowed("armory", "stronghold", "/mcp")

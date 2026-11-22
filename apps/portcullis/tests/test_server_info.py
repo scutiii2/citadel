@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 
 from tests.conftest import FakeEmailSender, FakeUpstream
 from tests.test_admin import login, make_member, role_by_name
-from src.services.permissions import DEFAULT_ROLE_PERMISSIONS
 from tests.test_registration import as_admin
 
 COMMANDS = [{"capability": "srv", "name": "list", "description": "List apps", "tool_name": "tool_srv_listApps"}]
@@ -19,10 +18,6 @@ CAPABILITIES = [
      "has_gui": True, "load_error": None, "missing": False, "loaded": True}
 ]
 GUI_PAGE = {"version": 1, "title": "Server", "description": "", "sections": [{"id": "list", "title": "Apps", "tool": "tool_srv_listApps"}]}
-EXTENSIONS = [
-    {"id": "notes", "label": "Notes", "description": "", "status": "connected", "error": None, "tools": ["notes__add"],
-     "web_url": "http://127.0.0.1:5174"}
-]
 
 
 def mcp_server(request: httpx.Request) -> httpx.Response:
@@ -50,17 +45,6 @@ def mcp_server(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404, json={"error": "Capability 'nope' has no page"})
     if path == "/capabilities/server_manager" and request.method == "PATCH":
         return httpx.Response(200, json={**CAPABILITIES[0], "enabled": json.loads(request.content)["enabled"]})
-    if path == "/extensions" and request.method == "GET":
-        return httpx.Response(200, json=EXTENSIONS)
-    if path == "/extensions" and request.method == "POST":
-        body = json.loads(request.content)
-        created = {"id": "wiki", "label": body["label"], "description": body["description"], "status": "error",
-                   "error": "connection refused", "tools": []}
-        return httpx.Response(201, json=created)
-    if path == "/extensions/notes" and request.method == "DELETE":
-        return httpx.Response(204)
-    if path.startswith("/extensions/") and request.method == "DELETE":
-        return httpx.Response(404, json={"error": "Unknown extension 'gone'"})
     return httpx.Response(404, json={"error": "no route"})
 
 
@@ -170,75 +154,6 @@ def test_triage_questions_are_appended_to_a_chat(client: TestClient) -> None:
 
     assert created.status_code == 200
     assert client.get(f"/api/chats/{chat_id}").json()["messages"][:2] == [asked, answer]
-
-
-def test_extensions_listed_for_chat_users_and_managed_by_admins(
-    client_factory, email: FakeEmailSender, upstream: FakeUpstream
-) -> None:
-    upstream.handler = mcp_server
-    member = client_factory()
-    make_member(member, email)
-    login(member, "alice")
-    assert member.get("/api/extensions").json() == EXTENSIONS
-    new = {"label": "Wiki", "url": "http://wiki.internal/mcp"}
-    assert member.post("/api/extensions", json=new).status_code == 403
-    assert member.delete("/api/extensions/notes").status_code == 403
-
-    admin = as_admin(client_factory())
-    added = admin.post("/api/extensions", json={**new, "description": "  team wiki "})
-    assert added.status_code == 201, added.text
-    assert (added.json()["id"], added.json()["status"]) == ("wiki", "error")
-    assert json.loads(upstream.requests[-1].content) == {
-        "label": "Wiki", "url": "http://wiki.internal/mcp", "description": "team wiki", "internal": False
-    }
-    assert admin.post("/api/extensions", json={"label": "X", "url": "file:///etc/passwd"}).status_code == 422
-    assert admin.delete("/api/extensions/notes").status_code == 204
-    gone = admin.delete("/api/extensions/gone")
-    assert (gone.status_code, gone.json()["detail"]) == (404, "Unknown extension 'gone'")
-    assert admin.delete("/api/extensions/Bad-Id").status_code == 422
-
-    root = admin.get("/api/auth/me").json()["id"]
-    logged = [e["message"] for e in admin.get("/api/logs/action", params={"actor": root}).json()]
-    assert logged[:2] == ["Removed extension 'notes'", "Added extension 'wiki' (http://wiki.internal/mcp)"]
-
-
-def test_extension_manager_can_add_remove_and_log_without_admin_access(
-    client_factory, email: FakeEmailSender, upstream: FakeUpstream
-) -> None:
-    upstream.handler = mcp_server
-    member = client_factory()
-    member_id = make_member(member, email)
-    admin = as_admin(client_factory())
-    role = role_by_name(admin, "Member")
-    assert admin.delete(f"/api/admin/roles/{role['id']}/permissions/tools.view").status_code == 200
-    assert admin.put(f"/api/admin/roles/{role['id']}/permissions/extensions.manage").status_code == 200
-    login(member, "alice")
-    assert member.get("/api/auth/me").json()["permissions"] == sorted([p for p in DEFAULT_ROLE_PERMISSIONS if p != "tools.view"] + ["extensions.manage"])
-
-    assert member.post("/api/extensions", json={"label": "Wiki", "url": "http://wiki.internal/mcp"}).status_code == 201
-    assert member.delete("/api/extensions/notes").status_code == 204
-    logged = admin.get("/api/logs/action", params={"actor": member_id}).json()
-    assert [entry["message"] for entry in logged[:2]] == [
-        "Removed extension 'notes'", "Added extension 'wiki' (http://wiki.internal/mcp)"
-    ]
-    assert member.patch("/api/capabilities/server_manager", json={"enabled": True}).status_code == 403
-    assert member.get("/api/admin/accounts").status_code == 403
-
-
-def test_admin_manage_without_extensions_manage_cannot_add_or_remove(
-    client_factory, email: FakeEmailSender, upstream: FakeUpstream
-) -> None:
-    upstream.handler = mcp_server
-    member = client_factory()
-    make_member(member, email)
-    admin = as_admin(client_factory())
-    role = role_by_name(admin, "Member")
-    assert admin.put(f"/api/admin/roles/{role['id']}/permissions/roles.manage").status_code == 200
-    login(member, "alice")
-
-    assert member.post("/api/extensions", json={"label": "Wiki", "url": "http://wiki.internal/mcp"}).status_code == 403
-    assert member.delete("/api/extensions/notes").status_code == 403
-    assert upstream.requests == []
 
 
 def test_capabilities_refresh_is_admin_only_and_logged(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:

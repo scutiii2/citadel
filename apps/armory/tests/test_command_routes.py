@@ -1,4 +1,4 @@
-"""Tests for GET /commands, with the same TestClient pattern as test_extension_routes.py.
+"""Tests for GET /commands, with the same TestClient pattern as test_capability_routes.py.
 Monkeypatch swaps in an isolated registry per test, as in test_commands.py."""
 
 from __future__ import annotations

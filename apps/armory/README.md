@@ -1,7 +1,6 @@
 # mcp_server
 
-A general-purpose MCP (Model Context Protocol) tool server: a proxy for other MCP
-servers' tools ("extensions"), and a `server_manager` capability for
+A general-purpose MCP (Model Context Protocol) tool server of built-in capabilities, among them `server_manager` for
 starting/stopping/restarting/listing managed apps. Built to be called by
 `chat_app` or any other MCP client speaking streamable HTTP.
 
@@ -31,10 +30,9 @@ Both loaded once at boot by `src/run.py`:
 
 - **`.env`** - credentials and deployment settings, gitignored. Copy
   `.env.example` to `.env`. See [`docs/secrets.md`](docs/secrets.md).
-- **Armory Admin pages** - capabilities, connections, deployment values, email and limits, saved in
+- **Armory Admin pages** - capabilities, deployment values, email and limits, saved in
   `.data/armory/settings.db`. See [`docs/settings.md`](docs/settings.md).
 
-The Connections page manages required Bard, Scribe, and Reader settings and optional shared MCP or REST connections. Armory keeps the addresses and credentials. Signed calls from Stronghold and Portcullis use the corresponding `/connections` routes. Existing shared MCP extensions keep their names after migration.
 
 ## Security
 

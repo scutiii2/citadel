@@ -59,7 +59,7 @@ class Settings:
     # records. Relative to CWD, like uploads_dir.
     watchers_dir: Path = Path(_env("MCP_WATCHERS_DIR", str(DATA / "watchers")))
     email_audit_path: Path = Path(_env("MCP_EMAIL_AUDIT_PATH", str(DATA / "email" / "audit.db")))
-    # Capability toggles and extensions that admin pages change (citadel_auth/settings_store.py).
+    # Capability toggles and settings that admin pages change (citadel_auth/settings_store.py).
     settings_db_path: Path = Path(_env("MCP_SETTINGS_DB_PATH", str(DATA / "settings.db")))
     # The Treasury instance and connection Armory registers itself under (run.py). The instance must list the connection.
     treasury_url: str = _env("TREASURY_URL", str(_APP.get("treasury_url") or "http://127.0.0.1:29602"))

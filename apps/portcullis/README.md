@@ -276,7 +276,7 @@ Each admin route requires `extensions.manage` and forwards to the same path on S
 | `DELETE` | `/api/admin/tool-services/{name}` | Remove a connection from Stronghold |
 | `POST` | `/api/admin/tool-services/{name}/test` | Test each saved origin |
 
-Armory's Connections proxy remains available until Plan 22.
+Armory no longer proxies outside MCP servers (Plan 22c): add one as a Legion connection.
 
 ## API
 
@@ -389,9 +389,6 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `GET` | `/api/capabilities` | `tools.view (also capabilities.manage)` | mcp_server's built-in capabilities: `[{name, label, enabled, tools, resources, has_gui}]`. |
 | `GET` | `/api/capabilities/{name}/gui` | `tools.view (also capabilities.manage)` | The capability's page layout (`{version, title, description, sections}`) as mcp_server validated it; `404` when it has no page. |
 | `PATCH` | `/api/capabilities/{name}` | `capabilities.manage` | `{enabled}` turns a capability on/off for every mcp_server client. |
-| `GET` | `/api/extensions` | `chat.use` or `tools.use` | mcp_server's extensions: `[{id, label, description, status, error, tools, web_url}]`. `web_url` is the extension's own web app (an http(s) address from mcp_server's config, or `null`); ember_web links to it. |
-| `POST` | `/api/extensions` | `extensions.manage` | `{label, url, description?}` (http/https URL) -> `201` the extension; mcp_server connects to it and saves it (an unreachable one is still added, `status: "error"`). |
-| `DELETE` | `/api/extensions/{id}` | `extensions.manage` | `204`; `404` unknown id. |
 | `GET` | `/api/logs` | any `logs.*` | `{kinds, accounts}`: the log kinds this account may read and every account to filter by. |
 | `GET` | `/api/logs/analytics?range=24h\|7d\|30d\|90d` | any `logs.*` | Counts for the Analytics page, only for the kinds this account may read (default `7d`): `{period, bucket (hour\|day), kinds, totals {kind: {current, previous}}, series [{bucket, counts}] (zero-filled), top_sources {kind: [{source, count}]}, accounts {kind: [{account_id, username, count}]}, heatmap [{weekday, hour, count}]}`. Top lists hold 10; `account_id` null is the server, `username` null a deleted account; heatmap is UTC, weekday 0 = Sunday. `422` bad range. |
 | `GET` | `/api/logs/{kind}?actor=server\|<account id>` | `logs.view` (action), `logs.errors.view` (error), `logs.chat.view` (chat_trace) | The 200 newest entries: `[{id, kind, account_id, source, message, details, prompts, created_at}]`. A chat turn's `details` lists each agent that ran (`agents[]`); `prompts` (JSON, one `{messages, truncated}` per agent, same order, system prompts never stored) is `null` unless the account holds `logs.chat.prompts.view`. |
@@ -652,8 +649,8 @@ operation verifies Portcullis's requester token, including per-tool MCP metadata
 - **What only Portcullis decides** (the `trusted` block of `POST /api/chats/{id}/turns`, filled here
   and overwriting anything the browser sends): `forced_approval` (`force_tool_approval` in
   `app_settings`, switched by an admin with `PUT /api/admin/settings/force_tool_approval`),
-  `tools_execute` (the account's `tools.execute` permission), `extension_ids` (every extension
-  Armory lists; the browser cannot name one). Stronghold's defaults
+  `tools_execute` (the account's `tools.execute` permission), `extension_ids` (always empty since Plan 22c;
+  the browser cannot name one). Stronghold's defaults
   are the safe side: approval forced, no tool execution, no extensions, no auto-save.
   Typed commands (`/tool`) call Armory directly with no agent and are not affected.
 - **Regenerate / edit** (`truncate_to` on `POST /api/chats/{id}/turns`): the

@@ -1,12 +1,10 @@
 import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { extensionsClient } from "../../capabilities/api/ExtensionsClient";
 import { chatsClient } from "../api/ChatsClient";
 import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "./chat";
 
-vi.mock("../../capabilities/api/ExtensionsClient", () => ({ extensionsClient: { list: vi.fn() } }));
 vi.mock("../api/ChatsClient", () => ({
   chatsClient: {
     list: vi.fn(),
@@ -48,7 +46,6 @@ async function store() {
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
-  vi.mocked(extensionsClient.list).mockResolvedValue([]);
   vi.mocked(chatsClient.list).mockResolvedValue([]);
   vi.mocked(chatsClient.search).mockResolvedValue([]);
 });

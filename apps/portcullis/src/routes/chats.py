@@ -30,7 +30,6 @@ from src.deps import (
     require_permission,
 )
 from src.models import Account
-from src.routes.server_info import get_server_info
 from src.services import question_answers
 from src.services.chat_service import (
     TITLE_MAX,
@@ -44,11 +43,6 @@ from src.services.chat_service import (
     decode_messages,
 )
 from src.services.log_service import LogWriter
-from src.services.mcp_server_info import (
-    McpServerInfo,
-    McpServerRefused,
-    McpServerUnavailable,
-)
 from src.services.permissions import CHAT_USE, TOOLS_EXECUTE
 from src.services.pricing import Pricing, with_cost
 from src.services.settings_service import FORCE_TOOL_APPROVAL, SettingsService
@@ -538,17 +532,12 @@ async def start_turn(
     account: Account = Depends(require_chat),
     stronghold: StrongholdForwarder = Depends(get_stronghold),
     app_settings: SettingsService = Depends(get_settings_service),
-    info: McpServerInfo = Depends(get_server_info),
 ) -> Response:
     """Starts answering in Stronghold, which saves the question and keeps going (and saves the answer)
     even if the browser leaves; watch it via /events. The `trusted` block is Portcullis's alone: a
     `trusted` key sent by the browser never reaches Stronghold."""
-    # Every extension mcp_server lists is on: which agent may call which tool is the agent file's
-    # tools.allow. Without the listing the answer still runs, just without extension tools.
-    try:
-        extension_ids = [e["id"] for e in await info.extensions(account) if isinstance(e, dict) and isinstance(e.get("id"), str)]
-    except (McpServerUnavailable, McpServerRefused):
-        extension_ids = []
+    # Shared extensions are gone (Plan 22c); the list stays in the contract, empty.
+    extension_ids: list[str] = []
     payload = {
         **body.model_dump(exclude={"agent_id"}),
         "trusted": {

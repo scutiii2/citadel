@@ -69,15 +69,14 @@ async def test_real_shared_mcp_session_isolates_signed_requester_per_call(stack,
     from mcp.client.streamable_http import streamable_http_client
     from mcp.server.fastmcp import FastMCP
     from src.citadel_auth import ServiceAuth
-    from src.services.extensions import ExtensionRegistry
+    from src.services.tool_handlers import install_tool_handlers
 
     monkeypatch.setattr(service_auth, "keyring", stack["armory"])
     mcp = FastMCP("requester-isolation")
     @mcp.tool()
     async def whoami() -> str:
         return identity_context.current_uid()
-    registry = ExtensionRegistry()
-    registry.install(mcp)
+    install_tool_handlers(mcp)
     app = mcp.streamable_http_app()
     service_auth.install_auth(app, stack["armory"])
     listener = socket.socket()

@@ -4,7 +4,7 @@ import httpx
 import pytest
 from mcp.server.fastmcp import FastMCP
 
-from src.services.extensions import ExtensionRegistry
+from src.services.tool_handlers import ToolHandlers
 
 
 @pytest.mark.parametrize(("capability", "name", "dependency", "args"), [
@@ -27,9 +27,8 @@ async def test_transport_failure_is_numbered(monkeypatch, capability, name, depe
 
     server = FastMCP("armory-test")
     server.tool()(getattr(module, name))
-    registry = ExtensionRegistry()
-    registry.install(server)
-    result = await registry.merged_call_tool(name, args)
+    handlers = ToolHandlers(server)
+    result = await handlers.call_tool(name, args)
     assert result.isError
     assert result.content[0].text == f"[1002] DEP_UNAVAILABLE {dependency} unavailable"
 
@@ -43,9 +42,8 @@ async def test_unexpected_tool_failure_hides_exception_text(monkeypatch):
     monkeypatch.setattr(tool, "_client", broken)
     server = FastMCP("armory-test")
     server.tool()(tool.tool_web_search)
-    registry = ExtensionRegistry()
-    registry.install(server)
-    result = await registry.merged_call_tool("tool_web_search", {"query": "q"})
+    handlers = ToolHandlers(server)
+    result = await handlers.call_tool("tool_web_search", {"query": "q"})
     assert result.isError
     assert "Something went wrong" in result.content[0].text
     assert "private host" not in result.content[0].text
@@ -61,8 +59,7 @@ async def test_malformed_tavily_score_is_a_safe_dependency_failure(monkeypatch):
     monkeypatch.setattr(tool, "_client", BadTavily)
     server = FastMCP("armory-test")
     server.tool()(tool.tool_web_search)
-    registry = ExtensionRegistry()
-    registry.install(server)
-    result = await registry.merged_call_tool("tool_web_search", {"query": "q"})
+    handlers = ToolHandlers(server)
+    result = await handlers.call_tool("tool_web_search", {"query": "q"})
     assert result.isError
     assert result.content[0].text == "[1005] DEP_ERROR tavily returned an error"

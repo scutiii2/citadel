@@ -6,11 +6,9 @@ or any specific capability - see each capability's own `domain.py` for
 where that logic lives instead.
 
 - **`app_config.py`** - loaders for the SMTP settings kept in the settings store
-  (`load_email_config`, `save_email_settings`) and for the extensions and capability toggles kept in
+  (`load_email_config`, `save_email_settings`) and for the capability toggles kept in
   the settings store (`settings_store.py`, `.data/armory/settings.db`):
-  `load_extensions_config`/`load_extension_config`, plus
-  `save_extension_config`/`delete_extension_config` for the runtime
-  add/remove routes, `load_capabilities_config`/`capability_enabled`/
+  `load_capabilities_config`/`capability_enabled`/
   `save_capabilities_config` for the capability toggle.
   Read its module docstring first - the `${VAR}` substitution convention
   and per-entry resolution behavior are documented there once rather
@@ -38,10 +36,9 @@ where that logic lives instead.
   `registry.offer(...)` and puts `marker(...)` in its result's
   `download_markers`; `download_routes.py` serves the file. Read its
   module docstring first.
-- **`extensions.py`** - connects out to other MCP servers as a client
-  and re-exposes their tools as this server's own, namespaced. The
-  proxying/aggregation engine behind the extensions table of the settings store and the
-  `/extensions` HTTP routes.
+- **`tool_handlers.py`** - the MCP `list_tools` / `call_tool` handlers: hides
+  `hidden` tools, runs each call as the signed requester and returns a numbered
+  dependency failure as an error result.
 - **`job_events.py`**, **`job_queue.py`** - the replayable event log
   (`Job`) and the slot-holding core (`JobQueueBase`: concurrency limit,
   cooperative timeout, cancel, prune) behind the `pdf_merger` and

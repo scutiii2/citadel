@@ -47,7 +47,7 @@ def test_bad_input_is_400_in_words_or_422(client):
     assert client.post(BASE, json={"name": "x"}).status_code == 422  # budget is required
     refused = client.post(BASE, json={"name": "x", "budget_tokens": 0})
     assert refused.status_code == 400 and "budget" in refused.json()["detail"]
-    assert client.post(BASE, json={"name": "x", "budget_tokens": 5, "services": ["stronghold"]}).status_code == 400
+    assert client.post(BASE, json={"name": "x", "budget_tokens": 5, "services": ["other"]}).status_code == 400
     assert client.post(BASE, json={"name": "x", "budget_tokens": 5, "key": "ock_mine"}).status_code == 422
     assert client.get(f"{BASE}/999").status_code == 404
     assert client.patch(f"{BASE}/999", json={"enabled": False}).status_code == 404

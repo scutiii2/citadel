@@ -38,7 +38,6 @@ import { toolTitle } from "../../../utils/tools/toolTitles";
 import { triageAnswerText, triageQuestionText } from "../utils/triageMessage";
 import { readStored, writeStored } from "../../../utils/browser/storage";
 import { useAuthStore } from "../../../stores/auth";
-import { extensionsClient } from "../../capabilities/api/ExtensionsClient";
 
 const TITLE_MAX_CHARS = 60;
 // While a chat other than the open one is still being answered, the list is
@@ -233,16 +232,6 @@ export const useChatStore = defineStore("chat", () => {
   // whose answer was sent but not yet confirmed by the agent.
   const pendingQuestions = ref<PendingQuestion[]>([]);
   const answeringQuestions = ref<string[]>([]);
-  // Shared extensions are on for everyone; which agent may call their tools is that
-  // agent's tools.allow. Built-in capabilities need no list: every slash command is offered.
-  const enabledExtensions = ref<string[]>([]);
-  async function loadExtensions(): Promise<void> {
-    const accountId = auth.account?.id;
-    let ids: string[] = [];
-    try { if (accountId) ids = (await extensionsClient.list()).map((e) => e.id); } catch { /* none: only built-in commands */ }
-    if (auth.account?.id === accountId) enabledExtensions.value = ids;
-  }
-  watch(() => auth.account?.id, () => void loadExtensions(), { immediate: true });
   // Slash commands (tools.view): the runner caches the command list and tool
   // schemas, so it's replaced per account.
   let commandRunner = new SlashCommandRunner();
@@ -696,17 +685,12 @@ export const useChatStore = defineStore("chat", () => {
     if (!auth.hasPermission("tools.view")) return;
     const started = generation;
     try {
-      const list = await commandRunner.list(enabledExtensions.value);
+      const list = await commandRunner.list();
       if (started === generation) commands.value = list;
     } catch {
       if (started === generation) commands.value = [];
     }
   }
-
-  // The suggestions follow the shared extensions.
-  watch(enabledExtensions, () => {
-    void loadCommands();
-  });
 
 
   /** "/..." runs an mcp_server tool directly (no AI); the call and its
@@ -721,7 +705,7 @@ export const useChatStore = defineStore("chat", () => {
     clockStart.value = began;
     const started = generation;
     try {
-      const result = await commandRunner.run(text, enabledExtensions.value);
+      const result = await commandRunner.run(text);
       if (started !== generation) return;
       const seconds = Number(((Date.now() - began) / 1000).toFixed(1));
       await appendMessages(
@@ -1402,7 +1386,6 @@ export const useChatStore = defineStore("chat", () => {
     answeringQuestions,
     answerQuestion,
     skipQuestion,
-    enabledExtensions,
     clearChat,
     summarizeChat,
     deleteAllChats,

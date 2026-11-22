@@ -1,4 +1,3 @@
-import { extensionsClient } from "../../capabilities/api/ExtensionsClient";
 import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +9,6 @@ import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "./chat";
 import { makeAccount } from "../../../testing/account";
 
-vi.mock("../../capabilities/api/ExtensionsClient", () => ({ extensionsClient: { list: vi.fn() } }));
 vi.mock("../api/ChatsClient", () => ({
   chatsClient: {
     list: vi.fn(),
@@ -83,7 +81,6 @@ const REQUEST = { type: "approval_request", id: "step0", tool: "tool_srv_stopApp
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
-  vi.mocked(extensionsClient.list).mockResolvedValue([]);
   sequence = 0;
   watch.mockImplementation(async (_id, _after, onEvent) => {
     emit = onEvent;

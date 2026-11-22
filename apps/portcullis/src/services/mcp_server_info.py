@@ -162,23 +162,6 @@ class McpServerInfo:
         body = await self._request("POST", "/capabilities/refresh", account)
         return body if isinstance(body, list) else []
 
-    async def extensions(self, account: Account) -> list[dict[str, Any]]:
-        """Extensions (other MCP servers mcp_server re-exposes, their tools
-        named "<id>__<tool>"): [{id, label, description, status, error, tools}]."""
-        body = await self._request("GET", "/extensions", account)
-        return body if isinstance(body, list) else []
-
-    async def add_extension(self, account: Account, label: str, url: str, description: str, internal: bool = False, token: str = "") -> dict[str, Any]:
-        """mcp_server connects to it and saves it to its config; an
-        unreachable URL is still added (status "error")."""
-        body = {"label": label, "url": url, "description": description, "internal": internal}
-        if token.strip():
-            body["token"] = token.strip()
-        return await self._request("POST", "/extensions", account, json=body)
-
-    async def remove_extension(self, account: Account, extension_id: str) -> None:
-        await self._request("DELETE", f"/extensions/{quote(extension_id, safe='')}", account)
-
     async def options(self, account: Account, path: str) -> list[dict[str, str]]:
         """A select's options from `path` on mcp_server (a tool's
         `options_url`, placeholders already filled), as

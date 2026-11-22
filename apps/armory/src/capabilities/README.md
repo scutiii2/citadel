@@ -80,12 +80,8 @@ loader rather than each folder inventing its own.
 together: four tools, a domain module that imports only `services/`, and
 a contract of typed results.
 
-A different pattern lives at `src/services/extensions.py`: proxied
-external tools, connected out to other MCP servers as a client and
-re-exposed here under a namespaced name, rather than written by hand in
-this repo at all. Reach for a capability when you're wrapping logic
-that lives in this codebase; reach for an extension when you're
-exposing an MCP server that already exists elsewhere.
+Armory does not proxy other MCP servers. An outside MCP server is a
+Legion connection (Legion Admin, Connections).
 
 ## GUI pages
 
@@ -232,8 +228,7 @@ A tool that only reads, and changes nothing here or elsewhere, declares it:
 decision with a consequence: ember's **Auto** approval mode (ai_agent's `allow_read_only`) runs a
 built-in tool that declares it **without asking the user**, while every other tool still asks.
 So declare it only when running the tool unasked is harmless. A tool that writes, sends, deletes,
-runs a command, or spends credits or crawls (firecrawl) must not. Extension tools can never earn
-this: only built-in tools count. `tests/test_read_only_declarations.py` pins the exact list, so
+runs a command, or spends credits or crawls (firecrawl) must not. Only built-in tools count. `tests/test_read_only_declarations.py` pins the exact list, so
 adding or removing a declaration means changing that test too.
 
 ## Add a new capability

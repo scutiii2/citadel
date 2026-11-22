@@ -22,11 +22,6 @@ const mocks = vi.hoisted(() => ({
   userUpdate: vi.fn(),
 }));
 
-vi.mock("../api/ExtensionsClient", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../api/ExtensionsClient")>()),
-  extensionsClient: { list: mocks.extensions, remove: vi.fn(), add: vi.fn() },
-}));
-
 vi.mock("../../../api/tools/CommandsClient", () => ({
   commandsClient: { capabilities: mocks.capabilities, setCapability: mocks.setCapability },
 }));
@@ -113,12 +108,11 @@ type Wrapper = Awaited<ReturnType<typeof show>>;
 const row = (w: Wrapper, label: string) => w.findAll(".catalog-row").find(r => r.get(".row-title").text() === label)!;
 const choose = (w: Wrapper, label: string) => row(w, label).get("button.item-link").trigger("click");
 const extensionsTab = (w: Wrapper) => w.get("#caps-tab-extensions").trigger("click");
-const EXT = {id:"ext",label:"Echo server",description:"Documents",status:"connected",error:null,tools:["ext__echo"],web_url:"https://echo.example/app"};
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal=function(){this.setAttribute("open","");};
   HTMLDialogElement.prototype.close=function(){this.removeAttribute("open");};
   vi.clearAllMocks();
-  mocks.capabilities.mockResolvedValue(CAPS);mocks.listTools.mockResolvedValue(TOOLS);mocks.listResources.mockResolvedValue(RESOURCES);mocks.extensions.mockResolvedValue([EXT]);
+  mocks.capabilities.mockResolvedValue(CAPS);mocks.listTools.mockResolvedValue(TOOLS);mocks.listResources.mockResolvedValue(RESOURCES);
   mocks.runTool.mockResolvedValue({text:"merged ok",isError:false});mocks.readResource.mockResolvedValue("# Help text");
   mocks.userUpdate.mockImplementation(async (id,patch)=>({...MINE,id,...patch}));
 });
@@ -140,16 +134,6 @@ describe("Capabilities tool and workspace access",()=>{
     mocks.capabilities.mockResolvedValue([{name:'custom',label:'Custom',enabled:false,tools:[],resources:[],has_gui:true}]);
     const offline=await show();await choose(offline,'Custom');expect(offline.find('.detail-footer a').exists()).toBe(false);
   });
-  it("opens external apps in a safe new tab, rejecting unsafe URLs and offline servers",async()=>{
-    const w=await show();await extensionsTab(w);await choose(w,'Echo server');const link=w.get('.detail-footer a');expect(link.attributes('target')).toBe('_blank');expect(link.attributes('rel')).toBe('noopener noreferrer');
-    mocks.extensions.mockResolvedValue([{...EXT,web_url:'javascript:alert(1)'}]);const unsafe=await show();await extensionsTab(unsafe);await choose(unsafe,'Echo server');expect(unsafe.find('.detail-footer a').exists()).toBe(false);
-    mocks.extensions.mockResolvedValue([{...EXT,status:'error',error:'refused'}]);const offline=await show();await extensionsTab(offline);await choose(offline,'Echo server');expect(offline.find('.detail-footer a').exists()).toBe(false);expect(offline.text()).toContain('refused');
-  });
-  it("keeps legacy PDF extension links tied to native capability access",async()=>{
-    mocks.extensions.mockResolvedValue([{...EXT,id:'pdf_merger',label:'PDF extension',tools:[]}]);
-    const w=await show();await extensionsTab(w);await choose(w,'PDF extension');expect(w.get('.detail-footer a').attributes('href')).toBe('/capabilities/pdf_merger');
-    mocks.capabilities.mockResolvedValue(CAPS.map(c=>({...c,enabled:false})));const noAccess=await show();await extensionsTab(noAccess);await choose(noAccess,'PDF extension');expect(noAccess.find('.detail-footer a').exists()).toBe(false);
-  });
   it("runs selected tools and shows results, then clears them on close",async()=>{
     const w=await show();await choose(w,'PDF files');await w.get('.tool-list button').trigger('click');await flushPromises();await w.get('form.tool-form').trigger('submit');await flushPromises();expect(mocks.runTool).toHaveBeenCalledWith('tool_pdf_merge',{});expect(w.text()).toContain('merged ok');
     await w.get('dialog button.close').trigger('click');await w.get('.tool-list button').trigger('click');expect(w.text()).not.toContain('merged ok');
@@ -157,11 +141,11 @@ describe("Capabilities tool and workspace access",()=>{
   it("lets read-only accounts inspect tools but offers no run form",async()=>{
     const w=await show({permissions:['tools.view']});await choose(w,'PDF files');await w.get('.tool-list button').trigger('click');await flushPromises();expect(w.text()).toContain('tool_pdf_merge');expect(w.find('form.tool-form').exists()).toBe(false);expect(mocks.runTool).not.toHaveBeenCalled();
   });
-  it("reads capability resources and keeps namespaced extension resources with their owner",async()=>{
-    mocks.listResources.mockResolvedValue([...RESOURCES,{name:'ext__doc',uri:'ext://doc',description:'',template:false}]);const w=await show();await choose(w,'PDF files');await w.get('.resource-link').trigger('click');await flushPromises();expect(mocks.readResource).toHaveBeenCalledWith('help://pdf');expect(w.text()).toContain('Help text');await extensionsTab(w);await choose(w,'Echo server');expect(w.get('.resources').text()).toContain('ext__doc');expect(w.get('.resources').text()).not.toContain('pdf_help');
+  it("reads capability resources and leaves unowned resources under Other tools",async()=>{
+    mocks.listResources.mockResolvedValue([...RESOURCES,{name:'ext__doc',uri:'ext://doc',description:'',template:false}]);const w=await show();await choose(w,'PDF files');await w.get('.resource-link').trigger('click');await flushPromises();expect(mocks.readResource).toHaveBeenCalledWith('help://pdf');expect(w.text()).toContain('Help text');await choose(w,'Other tools');expect(w.get('.resources').text()).toContain('ext__doc');expect(w.get('.resources').text()).not.toContain('pdf_help');
   });
   it("keeps unclaimed tools while excluding tools owned by a capability",async()=>{
-    mocks.extensions.mockResolvedValue([]);const w=await show();await choose(w,'Other tools');expect(w.get('.tool-list').text()).toContain('Echo');expect(w.get('.tool-list').text()).not.toContain('Merge');
+    const w=await show();await choose(w,'Other tools');expect(w.get('.tool-list').text()).toContain('Echo');expect(w.get('.tool-list').text()).not.toContain('Merge');
   });
   it("offers private editing and confirms removal without any private run action",async()=>{
     const w=await show({permissions:['tools.view','chat.use','extensions.personal.manage'],userExtensions:[MINE]});await extensionsTab(w);await choose(w,'My notes');expect(w.findAll('.tool-list button').every(b=>b.attributes('disabled')!==undefined)).toBe(true);await w.get('.edit-extension').trigger('click');expect(w.findComponent({name:'UserExtensionModal'}).props('extension').id).toBe('mynotes');await w.findComponent({name:'UserExtensionModal'}).vm.$emit('close');await w.get('.remove-extension').trigger('click');expect(w.findComponent(ConfirmModal).props('open')).toBe(true);

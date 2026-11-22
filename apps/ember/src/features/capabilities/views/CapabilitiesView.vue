@@ -3,8 +3,6 @@ import { computed, nextTick, onActivated, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { matchesWords } from "../../../utils/search";
 import { commandsClient, type CapabilityInfo } from "../../../api/tools/CommandsClient";
-import { extensionsClient } from "../api/ExtensionsClient";
-import { type ExtensionInfo } from "../../../api/contracts/extensions";
 import { McpServerClient } from "../../../api/tools/McpServerClient";
 import type { UserExtension } from "../api/UserExtensionsClient";
 import type { ResourceInfo, ToolInfo, ToolRunResult } from "../../../api/types";
@@ -16,19 +14,18 @@ import UserExtensionModal from "../components/UserExtensionModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { useUserExtensionsStore } from "../stores/userExtensions";
-import { groupTools, inExtensionNamespace } from "../utils/capabilityGroups";
+import { groupTools } from "../utils/capabilityGroups";
 import { CAPABILITY_ICONS } from "../utils/capabilityIcons";
 import { errorMessage } from "../../../utils/errors";
 import { formatToolResult } from "../../../utils/tools/toolResultFormat";
 import { commandsByTool } from "../../../utils/tools/toolCommands";
-import { safeWebUrl } from "../../../utils/browser/webUrl";
 import { dedicatedCapabilityPage } from "../../../router/capabilityPages";
 import { NAV_PAGES } from "../../../router/pages";
 
 // Both account choices and tool discovery live here; old Supermarket links redirect here.
 type Tab = "capabilities" | "extensions";
 interface Item {
-  key: string; id: string; label: string; tab: Tab; kind: "builtin" | "extension" | "private" | "other";
+  key: string; id: string; label: string; tab: Tab; kind: "builtin" | "private" | "other";
   enabled: boolean; online: boolean | null; locked: boolean; description: string;
   names: string[]; tools: ToolInfo[]; resources: ResourceInfo[]; page: SectionPage | null;
   privateExtension?: UserExtension;
@@ -45,10 +42,9 @@ const query = computed({ get: () => queries.value[tab.value], set: (value: strin
 const selection = ref<Record<Tab, string | null>>({ capabilities: null, extensions: null });
 const detailOpen = ref(false), catalog = ref<HTMLElement>(), backButton = ref<HTMLButtonElement>();
 const scrolls: Record<Tab, number> = { capabilities: 0, extensions: 0 };
-const capabilities = ref<CapabilityInfo[]>([]), extensions = ref<ExtensionInfo[]>([]);
+const capabilities = ref<CapabilityInfo[]>([]);
 const tools = ref<ToolInfo[]>([]), resources = ref<ResourceInfo[]>([]);
 const loading = ref(true), loadError = ref(""), discoveryError = ref(""), actionError = ref("");
-const extensionError = ref("");
 // The stores optimistically update. Hold each displayed switch at its confirmed value until settled.
 const pending = ref<Record<string, boolean>>({});
 const confirmed = (key: string, enabled: boolean): boolean => pending.value[key] ?? enabled;
@@ -68,17 +64,8 @@ function capabilityPage(c: CapabilityInfo): SectionPage | null {
   if (page) return auth.hasPermission(page.permission) ? { to: page.to, external: false } : null;
   return c.has_gui ? { to: `/capabilities/${encodeURIComponent(c.name)}`, external: false } : null;
 }
-function extensionPage(e: ExtensionInfo): SectionPage | null {
-  const page = dedicatedCapabilityPage(e.id);
-  if (page?.route) {
-    const available = capabilities.value.some(c => c.enabled && dedicatedCapabilityPage(c.name) === page);
-    return available && auth.hasPermission(page.permission) ? { to: page.to, external: false } : null;
-  }
-  const url = safeWebUrl(e.web_url);
-  return url ? { to: url, external: true, label: "Open app" } : null;
-}
 const items = computed<Item[]>(() => {
-  const grouped = groupTools(capabilities.value, tools.value, "", extensions.value);
+  const grouped = groupTools(capabilities.value, tools.value, "");
   const claimedResources = new Set(capabilities.value.flatMap(c => c.resources));
   const unclaimed = resources.value.filter(r => !claimedResources.has(r.name) && !claimedResources.has(r.uri));
   const rows: Item[] = grouped.groups.map(({ capability: c, tools: own }) => ({
@@ -87,23 +74,15 @@ const items = computed<Item[]>(() => {
     description: `Tools provided by ${c.label ?? c.name}.`, names: c.tools, tools: own,
     resources: resources.value.filter(r => c.resources.includes(r.name) || c.resources.includes(r.uri)), page: capabilityPage(c),
   }));
-  for (const { extension: e, tools: own } of grouped.extensionGroups) rows.push({
-    key: `extension:${e.id}`, id: e.id, label: e.label, tab: "extensions", kind: "extension",
-    enabled: true, online: connection(e.status), locked: true,
-    description: e.description || `Tools provided by ${e.label}.`, names: e.tools, tools: own,
-    resources: unclaimed.filter(r => inExtensionNamespace(e.id, r.name)), page: extensionPage(e),
-  });
   if (canSeePrivate.value) for (const e of userExt.items) rows.push({
     key: `private:${e.id}`, id: e.id, label: e.label, tab: "extensions", kind: "private",
     enabled: confirmed(`private:${e.id}`, e.enabled), online: connection(e.status), locked: !canPrivate.value,
     description: e.description || "Tools from your personal MCP server.", names: e.tools, tools: [], resources: [], page: null, privateExtension: e,
   });
-  // Without extension metadata, never offer its namespaced tools as unclaimed tools.
-  const otherResources = unclaimed.filter(r => !(extensionError.value && r.name.includes("__")) && !extensions.value.some(e => inExtensionNamespace(e.id, r.name)));
-  const otherTools = grouped.otherTools.filter(t => !(extensionError.value && t.name.includes("__")));
-  if (canTools.value && (otherTools.length || otherResources.length)) rows.push({
+  const otherTools = grouped.otherTools;
+  if (canTools.value && (otherTools.length || unclaimed.length)) rows.push({
     key: "other", id: "other", label: "Other tools", tab: "capabilities", kind: "other", enabled: true, online: true, locked: true,
-    description: "Tools and resources not assigned to a capability or extension.", names: otherTools.map(t => t.name), tools: otherTools, resources: otherResources, page: null,
+    description: "Tools and resources not assigned to a capability.", names: otherTools.map(t => t.name), tools: otherTools, resources: unclaimed, page: null,
   });
   return rows.sort((a, b) => Number(b.enabled) - Number(a.enabled) || Number(b.online !== false) - Number(a.online !== false) || a.label.localeCompare(b.label));
 });
@@ -114,7 +93,7 @@ watch(() => selected.value?.key, key => { if (key && !selection.value[tab.value]
 const enabledCount = computed(() => tabItems.value.filter(i => i.kind !== "other" && i.enabled).length);
 const status = (i: Item): string => i.online === false ? "Offline" : i.enabled ? "Enabled" : "Disabled";
 const available = (i: Item): boolean => i.enabled && i.online === true && !(i.key in pending.value);
-const scope = (i: Item): string => i.kind === "private" ? "Private extension" : i.kind === "extension" ? "Shared extension" : i.kind === "other" ? "Tools" : "Capability";
+const scope = (i: Item): string => i.kind === "private" ? "Private extension" : i.kind === "other" ? "Tools" : "Capability";
 function icon(i: Item): { box: string; paths: string[] } {
   const page = i.kind === "builtin" ? dedicatedCapabilityPage(i.id) : undefined;
   const native = page && NAV_PAGES.find(p => p.to === page.to);
@@ -156,15 +135,14 @@ async function change(i: Item, event?: Event): Promise<void> {
   finally { const next = { ...pending.value }; delete next[i.key]; pending.value = next; }
 }
 async function load(): Promise<void> {
-  loading.value = true; loadError.value = ""; discoveryError.value = ""; extensionError.value = "";
+  loading.value = true; loadError.value = ""; discoveryError.value = "";
   try {
-    const [caps, exts, toolList, res] = await Promise.all([
+    const [caps, toolList, res] = await Promise.all([
       canTools.value ? commandsClient.capabilities() : [],
-      extensionsClient.list().catch(err => { extensionError.value = errorMessage(err); return [] as ExtensionInfo[]; }),
       canTools.value ? server.listTools().catch(err => { discoveryError.value = errorMessage(err); return [] as ToolInfo[]; }) : [],
       canTools.value ? server.listResources().catch(() => [] as ResourceInfo[]) : [],
     ]);
-    capabilities.value = caps; extensions.value = exts; tools.value = [...toolList].sort((a, b) => a.title.localeCompare(b.title)); resources.value = res;
+    capabilities.value = caps; tools.value = [...toolList].sort((a, b) => a.title.localeCompare(b.title)); resources.value = res;
   } catch (err) { loadError.value = errorMessage(err); }
   finally { loading.value = false; }
 }
@@ -172,7 +150,7 @@ async function retry(): Promise<void> { await Promise.all([load(), canSeePrivate
 
 const tool = ref<ToolInfo | null>(null), running = ref(false), result = ref<ToolRunResult | null>(null);
 const registry = ref<Awaited<ReturnType<typeof commandsClient.list>>>([]);
-const toolCommand = computed(() => tool.value && selected.value ? commandsByTool(registry.value, selected.value.names, selected.value.kind === "extension" ? selected.value.id : null).get(tool.value.name) : undefined);
+const toolCommand = computed(() => tool.value && selected.value ? commandsByTool(registry.value, selected.value.names, null).get(tool.value.name) : undefined);
 let commandsLoaded = false;
 async function loadCommands(): Promise<void> {
   if (commandsLoaded) return;
@@ -247,7 +225,6 @@ onActivated(() => { if (canSeePrivate.value) void userExt.refresh(); });
         </div>
         <label class="search-box"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input v-model="query" type="search" :aria-label="tab === 'capabilities' ? 'Search capabilities and tools' : 'Search extensions and tools'" :placeholder="tab === 'capabilities' ? 'Search capabilities and tools…' : 'Search extensions and tools…'" /></label>
         <p v-if="discoveryError" class="error discovery-error">Tool details unavailable: {{ discoveryError }} <button class="link" @click="load">Retry</button></p>
-        <p v-if="tab === 'extensions' && extensionError" class="error discovery-error" role="alert">Extensions unavailable: {{ extensionError }} <button class="link" @click="load">Retry</button></p>
         <div class="list-heading"><h3>{{ tab === 'capabilities' ? 'Capabilities' : 'Extensions' }}</h3><span>{{ enabledCount }} enabled · {{ tabItems.filter(i => i.kind !== 'other').length }} total</span></div>
         <div id="caps-catalog" ref="catalog" class="catalog" role="tabpanel" :aria-labelledby="`caps-tab-${tab}`" tabindex="0">
           <p v-if="!shown.length" class="notice">{{ query.trim() ? `Nothing matches “${query.trim()}”.` : `No ${tab} are available.` }}</p>
@@ -276,8 +253,7 @@ onActivated(() => { if (canSeePrivate.value) void userExt.refresh(); });
             <p v-if="!selected.names.length" class="notice">No tools registered.</p>
             <p v-if="selected.kind === 'private'" class="private-note">Private extension tools are available in chats only and always ask first.</p>
             <p v-if="selected.online === false" class="notice">Offline · Tools cannot run until the connection returns.</p>
-            <p v-if="selected.privateExtension?.error" class="error">{{ selected.privateExtension.error }}</p><p v-else-if="selected.kind === 'extension' && extensions.find(e => e.id === selected?.id)?.error" class="error">{{ extensions.find(e => e.id === selected?.id)?.error }}</p>
-            <template v-if="selected.resources.length"><div class="section-heading"><h4>Resources</h4><span>{{ selected.resources.length }}</span></div><ul class="resources"><li v-for="r in selected.resources" :key="r.uri"><button type="button" class="resource-link" :disabled="!available(selected)" @click="startRead(r)">{{ r.name }}</button><code>{{ r.uri }}</code></li></ul><ResourceReader :pending="readPending" v-model:uri="readUri" :reading="reading" :read-result="readResult" :read-error="readError" :text="readShown" @read="read" /></template>
+            <p v-if="selected.privateExtension?.error" class="error">{{ selected.privateExtension.error }}</p>            <template v-if="selected.resources.length"><div class="section-heading"><h4>Resources</h4><span>{{ selected.resources.length }}</span></div><ul class="resources"><li v-for="r in selected.resources" :key="r.uri"><button type="button" class="resource-link" :disabled="!available(selected)" @click="startRead(r)">{{ r.name }}</button><code>{{ r.uri }}</code></li></ul><ResourceReader :pending="readPending" v-model:uri="readUri" :reading="reading" :read-result="readResult" :read-error="readError" :text="readShown" @read="read" /></template>
             <div v-if="selected.privateExtension && canPrivate" class="private-controls"><button class="edit-extension secondary" @click="edit(selected.privateExtension)">Edit connection</button><details class="danger-zone"><summary>Danger zone</summary><p>Remove this private extension and its saved headers.</p><button class="remove-extension danger" @click="pendingRemove = selected.privateExtension">Remove extension</button></details></div>
           </div>
           <footer class="detail-footer"><template v-if="selected.page && available(selected)"><a v-if="selected.page.external" :href="selected.page.to" class="primary" target="_blank" rel="noopener noreferrer">{{ selected.page.label ?? 'Open app' }} ↗</a><RouterLink v-else :to="selected.page.to" class="primary">Open {{ selected.label }} →</RouterLink></template><p v-else>{{ selected.kind === 'private' ? 'Tools are available in chats only.' : !available(selected) ? 'Offline. An administrator manages this.' : 'Choose a tool to view its details.' }}</p></footer>

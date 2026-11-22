@@ -1,13 +1,10 @@
 """/api/commands, /api/capabilities (and /api/capabilities/{name}/gui, a
-capability's page layout) and /api/extensions: mcp_server's command
-registry, capability help, capability switchboard and extensions, passed
-through. Reading needs tools.view (extensions: chat.use or tools.view, since
-the chat picks which ones the agent may use). Switching a capability (going
-online reloads its code from disk) and refreshing the capability list
-(POST /api/capabilities/refresh, which finds folders added while mcp_server
-runs) need capabilities.manage; adding/removing an extension needs
-extensions.manage. All change mcp_server for everyone and are written to the
-activity log.
+capability's page layout): mcp_server's command registry, capability help
+and capability switchboard, passed through. Reading needs tools.view.
+Switching a capability (going online reloads its code from disk) and
+refreshing the capability list (POST /api/capabilities/refresh, which finds
+folders added while mcp_server runs) need capabilities.manage. Both change
+mcp_server for everyone and are written to the activity log.
 
 The command form (tools.view) also gets a select's options from a path a
 tool's schema declares (`options_url`, with {placeholders} filled from
@@ -21,20 +18,19 @@ import binascii
 import re
 from collections.abc import AsyncIterator
 from typing import Any, Literal
-from urllib.parse import quote, unquote, urlsplit
+from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from src.config import Settings
-from src.deps import get_db_gateway, get_log_writer, get_server_tools, get_settings, require_any_permission, require_permission
+from src.deps import get_log_writer, get_server_tools, get_settings, require_any_permission, require_permission
 from src.models import Account
-from src.services.db_gateway import DocumentStore
 from src.services.caller import Caller
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo, McpServerRefused, McpServerUnavailable, is_server_path
-from src.services.permissions import (CHAT_USE, TOOLS_VIEW, CAPABILITIES_MANAGE, EXTENSIONS_MANAGE, FILES_UPLOAD, FILES_DOWNLOAD)
+from src.services.permissions import (TOOLS_VIEW, CAPABILITIES_MANAGE, FILES_UPLOAD, FILES_DOWNLOAD)
 from src.services.server_tools import ServerTools, ServerUnavailable
 
 router = APIRouter(prefix="/api", tags=["server-info"])
@@ -43,14 +39,10 @@ require_tools = require_any_permission(TOOLS_VIEW, CAPABILITIES_MANAGE)
 require_upload = require_permission(FILES_UPLOAD)
 require_download = require_permission(FILES_DOWNLOAD)
 require_admin = require_permission(CAPABILITIES_MANAGE)
-require_extensions_manage = require_permission(EXTENSIONS_MANAGE)
-require_chat_or_tools = require_any_permission(CHAT_USE, TOOLS_VIEW, EXTENSIONS_MANAGE)
 
 # Capability ids and command names as mcp_server defines them (one Path()
 # per route: FastAPI binds a shared instance to the first parameter name).
 NAME_PATTERN = r"^[A-Za-z0-9_.-]{1,64}$"
-# Extension ids are mcp_server-made slugs of their label.
-EXTENSION_ID_PATTERN = r"^[a-z0-9_]{1,64}$"
 # A file for a command's file-path parameter (mcp_server's /upload decides
 # which types it takes).
 UPLOAD_MAX_BYTES = 15 * 1024 * 1024
@@ -103,18 +95,6 @@ class CapabilitySwitch(BaseModel):
     enabled: bool
 
 
-class ExtensionOut(BaseModel):
-    id: str
-    label: str
-    description: str = ""
-    # "connected" or "error"
-    status: str
-    error: str | None = None
-    tools: list[str] = []
-    # The extension's own web app, from mcp_server's config; ember_web links to it.
-    web_url: str | None = None
-
-
 class OptionOut(BaseModel):
     value: str
     label: str
@@ -130,29 +110,6 @@ class UploadIn(BaseModel):
 class UploadOut(BaseModel):
     # Where mcp_server stored it: the value for the file-path parameter.
     path: str
-
-
-class ExtensionCreate(BaseModel):
-    label: str = Field(min_length=1, max_length=80)
-    url: str = Field(min_length=1, max_length=500)
-    description: str = Field(default="", max_length=500)
-    # A server of this stack: mcp_server sends it the internal token. Off for anything else.
-    internal: bool = False
-    # The token the tool service made for Armory on its own admin page (Tokens card). Sent on, never returned.
-    token: str = Field(default="", max_length=500, repr=False)
-
-    @field_validator("label", "url", "description")
-    @classmethod
-    def strip(cls, value: str) -> str:
-        return value.strip()
-
-    @field_validator("url")
-    @classmethod
-    def http_url(cls, url: str) -> str:
-        parts = urlsplit(url)
-        if parts.scheme not in ("http", "https") or not parts.netloc:
-            raise ValueError("must be an http:// or https:// URL")
-        return url
 
 
 @router.get("/commands")
@@ -401,37 +358,3 @@ async def refresh_capabilities(
     capabilities = [CapabilityOut(**r) for r in await _call(info.refresh_capabilities(account)) if isinstance(r, dict)]
     await logs.action(account, "mcp.capability_refresh", "Refreshed capabilities")
     return capabilities
-
-
-@router.get("/extensions")
-async def list_extensions(
-    account: Account = Depends(require_chat_or_tools), info: McpServerInfo = Depends(get_server_info)
-) -> list[ExtensionOut]:
-    return [ExtensionOut(**r) for r in await _call(info.extensions(account)) if isinstance(r, dict)]
-
-
-@router.post("/extensions", status_code=status.HTTP_201_CREATED)
-async def add_extension(
-    body: ExtensionCreate,
-    account: Account = Depends(require_extensions_manage),
-    info: McpServerInfo = Depends(get_server_info),
-    logs: LogWriter = Depends(get_log_writer),
-) -> ExtensionOut:
-    """mcp_server connects to the MCP server at `url` and offers its tools
-    to every client, requiring extensions.manage. Added even if unreachable right now."""
-    extension = ExtensionOut(**await _call(info.add_extension(account, body.label, body.url, body.description, body.internal, body.token)))
-    await logs.action(account, "mcp.extension_add", f"Added extension '{extension.id}' ({body.url})")
-    return extension
-
-
-@router.delete("/extensions/{extension_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_extension(
-    extension_id: str = Path(pattern=EXTENSION_ID_PATTERN),
-    account: Account = Depends(require_extensions_manage),
-    info: McpServerInfo = Depends(get_server_info),
-    logs: LogWriter = Depends(get_log_writer),
-    store: DocumentStore = Depends(get_db_gateway),
-) -> Response:
-    await _call(info.remove_extension(account, extension_id))
-    await logs.action(account, "mcp.extension_remove", f"Removed extension '{extension_id}'")
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
