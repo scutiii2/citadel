@@ -84,10 +84,6 @@ Runtime state is not kept in this folder. It lives in the Citadel root, one fold
 
 `CITADEL_DATA_DIR` and `CITADEL_CACHE_DIR` in the root `.env` move the two roots; each `MCP_*_DIR` / `MCP_*_PATH` setting still overrides one path. Configuration stays in the tracked `configs/` folders.
 
-## Maintenance
-
-One-off: `python -m src.prune_unused_tables <path to settings.db>` reports the unused `extensions` and `connections` tables in `settings.db`; add `--apply` to drop them. It is a dry run by default. Stop Armory and copy the file first. Only those two tables are removed; Armory never does this itself.
-
 ## Tests
 
 ```

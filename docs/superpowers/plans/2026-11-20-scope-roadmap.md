@@ -33,11 +33,12 @@ The spec covers independent subsystems, so it is built as separate plans. Each p
 | 24b | [Built](2026-11-22-plan-24b-outside-clients-stronghold-level.md) Outside clients at the Stronghold level: `POST /api/outside/stronghold/ask`, an agent with its own Brain folder (five tools, never the global brain), Legion tool-filter exception form (`"!name"`), Stronghold refuses every other tool for `oc_` uids, purge on client delete | 24 | none |
 | 25 | [Built](2026-11-22-plan-25-start-rule.md) Start rule everywhere: error codes 1000 to 1005 (shared library, Stronghold and Armory tools, Legion loop guard), `/health` and `/ready` in all five services with a Portcullis admin aggregate route (no screen), `depends_on` kept as hints by a compose check, Treasury discovery by probing compose names | any | none |
 | 26 | [Built](2026-11-22-plan-26-obsidian-leftovers-cleanup.md) Leftovers of 22b: Legion `vault-librarian` agent, `brain_scope` / `X-Brain-Destination` plumbing (Legion, Armory, Portcullis), `ember_cli` second-brain fields, dead Stronghold-to-Armory auth paths | 22b | none |
-| 27 | [Built](2026-11-22-plan-27-final-leftovers.md) Final leftovers: Armory prune script for the unused `extensions` and `connections` tables, starter role names (`Power User` to `Tool Services Manager`, `Operator` text), Plan 14 closed | 22c, 22e | none |
+| 27 | [Built](2026-11-22-plan-27-final-leftovers.md) Final leftovers: Armory prune script for the unused `extensions` and `connections` tables (removed again afterwards: a fresh install never creates them), starter role names (`Power User` to `Tool Services Manager`, `Operator` text), Plan 14 closed | 22c, 22e | none |
 
 Order: 16, 17, then 18 and 19 and 23 and 24 may run in parallel (different services). 20a to 20d follow 18. 22 comes last of the data moves. 25 may run alongside.
 
 ## Open checks before the plans that need them
-- Plan 18 and 19: confirm Bard and Scribe serve MCP and REST on one origin (READMEs confirm Lens, Reader, Mimic only).
+- Plan 18 and 19: settled 2026-11-22. Bard and Scribe may be served on the same origin or on different ones; the origin-id model (Plans 16 to 19) supports both, so nothing needs confirming.
 - Plan 20b ships BM25 keyword search. Revisit gateway embedding support when vector search enters scope.
-- Plan 22: sizes of media files against the download caps.
+- Plan 22: settled 2026-11-22. Keep the caps as built (media downloader 500 MB per file and 2,048 MB per account, PDF merger 100 MB and 500 MB, one-hour life; admins tune them on Armory Admin's Limits page). The live-stack runbook has one step that downloads a file near the cap.
+- Plan 24b: settled 2026-11-22. Outside clients never read the global brain, writing to their own folder is always allowed, and recall is always on, as built.

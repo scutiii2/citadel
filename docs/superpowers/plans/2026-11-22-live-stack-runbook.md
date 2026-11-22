@@ -45,6 +45,7 @@ Tick each box and write the date and a few words next to a failure. Source plans
 - [ ] Ask an agent to use `tool_mem_search`: it does not exist. Ask it to save and recall a Brain note: it works. [22]
 - [ ] A normal chat turn and an agent turn with tools still run end to end (Legion no longer takes `enabled_extensions`). A tool call from the agent runs under your account and a forced dependency failure shows a numbered error. [22c, 22d]
 - [ ] Delete a test account that had notes, an old memory and Brain files: the purges run, the log has no `notes`, `brains`, `admin.notes_purge` or `admin.memory_purge` error, and the Brain files are gone. [20j, 22, 22b]
+- [ ] Download a video near the 500 MB per-file cap (or lower the cap on Armory Admin's Limits page to a few MB and use a bigger file): it finishes inside the one-hour life, the disk has room, and an expired link says "Expired". [22]
 - [ ] Make a PDF merge in Ember: the download card shows "Expires in 60 min" or close, and later "Expired". Bard or Scribe dictation in Ember still works through Stronghold. [22]
 
 ## 4. Tickets and usage [Plan 21]
@@ -92,7 +93,7 @@ Run each on desktop, 768px, 767px and 375px, light and dark. Inputs and buttons 
 ## 7. Record the result
 
 - [ ] Note which steps failed and which were skipped, then bring them back as one list. A failed step becomes a fix plan; a passed section can be marked in the vault note for that plan.
-- [ ] Decide the three 24b questions with live behaviour in hand: global-brain reads for outside clients (built "no"), writing as a per-client switch (built "always allowed"), recall switch (built "always on").
+- [ ] The three 24b choices are settled as built (no global-brain reads for outside clients, writing always allowed, recall always on). Reopen them only if a step above shows a problem.
 
 ## Not in this runbook
 
