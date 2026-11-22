@@ -787,7 +787,7 @@ src/
               AccountService, AdminService, AgentDirectory, ChatService, ChatSearch, TemplateService, ShareService, PublicReadLimiter,
               UsageService, McpServerInfo, McpServerTools, mcp_session, LogWriter,
               text_extraction, config_validation, DeviceService, LoginRateLimiter, McpPolicy, McpProxy,
-              permissions, DbGatewayClient (db_gateway), NotesService (notes)
+              permissions, DbGatewayClient (db_gateway)
   routes/     auth, account, admin, settings, chats, templates, shares, usage, mcp, server_info, logs,
               attachments, config_issues
   utils/      config_loader

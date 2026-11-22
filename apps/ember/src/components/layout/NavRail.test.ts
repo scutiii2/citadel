@@ -90,7 +90,7 @@ describe("NavRail", () => {
     const links = pageLinks(wrapper);
 
     // Capabilities, Agents, Usage and Settings sit in the account menu.
-    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader"]);
+    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader"]);
     for (const link of [...links, ...wrapper.findAll("nav.header a")]) {
       expect(link.text()).toBe("");
       expect(link.find("svg").exists()).toBe(true);
@@ -217,7 +217,7 @@ describe("NavRail", () => {
       arrangement({ order: ["/skills", "/notes"], pinned: ["/skills"], hidden: [] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Skills", "Notes", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader"]);
+      expect(labels(wrapper)).toEqual(["Skills", "Notes", "Shares", "Global", "Generator", "PDF merger", "Media downloader"]);
       expect(wrapper.findAll("nav .divider")).toHaveLength(1);
       expect(wrapper.find("nav.pages").element.children[1]!.classList.contains("divider")).toBe(true);
     });
@@ -226,7 +226,7 @@ describe("NavRail", () => {
       arrangement({ order: [], pinned: [], hidden: ["/skills", "/notes"] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader"]);
+      expect(labels(wrapper)).toEqual(["Shares", "Global", "Generator", "PDF merger", "Media downloader"]);
       expect(wrapper.find("nav .divider").exists()).toBe(false);
     });
 
@@ -234,7 +234,7 @@ describe("NavRail", () => {
       arrangement({ order: ["/memory", "/skills", "/notes"], pinned: ["/memory", "/skills"], hidden: ["/notes"] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader"]);
+      expect(labels(wrapper)).toEqual(["Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader"]);
     });
 
     it("keeps the account menu pages out of the arrangement", async () => {
@@ -254,7 +254,7 @@ describe("NavRail", () => {
       release({ order: [], pinned: [], hidden: [] });
       await flushPromises();
 
-      expect(pageLinks(wrapper)).toHaveLength(8);
+      expect(pageLinks(wrapper)).toHaveLength(7);
     });
   });
 
@@ -307,7 +307,7 @@ describe("pages hidden by the administrator", () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage"] });
     const { wrapper } = await setup(ACCOUNT);
 
-    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader"]);
+    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader"]);
     expect(await footerLabels(wrapper)).toEqual(["Capabilities", "Agents", "Settings", "Profile"]);
   });
 
@@ -327,6 +327,6 @@ describe("pages hidden by the administrator", () => {
     expect(pageLinks(wrapper)).toHaveLength(0);
     release({ hidden: [] });
     await flushPromises();
-    expect(pageLinks(wrapper)).toHaveLength(8);
+    expect(pageLinks(wrapper)).toHaveLength(7);
   });
 });

@@ -290,12 +290,6 @@ Usage (/usage, usage.all.view) lists every account for a selected period, includ
 
 Every page view uses PageLayout; the AdminView routing shell and chat/auth screens are exempt. Overview lives at `/overview`; `/` and `/admin` redirect there. Shared PageLayout fixes must be applied in both apps.
 
-## Instance Brain
-
-Manage the shared Obsidian connection in **Armory Admin → Brain** with
-`settings.manage`. `brain.instance.publish` permits publishing shared knowledge.
-See [brain operations](../../../docs/obsidian-brains.md).
-
 Laya's internal strategy is configured in Legion's `gateways/decision/laya.json`
 and read on each call. Admin Tuning edits the gateway strategy and confidence for
 automatic tier selection and specialist routing; no admin or account control

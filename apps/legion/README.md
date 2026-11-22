@@ -721,14 +721,6 @@ See
 [`docs/superpowers/specs/2026-09-07-ai-agent-mcp-layer-design.md`](../docs/superpowers/specs/2026-09-07-ai-agent-mcp-layer-design.md)
 for the full design rationale.
 
-## Scoped second-brain auto-save
-
-Ember's auto-save destination travels as trusted `X-Brain-Destination` identity
-metadata, then as `requester.brain_scope` on Armory calls and headers to delegated
-agents. A model cannot change a constrained personal/instance write destination.
-Normal calls retain their previous metadata shape when no destination is bound.
-See [Obsidian brains](../../docs/obsidian-brains.md).
-
 Treasury bootstrap address lives in tracked `configs/config_app.json` as `treasury_url`; `TREASURY_URL` overrides it. Legion entry agents register their base address in Treasury’s catalog. Treasury Admin, Services controls address pins; Legion Admin no longer edits Treasury’s address.
 
 ## Liveness, readiness, and tool failures

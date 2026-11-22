@@ -74,7 +74,6 @@ class Trusted(BaseModel):
     forced_approval: bool = True
     tools_execute: bool = False
     extension_ids: list[str] = Field(default_factory=list, max_length=500)
-    # Whether auto-save may use each brain (permission, Obsidian write tool, brain connection).
 
 
 class TurnRequest(BaseModel):

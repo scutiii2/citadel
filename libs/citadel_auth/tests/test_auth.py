@@ -111,10 +111,8 @@ async def test_unreadable_trust_fails_closed(stack, monkeypatch):
 
 @pytest.mark.parametrize("audience,caller,path,forward", [
     ("stronghold", "portcullis", "/chat", True),
-    ("stronghold", "armory", "/brains/resolve", True),
     ("stronghold", "legion", "/mcp", True),
     ("armory", "portcullis", "/download/file", True),
-    ("armory", "stronghold", "/notes", True),
     ("armory", "legion", "/mcp", True),
     ("legion", "portcullis", "/agents", True),
     ("legion", "stronghold", "/registry", True),
@@ -125,10 +123,6 @@ async def test_unreadable_trust_fails_closed(stack, monkeypatch):
     ("armory", "portcullis", "/pdf/ui/files", True),
     ("armory", "portcullis", "/tickets/tags", True),
     ("armory", "stronghold", "/upload/pdf", True),
-    ("armory", "stronghold", "/brains/operation", True),
-    ("armory", "stronghold", "/brains/destination", True),
-    ("armory", "portcullis", "/admin/brain", True),
-    ("stronghold", "armory", "/brains/instance-migration", True),
     ("armory", "stronghold", "/ticket-admin/tickets", True),
     ("treasury", "portcullis", "/instances", False),
     ("treasury", "stronghold", "/instances", False),
@@ -145,11 +139,6 @@ def test_policy_rows(audience, caller, path, forward):
 @pytest.mark.parametrize("path", ["/memory/x", "/skills/x", "/tickets/x"])
 def test_armory_may_no_longer_call_stronghold_memory_skills_or_tickets(path):
     assert not allowed("stronghold", "armory", path)
-
-
-@pytest.mark.parametrize("path", ["/notes/x", "/brains/resolve", "/brains/instance-migration"])
-def test_armory_may_still_call_stronghold_for_the_obsidian_chain(path):
-    assert allowed("stronghold", "armory", path)
 
 
 def test_policy_denies_unlisted_routes_and_prefix_lookalikes():
@@ -247,3 +236,24 @@ def test_root_env_overrides_a_service_env(tmp_path, monkeypatch):
     assert root_overrides(armory) == {"TAVILY_API_KEY": "plain", "BARD_TOKEN": "armory-only"}
     assert root_overrides(legion) == {"BARD_TOKEN": "shared"}
     assert root_overrides(tmp_path / "other") == {}
+
+
+@pytest.mark.parametrize("audience,caller,path", [
+    ("stronghold", "armory", "/brains/resolve"),
+    ("stronghold", "armory", "/brains/instance-migration"),
+    ("stronghold", "armory", "/notes/x"),
+    ("armory", "stronghold", "/notes"),
+    ("armory", "stronghold", "/brains/operation"),
+    ("armory", "stronghold", "/brains/destination"),
+])
+def test_the_obsidian_era_paths_are_refused(audience, caller, path):
+    from citadel_auth.policy import allowed
+
+    assert allowed(audience, caller, path) is False
+
+
+def test_the_other_stronghold_and_armory_paths_still_pass():
+    from citadel_auth.policy import allowed
+
+    assert allowed("stronghold", "legion", "/mcp") and allowed("stronghold", "portcullis", "/brains/x")
+    assert allowed("armory", "stronghold", "/upload/pdf") and allowed("armory", "legion", "/mcp")

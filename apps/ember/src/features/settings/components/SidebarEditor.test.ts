@@ -14,7 +14,7 @@ vi.mock("../../../api/navigation/NavPreferencesClient", () => ({
 
 const ACCOUNT = makeAccount({ username: "lex", email: "l@e.com" });
 // chat.use opens: Chat, Capabilities, Agents, Usage, Settings (in that default order).
-const DEFAULT_ORDER = ["Chat", "Capabilities", "Agents", "Usage", "Notes", "Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader", "Settings"];
+const DEFAULT_ORDER = ["Chat", "Capabilities", "Agents", "Usage", "Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader", "Settings"];
 const EMPTY: NavPrefs = { order: [], pinned: [], hidden: [] };
 
 async function setup(stored: NavPrefs = EMPTY) {
@@ -57,7 +57,7 @@ describe("SidebarEditor", () => {
     await row(wrapper, "Chat").find('button[aria-label="Move Chat down"]').trigger("click");
     await flushPromises();
 
-    expect(names(wrapper)).toEqual(["Capabilities", "Chat", "Agents", "Usage", "Notes", "Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader", "Settings"]);
+    expect(names(wrapper)).toEqual(["Capabilities", "Chat", "Agents", "Usage", "Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader", "Settings"]);
     expect(lastSaved().order.slice(0, 2)).toEqual(["/capabilities", "/"]);
   });
 
@@ -75,7 +75,7 @@ describe("SidebarEditor", () => {
     await row(wrapper, "Chat").trigger("drop");
     await flushPromises();
 
-    expect(names(wrapper)).toEqual(["Settings", "Chat", "Capabilities", "Agents", "Usage", "Notes", "Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader"]);
+    expect(names(wrapper)).toEqual(["Settings", "Chat", "Capabilities", "Agents", "Usage", "Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader"]);
   });
 
   it("shows a drop slot after the hovered row when moving down and before it when moving up", async () => {
@@ -84,12 +84,12 @@ describe("SidebarEditor", () => {
 
     await row(wrapper, "Chat").trigger("dragstart");
     await row(wrapper, "Agents").trigger("dragover");
-    expect(order()).toEqual(["Chat", "Capabilities", "Agents", "slot", "Usage", "Notes", "Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader", "Settings"]);
+    expect(order()).toEqual(["Chat", "Capabilities", "Agents", "slot", "Usage", "Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader", "Settings"]);
 
     await row(wrapper, "Chat").trigger("dragend");
     await row(wrapper, "Settings").trigger("dragstart");
     await row(wrapper, "Capabilities").trigger("dragover");
-    expect(order()).toEqual(["Chat", "slot", "Capabilities", "Agents", "Usage", "Notes", "Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader", "Settings"]);
+    expect(order()).toEqual(["Chat", "slot", "Capabilities", "Agents", "Usage", "Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader", "Settings"]);
   });
 
   it("shows no slot over the dragged row, after a drop or after the drag ends", async () => {
@@ -113,7 +113,7 @@ describe("SidebarEditor", () => {
     await wrapper.find(".slot").trigger("drop");
     await flushPromises();
 
-    expect(names(wrapper)).toEqual(["Capabilities", "Agents", "Chat", "Usage", "Notes", "Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader", "Settings"]);
+    expect(names(wrapper)).toEqual(["Capabilities", "Agents", "Chat", "Usage", "Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader", "Settings"]);
   });
 
   it("pins and unpins a page", async () => {
@@ -174,6 +174,6 @@ describe("pages hidden by the administrator", () => {
   it("are not offered to the account, and visible pages remain available", async () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage", "/agents"] });
 
-    expect(names(await setup())).toEqual(["Chat", "Capabilities", "Notes", "Skills", "Shares", "Global", "Brains", "Generator", "PDF merger", "Media downloader", "Settings"]);
+    expect(names(await setup())).toEqual(["Chat", "Capabilities", "Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader", "Settings"]);
   });
 });

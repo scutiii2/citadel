@@ -322,7 +322,7 @@ async def switch_capability(
 
 @router.get("/armory-environment")
 async def armory_environment(account: Account = Depends(require_admin), info: McpServerInfo = Depends(get_server_info)) -> Any:
-    """Armory's deployment values (addresses, link keys, Obsidian, folders). A secret is never returned."""
+    """Armory's deployment values (addresses, link keys, folders). A secret is never returned."""
     return await _call(info.environment(account))
 
 

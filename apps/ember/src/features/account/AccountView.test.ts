@@ -70,8 +70,8 @@ describe("AccountView", () => {
   it("lists the pages the tab bar leaves out", async () => {
     const wrapper = await mountView([]);
 
-    // chat.use: Agents, Notes, Skills, Shares, Global, Brains and Settings; Chat, Capabilities and Usage are in the bar.
-    expect(wrapper.findAll(".more-list a").map((a) => a.text())).toEqual(["Agents", "Notes", "Skills", "Shares", "Global", "Brains", "Settings"]);
+    // chat.use: Agents, Notes, Skills, Shares, Global and Settings; Chat, Capabilities and Usage are in the bar.
+    expect(wrapper.findAll(".more-list a").map((a) => a.text())).toEqual(["Agents", "Notes", "Skills", "Shares", "Global", "Settings"]);
   });
 
   it("cycles the theme and logs out to the login page", async () => {

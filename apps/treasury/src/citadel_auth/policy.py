@@ -14,12 +14,11 @@ class Rule:
 POLICY = {
     "stronghold": {
         "portcullis": Rule(("/",), True),
-        "armory": Rule(("/brains/resolve", "/brains/instance-migration", "/notes"), True),
         "legion": Rule(("/mcp",), True),
     },
     "armory": {
         "portcullis": Rule(("/mcp", "/upload", "/download", "/media", "/pdf", "/admin", "/capabilities", "/extensions", "/commands", "/tickets/tags", "/connections"), True),
-        "stronghold": Rule(("/mcp", "/skills", "/memory", "/notes", "/tickets", "/ticket-admin", "/upload", "/brains/operation", "/brains/destination", "/connections"), True),
+        "stronghold": Rule(("/mcp", "/skills", "/memory", "/tickets", "/ticket-admin", "/upload", "/connections"), True),
         "legion": Rule(("/mcp",), True),
     },
     "legion": {
