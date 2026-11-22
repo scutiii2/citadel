@@ -67,7 +67,7 @@ def test_crawl_site_reports_a_running_job_and_a_failed_one():
     client.crawl.return_value = ("scraping", [])
     assert "still running" in domain.FirecrawlDesk(client).crawl_site("https://a.test").message
     client.crawl.return_value = ("failed", [])
-    with pytest.raises(ValueError, match="failed"):
+    with pytest.raises(FirecrawlError, match="failed crawl"):
         domain.FirecrawlDesk(client).crawl_site("https://a.test")
 
 

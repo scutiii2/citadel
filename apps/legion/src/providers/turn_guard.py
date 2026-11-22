@@ -6,6 +6,7 @@ import asyncio
 import json
 from typing import Any
 
+from src.citadel_auth.failure import parse
 
 
 class TurnStopped(Exception):
@@ -25,6 +26,7 @@ class TurnGuard:
         self.max_seconds = max_seconds
         self._last_call: str | None = None
         self._repetitions = 0
+        self._failures: dict[str, str] = {}
 
     def timeout(self) -> asyncio.Timeout:
         """Apply the turn deadline to the entire provider loop."""
@@ -34,8 +36,24 @@ class TurnGuard:
         if total is not None and total >= self.max_tokens:
             raise TurnStopped(f"Stopped: this turn reached its token budget ({self.max_tokens:,} tokens).")
 
+    @staticmethod
+    def _call_key(name: str, arguments: Any) -> str:
+        return json.dumps([name, arguments], sort_keys=True, separators=(",", ":"))
+
+    def note_result(self, name: str, arguments: Any, text: str) -> None:
+        failure = parse(text)
+        if failure is None:
+            return
+        key = self._call_key(name, arguments)
+        if failure.retryable is False:
+            self._failures[key] = failure.text
+        elif key == self._last_call:
+            self._last_call = None
+
     def check_call(self, name: str, arguments: Any) -> None:
-        key = json.dumps([name, arguments], sort_keys=True, separators=(",", ":"))
+        key = self._call_key(name, arguments)
+        if key in self._failures:
+            raise TurnStopped(self._failures[key])
         self._repetitions = self._repetitions + 1 if key == self._last_call else 1
         self._last_call = key
         if self._repetitions >= 3:

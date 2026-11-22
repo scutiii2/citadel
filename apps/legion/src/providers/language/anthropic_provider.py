@@ -34,7 +34,7 @@ from src.providers.context_breakdown import ProviderCounter, breakdown_fields
 from src.providers.base_provider import (
     BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, cancel_on_stop, dispatch_with_progress, step_event,
 )
-from src.tools.mcp_client.mcp_upstream import call_tool, list_tools, tool_description
+from src.tools.mcp_client.mcp_upstream import NumberedFailureText, call_tool, list_tools, tool_description
 
 
 PROVIDER_NAME = "anthropic"
@@ -511,6 +511,9 @@ async def run_chat(
                             except Exception as error:
                                 result_text = f"Tool '{block.name}' failed: {error}"
                                 ok = False
+                    if isinstance(result_text, NumberedFailureText):
+                        guard.note_result(block.name, block.input, result_text)
+                        ok = False
                     if on_event:
                         await on_event(step_event("step_end", id=step_id, ok=ok, result=result_text))
                     tool_calls.append(ToolCallRecord(name=block.name, arguments=block.input, result=result_text))

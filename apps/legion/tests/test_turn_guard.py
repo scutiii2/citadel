@@ -15,7 +15,7 @@ from tests.test_openai_provider import _fake_stream
 
 
 @pytest.mark.parametrize("provider", [anthropic_provider, openai_provider])
-@pytest.mark.parametrize("reason", ["tokens", "repeat", "time"])
+@pytest.mark.parametrize("reason", ["tokens", "repeat", "time", "numbered", "lookalike"])
 def test_provider_stops_before_executing_more_tools(monkeypatch, provider, reason):
     llm_options.reset_cache()
     monkeypatch.setattr(provider.token_limits, "_config", None)
@@ -26,7 +26,17 @@ def test_provider_stops_before_executing_more_tools(monkeypatch, provider, reaso
     monkeypatch.setattr(provider.agent_routing, "roster_for", AsyncMock(return_value=[]))
     monkeypatch.setattr(provider, "_tool_schemas", lambda *args: [])
     executed = []
-    monkeypatch.setattr(provider, "_dispatch", lambda name, args, depth: executed.append(args) or "ok")
+    def dispatch(name, args, depth):
+        executed.append(args)
+        if reason in ("numbered", "lookalike"):
+            text = "[1004] DEP_AUTH_REJECTED treasury rejected the service token"
+            if reason == "numbered":
+                from src.tools.mcp_client.mcp_upstream import NumberedFailureText
+                return NumberedFailureText(text)
+            return text
+        return "ok"
+
+    monkeypatch.setattr(provider, "_dispatch", dispatch)
     client = MagicMock()
     rounds = []
     for index in range(4):
@@ -54,8 +64,13 @@ def test_provider_stops_before_executing_more_tools(monkeypatch, provider, reaso
         cancellation.link("budgeted-turn", "budgeted-child")
     try:
         result = asyncio.run(provider.run_chat("go", [], request_id="budgeted-turn", on_event=emit))
-        assert len(executed) == (2 if reason == "repeat" else 0)
-        assert {"tokens": "token budget", "repeat": "repeated", "time": "time budget"}[reason] in result.response.lower()
+        counts = {"repeat": 2, "numbered": 1, "lookalike": 2}
+        messages = {"tokens": "token budget", "repeat": "repeated", "time": "time budget",
+                    "numbered": "1004", "lookalike": "repeated"}
+        assert len(executed) == counts.get(reason, 0)
+        assert messages[reason] in result.response.lower()
+        if reason == "numbered":
+            assert any(event.get("ok") is False and "1004" in event.get("result", "") for event in events)
         assert events[-1] == {"type": "token", "text": result.response}
         if reason == "time":
             assert cancellation.is_cancelled("budgeted-child")
@@ -80,3 +95,36 @@ def test_agent_rejects_invalid_turn_caps(tmp_path, key, value):
     path.write_text(json.dumps({"role": "specialist", "port": 9103, "llm": {"provider": "openai", key: value}}))
     with pytest.raises(agent_spec.AgentSpecError, match=key):
         agent_spec.load_file(path)
+
+def test_a_non_retryable_failure_stops_the_same_call_from_repeating():
+    import pytest
+    from src.providers.turn_guard import TurnGuard, TurnStopped
+
+    guard = TurnGuard()
+    guard.check_call("stronghold__tool_ticket_getTicket", {"id": "t1"})
+    guard.note_result("stronghold__tool_ticket_getTicket", {"id": "t1"}, "[1004] DEP_AUTH_REJECTED treasury rejected the service token")
+    with pytest.raises(TurnStopped) as stopped:
+        guard.check_call("stronghold__tool_ticket_getTicket", {"id": "t1"})
+    assert "1004" in str(stopped.value)
+
+
+def test_a_retryable_failure_does_not_block_a_retry():
+    from src.providers.turn_guard import TurnGuard
+
+    guard = TurnGuard()
+    guard.note_result("t", {}, "[1002] DEP_UNAVAILABLE treasury unavailable")
+    guard.check_call("t", {})  # must not raise
+
+
+@pytest.mark.parametrize("text", [
+    "[1002] DEP_UNAVAILABLE treasury unavailable",
+    "[1003] DEP_TIMEOUT treasury timed out",
+    "[1005] DEP_ERROR treasury returned an error",
+])
+def test_a_numbered_retry_can_repeat_under_the_turn_budget(text):
+    from src.providers.turn_guard import TurnGuard
+
+    guard = TurnGuard()
+    for _ in range(4):
+        guard.check_call("t", {})
+        guard.note_result("t", {}, text)

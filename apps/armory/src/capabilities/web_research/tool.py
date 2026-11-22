@@ -10,15 +10,19 @@ from pydantic import Field
 
 from src.capabilities.web_research import domain
 from src.capabilities.web_research.contract import PageResult, SearchResult
-from src.capabilities.web_research.utils.tavily import TavilyClient
+from src.capabilities.web_research.utils.tavily import TavilyClient, TavilyError
 from src.commands import command
 from src.config import settings
+from src.citadel_auth.failure import Code, Failure
+from src.errors import numbered_dependency
 from src.offload import offload
 from src.server import mcp
 
 
 def _client() -> TavilyClient:
     # Built per call so a missing key fails this tool, not server startup.
+    if not settings.tavily_api_key:
+        raise Failure(Code.DEP_NOT_CONFIGURED, "tavily")
     return TavilyClient(settings.tavily_api_key)
 
 
@@ -28,6 +32,7 @@ _READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
 
 @command(name="search", description="Search the web")
 @mcp.tool(meta={"keywords": ["web", "search", "internet", "google", "look up", "research", "news", "find"], "display_label": "Searching the web"}, annotations=_READ_ONLY)
+@numbered_dependency("tavily", TavilyError)
 @offload
 def tool_web_search(
     query: Annotated[str, Field(description="What to search for, as a plain search query.")],
@@ -43,6 +48,7 @@ def tool_web_search(
 
 @command(name="read", description="Read a web page")
 @mcp.tool(meta={"keywords": ["web", "page", "url", "read", "open", "fetch", "article", "link"], "display_label": "Reading web page"}, annotations=_READ_ONLY)
+@numbered_dependency("tavily", TavilyError)
 @offload
 def tool_web_readPage(
     url: Annotated[str, Field(description="The full http:// or https:// address, e.g. one from `tool_web_search`.")],

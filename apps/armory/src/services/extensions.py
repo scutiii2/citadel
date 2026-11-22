@@ -19,6 +19,7 @@ from mcp.client.session import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 
 from src.config import settings
 from src.service_catalog import require_internal_origin
@@ -32,6 +33,7 @@ from src.services.app_config import (
 from src.services.connections import extension_entry
 from src.services.identity_context import current_email, current_username
 from src.citadel_auth import ServiceAuth, requester_meta
+from src.errors import DependencyToolError
 from src.services.service_auth import keyring, mcp_requester
 
 logger = logging.getLogger(__name__)
@@ -394,7 +396,14 @@ class ExtensionRegistry:
             logger.info("tool call %s by %s", name, current_username() or current_email() or "-")
             if self.is_proxied(name):
                 return await self.call(name, arguments)
-            return await self._mcp.call_tool(name, arguments)
+            try:
+                return await self._mcp.call_tool(name, arguments)
+            except ToolError as error:
+                if isinstance(error.__cause__, DependencyToolError):
+                    return types.CallToolResult(
+                        isError=True, content=[types.TextContent(type="text", text=str(error.__cause__))]
+                    )
+                raise
 
     def install(self, mcp: FastMCP) -> None:
         """Wire this registry's tools into `mcp`'s list_tools/call_tool by re-registering the handlers (see module docstring).

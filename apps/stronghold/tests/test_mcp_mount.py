@@ -97,9 +97,9 @@ def test_signed_legion_calls_carry_verified_mcp_metadata(client, auth_stack, db_
         "name": "tool_stack_list", "arguments": {},
         "_meta": {"requester_token": token, "chat_id": CHAT},
     }, headers=headers)
-    assert result(refused)["structuredContent"] == {
-        "ok": False, "message": "Short-term memory storage is unavailable.",
-    }
+    failure = result(refused)
+    assert failure["isError"] is True
+    assert failure["content"][0]["text"] == "[1002] DEP_UNAVAILABLE treasury unavailable"
     assert client.get(f"/stack/{CHAT}").status_code == 503
 
 
@@ -181,4 +181,8 @@ def test_ticket_and_usage_tools_use_the_signed_account_and_return_refusals(clien
         raise DbGatewayUnavailable("storage failure")
 
     monkeypatch.setattr(db_gateway, "query", down)
-    assert call("tool_ticket_listMyTickets", {}, ana) == {"ok": False, "message": "Storage is unavailable."}
+    refused = result(rpc(client, legion, "tools/call", {
+        "name": "tool_ticket_listMyTickets", "arguments": {}, "_meta": {"requester_token": ana},
+    }, headers=headers))
+    assert refused["isError"] is True
+    assert refused["content"][0]["text"] == "[1002] DEP_UNAVAILABLE treasury unavailable"

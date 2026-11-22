@@ -6,7 +6,7 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 from src.capabilities.web_research.contract import PageResult, SearchHit, SearchResult
-from src.capabilities.web_research.utils.tavily import TavilyClient
+from src.capabilities.web_research.utils.tavily import TavilyClient, TavilyError
 from src.services import untrusted
 
 MAX_RESULTS = 10
@@ -34,16 +34,20 @@ class WebResearchDesk:
             raise ValueError(f"max_results must be between 1 and {MAX_RESULTS}, not {max_results}")
         if topic not in TOPICS:
             raise ValueError(f"topic must be one of {', '.join(TOPICS)}, not {topic!r}")
-        hits = [
-            SearchHit(
-                title=item.get("title") or item["url"],
-                url=item["url"],
-                snippet=_snippet(item.get("content") or ""),
-                score=round(float(item.get("score") or 0.0), 3),
-            )
-            for item in self._client.search(query, max_results, topic)
-            if item.get("url")
-        ]
+        results = self._client.search(query, max_results, topic)
+        try:
+            hits = [
+                SearchHit(
+                    title=item.get("title") or item["url"],
+                    url=item["url"],
+                    snippet=_snippet(item.get("content") or ""),
+                    score=round(float(item.get("score") or 0.0), 3),
+                )
+                for item in results
+                if item.get("url")
+            ]
+        except (TypeError, ValueError, AttributeError):
+            raise TavilyError("Tavily returned an invalid search result.") from None
         message = f"{len(hits)} results for {query!r}." if hits else f"No results for {query!r}."
         return SearchResult(query=query, results=hits, message=message)
 

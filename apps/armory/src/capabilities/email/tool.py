@@ -7,7 +7,10 @@ from pydantic import Field
 from src.capabilities.email import domain
 from src.capabilities.email.contract import AuditResult, SendResult
 from src.commands import command
+from src.citadel_auth.failure import Code, Failure
+from src.errors import numbered_dependency
 from src.offload import offload
+from src.services.email.delivery import EmailDeliveryError, EmailUnavailable
 from src.server import mcp
 
 Recipients = Annotated[str, Field(description="Recipient addresses separated by commas.")]
@@ -23,6 +26,7 @@ References = Annotated[str, Field(description="Optional earlier bracketed Messag
 @command(name="send", description="Send an email")
 @mcp.tool(meta={"keywords": ["email", "mail", "send", "notify"], "display_label": "Sending email"},
           annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True))
+@numbered_dependency("smtp", EmailDeliveryError)
 @offload
 def tool_email_sendEmail(to: Recipients, subject: Subject, body_text: Text = None,
                          body_html: Html = None, capability_alias: Alias = "email",
@@ -32,12 +36,16 @@ def tool_email_sendEmail(to: Recipients, subject: Subject, body_text: Text = Non
     thread. SMTP acceptance does not guarantee inbox delivery. Never retry automatically
     after an ambiguous failure. Bodies are not kept in this capability's audit log.
     """
-    return domain.desk.send(to, subject, body_text, body_html, capability_alias, prefix_subject)
+    try:
+        return domain.desk.send(to, subject, body_text, body_html, capability_alias, prefix_subject)
+    except EmailUnavailable:
+        raise Failure(Code.DEP_NOT_CONFIGURED, "smtp") from None
 
 
 @command(name="reply", description="Send a reply in an email thread")
 @mcp.tool(meta={"keywords": ["email", "mail", "reply", "thread"], "display_label": "Sending email reply"},
           annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True))
+@numbered_dependency("smtp", EmailDeliveryError)
 @offload
 def tool_email_replyEmail(to: Recipients, subject: Subject, in_reply_to: Parent,
                           body_text: Text = None, body_html: Html = None,
@@ -47,8 +55,11 @@ def tool_email_replyEmail(to: Recipients, subject: Subject, in_reply_to: Parent,
     Use the same recipients, subject and prefix choice as the original email.
     Uses MCP SMTP configuration; never ask for credentials or automatically retry.
     """
-    return domain.desk.reply(to, subject, in_reply_to, body_text, body_html,
-                        capability_alias, prefix_subject, references)
+    try:
+        return domain.desk.reply(to, subject, in_reply_to, body_text, body_html,
+                                 capability_alias, prefix_subject, references)
+    except EmailUnavailable:
+        raise Failure(Code.DEP_NOT_CONFIGURED, "smtp") from None
 
 
 # MCP-only: account-scoped metadata for history surfaces, without message contents.

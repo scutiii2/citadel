@@ -22,6 +22,7 @@ from src.tools.mcp_client import tool_progress
 from src.runtime.config_files import SETTINGS_DB
 from src.tools.mcp_client.sync_wrapper import SyncMcpClient
 from src.citadel_auth import ServiceAuth, settings_store
+from src.citadel_auth.failure import parse
 from src.runtime.service_catalog import catalog
 
 import asyncio
@@ -172,6 +173,10 @@ def _qualified(name: str) -> str:
     return _PREFIX + name if _PREFIX + name in listed else name
 
 
+class NumberedFailureText(str):
+    """Error content emitted by a Citadel MCP tool."""
+
+
 def call_tool(name: str, arguments: dict[str, Any]) -> str:
     name = _qualified(name)
     private = name.startswith(private_turn.TOOL_PREFIX)
@@ -197,7 +202,13 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
         extra["meta"] = meta
     result = client.call_tool(name, arguments, **extra)
     parts = [getattr(block, "text", str(block)) for block in result.content]
-    return "\n".join(parts) if parts else "(no output)"
+    text = "\n".join(parts) if parts else "(no output)"
+    citadel_tool = name.startswith(_STRONGHOLD_PREFIX) or (
+        name.startswith(_PREFIX) and "__" not in name.removeprefix(_PREFIX)
+    )
+    if citadel_tool and getattr(result, "isError", False) and parse(text) is not None:
+        return NumberedFailureText(text)
+    return text
 
 
 def _call_private(name: str, arguments: dict[str, Any]) -> str:
