@@ -1,0 +1,12 @@
+# Setup overlay: opens the two gateway admin pages on this machine only (127.0.0.1), to create Legion's token and the
+# gateway entries. Use it while setting up, then start without it so the gateways have no host port again.
+# Start:  docker compose -f docker-compose.yml -f docker-compose.gateway-admin.yml up -d conversation-gateway decision-gateway
+# Stop any standalone gateway stack first: it publishes the same host ports (29407, 29406).
+
+services:
+  conversation-gateway:
+    ports:
+      - "127.0.0.1:29407:29407"
+  decision-gateway:
+    ports:
+      - "127.0.0.1:29406:29406"
