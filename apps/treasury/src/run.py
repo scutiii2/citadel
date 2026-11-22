@@ -20,7 +20,7 @@ def build_app():
     registry = ConnectionRegistry(connections.connections, build_backend)
     manager = InstanceManager(connections.instances, registry)
     log.info("instances: %s", ", ".join(connections.instances) or "none")
-    return create_app(manager, settings_db=SETTINGS_DB), config
+    return create_app(manager, settings_db=SETTINGS_DB, discovery_enabled=True), config
 
 
 def main() -> None:

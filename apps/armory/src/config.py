@@ -59,34 +59,13 @@ class Settings:
     # records. Relative to CWD, like uploads_dir.
     watchers_dir: Path = Path(_env("MCP_WATCHERS_DIR", str(DATA / "watchers")))
     email_audit_path: Path = Path(_env("MCP_EMAIL_AUDIT_PATH", str(DATA / "email" / "audit.db")))
-    # Per-user memory notes (capabilities/memory). Runtime state: gitignored.
-    memory_db_path: Path = Path(_env("MCP_MEMORY_DB_PATH", str(DATA / "memory" / "memory.db")))
-    # Per-user learned skills (capabilities/skills). Runtime state: gitignored.
-    skills_db_path: Path = Path(_env("MCP_SKILLS_DB_PATH", str(DATA / "skills" / "skills.db")))
-    # Capability toggles, extensions and ticket settings that admin pages change (citadel_auth/settings_store.py).
+    # Capability toggles and settings that admin pages change (citadel_auth/settings_store.py).
     settings_db_path: Path = Path(_env("MCP_SETTINGS_DB_PATH", str(DATA / "settings.db")))
-    # Support tickets (capabilities/tickets/utils/service.py): SQLite file and the optional Laya MCP address (http://host:29611/mcp).
-    # Blank LAYA_URL skips Laya; tickets still work.
-    tickets_db_path: Path = Path(_env("MCP_TICKETS_DB_PATH", str(DATA / "tickets" / "tickets.db")))
-    laya_url: str = _env("LAYA_URL", "")
-    # db_gateway, where portcullis keeps per-account notes; the notes capability reads those shared with agents.
-    # The instance must list the connection; requests carry Armory service assertions.
+    # The Treasury instance and connection Armory registers itself under (run.py). The instance must list the connection.
     treasury_url: str = _env("TREASURY_URL", str(_APP.get("treasury_url") or "http://127.0.0.1:29602"))
     advertise_url: str | None = _APP.get("advertise_url") or None
     db_gateway_instance: str = _env("DB_GATEWAY_INSTANCE", "mcp_server")
     db_gateway_connection: str = _env("DB_GATEWAY_CONNECTION", "data")
-    # Obsidian Local REST API. Never include the address or credential in settings repr.
-    obsidian_base_url: str = field(default=_env("OBSIDIAN_BASE_URL", "https://127.0.0.1:27124"), repr=False)
-    obsidian_api_key: str = field(default=_env("OBSIDIAN_API_KEY", ""), repr=False)
-    obsidian_timeout: float = float(_env("OBSIDIAN_TIMEOUT", "5"))
-    obsidian_verify_tls: bool = _env("OBSIDIAN_VERIFY_TLS", "true").lower() != "false"
-    obsidian_allow_write: bool = _env("OBSIDIAN_ALLOW_WRITE", "false").lower() == "true"
-    obsidian_vault_path: str = _env("OBSIDIAN_VAULT_PATH", "")
-    obsidian_index_path: Path = Path(_env("OBSIDIAN_INDEX_PATH", str(CACHE / "obsidian" / "index.db")))
-    obsidian_ollama_url: str = _env("OBSIDIAN_OLLAMA_URL", "http://127.0.0.1:11434")
-    obsidian_embed_model: str = _env("OBSIDIAN_EMBED_MODEL", "nomic-embed-text")
-    obsidian_refresh_seconds: float = float(_env("OBSIDIAN_REFRESH_SECONDS", "60"))
-    # Stronghold keeps the brain connections; Armory asks it which one an account may use.
     # Tavily API key for the web_research capability. Blank until set in .env;
     # the tools then fail with a message naming the variable.
     tavily_api_key: str = _env("TAVILY_API_KEY", "")
@@ -102,9 +81,7 @@ class Settings:
     media_signing_key: str = _env("MCP_MEDIA_SIGNING_KEY", "")
 
     # Folders the read-only capabilities look at, relative to apps/armory/.
-    # usage_report: ai_agent's usage log. vault: the Obsidian vault. repo_reader: the folder holding project repos.
-    usage_dir: Path = Path(_env("MCP_USAGE_DIR", str(data_dir(_PROJECT.parent / "legion") / "usage")))
-    vault_dir: Path = Path(_env("MCP_VAULT_DIR", "../../../../Brain"))
+    # repo_reader: the folder holding project repos.
     workspace_dir: Path = Path(_env("MCP_WORKSPACE_DIR", "../../../.."))
 
 

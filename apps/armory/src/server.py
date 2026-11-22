@@ -5,6 +5,10 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+from src import ready
 from src.config import settings
 
 # host=settings.host (not the library's 127.0.0.1) matters: FastMCP enables Host-header DNS-rebinding protection
@@ -17,3 +21,12 @@ mcp = FastMCP(
     ),
     host=settings.host,
 )
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(_request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok"})
+
+
+@mcp.custom_route("/ready", methods=["GET"])
+async def readiness(_request: Request) -> JSONResponse:
+    return JSONResponse(await ready.probe.check(ready.dependencies()))

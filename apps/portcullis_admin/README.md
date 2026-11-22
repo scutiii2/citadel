@@ -40,7 +40,6 @@ scoped by port, so the same portcullis session cookie is sent.
 | Page | Needs |
 |---|---|
 | Capabilities (`/capabilities`) | `capabilities.manage` |
-| Extensions (`/extensions`) | `extensions.manage` |
 | Agents (`/agents`) | `agents.manage` |
 | Tickets (`/tickets`) | `tickets.manage` |
 | Config issues (`/config-issues`) | `config.issues.view`; not a rail tab: a red or amber alert with a count shows in the rail, and the page opens, only while there are issues |
@@ -234,8 +233,8 @@ access through the one-time API migration; role editors list the new permissions
 
 Administration uses `accounts.view`, `accounts.manage`, `accounts.delete`,
 `roles.view`, `roles.manage`, `roles.assign`, `invites.manage`, and
-`settings.manage`. Shared capability controls use `capabilities.manage`; shared
-extension management remains `extensions.manage`. The all-account usage report
+`settings.manage`. Shared capability controls use `capabilities.manage`;
+tool services management uses `tool_services.manage`. The all-account usage report
 uses `usage.all.view`. Navigation and controls follow these permissions, and the
 API enforces every action. Delegated administrators can only grant or change
 roles within their own permissions.
@@ -289,12 +288,6 @@ loading, API cache exclusion and reconnection.
 Usage (/usage, usage.all.view) lists every account for a selected period, including zero-usage accounts. Select a user for rolling limits, totals, activity, annual heatmap, breakdown, recent calls and a Markdown export. It does not require chat.use or accounts.view.
 
 Every page view uses PageLayout; the AdminView routing shell and chat/auth screens are exempt. Overview lives at `/overview`; `/` and `/admin` redirect there. Shared PageLayout fixes must be applied in both apps.
-
-## Instance Brain
-
-Manage the shared Obsidian connection in **Armory Admin → Brain** with
-`settings.manage`. `brain.instance.publish` permits publishing shared knowledge.
-See [brain operations](../../../docs/obsidian-brains.md).
 
 Laya's internal strategy is configured in Legion's `gateways/decision/laya.json`
 and read on each call. Admin Tuning edits the gateway strategy and confidence for

@@ -14,11 +14,11 @@ class Rule:
 POLICY = {
     "stronghold": {
         "portcullis": Rule(("/",), True),
-        "armory": Rule(("/brains/resolve", "/brains/instance-migration", "/notes", "/memory", "/skills", "/tickets"), True),
+        "legion": Rule(("/mcp",), True),
     },
     "armory": {
-        "portcullis": Rule(("/mcp", "/upload", "/download", "/media", "/pdf", "/admin", "/capabilities", "/extensions", "/commands", "/tickets/tags", "/connections"), True),
-        "stronghold": Rule(("/mcp", "/skills", "/memory", "/notes", "/tickets", "/ticket-admin", "/upload", "/brains/operation", "/brains/destination", "/connections"), True),
+        "portcullis": Rule(("/mcp", "/upload", "/download", "/media", "/pdf", "/admin", "/capabilities", "/commands", "/tickets/tags"), True),
+        "stronghold": Rule(("/mcp", "/upload"), True),
         "legion": Rule(("/mcp",), True),
     },
     "legion": {
@@ -27,15 +27,19 @@ POLICY = {
         "stronghold": Rule(("/mcp", "/registry", "/agents"), True),
         "legion": Rule(("/mcp",), True),
     },
-    "treasury": {name: Rule(("/",)) for name in ("portcullis", "stronghold", "legion", "armory")},
+    "treasury": {
+        **{name: Rule(("/",)) for name in ("portcullis", "stronghold", "legion", "armory")},
+        "treasury": Rule(("/outside",)),
+    },
     "portcullis": {"stronghold": Rule(("/internal",))},
 }
 
 
 def allowed(audience: str, caller: str, path: str) -> bool:
     rule = POLICY.get(audience, {}).get(caller)
-    return bool(rule and any(prefix == "/" or path == prefix or path.startswith(prefix + "/")
-                             for prefix in rule.prefixes))
+    return bool(rule and (path == "/ready" or any(
+        prefix == "/" or path == prefix or path.startswith(prefix + "/") for prefix in rule.prefixes
+    )))
 
 
 def may_forward(audience: str, caller: str) -> bool:

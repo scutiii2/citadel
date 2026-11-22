@@ -43,8 +43,8 @@ class Caller:
     username: str
     email: str
     uid: str = ""
-    brain_scope: str = ""
     requester_token: str = field(default="", repr=False)
+    chat_id: str = ""
 
 
 class AgentGateway(Protocol):
@@ -57,7 +57,6 @@ class AgentGateway(Protocol):
         history: list[dict[str, str]],
         request_id: str,
         caveman: bool,
-        enabled_extensions: list[str],
         on_event: EventHandler,
         approval_mode: str = "off",
         allowed_tools: list[str] | None = None,
@@ -91,10 +90,7 @@ class McpAgentGateway:
         self._keyring = keyring or service_auth.keyring
 
     def _headers(self, caller: Caller) -> dict[str, str]:
-        headers = requester_header(current_requester_token() or caller.requester_token)
-        if caller.brain_scope in {"instance", "personal"}:
-            headers["X-Brain-Destination"] = caller.brain_scope
-        return headers
+        return requester_header(current_requester_token() or caller.requester_token)
 
     async def _call(
         self,
@@ -140,7 +136,6 @@ class McpAgentGateway:
         history,
         request_id,
         caveman,
-        enabled_extensions,
         on_event,
         approval_mode="off",
         allowed_tools=None,
@@ -158,8 +153,6 @@ class McpAgentGateway:
             "history": history,
             "request_id": request_id,
             "caveman": caveman,
-            # Which extensions' tools the agent may use; none by default.
-            "enabled_extensions": enabled_extensions,
         }
         if approval_mode != "off":
             # Fail closed: an ai_agent that predates this option would ignore
@@ -222,6 +215,8 @@ class McpAgentGateway:
             status = await self._call(url, caller, "status", {})
             if status.get("user_limits"):
                 arguments["limits"] = limits
+        if caller.chat_id:
+            arguments["chat_id"] = caller.chat_id
         return await self._call(url, caller, "ask", arguments, on_event)
 
     async def interpret(self, url, caller, text):

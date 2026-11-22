@@ -30,9 +30,7 @@ from src.deps import (
     require_permission,
 )
 from src.models import Account
-from src.routes.server_info import get_server_info
-from src.services.brain_client import RemoteBrains
-from src.services import question_answers, second_brain
+from src.services import question_answers
 from src.services.chat_service import (
     TITLE_MAX,
     ChatLimitError,
@@ -45,11 +43,6 @@ from src.services.chat_service import (
     decode_messages,
 )
 from src.services.log_service import LogWriter
-from src.services.mcp_server_info import (
-    McpServerInfo,
-    McpServerRefused,
-    McpServerUnavailable,
-)
 from src.services.permissions import CHAT_USE, TOOLS_EXECUTE
 from src.services.pricing import Pricing, with_cost
 from src.services.settings_service import FORCE_TOOL_APPROVAL, SettingsService
@@ -193,8 +186,6 @@ class UpdateChatRequest(BaseModel):
     title: str | None = Field(default=None, max_length=TITLE_MAX)
     folder_id: int | None = None
     pinned: bool | None = None
-    save_to_second_brain: bool | None = None
-    second_brain_scope: Literal["instance", "personal"] | None = None
 
     @field_validator("title")
     @classmethod
@@ -203,8 +194,8 @@ class UpdateChatRequest(BaseModel):
 
     @model_validator(mode="after")
     def something_to_change(self) -> UpdateChatRequest:
-        if self.title is None and self.pinned is None and self.save_to_second_brain is None and self.second_brain_scope is None and "folder_id" not in self.model_fields_set:
-            raise ValueError("send a title, a folder_id, pinned or save_to_second_brain")
+        if self.title is None and self.pinned is None and "folder_id" not in self.model_fields_set:
+            raise ValueError("send a title, a folder_id or pinned")
         return self
 
 
@@ -221,8 +212,6 @@ class TurnRequest(BaseModel):
     # Send no earlier messages to the agent: this question stands alone. The chat still saves them.
     independent: bool = False
     # None uses the saved preference; older clients never enable it accidentally.
-    save_to_second_brain: bool | None = None
-    second_brain_scope: Literal["instance", "personal"] | None = None
     # The agent may keep a task checklist (update_plan); plan_lean asks it to update the list only on a status change.
     plan: bool = True
     plan_lean: bool = True
@@ -311,8 +300,6 @@ class ChatSummaryOut(BaseModel):
     # The folder this chat is filed in (chat-folders id), and whether it is pinned.
     folder_id: int | None = None
     pinned: bool = False
-    save_to_second_brain: bool = False
-    second_brain_scope: Literal["instance", "personal"] = "instance"
 
     @classmethod
     def of(cls, chat: ChatRecord, running: bool = False) -> ChatSummaryOut:
@@ -326,8 +313,6 @@ class ChatSummaryOut(BaseModel):
             running=running,
             folder_id=chat.folder_id,
             pinned=chat.pinned,
-            save_to_second_brain=chat.save_to_second_brain,
-            second_brain_scope=chat.second_brain_scope,
         )
 
 
@@ -405,23 +390,6 @@ async def search_chats(
     return await pass_on(request, stronghold, account, "/chats/search")
 
 
-async def _second_brain_available(account: Account, stronghold: StrongholdForwarder, info: McpServerInfo, scope="instance") -> bool:
-    try:
-        return await second_brain.available(account, info, scope=scope, connections=RemoteBrains(stronghold, account))
-    except (StrongholdUnavailable, McpServerUnavailable, McpServerRefused):
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Could not check Obsidian capability availability") from None
-
-
-@router.get("/second-brain")
-async def second_brain_status(
-    scope: Literal["instance", "personal", "both"] = "instance",
-    account: Account = Depends(require_chat),
-    stronghold: StrongholdForwarder = Depends(get_stronghold),
-    info: McpServerInfo = Depends(get_server_info),
-) -> dict[str, bool]:
-    return {"available": await _second_brain_available(account, stronghold, info, scope)}
-
-
 @router.get("/{chat_id}")
 async def get_chat(
     chat_id: str = ChatId,
@@ -476,26 +444,18 @@ async def update_chat(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     stronghold: StrongholdForwarder = Depends(get_stronghold),
-    info: McpServerInfo = Depends(get_server_info),
-    logs: LogWriter = Depends(get_log_writer),
 ) -> ChatSummaryOut:
     """Renames, files (folder_id; null takes it out of its folder) or pins a
     chat. Allowed while an answer is being written: it changes no messages."""
-    changes: dict[str, Any] = {"title": body.title, "pinned": body.pinned, "save_to_second_brain": body.save_to_second_brain, "second_brain_scope": body.second_brain_scope}
+    changes: dict[str, Any] = {"title": body.title, "pinned": body.pinned}
     if "folder_id" in body.model_fields_set:
         changes["folder_id"] = body.folder_id
     try:
-        previous = await chats.get(chat_id)
-        destination = body.second_brain_scope or previous.second_brain_scope
-        if (body.save_to_second_brain is True or body.second_brain_scope is not None and previous.save_to_second_brain) and not await _second_brain_available(account, stronghold, info, destination):
-            raise HTTPException(status.HTTP_409_CONFLICT, "Add and activate the Obsidian capability before enabling auto-save")
         chat = await chats.update(chat_id, **changes)
     except ChatNotFound as error:
         raise _not_found() from error
     except FolderNotFound as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Folder not found") from error
-    if body.save_to_second_brain is not None:
-        await logs.action(account, "chat.second_brain", f"Chat {chat_id}: auto-save={body.save_to_second_brain}")
     return ChatSummaryOut.of(chat, chat_id in await running_chat_ids(stronghold, account))
 
 
@@ -570,35 +530,17 @@ async def start_turn(
     body: TurnRequest,
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
-    chats: ChatService = Depends(get_chat_service),
     stronghold: StrongholdForwarder = Depends(get_stronghold),
     app_settings: SettingsService = Depends(get_settings_service),
-    info: McpServerInfo = Depends(get_server_info),
 ) -> Response:
     """Starts answering in Stronghold, which saves the question and keeps going (and saves the answer)
     even if the browser leaves; watch it via /events. The `trusted` block is Portcullis's alone: a
     `trusted` key sent by the browser never reaches Stronghold."""
-    try:
-        saved = await chats.get(chat_id)
-        saved_preference, saved_scope = saved.save_to_second_brain, saved.second_brain_scope
-    except ChatNotFound:
-        saved_preference, saved_scope = False, "instance"
-    scope = body.second_brain_scope or saved_scope
-    wants_auto_save = saved_preference if body.save_to_second_brain is None else body.save_to_second_brain
-    available = {scope: await _second_brain_available(account, stronghold, info, scope)} if wants_auto_save else {}
-    # Every extension mcp_server lists is on: which agent may call which tool is the agent file's
-    # tools.allow. Without the listing the answer still runs, just without extension tools.
-    try:
-        extension_ids = [e["id"] for e in await info.extensions(account) if isinstance(e, dict) and isinstance(e.get("id"), str)]
-    except (McpServerUnavailable, McpServerRefused):
-        extension_ids = []
     payload = {
         **body.model_dump(exclude={"agent_id"}),
         "trusted": {
             "forced_approval": await app_settings.get_bool(FORCE_TOOL_APPROVAL),
             "tools_execute": TOOLS_EXECUTE in account.permission_names,
-            "extension_ids": extension_ids,
-            "second_brain_available": available,
         },
     }
     answer = await stronghold.forward("POST", f"/turns/{chat_id}", account, json=payload)

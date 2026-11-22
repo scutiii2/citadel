@@ -4,6 +4,8 @@ Admin web app for Treasury, built with Vue 3, TypeScript and Vite. It runs on po
 
 Pages: Instances (Treasury's instances and the connections each may use, read-only) and Connections (the databases Treasury keeps data in, plus the cache defaults). Calls: `/api/admin/treasury` and `/api/admin/treasury/connections`. Each service registers its own instance; the connections are built in or saved here.
 
+**Outside services** shows each group's origins and the Citadel services using it. Rename a group or confirm removal of an origin or the whole group through `/api/admin/treasury/outside`.
+
 ## Run
 
 - `pnpm install` once, then `pnpm run dev` starts Vite on port 26505.

@@ -11,17 +11,20 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from dataclasses import replace
 import json
+import logging
 import os
 import sys
 from uuid import uuid4
 from pathlib import Path
+from src import ready
 from src.providers import gateway_client
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from src.citadel_auth import settings_store, advertised_url
 from src.citadel_auth.treasury import register_instance
 from src.runtime.service_catalog import catalog
-from src.runtime import config_files, gateway_settings, tuning_overrides
+from src.runtime import config_files, gateway_settings, outside_origins, tuning_overrides
 from src.tools.mcp_client import config as mcp_config
 from typing import Any
 from urllib.parse import urlsplit
@@ -160,7 +163,6 @@ def _cancelled_result() -> dict[str, Any]:
 async def ask(
     question: str,
     history: list[dict[str, Any]] | None = None,
-    enabled_extensions: list[str] | None = None,
     request_id: str | None = None,
     depth: int = 0,
     caveman: bool = False,
@@ -177,6 +179,7 @@ async def ask(
     allow_read_only: bool = False,
     exact_context: bool = False,
     limits: dict[str, int] | None = None,
+    chat_id: str | None = None,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ask this agent a question. Runs its own tool-calling loop against
@@ -212,6 +215,7 @@ async def ask(
     offered only when this agent's plan_tool is on too. plan_lean: ask the
     model to update the checklist only when an item changes status.
     limits: the asking user's own output-token and tool-round caps; lower only.
+    chat_id: the chat for Stronghold's tools, used only as a selection hint.
 
     exact_context: count what fills the context window with the provider's own
     token counter; the result's `context_breakdown_exact` says whether that worked.
@@ -236,7 +240,8 @@ async def ask(
     # The asking user, from portcullis's / chat_app's identity headers; every
     # mcp_server tool this turn calls carries it on (see internal_auth.py).
     started_at = agent_events.now_iso()
-    requester_token = internal_auth.bind_requester(internal_auth.current_requester())
+    requester_token = internal_auth.bind_requester(
+        replace(internal_auth.current_requester(), chat_id=chat_id or ""))
     from src.agents.roles.architect.pipeline import ArchitectError
 
     try:
@@ -248,7 +253,7 @@ async def ask(
         if SPEC.role == "architect":
             tier_args["delegated_by"] = delegated_by
         result = await agent_config.run_chat(
-            question, history or [], enabled_extensions or [], request_id, depth,
+            question, history or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
             disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
             allow_read_only=allow_read_only, exact_context=exact_context, **tier_args, **private_args, **limit_args,
@@ -308,6 +313,16 @@ async def ask(
     if result.status is not None:
         reply.update(status=result.status, units=result.units)
     return reply
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(_request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok"})
+
+
+@mcp.custom_route("/ready", methods=["GET"])
+async def readiness(_request: Request) -> JSONResponse:
+    return JSONResponse(await ready.probe.check(ready.dependencies()))
 
 
 @mcp.custom_route("/registry", methods=["GET"])
@@ -485,22 +500,58 @@ async def decision_gateway_settings_put(request: Request) -> JSONResponse:
 
 @mcp.custom_route("/agents/servers", methods=["GET"])
 async def servers_get(_request: Request) -> JSONResponse:
-    """The MCP servers Legion connects to, as stored. Edits apply at the next start."""
-    return JSONResponse({"servers": await asyncio.to_thread(settings_store.read_all, config_files.SETTINGS_DB, "servers")})
+    """The MCP servers Legion connects to, as stored; an origin also shows its current address. Edits apply at the next start."""
+    servers = await asyncio.to_thread(settings_store.read_all, config_files.SETTINGS_DB, "servers")
+    return JSONResponse({"servers": {server_id: outside_origins.server_view(entry)
+                                     for server_id, entry in servers.items()}})
+
+
+@mcp.custom_route("/agents/servers/lookup", methods=["POST"])
+async def servers_lookup(request: Request) -> JSONResponse:
+    """Is this address already in Treasury's outside catalog? Body {address}; changes nothing."""
+    body = await _json_object(request)
+    if body is None or not isinstance(body.get("address"), str):
+        return JSONResponse({"error": "body must be {address}"}, status_code=400)
+    try:
+        return JSONResponse(await outside_origins.lookup(body["address"]))
+    except outside_origins.OutsideError as error:
+        return JSONResponse({"error": str(error)}, status_code=error.status)
 
 
 @mcp.custom_route("/agents/servers/{server_id}", methods=["PUT"])
 async def servers_put(request: Request) -> JSONResponse:
-    """Body: one server entry (transport, url or command, optional auth). Checked before it is saved."""
+    """Body: one server entry (transport, url or command or addresses, optional auth). Checked before it is saved."""
     entry = await _json_object(request)
     if entry is None:
         return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
     server_id = request.path_params["server_id"]
+    auth = entry.get("auth")
+    keep_parent = isinstance(auth, dict) and auth.get("type") == "header" and not auth.get("header_value")
+    previous = None
+    if "addresses" in entry or keep_parent:
+        previous = (await asyncio.to_thread(settings_store.read_all, config_files.SETTINGS_DB, "servers")).get(server_id)
+    if keep_parent and previous:
+        old = previous.get("auth")
+        if isinstance(old, dict) and old.get("type") == "header" and old.get("header_value"):
+            entry["auth"] = {**auth, "header_value": old["header_value"]}
+    if "origins" in entry or "service_id" in entry:
+        return JSONResponse({"error": "send addresses to register outside origins"}, status_code=400)
     try:
+        if "addresses" in entry:
+            # Check local fields before creating any Treasury record.
+            draft = {**entry, "service_id": "pending", "path": "/mcp", "origins": [{"origin_id": "pending"}]}
+            mcp_config.validate_server(server_id, draft)
+            entry = await outside_origins.entry_from_addresses(entry, previous)
         mcp_config.validate_server(server_id, entry)
+    except outside_origins.OutsideError as error:
+        return JSONResponse({"error": str(error)}, status_code=error.status)
     except mcp_config.ConfigError as error:
         return JSONResponse({"error": str(error)}, status_code=400)
     await asyncio.to_thread(settings_store.put, config_files.SETTINGS_DB, "servers", server_id, entry)
+    if any(outside_origins.origin_address(ref["origin_id"]) is None for ref in entry.get("origins", [])):
+        with suppress(TimeoutError):
+            async with asyncio.timeout(20):
+                await catalog.refresh()
     return JSONResponse({"saved": server_id, "applies": "next start"})
 
 
@@ -678,27 +729,44 @@ def main() -> None:
     role_info = {}
     if SPEC.role == "architect":
         role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
-    if SPEC.internal_role == "router":
-        from src.agents.roles.router import router_service
+    decision = agent_config.PROVIDER_ID == "decision"
+    router = SPEC.internal_role == "router"
 
-        role_info = {"decision": router_service.status_summary()}
-    if agent_config.PROVIDER_ID == "decision" and SPEC.internal_role != "router":
-        from src.providers.decision import provider
+    def register_agent() -> None:
+        agent_registry.register(
+            _AGENT_ID, _AGENT_LABEL, _AGENT_URL,
+            entry=SPEC.entry, role=SPEC.role, focus=SPEC.focus,
+            tiers=_OWN_TIERS, efforts=_OWN_EFFORTS, tool_allow=list(SPEC.tools.allow),
+            delegable=SPEC.delegable,
+            **role_info,
+        )
 
-        provider.prepare()
-    elif agent_config.PROVIDER_ID != "decision":
-        if _args.mcp_url:
-            mcp_upstream.connect(_args.mcp_url)
-        else:
-            mcp_upstream.connect()
-        mcp_upstream.warn_unmatched_tool_globs()
-    agent_registry.register(
-        _AGENT_ID, _AGENT_LABEL, _AGENT_URL,
-        entry=SPEC.entry, role=SPEC.role, focus=SPEC.focus,
-        tiers=_OWN_TIERS, efforts=_OWN_EFFORTS, tool_allow=list(SPEC.tools.allow),
-        delegable=SPEC.delegable,
-        **role_info,
-    )
+    def prepare_dependencies() -> None:
+        if router:
+            from src.agents.roles.router import router_service
+
+            role_info["decision"] = router_service.status_summary()
+        elif decision:
+            from src.providers.decision import provider
+
+            provider.prepare()
+        if not decision:
+            if _args.mcp_url:
+                mcp_upstream.connect(_args.mcp_url)
+            else:
+                mcp_upstream.connect()
+            mcp_upstream.warn_unmatched_tool_globs()
+        if router or decision:
+            register_agent()
+
+    async def initialize() -> None:
+        try:
+            await asyncio.to_thread(prepare_dependencies)
+        except Exception as error:
+            logging.getLogger(__name__).warning("Legion dependency initialization failed (%s)", type(error).__name__)
+
+    if not router and not decision:
+        register_agent()
     try:
         # Same app, host, port and log level mcp.run(transport="streamable-http")
         # would use, built explicitly so middleware can be added here. No CORS:
@@ -713,13 +781,19 @@ def main() -> None:
         @asynccontextmanager
         async def lifespan(application):
             async with previous_lifespan(application), _register_with_treasury():
-                yield
+                initialization = asyncio.create_task(initialize(), name="Legion dependencies")
+                try:
+                    yield
+                finally:
+                    # The MCP connection thread owns its sessions. Let initialization
+                    # finish before main closes that thread.
+                    await initialization
 
         app.router.lifespan_context = lifespan
         uvicorn.run(app, host=HOST, port=PORT, log_level=mcp.settings.log_level.lower())
     finally:
         agent_registry.deregister(_AGENT_ID)
-        if agent_config.PROVIDER_ID != "decision":
+        if not decision:
             mcp_upstream.close()
 
 

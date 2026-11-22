@@ -12,12 +12,12 @@
 | `WS /api/attachments/dictate/stream` | session cookie + `files.upload` | Same-origin binary mono 16 kHz PCM16 and JSON `{"type":"stop"}`; returns `{type:"partial"|"final", text}` events. Scribe capacity closes with 1013 so the browser can use HTTP previews. |
 | `POST /api/bard/speak` | `tools.execute` + `files.download` | JSON `{text, voice?}`; returns `{file_id, duration_s, voice}`. Logs `bard.speak` without spoken text. |
 | `GET /api/bard/voices` | `tools.execute` + `files.download` | Returns `{voices: string[]}` for installed voices only. |
-| `GET /api/bard/audio/{id}` | `tools.execute` + `files.download` | Streams owned Bard audio from Armory and forwards Range. |
+| `GET /api/bard/audio/{id}` | `tools.execute` + `files.download` | Streams owned Bard audio from Stronghold and forwards Range. |
 | `GET /api/connection-status` | signed-in account | Returns readiness and a safe configuration reason for Bard, Scribe, and Reader. |
 
-Portcullis checks login and permissions and forwards the JSON features to Stronghold. It opens attachment previews, Bard audio, and live dictation directly against Armory with signed service and requester assertions. Armory holds the tool-service addresses and per-caller tokens. Rejected audio or text returns 400, quota and size errors return 413, and unavailable services or refused credentials return 502.
+Portcullis checks login and permissions and forwards the JSON features to Stronghold. It opens Bard audio and live dictation against Stronghold with signed service and requester assertions. Stronghold holds the tool-service origin references and per-caller tokens. Attachment previews continue through Armory. Rejected audio or text returns 400, quota and size errors return 413, and unavailable services or refused credentials return 502.
 
-Armory allows one live dictation stream per account, with at most
+Stronghold allows one live dictation stream per account, with at most
 64,000 bytes per PCM frame, 150 seconds of audio, 15 seconds idle while recording,
 120 seconds awaiting the final result and 270 seconds total connection lifetime.
 Completed streams log `attachments.dictate` with the byte count, before delivering
@@ -57,6 +57,27 @@ automatic compaction keeps the available history and continues answering. An
 existing compacted summary is also available to subsequent routing briefs.
 
 
+## Chat short-term memory
+
+These routes require login and `chat.use`. Portcullis forwards them to Stronghold,
+which checks that the signed requester owns the chat.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/chats/{id}/stack` | Read stack items and capacity |
+| `POST /api/chats/{id}/stack/items` | Add `{"text": "...", "pinned": false}` |
+| `PUT /api/chats/{id}/stack/items/{item_id}` | Set `{"pinned": true}` or unpin with `false` |
+| `DELETE /api/chats/{id}/stack/items/{item_id}` | Remove an item |
+| `POST /api/chats/{id}/stack/compact` | Compact unpinned items |
+
+Send `Content-Type: application/json` on POST requests, including compaction.
+
+## Long-term memory (Brain)
+
+Accounts with `chat.use` can list and create files at `/api/brain/files`, read, update and delete an individual file at `/api/brain/files/{id}`, and revert an edit with `POST /api/brain/files/{id}/revert`. `GET /api/brain/search` accepts `q` and optional `limit`. `GET /api/brain/summary` shows disk usage and limits.
+
+Staff with `settings.manage` can read and update limits at `/api/admin/stronghold-brain-settings`. On account deletion, Portcullis asks Stronghold to purge the account’s long-term memory and logs any unconfirmed purge.
+
 ## Internal Router metadata and access
 
 `GET /api/agents` adds derived `internal_role` status metadata (not an agent-file field)
@@ -72,32 +93,6 @@ usage accounting and permissions. Chat traces retain up to 64 attempt diagnostic
 without increasing the established 20-row chat-message breakdown limit; prompt
 text and credentials are excluded from routing metadata.
 
-
-## Second brain auto-save
-
-Migration `0024` adds `chats.save_to_second_brain`, default false. It appears in
-chat list/detail/turn responses and persists per chat across devices. PATCH
-`/api/chats/{id}` accepts `{save_to_second_brain: bool}`; a turn may set it with
-the same field. Omission uses the saved preference; a new chat defaults off.
-
-GET `/api/chats/second-brain` returns `{available: bool}` for the signed-in
-account. Enabling requires `chat.use`, `tools.execute`, an account subscription
-to `obsidian`, and an online Armory capability exposing `tool_obsidian_write`.
-The server checks these itself; disabling the write tool refuses an explicit
-auto-save request. Unknown/foreign chats remain 404. Capability/storage outages
-fail closed. No new permissions or role grants are introduced.
-
-When enabled, portcullis asks the agent to summarize the current exchange and
-write `Conversations/<UTC date>-<question slug>-<unique suffix>.md` with `date`,
-`chat_id` and `tags` frontmatter, using `overwrite=false`. The stored user
-question stays unchanged. Saving uses the normal agent tool/approval flow and
-Armory's `allow_write` guard. The option requests an agent action; it cannot
-guarantee an external write if the agent does not perform it, approval is denied,
-or Obsidian is unavailable. The agent is instructed to confirm only a successful
-write and explain failures. With the option off, no auto-save instruction is
-added; an explicit user request to save still works. This vault is shared by
-callers of this Armory instance, so do not enable this for private transcripts
-that should stay inside a single account.
 
 ## Native capability workspace API
 
@@ -185,29 +180,6 @@ Only resolved or closed tickets may reopen. The core sets status to open, clears
 `closed_at` and adds a system comment in one transaction; other statuses return
 400, and foreign or unknown tickets return 404. The action is logged by id only.
 
-## Memory page API
-
-The separate Memory page uses the existing mcp_server memory store. These routes
-require a verified account with `chat.use`; the owner is always the authenticated
-account's internal uid. Browser-supplied owner fields are ignored.
-
-| Method | Route | Behavior |
-| --- | --- | --- |
-| GET | `/api/memory` | All saved memories, newest first; `[{id, text, created_at}]`. |
-| POST | `/api/memory` | `{text}` creates a memory (201), or returns an identical existing memory. |
-| PUT | `/api/memory/{id}` | `{text, expected_text}` edits atomically; 409 for stale or duplicate text. |
-| DELETE | `/api/memory/{id}` | Deletes only an owned memory (204); 404 when missing. |
-
-Text is limited to 500 characters, whitespace is normalized, and the store holds
-at most 200 memories per account. Creation dates survive edits. Mutations log only
-the action, never memory text. No categories or source labels are inferred.
-portcullis checks the login and `chat.use`, then passes each request to Stronghold
-(`/memory/...`), which calls Armory's token-protected `/memory/owners/{uid}/notes`
-routes; all three services need service identity and public trust mounts and the memory capability
-must be enabled. Stronghold down returns 502 `Stronghold is unavailable`, Armory
-down returns 503, missing/disabled memory returns 404, and redirects are refused.
-Deleting an account purges its memories through Stronghold (best effort; a failure
-is logged as the error `admin.memory_purge`). Private `/api/notes` remains separate.
 
 ## Skills page API
 
@@ -288,6 +260,24 @@ Tests:
 uv run pytest
 ```
 
+## Tool services
+
+Portcullis sends Bard speech and voices, Scribe dictation and audio attachments, and Reader document attachments to Stronghold. It streams browser audio from Stronghold's `/speech/audio/{file_id}` and relays live dictation to `/speech/dictate`. The browser URLs and permission checks stay the same. PDF and table uploads and owned attachment previews retain their Armory routes.
+
+`GET /api/connection-status` returns configuration readiness from Stronghold. `GET /api/config-issues` lists unavailable configurations under **Stronghold Tool services**.
+
+Each admin route requires `tool_services.manage` and forwards to the same path on Stronghold without the `/api` prefix.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/admin/tool-services` | List the three connections and their status |
+| `POST` | `/api/admin/tool-services/lookup` | Look up a typed address in Treasury |
+| `PUT` | `/api/admin/tool-services/{name}` | Save addresses, availability, and write-only tokens |
+| `DELETE` | `/api/admin/tool-services/{name}` | Remove a connection from Stronghold |
+| `POST` | `/api/admin/tool-services/{name}/test` | Test each saved origin |
+
+Armory no longer proxies outside MCP servers (Plan 22c): add one as a Legion connection.
+
 ## API
 
 Every `POST` must send `Content-Type: application/json` (anything else gets
@@ -313,6 +303,12 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `GET` | `/api/settings` | any logged-in account | `{force_tool_approval}`: what the administrator requires of everyone. |
 | `GET` | `/api/settings/pages` | any logged-in account | `{hidden: ["/usage", ...]}`: pages the administrator hid from every sidebar. |
 | `PUT` | `/api/admin/settings/pages` | `settings.manage` | `{hidden: [...]}` -> `{hidden: [...]}`. Hides pages from every account's sidebar (nav only: they still open by URL). Ids look like `/usage`, at most 20, repeats dropped; `/` and `/settings` cannot be hidden. `400` for a bad id or a list too long to store, `422` for a bad body. Logged as `admin.setting`. |
+| `POST` | `/api/admin/servers/lookup` | `agents.manage` | Sends `{address}` to Legion for a read-only Treasury catalog lookup. |
+| `GET` | `/api/admin/servers` | `agents.manage` | Lists connections and resolved origins. `has_value` and `has_override` indicate saved tokens. |
+| `GET` | `/api/admin/treasury/outside` | `settings.manage` | Outside service groups, their origins, and `used_by`. |
+| `PATCH` | `/api/admin/treasury/outside/{service_id}` | `settings.manage` | `{name}` renames a group and returns it with the same ID. |
+| `DELETE` | `/api/admin/treasury/outside/origins/{origin_id}` | `settings.manage` | Removes one origin and returns the catalog. An origin in use requires `?confirm=true`. |
+| `DELETE` | `/api/admin/treasury/outside/{service_id}` | `settings.manage` | Removes a group and its origins and returns the catalog. A group in use requires `?confirm=true`. |
 | `GET` | `/api/admin/invites` | `invites.manage` | Open (unused, unexpired) invites, without codes. |
 | `DELETE` | `/api/admin/invites/{id}` | `invites.manage` | `204`; the code stops working. `409` if already used. |
 | `GET` | `/api/admin/summary` | `any administrative permission; unrelated counts are null` | `{accounts, unverified, disabled, open_invites, roles}`: counts for the Admin overview tiles. |
@@ -367,22 +363,8 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `GET` | `/api/nav-preferences` | any logged-in account | How this account arranges its nav rail: `{order, pinned, hidden}`, lists of page ids (route paths such as `/agents`). All empty means the default arrangement. |
 | `PUT` | `/api/nav-preferences` | any logged-in account | Replaces it with the same shape. At most 50 ids per list, each 1-64 characters (`422` otherwise). Repeats are dropped; `pinned` and `hidden` keep only ids in `order`, and a hidden page is never pinned. portcullis does not know the page list, so unknown ids are kept. Returns what was stored. |
 | `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. | Nav preferences and the account's switched-off agents are kept in db_gateway (one document per account, keyed by uid). While it is down, `GET` answers the default arrangement and saving gives `503`; account agents answer `503` for every call (an empty list would switch every agent back on). Migration `0023` drops the old tables, and refuses to run while any still holds rows: copy them to the gateway or empty them first. |
-| `GET` | `/api/notes` | `chat.use` | This account's private notes, newest edit first: `[{id, title, body, tags, agent_readable, last_editor, created_at, updated_at}]`. Kept by Stronghold in db_gateway, not in this database. |
-| `GET` | `/api/notes/tags` | `chat.use` | The tags this account already uses, most used first: `[{tag, count}]`. |
-| `POST` | `/api/notes/suggest-tags` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): which of this account's existing tags, not already in `tags`, Laya thinks fit. `{suggested, checked, skipped}`. Needs a running agent whose file uses the `laya` provider, else `503`. Laya answers alone (`local_only`: English, then typed-decisions; no fallback to Jev). |
-| `POST` | `/api/notes/generate-tag` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): `{tags}`, up to 3 new lowercase tags (not already on the note or used by the account) written by the `tag-writer` agent, a light-tier model that sees about 1,500 characters of the note and the account's tag names. An unusable reply gives `[]`. Nothing is saved. `503` when `tag-writer` is not running or does not answer. |
 | `POST` | `/api/triage/titles` | `chat.use` | `{descriptions}` (2-10 strings, 1-300 characters each): a one-word lowercase title for each, in order, written by the `title-writer` agent (one plain model call that sees only the descriptions). An unusable reply falls back to `option1`, `option2`...; a repeat gets a number. `503` when `title-writer` is not running or does not answer, `429` at the usage limit. Counted in usage as kind `triage_titles`; logged as the action `triage.titles` (the count of options only) and, on a `503`, as an error. |
 | `POST` | `/api/triage/ask` | `chat.use` | `{kind: "choice"\|"yes_no", text, question, options?, trace?}`: asks the Triage Assistant one typed question about `text` (1-4000 characters) directly, without the orchestrator. `choice` needs 2-10 `options` `{title, description}` (title: one word, unique ignoring case); `yes_no` takes none. Answer: `{kind: "yes_no", answer, yes, confidence, uncertain}` or `{kind: "choice", choice, probabilities, confidence, uncertain, also_check?, candidates?, unknown?, answered_by?, rounds?}` (`rounds` only with `trace: true`). `422` when Laya refuses the question (for example the text is too long), `503` when the Triage Assistant is not running or gives no usable answer, `429` at the usage limit. Counted in usage as kind `triage`; logged as the action `triage.ask` (the kind, the number of options and the pick, never the text or the question) and, on a `503`, as an error. |
-| `POST` | `/api/notes` | `chat.use` | `{title, body?, tags?, agent_readable?}` (title 1-200 characters after trimming, body up to 20,000; `422` otherwise). `201` with the note; `409` at 200 notes. |
-| `GET` / `PUT` / `DELETE` | `/api/notes/{id}` | `chat.use` | Read, replace (`{title, body?, tags?, agent_readable?, expected_updated_at?}`; a field left out is reset to its default) or delete one note. With `expected_updated_at` (the `updated_at` the editor opened) the save is refused with `412` `This note changed since you opened it` when the note was saved since, and nothing changes; to overwrite anyway, send the note's newer `updated_at`. The check is not atomic (db_gateway has no compare-and-set). Another account's note, or a malformed id, is `404`. `DELETE` is `204`. |
-
-Tags are trimmed and lowercased, repeats are dropped, and each is 1 to 30 characters of `a-z`, `0-9`, `-` and `_` (not starting with `-` or `_`); at most 10 per note, otherwise `422`. `agent_readable` (default off) marks a note agents may read; mcp_server's `notes` capability (read-only) is the only reader: it lists, searches and reads just the notes whose flag is on, for the asking account, straight from db_gateway. A note saved before tags existed reads as untagged and not agent-readable. `last_editor` is `"agent"` when mcp_server's notes tools saved the note last and `"user"` otherwise (older notes too); a create or save from the page always sets `"user"`, and a `last_editor` in a request body is ignored.
-
-The notes routes are answered by Stronghold (`apps/stronghold/src/notes`): portcullis checks the login and `chat.use`, then passes the request on. Notes are kept in Stronghold's database in Treasury. A malformed id is refused here with `404` and does not reach Stronghold. When Stronghold is down every notes route answers `502` `Stronghold is unavailable`. Stronghold owns personal Brain settings and publication records.
-
-Tag suggestions (Stronghold, `src/notes/tag_suggestions.py`): Stronghold finds the running agent whose definition uses the `laya` provider (`AgentDirectory.find_by_provider`) and sends it `ask` with a text and one yes/no question per candidate tag. The text is the first 700 characters of title and body, at most 8 candidates (the most used) are checked, 4 per call (a call Laya finds too long is retried one tag at a time), and the whole request has a 30 second limit. Only answers that are yes (0.5 or more) and not marked uncertain are returned, best first, at most 5. Laya runs locally, so the note text does not leave the machine; the agent logs a usage row for each call. The suggestions are rough (Laya's confidence is uncalibrated), so the page only offers them and never applies one.
-
-Every notes route answers `503` when Stronghold cannot reach db_gateway; the rest of the API is unaffected. Create, edit and delete are written to the action log without the note text, and so is each time the agent switch is turned on or off ("Let agents read a note", "Stopped agents reading a note"); Stronghold sends these lines through `POST /internal/accounts/{uid}/actions`, and a line is lost if that call fails. Deleting an account removes its notes through Stronghold (best effort: a failure is logged as the error `admin.notes_purge` and the deletion still succeeds).
 | `GET` | `/api/account-agents` | any logged-in account | The specialist agents this account switched off: `{disabled: [agent ids]}`. A new account has every agent on. `503` while db_gateway is down (an empty list would switch them all back on). |
 | `PUT` | `/api/account-agents/{agent_id}` | any logged-in account | `{enabled: bool}` switches one agent on or off for this account's chats (`agent_id` 1-64 characters of `A-Za-z0-9_.-`, else `422`). Same reply as `GET`. Repeating a change is a no-op; at most 200 agents per account (`409`). Logged as `account.agent_enable` / `account.agent_disable`. The entry agent leaves a switched-off specialist out of its roster and refuses to delegate to it. |
 | `GET` | `/api/user-extensions` | `chat.use` | This account's own MCP servers ("private extensions"): `[{id, label, description, url, header_names, enabled, status, error, tools}]`. `id` is a slug of the label, unique per account. `status` is `connected`, `error` or `unknown`, from `ai_agent`'s `probe_extension`, cached for 60 seconds; a disabled extension is not probed and reports `unknown`. Header **values** are never returned, only their names. |
@@ -407,9 +389,6 @@ Every notes route answers `503` when Stronghold cannot reach db_gateway; the res
 | `GET` | `/api/capabilities` | `tools.view (also capabilities.manage)` | mcp_server's built-in capabilities: `[{name, label, enabled, tools, resources, has_gui}]`. |
 | `GET` | `/api/capabilities/{name}/gui` | `tools.view (also capabilities.manage)` | The capability's page layout (`{version, title, description, sections}`) as mcp_server validated it; `404` when it has no page. |
 | `PATCH` | `/api/capabilities/{name}` | `capabilities.manage` | `{enabled}` turns a capability on/off for every mcp_server client. |
-| `GET` | `/api/extensions` | `chat.use` or `tools.use` | mcp_server's extensions: `[{id, label, description, status, error, tools, web_url}]`. `web_url` is the extension's own web app (an http(s) address from mcp_server's config, or `null`); ember_web links to it. |
-| `POST` | `/api/extensions` | `extensions.manage` | `{label, url, description?}` (http/https URL) -> `201` the extension; mcp_server connects to it and saves it (an unreachable one is still added, `status: "error"`). |
-| `DELETE` | `/api/extensions/{id}` | `extensions.manage` | `204`; `404` unknown id. |
 | `GET` | `/api/logs` | any `logs.*` | `{kinds, accounts}`: the log kinds this account may read and every account to filter by. |
 | `GET` | `/api/logs/analytics?range=24h\|7d\|30d\|90d` | any `logs.*` | Counts for the Analytics page, only for the kinds this account may read (default `7d`): `{period, bucket (hour\|day), kinds, totals {kind: {current, previous}}, series [{bucket, counts}] (zero-filled), top_sources {kind: [{source, count}]}, accounts {kind: [{account_id, username, count}]}, heatmap [{weekday, hour, count}]}`. Top lists hold 10; `account_id` null is the server, `username` null a deleted account; heatmap is UTC, weekday 0 = Sunday. `422` bad range. |
 | `GET` | `/api/logs/{kind}?actor=server\|<account id>` | `logs.view` (action), `logs.errors.view` (error), `logs.chat.view` (chat_trace) | The 200 newest entries: `[{id, kind, account_id, source, message, details, prompts, created_at}]`. A chat turn's `details` lists each agent that ran (`agents[]`); `prompts` (JSON, one `{messages, truncated}` per agent, same order, system prompts never stored) is `null` unless the account holds `logs.chat.prompts.view`. |
@@ -458,12 +437,8 @@ addresses only, never loopback, link-local or cloud-metadata ones).
   be read, is reported to the watcher as a live turn event
   `{type: "notice", notices: [{id, label, error}]}`. It is not saved in the chat.
 
-Tickets and groups live in mcp_server (Armory); portcullis stores no ticket data and
-only passes authenticated calls to Stronghold, which calls Armory with the internal token and session identity.
-Creates always send `source: "user"` and `verified_context` containing
-`via: "portcullis"` and the account's uid (a stable text) as `account_id`. Ticket ownership is
-keyed by username: renaming an account orphans its existing tickets in
-mcp_server's store. The verified account id is retained for a later ownership migration.
+Stronghold stores tickets and groups in Treasury. Portcullis forwards authenticated requests to Stronghold.
+Stronghold records the account’s stable uid as the ticket owner, so ownership survives a username change.
 
 Titles are 1-120 characters, descriptions 1-4000, comments 1-2000 and
 assignees at most 64. Invalid request fields and ids return `422`.
@@ -473,6 +448,123 @@ become `502` (Stronghold says `"armory is unreachable"`, portcullis `"Stronghold
 field names only, after upstream success, never titles, descriptions or comments.
 Manual ticket creation has no additional rate limiter; mcp_server limits
 automatic reports. Add manual limits later if abuse appears.
+
+## Outside clients
+
+A program outside the Citadel can call Legion's entry agent with its own key through one door. It has no account, cookie or
+chat; the key opens nothing else (not `/api/chats`, not any admin route), and a signed-in session cannot use the door.
+
+### The door: `POST /api/outside/legion/ask`
+
+```
+curl -H "Authorization: Bearer ock_..." -H "Content-Type: application/json" \
+     -d '{"question":"Say hello","history":[{"role":"user","content":"earlier"}]}' \
+     http://<host>:29601/api/outside/legion/ask
+```
+
+Body: `question` (1 to 8000 characters), optional `history` (up to 20 turns of `{role: user|assistant, content}`); other fields
+are refused. Answer: `{answer, usage: {total_tokens, budget_remaining}, request_id}`.
+
+| Status | Meaning |
+|---|---|
+| `200` | The answer; its tokens were recorded. |
+| `401` | Wrong, missing, disabled or deleted key: one identical text for all of them. |
+| `403` | The client may not use this service, or its address is outside the client's `ip_allow`, or the address is refused by the main deny list or the outside IP lists. |
+| `413` | Body over 1 MiB (answered before the key is checked; not audited). |
+| `415` | Content type is not `application/json` (answered before the key is checked; not audited). |
+| `422` | Malformed body. The error lists `loc`, `msg` and `type` only, never the submitted text. It is answered before the key is checked, so it is not audited. |
+| `429` + `Retry-After` | Client rate limit, or the token budget is used up. |
+| `503` | Legion or the entry agent is down, the budget cannot be read, or the tokens could not be recorded (the answer is then withheld). Nothing is counted. |
+
+Every check that cannot decide refuses (fail closed).
+
+### The Stronghold level: `POST /api/outside/stronghold/ask`
+
+Same body, answers, statuses, key, rate limit, budget and audit log as the Legion door; the client record must list the
+service `stronghold` (a client allowed `legion` only gets `403`). The agent may use five Stronghold Brain tools and
+nothing else: `tool_brain_search`, `tool_brain_read`, `tool_brain_list`, `tool_brain_write`, `tool_brain_update`, on the
+client's own Brain folder (its uid, `oc_<12 hex>`, created at the first write). Legion gets
+`disabled_tools = ["*", "!stronghold__tool_brain_search", ...]` (the `"!name"` exception form), and Stronghold refuses every
+other tool for an `oc_` uid on its own. The global brain, tickets, usage, skills, short-term memory, sharing and every
+Armory tool stay out of reach. Deleting the client also asks Stronghold to purge `/brain`, `/stack`, `/brain/proposals`
+and `/brain/shares` for its uid (best effort, one error log per failure; the delete still answers `204`). The path
+through a live Legion and Stronghold has not been run.
+
+### Key and client record
+
+The key is `ock_` plus 43 URL-safe characters. It is shown once, on create and on rotate; Portcullis keeps only its
+SHA-256 and the 8-character prefix (`key_prefix`). It never appears in logs, errors or the audit log.
+
+A client is `{id, uid, name, key_prefix, services, ip_allow, rate_per_minute, enabled, created_at, last_used_at, budget}`:
+`name` 1 to 60 of letters, digits, space, `-_.`, unique ignoring case; `services` is `["legion"]` by default (`legion` and `stronghold` are the two services); `ip_allow` a list of addresses or networks (empty = any address the IP lists let in); `rate_per_minute`
+1 to 600 (default 10); `budget_tokens` 1 to 100000000 (required on create); `budget_days` 1 to 366 (default 30).
+
+### Budget
+
+Tokens are summed over a rolling window of `budget_days` from the client's audit events. The budget is checked before a
+call and the call's tokens are added after it, so the overshoot is bounded by the calls in flight at once (up to
+`rate_per_minute` within the 120 s ask window), not by one call. If the record cannot be
+written, the answer is withheld. `budget` in a client view is `{tokens, days, used, remaining, resets_at}`
+(`resets_at`: when the oldest counted call leaves the window, `null` if none).
+
+### Audit log
+
+Each call or refusal is one event: `at, service, action (call|refused), reason, status, tokens, ip`. Reasons:
+`invalid_key`, `disabled`, `service_not_allowed`, `ip_not_allowed`, `rate_limited`, `budget_exhausted`,
+`budget_unavailable`, `upstream`. It holds no question or answer text and no key. Refusals of unknown keys are not
+audited (no client to attach them to).
+
+### IP lists
+
+Two lists, `security.outside_ip_filter.allow_list` and `deny_list`, apply only to `/api/outside/*` (set them in the
+Portcullis settings; like other policy values they apply from the next start). On that path the main deny list applies
+too, but the main allow list does not (it is for people); an empty outside allow list admits any address. A client's own
+`ip_allow` narrows this further.
+
+### Admin routes (`settings.manage`)
+
+All under `/api/admin/outside-clients`; each change is logged in the activity log as `outside_client.create|update|rotate|delete`
+with the client's id, name and changed field names, never a key.
+
+| Method | Path | Returns |
+|---|---|---|
+| `POST` | `/` `{name, budget_tokens, services?, rate_per_minute?, budget_days?, ip_allow?}` | `201 {client, key}`; the only time the key is shown. |
+| `GET` | `/` | `{clients: [...]}`, never a key or hash. |
+| `GET` | `/{id}` | The client plus `events` (newest 50; `limit` 1 to 200, `before_id` pages back). |
+| `PATCH` | `/{id}` any of `name, services, ip_allow, rate_per_minute, budget_tokens, budget_days, enabled` | The client. |
+| `POST` | `/{id}/rotate-key` | `{client, key}`; the old key stops working. |
+| `DELETE` | `/{id}` | `204`; its events go too. |
+
+Errors: `404` unknown id, `400` with the reason in words, `422` malformed body (unknown fields such as `key` are refused).
+
+```
+curl -b cookies -H "Content-Type: application/json" -d '{"name":"Docs bot","budget_tokens":50000}' \
+     http://<host>:29601/api/admin/outside-clients
+```
+
+### No tools, no memory
+
+Each call is stateless and reaches no tool. Portcullis asks Legion with no extensions, `approval_mode=deny`,
+`allowed_tools=[]`, no plan and no questions back, and with `disabled_tools=["*"]`. The last one matters most: deny
+and the empty allow list only gate the model's own tool loop, while Legion's memory recall, skill recall and skill
+learning call the upstream directly; `"*"` is Legion's filter wildcard, checked first, and delegates inherit it. This was
+proven by a probe against Legion's real filter (`tests/legion_filter_probe.py`, run by `tests/test_legion_ask.py`), not
+against a live Legion ask. Legion sees the client as requester uid `oc_<12 hex>` with username `outside:<uid>` (`:` is not
+allowed in account usernames, so it can never equal an account) and an empty email. The only context is the `history` the client sends.
+
+### Known gaps
+
+- Not built: a Stronghold level (a client with its own memory namespace), a Portcullis Admin screen for clients, per-client
+  tool access, a per-call token ceiling.
+- The client IP comes from `X-Forwarded-For` only when the peer is loopback (a `trusted_proxies` entry), so every loopback
+  proxy in front of Portcullis must append to that header, not pass it through, or a client can pick its own address
+  (which defeats the IP lists and a client's `ip_allow`).
+- Refusals of unknown keys are not audited or counted; a flood of bad keys is limited only by the IP lists and traffic counters.
+- IPv4-mapped IPv6 addresses (`::ffff:a.b.c.d`) do not match IPv4 entries in either IP filter (pre-existing).
+- A call refused for budget still uses a rate slot.
+- A missing token count from Legion is counted as 0 (and a warning is logged).
+- If the entry agent were ever switched to plan or architect mode, delegation would run: delegates still get
+  `disabled_tools ["*"]` and deny, but model calls happen. Keep the entry agent out of those modes.
 
 ## Security model
 
@@ -492,7 +584,7 @@ automatic reports. Add manual limits later if abuse appears.
 - **Permissions:** `chat.use`, `chat.share`, `tools.view`, `tools.execute`, `files.upload`, `files.download`,
   `accounts.view`, `accounts.manage`, `accounts.delete`, `roles.view`, `roles.manage`, `roles.assign`,
   `invites.manage`, `settings.manage`, `capabilities.manage`, `usage.all.view`,
-  `extensions.personal.manage`, `extensions.manage`,
+  `extensions.personal.manage`, `tool_services.manage`,
   `logs.view`, `logs.errors.view`, `logs.chat.view`, `logs.chat.prompts.view`, `config.issues.view`,
   `traffic.view`, `tickets.create`, `tickets.manage` (`src/services/permissions.py`). The Administrator role always holds all
   of them (new ones are added to it on startup). New registrations get `default_role` (config, default `Member`:
@@ -501,9 +593,9 @@ automatic reports. Add manual limits later if abuse appears.
   role. An account with an unverified email holds no permissions at all, unless
   `require_email_verification` is `false` in config. Even then it never holds a staff permission
   (`STAFF_PERMISSIONS` in `permissions.py`: `accounts.*`, `roles.*`, `invites.manage`, `settings.manage`,
-  `capabilities.manage`, `extensions.manage`, `agents.manage`, `logs.*`, `config.issues.view`, `traffic.view`,
+  `capabilities.manage`, `tool_services.manage`, `agents.manage`, `logs.*`, `config.issues.view`, `traffic.view`,
   `usage.all.view`, `tickets.manage`), and a role holding one cannot be assigned to it (`409`).
-- **Starter roles:** migration `0019` creates `Viewer`, `Support`, `Moderator`, `Auditor`, `Power User` and `Operator` once,
+- **Starter roles:** migration `0019` creates `Viewer`, `Support`, `Moderator`, `Auditor`, `Tool Services Manager` (renamed from `Power User` by `0030`) and `Operator` once,
   with preset permissions (none holds `roles.manage`, `roles.assign`, `accounts.delete` or any `logs.chat.*`). An existing
   role of the same name is left alone, and edits or deletions later stick.
 - **Ticket permissions:** `tickets.create`: "Report bugs, suggest features and follow your own tickets";
@@ -557,8 +649,7 @@ operation verifies Portcullis's requester token, including per-tool MCP metadata
 - **What only Portcullis decides** (the `trusted` block of `POST /api/chats/{id}/turns`, filled here
   and overwriting anything the browser sends): `forced_approval` (`force_tool_approval` in
   `app_settings`, switched by an admin with `PUT /api/admin/settings/force_tool_approval`),
-  `tools_execute` (the account's `tools.execute` permission), `extension_ids` (every extension
-  Armory lists; the browser cannot name one) and `second_brain_available`. Stronghold's defaults
+  `tools_execute` (the account's `tools.execute` permission), and no extension list (the turn body carries none). Stronghold's defaults
   are the safe side: approval forced, no tool execution, no extensions, no auto-save.
   Typed commands (`/tool`) call Armory directly with no agent and are not affected.
 - **Regenerate / edit** (`truncate_to` on `POST /api/chats/{id}/turns`): the
@@ -703,9 +794,9 @@ src/
               AccountService, AdminService, AgentDirectory, ChatService, ChatSearch, TemplateService, ShareService, PublicReadLimiter,
               UsageService, McpServerInfo, McpServerTools, mcp_session, LogWriter,
               text_extraction, config_validation, DeviceService, LoginRateLimiter, McpPolicy, McpProxy,
-              permissions, DbGatewayClient (db_gateway), NotesService (notes)
+              permissions, DbGatewayClient (db_gateway)
   routes/     auth, account, admin, settings, chats, templates, shares, usage, mcp, server_info, logs,
-              attachments, config_issues, notes
+              attachments, config_issues
   utils/      config_loader
 scripts/   backup_db.py                         back up the database now
            migrate_db.py                        schema status / upgrade / new migration (see "Changing the schema")
@@ -763,38 +854,27 @@ connection must exist there (`data` is built in; see `apps/treasury/configs/READ
 (equality filters). A missing record is `None` or `False`. An unreachable gateway raises
 `DbGatewayUnavailable`, so only a feature that uses it fails; portcullis starts without the
 gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDbGateway`
-(the `db_gateway` fixture). The notes routes are the first user.
-
-
-## Obsidian brains
-
-Authenticated `/api/brains` routes manage personal vault connections and Notes
-promotion. Stronghold keeps personal connections and asks Portcullis for current
-permissions. Armory stores the Instance Brain connection. See [operations and storage](../../../docs/obsidian-brains.md).
-
-| Route | Responsibility |
-| --- | --- |
-| `GET/PUT /api/brains/connections/personal` | Personal settings read and revision-checked explicit save. |
-| `GET/PUT /api/admin/brain`, `POST /test`, `GET /status`, `POST /disable` under that path | Signed proxy to Armory for the shared connection. Requires `settings.manage`. |
-| `POST /api/brains/connections/personal/test` | Bounded read-only candidate test; no activation or publication. |
-| `GET /api/brains/destinations` | Authorized destination labels, revisions and write availability. |
-| `POST /api/brains/browse` | Signed-in browse/read/status/scoped hybrid search, independent of Supermarket opt-in. |
-| (Stronghold) `POST /brains/resolve` | Service-authenticated personal snapshots and shared authorization for Armory. |
-| `GET /api/brains/notes/{id}/review` | Owned Note content/hash/revision for publication review. |
-| `GET /api/brains/promotions` | Owned publication receipts and changed-source state. |
-| `POST /api/brains/notes/{id}/promote` | Recoverable, create-only reviewed publication; preserves the source Note. |
-| `POST /api/brains/promotions/{id}/reconcile` | Confirm a pending write by content hash without another write. |
-| `GET /api/brains/suggestions` | Current, authorized, non-dismissed AI proposals. |
-| `POST /api/brains/suggestions/review` | Explicit AI review, private-note consent, 20 Notes/40,000 characters, usage limits/accounting. |
-| `POST /api/brains/suggestions/{id}/dismiss` | Owned, content/destination-specific dismissal. |
-
-Migration `0025` grants `brain.instance.publish` to Administrator only and preserves
-existing chat auto-save destinations as `instance`. Chat summaries/updates/turns
-carry additive `second_brain_scope` (`instance|personal`); loss of access disables
-auto-save with a visible notice. Personal keys use SecretBox encryption in
-db_gateway. Account deletion purges personal Brain records.
+(the `db_gateway` fixture).
 
 
 ## Internal API
 
 `/internal/...` is for Stronghold only. Every route requires a signed Stronghold service assertion. `POST /internal/requester-token` renews identity only for an active account with a running Stronghold turn. `GET /internal/accounts/{uid}/permissions`, `POST /internal/accounts/{uid}/actions`, `POST /internal/errors` and `POST /internal/logs`. The web apps' nginx proxies only `/api/`, so these routes are not reachable from a browser.
+
+## Liveness, readiness, and tool failures
+
+`GET /health` is public and answers `{"status":"ok"}` while the process runs.
+`GET /ready` requires a signed Citadel service assertion. Authorized calls return
+HTTP 200 with dependency addresses and states (`configured`, `reachable`,
+`unreachable`, `not_configured`) even during an outage.
+
+| Code | Failure | Retryable |
+|---|---|---|
+| 1000 | `TOOL_INTERNAL` | No |
+| 1001 | `DEP_NOT_CONFIGURED` | No |
+| 1002 | `DEP_UNAVAILABLE` | Yes |
+| 1003 | `DEP_TIMEOUT` | Yes |
+| 1004 | `DEP_AUTH_REJECTED` | No |
+| 1005 | `DEP_ERROR` | Maybe |
+
+`/api/health` remains available. `GET /api/admin/ready` aggregates all five service reports for accounts with `settings.manage`. The admin screen is pending.

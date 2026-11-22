@@ -6,7 +6,7 @@ import PasswordInput from "../components/PasswordInput.vue";
 import { errorMessage } from "../utils/errors";
 import "../components/infoPage.css";
 
-/** The deployment values of Armory (addresses, link keys, Obsidian, folders). Saved in Armory's database, so a change
+/** The deployment values of Armory (addresses, link keys, folders). Saved in Armory's database, so a change
  * needs no file edit. A value marked "after restart" is saved at once and used from Armory's next start. A secret is
  * write-only: the page only says whether one is set. */
 const settings = ref<EnvironmentSetting[]>([]);
@@ -93,7 +93,7 @@ async function save() {
   <PageLayout
     class="info-content environment"
     title="Settings"
-    description="Addresses, link signing keys, Obsidian and folders. They are saved in Armory's database. A value you have not set here comes from Armory's .env file or its default."
+    description="Addresses, link signing keys and folders. They are saved in Armory's database. A value you have not set here comes from Armory's .env file or its default."
   >
     <p v-if="loading" class="muted">Loading…</p>
     <form v-else class="form" data-test="form" @submit.prevent="save">

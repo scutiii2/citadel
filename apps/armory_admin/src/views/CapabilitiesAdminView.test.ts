@@ -6,7 +6,7 @@ import { commandsClient } from "../api/CommandsClient";
 import CapabilitiesAdminView from "./CapabilitiesAdminView.vue";
 
 function cap(over: Partial<CapabilityStatus>): CapabilityStatus {
-  return { name: "vault", enabled: true, label: "Vault", tools: ["tool_vault_search"], resources: [], has_gui: false, load_error: null, missing: false, loaded: true, ...over };
+  return { name: "pdf_merger", enabled: true, label: "PDF merger", tools: ["tool_pdf_inspect"], resources: [], has_gui: false, load_error: null, missing: false, loaded: true, ...over };
 }
 
 beforeAll(() => {
@@ -14,7 +14,7 @@ beforeAll(() => {
   HTMLDialogElement.prototype.close ??= function () { this.removeAttribute("open"); };
 });
 beforeEach(() => {
-  vi.spyOn(commandsClient, "helpIndex").mockResolvedValue({ capabilities: [{ capability: "/vault", summary: "Search and manage notes in your vault." }] });
+  vi.spyOn(commandsClient, "helpIndex").mockResolvedValue({ capabilities: [{ capability: "/pdf_merger", summary: "Merge and inspect PDF files." }] });
   vi.spyOn(capabilitiesAdminClient, "list").mockResolvedValue([
     cap({}),
     cap({ name: "fresh", label: "Fresh", enabled: false, loaded: false, tools: [] }),
@@ -74,7 +74,7 @@ describe("CapabilitiesAdminView", () => {
 
   it("offers Restart only on a capability that is online", async () => {
     const wrapper = await mounted();
-    expect(wrapper.find("[data-name=vault] [data-test=restart]").exists()).toBe(true);
+    expect(wrapper.find("[data-name=pdf_merger] [data-test=restart]").exists()).toBe(true);
     for (const name of ["fresh", "broken", "gone"]) {
       expect(wrapper.find(`[data-name=${name}] [data-test=restart]`).exists()).toBe(false);
     }
@@ -84,10 +84,10 @@ describe("CapabilitiesAdminView", () => {
     let answer: (value: CapabilityStatus) => void = () => {};
     const set = vi.spyOn(capabilitiesAdminClient, "setOnline").mockReturnValue(new Promise((resolve) => (answer = resolve)));
     const wrapper = await mounted();
-    const restart = wrapper.get("[data-name=vault] [data-test=restart]");
+    const restart = wrapper.get("[data-name=pdf_merger] [data-test=restart]");
 
     await restart.trigger("click");
-    expect(set).toHaveBeenCalledWith("vault", true);
+    expect(set).toHaveBeenCalledWith("pdf_merger", true);
     expect((restart.element as HTMLButtonElement).disabled).toBe(true); // pending
     answer(cap({}));
     await flushPromises();
@@ -98,10 +98,10 @@ describe("CapabilitiesAdminView", () => {
     vi.spyOn(capabilitiesAdminClient, "setOnline").mockRejectedValue(new Error("boom in tool.py"));
     const wrapper = await mounted();
 
-    await wrapper.get("[data-name=vault] [data-test=restart]").trigger("click");
+    await wrapper.get("[data-name=pdf_merger] [data-test=restart]").trigger("click");
     await flushPromises();
 
-    expect(wrapper.get("[data-name=vault] [data-test=row-error]").text()).toContain("boom in tool.py");
+    expect(wrapper.get("[data-name=pdf_merger] [data-test=row-error]").text()).toContain("boom in tool.py");
   });
 
   it("refresh reloads the list", async () => {
@@ -136,9 +136,9 @@ describe("CapabilitiesAdminView", () => {
 
 it("shows the capability summary beneath its metadata, with a fallback if help is unavailable", async () => {
   const wrapper = await mounted();
-  await wrapper.get('button[aria-label="Open Vault"]').trigger("click");
+  await wrapper.get('button[aria-label="Open PDF merger"]').trigger("click");
   await flushPromises();
-  expect(wrapper.get(".summary-description").text()).toContain("Search and manage notes in your vault.");
+  expect(wrapper.get(".summary-description").text()).toContain("Merge and inspect PDF files.");
   vi.mocked(commandsClient.helpIndex).mockRejectedValue(new Error("Unavailable"));
   await wrapper.get('button[aria-label="Open Fresh"]').trigger("click");
   await flushPromises();
@@ -148,7 +148,7 @@ it("shows the capability summary beneath its metadata, with a fallback if help i
 it("searches capability labels and tool names without changing their state", async () => {
   const wrapper = await mounted();
   const search = wrapper.get('input[aria-label="Search capabilities"]');
-  await search.setValue("  VAULT_SEARCH  ");
+  await search.setValue("  PDF_INSPECT  ");
   expect(wrapper.findAll("[data-test=capability]")).toHaveLength(3);
   await search.setValue("Fresh");
   expect(wrapper.findAll("[data-test=capability]")).toHaveLength(1);

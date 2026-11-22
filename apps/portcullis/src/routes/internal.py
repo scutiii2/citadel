@@ -6,11 +6,13 @@ Mandatory service middleware admits only signed Stronghold assertions.
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.deps import get_db_session, get_log_writer, get_settings
@@ -22,12 +24,33 @@ from src.services.service_auth import identity_headers
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 Uid = Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+_USERNAME = re.compile(r"[A-Za-z0-9_.-]{3,80}")
+
+
+def _is_usable(account: Account | None, settings: Settings) -> bool:
+    return account is not None and account.is_active and (not settings.require_email_verification or account.email_verified)
+
+
+@router.get("/accounts/by-username/{username}")
+async def account_by_username(
+    username: str, session: AsyncSession = Depends(get_db_session), settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    """Resolve a usable recipient with the same username comparison as sign-in."""
+    if _USERNAME.fullmatch(username) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipient")
+    try:
+        account = await session.scalar(select(Account).where(Account.username == username))
+    except SQLAlchemyError:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Storage is unavailable") from None
+    if account is None or not _is_usable(account, settings):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipient")
+    return {"uid": account.uid, "username": account.username}
 
 
 async def _usable_account(session: AsyncSession, settings: Settings, uid: str) -> Account:
     """An account that may be contacted: active, and verified when verification is required."""
     account = await session.scalar(select(Account).where(Account.uid == uid))
-    if account is None or not account.is_active or (settings.require_email_verification and not account.email_verified):
+    if account is None or not _is_usable(account, settings):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipient")
     return account
 

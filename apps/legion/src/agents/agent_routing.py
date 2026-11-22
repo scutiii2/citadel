@@ -24,7 +24,7 @@ from src.providers import model_tiers, reasoning_effort
 _log = logging.getLogger(__name__)
 
 # Tools every specialist gets for reporting problems; they do not make a specialist useful.
-SUPPORT_TOOLS = ("tool_ticket_*",)
+SUPPORT_TOOLS = ("stronghold__tool_ticket_*",)
 
 
 def own_tools(entry: RosterEntry) -> list[str]:
@@ -44,12 +44,12 @@ def is_usable(entry: RosterEntry, tool_names: Iterable[str]) -> bool:
 
 
 def _live_tool_names() -> list[str] | None:
-    """Unprefixed names of the tools mcp_server offers right now; None when
+    """Unprefixed names of the tools every connection offers right now; None when
     they cannot be read (then nothing is left out). Blocking."""
     try:
         from src.tools.mcp_client import mcp_upstream
 
-        return [mcp_upstream.unprefixed(t.name) for t in mcp_upstream.client.list_tools() if t.name.startswith("main__")]
+        return [mcp_upstream.unprefixed(t.name) for t in mcp_upstream.client.list_tools()]
     except Exception:  # noqa: BLE001 - an unreadable catalog must not empty the roster
         _log.debug("could not read the tool catalog; offering every specialist", exc_info=True)
         return None

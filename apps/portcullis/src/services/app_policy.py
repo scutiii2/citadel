@@ -17,7 +17,7 @@ from src.citadel_auth import settings_store
 from src.config import BackupSettings, SecuritySettings
 
 TABLE = "app_config"
-SECURITY_PARTS = ("rate_limit", "ip_filter", "headers", "fingerprint")
+SECURITY_PARTS = ("rate_limit", "ip_filter", "outside_ip_filter", "headers", "fingerprint")
 KEYS = ("session_hours", "default_role", "require_email_verification", *SECURITY_PARTS, "backup")
 SIGNALS = ("user_agent", "accept_language", "ip_subnet")
 
@@ -62,6 +62,8 @@ def _in_use(settings: Any) -> dict[str, Any]:
                        "max_attempts": security.max_attempts, "window_seconds": security.window_seconds,
                        "lockout_seconds": security.lockout_seconds},
         "ip_filter": {"allow_list": list(security.ip_allow_list), "deny_list": list(security.ip_deny_list)},
+        "outside_ip_filter": {"allow_list": list(security.outside_ip_allow_list),
+                              "deny_list": list(security.outside_ip_deny_list)},
         "headers": {"enabled": security.security_headers, "hsts_max_age": security.hsts_max_age},
         "fingerprint": {"enabled": security.fingerprint_enabled, "signals": list(security.fingerprint_signals)},
         "backup": {"enabled": backup.enabled, "keep": backup.keep, "every_hours": backup.every_hours},
@@ -115,6 +117,9 @@ def _checked(key: str, value: Any, current: dict[str, Any]) -> Any:
             _whole(group[name], 1, f"Rate limit {name}")
     elif key == "ip_filter":
         group = {"allow_list": _networks(group["allow_list"], "Allow list"), "deny_list": _networks(group["deny_list"], "Deny list")}
+    elif key == "outside_ip_filter":
+        group = {"allow_list": _networks(group["allow_list"], "Outside allow list"),
+                 "deny_list": _networks(group["deny_list"], "Outside deny list")}
     elif key == "headers":
         _flag(group["enabled"], "Security headers")
         _whole(group["hsts_max_age"], 0, "HSTS max age")

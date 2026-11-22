@@ -74,8 +74,6 @@ class ChatRecord:
     message_count: int
     folder_id: int | None
     pinned: bool
-    save_to_second_brain: bool
-    second_brain_scope: str
     created_at: datetime
     updated_at: datetime
     messages: list[ChatMessage] | None = None
@@ -84,8 +82,8 @@ class ChatRecord:
     def of(cls, doc: dict[str, Any]) -> ChatRecord:
         return cls(
             chat_id=doc["chat_id"], title=doc["title"], agent_id=doc["agent_id"], message_count=doc["message_count"],
-            folder_id=doc["folder_id"], pinned=doc["pinned"], save_to_second_brain=doc["save_to_second_brain"],
-            second_brain_scope=doc["second_brain_scope"], created_at=datetime.fromisoformat(doc["created_at"]),
+            folder_id=doc["folder_id"], pinned=doc["pinned"],
+            created_at=datetime.fromisoformat(doc["created_at"]),
             updated_at=datetime.fromisoformat(doc["updated_at"]), messages=doc.get("messages"),
         )
 
@@ -146,13 +144,11 @@ class ChatService:
 
     async def update(
         self, chat_id: str, *, title: str | None = None, folder_id: int | None = UNSET,
-        pinned: bool | None = None, save_to_second_brain: bool | None = None,
-        second_brain_scope: str | None = None,
+        pinned: bool | None = None,
     ) -> ChatRecord:
-        """Changes whichever of title, folder, pin and the second-brain settings are given. `folder_id` None
+        """Changes the supplied title, folder or pin. `folder_id` None
         takes the chat out of its folder; a folder of another account is FolderNotFound."""
-        changes: dict[str, Any] = {"title": title, "pinned": pinned, "save_to_second_brain": save_to_second_brain,
-                                   "second_brain_scope": second_brain_scope}
+        changes: dict[str, Any] = {"title": title, "pinned": pinned}
         body = {k: v for k, v in changes.items() if v is not None}
         if folder_id is not UNSET:
             body["folder_id"] = folder_id

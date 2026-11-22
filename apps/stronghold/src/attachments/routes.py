@@ -1,8 +1,8 @@
 """/attachments: files attached to a chat question, and dictation (files.upload at Portcullis).
 
 The file comes base64-encoded in JSON. Text is read here and sent back; PDFs and tables go to
-Armory, including Scribe audio and Reader documents through its connection routes. Portcullis
-checks the login and the permission and still streams the file content and the dictation socket itself.
+Armory. Stronghold sends audio and documents to the configured Scribe and Reader origins.
+Portcullis checks the login and permissions and relays browser streams.
 """
 
 from __future__ import annotations
@@ -14,9 +14,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from src.attachments.extraction import MAX_FILE_BYTES, ExtractionError, extract_text_async
-from src.attachments.services import ArmoryConnections, ArmoryUploads
+from src.attachments.services import ArmoryUploads
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
+from src.tool_services.client import ToolServices
 
 router = APIRouter(prefix="/attachments", tags=["attachments"])
 
@@ -43,7 +44,7 @@ def get_uploads(request: Request) -> ArmoryUploads:
     return request.app.state.uploads
 
 
-def get_connections(request: Request) -> ArmoryConnections:
+def get_connections(request: Request) -> ToolServices:
     return request.app.state.connections
 
 
@@ -182,7 +183,7 @@ async def attachment_pdf(body: FileIn, who: Requester = Depends(current_requeste
 
 @router.post("/audio")
 async def attachment_audio(body: AudioIn, who: Requester = Depends(current_requester),
-                           connections: ArmoryConnections = Depends(get_connections),
+                           connections: ToolServices = Depends(get_connections),
                            platform: PortcullisClient = Depends(get_platform)) -> AudioOut:
     """Keep the original for Scribe's transcribe tool; the agent gets the file_id."""
     filename, content = _audio(body)
@@ -194,7 +195,7 @@ async def attachment_audio(body: AudioIn, who: Requester = Depends(current_reque
 
 @router.post("/document")
 async def attachment_document(body: DocumentIn, who: Requester = Depends(current_requester),
-                              connections: ArmoryConnections = Depends(get_connections),
+                              connections: ToolServices = Depends(get_connections),
                               platform: PortcullisClient = Depends(get_platform)) -> DocumentOut:
     """Keep the original for Reader's OCR tool; the agent gets the file_id."""
     filename = _name(body.filename)
@@ -209,7 +210,7 @@ async def attachment_document(body: DocumentIn, who: Requester = Depends(current
 
 @router.post("/dictate")
 async def dictate(body: AudioIn, who: Requester = Depends(current_requester),
-                  connections: ArmoryConnections = Depends(get_connections),
+                  connections: ToolServices = Depends(get_connections),
                   platform: PortcullisClient = Depends(get_platform)) -> DictationOut:
     """Speech as draft text, without asking the chat agent to transcribe it. The log never holds the words."""
     filename, content = _audio(body)
@@ -220,7 +221,7 @@ async def dictate(body: AudioIn, who: Requester = Depends(current_requester),
 
 @router.post("/dictate/partial")
 async def dictate_partial(body: AudioIn, who: Requester = Depends(current_requester),
-                          connections: ArmoryConnections = Depends(get_connections)) -> DictationOut:
+                          connections: ToolServices = Depends(get_connections)) -> DictationOut:
     """A transient preview of a recording so far: no uploaded file and no log line."""
     filename, content = _audio(body)
     result = await connections.post_file("/connections/scribe/transcribe-partial", filename, content)

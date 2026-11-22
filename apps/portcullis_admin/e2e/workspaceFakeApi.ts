@@ -15,7 +15,7 @@ export const ACCOUNT = {
 const ADMIN_ACCOUNT = {
   ...ACCOUNT,
   roles: ["Administrator"],
-  permissions: [...ACCOUNT.permissions, "tools.view", "tools.execute", "files.upload", "files.download", "accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "usage.all.view", "extensions.manage"],
+  permissions: [...ACCOUNT.permissions, "tools.view", "tools.execute", "files.upload", "files.download", "accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "usage.all.view", "tool_services.manage"],
 };
 
 export const PASSWORD = "correct horse battery";
@@ -45,7 +45,7 @@ const ADMIN_PERMISSIONS = [
   { name: "chat.use", description: "Chat with the agent" },
   { name: "tools.view", description: "Run mcp_server tools" },
   { name: "roles.manage", description: "Manage accounts" },
-  { name: "extensions.manage", description: "Add and remove mcp_server extensions (other MCP servers offered to every client)" },
+  { name: "tool_services.manage", description: "Add, test and remove the Bard, Scribe and Reader connections in Stronghold Admin" },
 ];
 
 const json = (route: Route, body: unknown, status = 200) =>

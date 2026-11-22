@@ -21,6 +21,24 @@ const label = ref("");
 const description = ref("");
 const transport = ref<"http" | "stdio">("http");
 const url = ref("");
+
+type AddressRow = {
+  key: number;
+  address: string;
+  name: string;
+  found: boolean | null;
+  overrideSet: boolean;
+  token: string;
+};
+
+let nextAddressKey = 0;
+function newAddress(): AddressRow {
+  return { key: nextAddressKey++, address: "", name: "", found: null, overrideSet: false, token: "" };
+}
+
+const mode = ref<"catalog" | "direct">("catalog");
+const addressRows = ref<AddressRow[]>([newAddress()]);
+
 const command = ref("");
 const args = ref("");
 const headerName = ref("");
@@ -30,11 +48,22 @@ const removing = ref<string | null>(null);
 
 const rows = computed(() => Object.entries(servers.value).sort(([a], [b]) => a.localeCompare(b)));
 const isNew = computed(() => editing.value === "");
+const overrideNeedsConnectionToken = computed(() =>
+  transport.value === "http" && mode.value === "catalog" &&
+  addressRows.value.some((row) => row.token || row.overrideSet) &&
+  !(headerName.value.trim() && (headerValue.value || hadHeader.value)),
+);
 const valid = computed(
   () =>
     /^[a-z0-9][a-z0-9_-]{0,62}$/.test(id.value) &&
     label.value.trim() !== "" &&
-    (transport.value === "http" ? url.value.trim() !== "" : command.value.trim() !== ""),
+    !overrideNeedsConnectionToken.value &&
+    (transport.value === "stdio"
+      ? command.value.trim() !== ""
+      : mode.value === "direct"
+        ? url.value.trim() !== ""
+        : addressRows.value.length > 0 &&
+          addressRows.value.every((row) => row.address.trim() !== "" && (row.found === true || (row.found === false && row.name.trim() !== "")))),
 );
 
 async function load() {
@@ -56,6 +85,14 @@ function open(serverId: string) {
   description.value = server?.description ?? "";
   transport.value = server?.transport ?? "http";
   url.value = server?.url ?? "";
+  const path = server?.path ?? "/mcp";
+  if (server?.origins?.length) {
+    mode.value = "catalog";
+    addressRows.value = server.origins.map((o) => ({ ...newAddress(), address: o.origin ? o.origin + path : "", found: o.origin ? true : null, overrideSet: !!o.has_override }));
+  } else {
+    mode.value = server?.url ? "direct" : "catalog";
+    addressRows.value = [newAddress()];
+  }
   command.value = server?.command ?? "";
   args.value = (server?.args ?? []).join(" ");
   headerName.value = server?.auth?.type === "header" ? (server.auth.header_name ?? "") : "";
@@ -64,6 +101,32 @@ function open(serverId: string) {
   error.value = notice.value = "";
 }
 
+function addressChanged(row: AddressRow) {
+  row.found = null;
+  row.name = "";
+  row.overrideSet = false;
+  row.token = "";
+  error.value = "";
+}
+
+async function check(row: AddressRow) {
+  const address = row.address.trim();
+  if (!address) return;
+  try {
+    const result = await agentsAdminClient.lookupOrigin(address);
+    if (!addressRows.value.includes(row) || row.address.trim() !== address || editing.value === null) return;
+    row.found = result.found;
+    if (result.found && result.group) row.name = result.group.name;
+  } catch (err) {
+    if (addressRows.value.includes(row) && row.address.trim() === address && editing.value !== null) {
+      error.value = errorMessage(err);
+    }
+  }
+}
+
+function addAddress() { addressRows.value.push(newAddress()); }
+function removeAddress(index: number) { addressRows.value.splice(index, 1); }
+
 function close() {
   editing.value = null;
 }
@@ -71,7 +134,14 @@ function close() {
 /** An untouched header value is left out, so the stored one stays. */
 function entry(): McpServer {
   const body: McpServer = { label: label.value.trim(), description: description.value.trim(), transport: transport.value };
-  if (transport.value === "http") body.url = url.value.trim();
+  if (transport.value === "http" && mode.value === "direct") body.url = url.value.trim();
+  else if (transport.value === "http") {
+    body.addresses = addressRows.value.map((row) => ({
+      address: row.address.trim(),
+      ...(row.found ? {} : { name: row.name.trim() }),
+      ...(row.token ? { header_value: row.token } : {}),
+    }));
+  }
   else {
     body.command = command.value.trim();
     body.args = args.value.split(/\s+/).filter(Boolean);
@@ -87,6 +157,7 @@ function entry(): McpServer {
 }
 
 async function save() {
+  if (saving.value || !valid.value) return;
   saving.value = true;
   error.value = notice.value = "";
   try {
@@ -143,7 +214,7 @@ async function remove() {
         <tr v-for="[serverId, server] in rows" :key="serverId" :data-test="`row-${serverId}`">
           <td><code>{{ serverId }}</code></td>
           <td>{{ server.label }}<span v-if="server.description" class="muted"> — {{ server.description }}</span></td>
-          <td>{{ server.transport === "http" ? server.url : `${server.command} ${(server.args ?? []).join(" ")}` }}</td>
+          <td>{{ server.transport !== "http" ? `${server.command} ${(server.args ?? []).join(" ")}` : server.origins?.length ? server.origins.map((o) => o.origin ?? "(removed from Treasury)").join(", ") : server.url }}</td>
           <td class="row-actions">
             <button type="button" class="chip" data-test="edit" @click="open(serverId)">Edit</button>
             <button type="button" class="danger" data-test="remove" @click="removing = serverId">Remove</button>
@@ -175,10 +246,32 @@ async function remove() {
         </select>
       </div>
       <div v-if="transport === 'http'" class="field">
+        <label for="server-mode">Connects to</label>
+        <select id="server-mode" v-model="mode" :disabled="saving" data-test="mode">
+          <option value="catalog">An outside service (saved in Treasury, backups allowed)</option>
+          <option value="direct">One address (a Citadel service such as Armory)</option>
+        </select>
+      </div>
+      <div v-if="transport === 'http' && mode === 'direct'" class="field">
         <label for="server-url">Address</label>
         <input id="server-url" v-model="url" type="url" inputmode="url" :disabled="saving" autocomplete="off" spellcheck="false" data-test="url" />
       </div>
-      <template v-else>
+      <template v-if="transport === 'http' && mode === 'catalog'">
+        <fieldset v-for="(row, index) in addressRows" :key="row.key" class="field origin">
+          <legend>{{ index === 0 ? "Address" : `Backup address ${index}` }}</legend>
+          <input v-model="row.address" type="url" inputmode="url" :disabled="saving" autocomplete="off" spellcheck="false"
+                 :aria-label="`Address ${index + 1}`" :data-test="`address-${index}`" @input="addressChanged(row)" @blur="check(row)" />
+          <input v-model="row.name" :disabled="saving || row.found === true" autocomplete="off"
+                 :aria-label="`Service name for address ${index + 1}`" :data-test="`name-${index}`"
+                 :placeholder="row.found === false ? 'Give this service a name' : 'Service name'" />
+          <PasswordInput v-model="row.token" :label="`Token for address ${index + 1} (optional)`" :data-test="`override-${index}`" autocomplete="off" :disabled="saving"
+                         :placeholder="row.overrideSet ? 'Leave empty to keep its saved token' : 'Empty uses the connection token below'" />
+          <button v-if="addressRows.length > 1" type="button" class="chip" :disabled="saving" @click="removeAddress(index)">Remove address</button>
+        </fieldset>
+        <button type="button" class="chip" :disabled="saving || addressRows.length >= 10" data-test="add-address" @click="addAddress">Add a backup address</button>
+        <p class="help">Legion tries the addresses in this order, switches only when one cannot be reached, and goes back when the first answers again.</p>
+      </template>
+      <template v-if="transport === 'stdio'">
         <div class="field">
           <label for="server-command">Command</label>
           <input id="server-command" v-model="command" :disabled="saving" autocomplete="off" spellcheck="false" data-test="command" />
@@ -203,6 +296,9 @@ async function remove() {
         />
         <p class="help">{{ hadHeader ? "A token is saved. It is never shown again." : "No token is saved yet." }}</p>
       </div>
+      <p v-if="overrideNeedsConnectionToken" class="help">
+        Set a connection token header and value to use address overrides.
+      </p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="actions">
         <button type="button" class="chip" :disabled="saving" @click="close">Cancel</button>
@@ -237,6 +333,8 @@ async function remove() {
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }
 .field > input, .field > select { width: 100%; min-width: 0; min-height: 44px; }
+.origin { gap: 8px; margin: 0; padding: 0; border: 0; }
+.origin legend { font-size: 0.9em; font-weight: 600; padding: 0; }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
 .actions, .row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .actions { justify-content: flex-end; }

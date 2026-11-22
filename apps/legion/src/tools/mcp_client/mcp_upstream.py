@@ -1,7 +1,7 @@
 """ai_agent's connection to mcp_server - a thin, sync-friendly wrapper
 around src/mcp_client/sync_wrapper.py's SyncMcpClient, giving the provider files
 (src/llm/anthropic_provider.py, src/llm/openai_provider.py) the same
-call_tool(name, args) -> str / list_tools(enabled_extensions) -> list
+call_tool(name, args) -> str / list_tools() -> list
 shape chat_app's own services/mcp_client.py gives them today.
 
 Connected once at process startup (see server.py's main()) and reused
@@ -22,6 +22,7 @@ from src.tools.mcp_client import tool_progress
 from src.runtime.config_files import SETTINGS_DB
 from src.tools.mcp_client.sync_wrapper import SyncMcpClient
 from src.citadel_auth import ServiceAuth, settings_store
+from src.citadel_auth.failure import parse
 from src.runtime.service_catalog import catalog
 
 import asyncio
@@ -32,16 +33,16 @@ from src.tools.private_extensions.spec import InvalidSpec, PrivateSpec, describe
 
 _CONFIG_PATH = SETTINGS_DB
 
-# The single upstream server id stored in the settings database.
-# Every tool list_tools() returns is namespaced "main__<tool name>" by
-# SyncMcpClient's underlying McpClientRegistry (see registry.py's
-# NAMESPACE_SEPARATOR) even though there's only one upstream server today.
+# Armory keeps the default server id. The registry namespaces each tool
+# with the ID of its server.
 _SERVER_ID = "main"
 _PREFIX = f"{_SERVER_ID}__"
+_STRONGHOLD_ID = "stronghold"
+_STRONGHOLD_PREFIX = f"{_STRONGHOLD_ID}__"
 
 _log = logging.getLogger(__name__)
 
-client = SyncMcpClient()
+client = SyncMcpClient(resolve_origin=catalog.outside_origin)
 
 # The built-in mcp_server tools (agent-facing names, "main__<tool>") that declare readOnlyHint, from
 # the last list_tools(). A new frozenset each time, so a reader never sees a half-built one.
@@ -78,37 +79,40 @@ def connect(url_override: str | None = None) -> None:
     """Saved main URLs win over the catalog; an explicit CLI override wins over both."""
     main = settings_store.read_all(_CONFIG_PATH, "servers").get(_SERVER_ID, {})
     url_overrides = {_SERVER_ID: url_override} if url_override else (
-        {_SERVER_ID: catalog.mcp_url} if not main.get("url") and main.get("transport", "http") == "http" else None)
-    # Armory checks a signed service assertion on /mcp.
-    client.connect_all(_CONFIG_PATH, url_overrides, auth_by_server={_SERVER_ID: ServiceAuth(internal_auth.keyring, "armory")})
+        {_SERVER_ID: catalog.mcp_url} if not main.get("url") and not main.get("origins") and main.get("transport", "http") == "http" else None)
+    stronghold = {"label": "Stronghold", "transport": "http", "url": lambda: catalog.mcp_url(_STRONGHOLD_ID)}
+    client.connect_all(
+        _CONFIG_PATH, url_overrides,
+        auth_by_server={
+            _SERVER_ID: ServiceAuth(internal_auth.keyring, "armory"),
+            _STRONGHOLD_ID: ServiceAuth(internal_auth.keyring, _STRONGHOLD_ID),
+        },
+        builtins={_STRONGHOLD_ID: stronghold},
+    )
 
 
-def _tool_is_enabled(name: str, enabled: set[str]) -> bool:
-    """Mirrors chat_app's mcp_client._tool_is_enabled, applied to the
-    tool's name AFTER stripping this module's own "main__" registry
-    prefix - a proxied extension tool arrives as "main__{ext_id}__{tool}",
-    mcp_server's own built-ins as "main__{tool}" with no further "__"."""
-    ext_id, sep, _ = name.partition("__")
-    if not sep:
-        return True
-    return ext_id in enabled
+def _other_server(name: str) -> bool:
+    """A registry tool of a connection other than `main` (for example `bard__tool_bard_speak`)."""
+    return "__" in name and not name.startswith((_PREFIX, private_turn.TOOL_PREFIX))
 
 
-def list_tools(enabled_extensions: list[str] | None = None) -> list[Any]:
-    """Live tool catalog from mcp_server, filtered the same way
-    chat_app's mcp_client.list_tools() filters it today - an extension
-    tool is only kept when its extension id is in enabled_extensions - and
-    without the tools this turn's user switched off (see core/tool_filter.py)."""
+def list_tools() -> list[Any]:
+    """Live tool catalog from every connected server.
+
+    Outside connections require explicit agent scope. Users can switch off a tool for their turn.
+    """
     tools = client.list_tools()
     _remember_read_only(tools)
-    enabled = set(enabled_extensions or [])
     scope = agent_spec.current().tools
     result = []
     for tool in tools:
-        if not tool.name.startswith(_PREFIX):
-            continue
         short = unprefixed(tool.name)
-        if not _tool_is_enabled(short, enabled):
+        if _other_server(tool.name):
+            # An administrator's connection: only an explicit tools.allow offers it.
+            if scope.allows_explicitly(short) and not tool_filter.is_blocked(short):
+                result.append(tool)
+            continue
+        if not tool.name.startswith(_PREFIX):
             continue
         if not scope.allows(short):
             continue
@@ -141,29 +145,37 @@ def is_read_only_builtin(name: str) -> bool:
 
 def _qualified(name: str) -> str:
     """`name` as the registry lists it. A model that drops the "main__" prefix (tool descriptions and
-    instructions name tools bare) still reaches the built-in tool it meant; anything else is unchanged."""
+    instructions name tools bare) still reaches the built-in tool it meant. An exact registry name, such as a
+    connection's `bard__tool_bard_speak`, always wins over that guess."""
     if name.startswith((_PREFIX, private_turn.TOOL_PREFIX)):
         return name
-    qualified = _PREFIX + name
-    return qualified if any(tool.name == qualified for tool in client.list_tools()) else name
+    listed = {tool.name for tool in client.list_tools()}
+    if name in listed:
+        return name
+    return _PREFIX + name if _PREFIX + name in listed else name
+
+
+class NumberedFailureText(str):
+    """Error content emitted by a Citadel MCP tool."""
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> str:
     name = _qualified(name)
-    if tool_filter.is_blocked(unprefixed(name) if name.startswith(_PREFIX) else name):
+    private = name.startswith(private_turn.TOOL_PREFIX)
+    short = name if private else unprefixed(name)
+    if tool_filter.is_blocked(short):
         raise PermissionError(f"tool {name!r} is switched off for this user")
-    if name.startswith(private_turn.TOOL_PREFIX):
+    if private:
         return _call_private(name, arguments)
-    if name.startswith(_PREFIX) and not agent_spec.current().tools.allows(unprefixed(name)):
+    scope = agent_spec.current().tools
+    if not (scope.allows_explicitly(short) if _other_server(name) else scope.allows(short)):
         # The model only sees in-scope tools, but may still name another one.
         raise PermissionError(f"tool {name!r} is not available to this agent")
-    if name.startswith(_PREFIX) and tool_filter.is_blocked(unprefixed(name)):
-        # Switched off by the user for their own chats; the model may still name it.
-        raise PermissionError(f"tool {name!r} is switched off for this user")
     on_progress = tool_progress.current()
-    # The asking user rides in the call's _meta: the session is shared by
-    # every user, so it can't go in a header (see internal_auth.py).
-    meta = internal_auth.requester_meta()
+    # Internal connections share sessions across users. Identity belongs to the call.
+    meta = internal_auth.requester_meta() if name.startswith((_PREFIX, _STRONGHOLD_PREFIX)) else None
+    if meta and name.startswith(_PREFIX):
+        meta.pop("chat_id", None)
     # Each only passed when set, so the plain call keeps its original shape.
     extra: dict[str, Any] = {}
     if on_progress:
@@ -172,7 +184,13 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
         extra["meta"] = meta
     result = client.call_tool(name, arguments, **extra)
     parts = [getattr(block, "text", str(block)) for block in result.content]
-    return "\n".join(parts) if parts else "(no output)"
+    text = "\n".join(parts) if parts else "(no output)"
+    citadel_tool = name.startswith(_STRONGHOLD_PREFIX) or (
+        name.startswith(_PREFIX) and "__" not in name.removeprefix(_PREFIX)
+    )
+    if citadel_tool and getattr(result, "isError", False) and parse(text) is not None:
+        return NumberedFailureText(text)
+    return text
 
 
 def _call_private(name: str, arguments: dict[str, Any]) -> str:
@@ -232,8 +250,9 @@ def unprefixed(name: str) -> str:
 
 
 def warn_unmatched_tool_globs() -> None:
-    """One warning per tools.allow/deny glob that matches no mcp_server
-    tool - almost always a typo. Called once at startup, after connect()."""
-    names = [unprefixed(t.name) for t in client.list_tools() if t.name.startswith(_PREFIX)]
-    for glob in agent_spec.current().tools.unmatched(names):
-        _log.warning("agent %s: tools glob %r matches no mcp_server tool", agent_spec.current().id, glob)
+    """Warn once per tools.allow/deny glob that matches no tool on any connection.
+    Called once at startup, after connect()."""
+    names = [unprefixed(t.name) for t in client.list_tools()]
+    agent = agent_spec.current()
+    for glob in dict.fromkeys(agent.tools.unmatched(names)):
+        _log.warning("agent %s: tools glob %r matches no tool on any MCP connection", agent.id, glob)

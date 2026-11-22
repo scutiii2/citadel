@@ -35,7 +35,7 @@ def identity_headers(username: str, email: str, uid: str = "", *, fresh: bool = 
 
 
 class InternalServiceAuthMiddleware:
-    """Protect only internal routes; browser routes keep account/session authentication."""
+    """Protect internal routes and readiness; browser routes keep account/session authentication."""
 
     def __init__(self, app, identity: Keyring):
         self.app = app
@@ -43,7 +43,7 @@ class InternalServiceAuthMiddleware:
 
     async def __call__(self, scope, receive, send):
         path = scope.get("path", "")
-        if scope["type"] == "http" and (path == "/internal" or path.startswith("/internal/")):
+        if scope["type"] == "http" and (path in ("/internal", "/ready") or path.startswith("/internal/")):
             await self.protected(scope, receive, send)
         else:
             await self.app(scope, receive, send)

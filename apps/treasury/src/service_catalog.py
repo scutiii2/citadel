@@ -8,6 +8,8 @@ Two tables in `.data/treasury/settings.db`: `service_addresses` (what a service 
 
 from __future__ import annotations
 
+import json
+from contextlib import closing
 from pathlib import Path
 
 from src.citadel_auth import SERVICE_DEFAULTS, checked_address, settings_store
@@ -55,6 +57,19 @@ def view(db: Path) -> dict:
 def register(db: Path, name: str, url: object) -> None:
     name, url = _checked(name, url)
     settings_store.put(db, REGISTERED_TABLE, name, url)
+
+
+def register_if_missing(db: Path, name: str, url: str) -> bool:
+    """Fill a gap atomically without racing a service registration or administrator pin."""
+    name, url = _checked(name, url)
+    with closing(settings_store._connect(db, REGISTERED_TABLE)) as connection, connection:
+        connection.execute(f"CREATE TABLE IF NOT EXISTS {PINNED_TABLE} (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        cursor = connection.execute(
+            f"INSERT OR IGNORE INTO {REGISTERED_TABLE} (key, value) "
+            f"SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM {PINNED_TABLE} WHERE key = ?)",
+            (name, json.dumps(url), name),
+        )
+        return cursor.rowcount == 1
 
 
 def pin(db: Path, name: str, url: object) -> None:

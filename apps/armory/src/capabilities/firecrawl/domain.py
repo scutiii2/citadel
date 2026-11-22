@@ -6,7 +6,7 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 from src.capabilities.firecrawl.contract import CrawlResult, MapResult, ScrapeResult, SiteLink
-from src.capabilities.firecrawl.utils.firecrawl import FirecrawlClient
+from src.capabilities.firecrawl.utils.firecrawl import FirecrawlClient, FirecrawlError
 from src.services import untrusted
 
 MAX_PAGE_BYTES = 24_000
@@ -61,7 +61,7 @@ class FirecrawlDesk:
         _check_limit(limit, MAX_CRAWL_PAGES)
         status, raw_pages = self._client.crawl(url, limit, wait_seconds)
         if status == "failed":
-            raise ValueError(f"The crawl of {url} failed on Firecrawl's side.")
+            raise FirecrawlError("Firecrawl reported a failed crawl.")
         pages: list[str] = []
         sections: list[str] = []
         for item in raw_pages:

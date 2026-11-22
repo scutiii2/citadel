@@ -13,8 +13,7 @@ keyring = from_env("armory", data_dir=data_dir(Path(__file__).resolve().parents[
 def install_auth(app, identity=None):
     """Install once even when multiple capability route installers share an app."""
     if not getattr(app.state, "citadel_auth_installed", False):
-        app.add_middleware(ServiceAuthMiddleware, keyring=identity or keyring, audience="armory",
-                           websocket_paths=("/connections/scribe/dictate",))
+        app.add_middleware(ServiceAuthMiddleware, keyring=identity or keyring, audience="armory")
         app.state.citadel_auth_installed = True
 
 

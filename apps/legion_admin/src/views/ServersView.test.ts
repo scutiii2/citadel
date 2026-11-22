@@ -40,6 +40,7 @@ describe("ServersView", () => {
     expect(wrapper.get('[data-test="save"]').attributes("disabled")).toBeDefined();
     await wrapper.get('[data-test="id"]').setValue("docs");
     await wrapper.get('[data-test="label"]').setValue("Docs");
+    await wrapper.get('[data-test="mode"]').setValue("direct");
     await wrapper.get('[data-test="url"]').setValue("http://docs:1/mcp");
     await wrapper.get('[data-test="form"]').trigger("submit");
     await flushPromises();
@@ -67,6 +68,68 @@ describe("ServersView", () => {
     await wrapper.get('[data-test="form"]').trigger("submit");
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain("requires 'url'");
+    wrapper.unmount();
+  });
+
+  it("fills the name of a known address and locks it", async () => {
+    vi.spyOn(agentsAdminClient, "lookupOrigin").mockResolvedValue(
+      { found: true, origin: "http://bard:29400", path: "/mcp", origin_id: "o1", group: { service_id: "s", name: "bard" } });
+    const wrapper = await mounted();
+    await wrapper.get('[data-test="add"]').trigger("click");
+    await wrapper.get('[data-test="address-0"]').setValue("http://bard:29400/mcp");
+    await wrapper.get('[data-test="address-0"]').trigger("blur");
+    await flushPromises();
+    const name = wrapper.get('[data-test="name-0"]');
+    expect((name.element as HTMLInputElement).value).toBe("bard");
+    expect(name.attributes("disabled")).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it("asks for a name when the address is new and sends addresses with an override token", async () => {
+    vi.spyOn(agentsAdminClient, "lookupOrigin").mockResolvedValue(
+      { found: false, origin: "http://bard:29400", path: "/mcp", origin_id: null, group: null });
+    const save = vi.spyOn(agentsAdminClient, "saveServer").mockResolvedValue({ saved: "bard" });
+    const wrapper = await mounted();
+    await wrapper.get('[data-test="add"]').trigger("click");
+    await wrapper.get('[data-test="id"]').setValue("bard");
+    await wrapper.get('[data-test="label"]').setValue("Bard");
+    await wrapper.get('[data-test="address-0"]').setValue("http://bard:29400/mcp");
+    await wrapper.get('[data-test="address-0"]').trigger("blur");
+    await flushPromises();
+    expect(wrapper.get('[data-test="save"]').attributes("disabled")).toBeDefined(); // a new address needs a name
+    await wrapper.get('[data-test="name-0"]').setValue("bard");
+    await wrapper.get('[data-test="add-address"]').trigger("click");
+    await wrapper.get('[data-test="address-1"]').setValue("http://bard2:29400/mcp");
+    vi.mocked(agentsAdminClient.lookupOrigin).mockResolvedValue(
+      { found: true, origin: "http://bard2:29400", path: "/mcp", origin_id: "o2", group: { service_id: "s", name: "bard" } });
+    await wrapper.get('[data-test="address-1"]').trigger("blur");
+    await flushPromises();
+    await wrapper.get('[data-test="override-1"]').setValue("second");
+    expect(wrapper.get('[data-test="save"]').attributes("disabled")).toBeDefined();
+    await wrapper.get('[data-test="header-name"]').setValue("X-Test-Token");
+    await wrapper.get('[data-test="header-value"]').setValue("parent");
+    await wrapper.get('[data-test="form"]').trigger("submit");
+    await flushPromises();
+    expect(save).toHaveBeenCalledWith("bard", {
+      label: "Bard", description: "", transport: "http",
+      auth: { type: "header", header_name: "X-Test-Token", header_value: "parent" },
+      addresses: [{ address: "http://bard:29400/mcp", name: "bard" }, { address: "http://bard2:29400/mcp", header_value: "second" }],
+    });
+    wrapper.unmount();
+  });
+
+  it("shows the origins of a catalog connection and keeps unretyped overrides", async () => {
+    vi.spyOn(agentsAdminClient, "servers").mockResolvedValue({ bard: { label: "Bard", transport: "http", service_id: "s", path: "/mcp",
+      auth: { type: "header", header_name: "X-Test-Token", has_value: true },
+      origins: [{ origin_id: "o1", origin: "http://bard:29400", has_override: false }, { origin_id: "o2", origin: "http://bard2:29400", has_override: true }] } });
+    const save = vi.spyOn(agentsAdminClient, "saveServer").mockResolvedValue({ saved: "bard" });
+    const wrapper = await mounted();
+    expect(wrapper.get('[data-test="row-bard"]').text()).toContain("http://bard:29400, http://bard2:29400");
+    await wrapper.get('[data-test="edit"]').trigger("click");
+    expect((wrapper.get('[data-test="address-1"]').element as HTMLInputElement).value).toBe("http://bard2:29400/mcp");
+    await wrapper.get('[data-test="form"]').trigger("submit");
+    await flushPromises();
+    expect(save.mock.calls[0][1].addresses).toEqual([{ address: "http://bard:29400/mcp" }, { address: "http://bard2:29400/mcp" }]);
     wrapper.unmount();
   });
 });

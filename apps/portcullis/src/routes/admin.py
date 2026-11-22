@@ -306,9 +306,10 @@ async def delete_account(
     except AdminError as error:
         raise _http_error(error) from error
     # These domains live in Stronghold. Best effort: the account is already gone.
-    for domain, what in (("memory", "Memory notes"), ("notes", "Notes"),
-                         ("skills", "Skills"), ("templates", "Templates"), ("usage", "Usage"), ("tickets", "Tickets"), ("shares", "Share links"),
-                         ("tuning", "Response limits"), ("chats", "Chats and folders"), ("brains", "Brain connections"),
+    for domain, what in (("skills", "Skills"), ("templates", "Templates"), ("usage", "Usage"), ("tickets", "Tickets"), ("shares", "Share links"),
+                         ("tuning", "Response limits"), ("chats", "Chats and folders"), ("stack", "Short-term memory"),
+                         ("brain", "Long-term memory"), ("brain/shares", "Shared items and blocks"),
+                         ("brain/proposals", "Memory suggestions"),
                          ("account-agents", "Switched-off agents"), ("user-extensions", "Private extensions"),
                          ("turns", "Running answers")):
         try:
@@ -316,7 +317,9 @@ async def delete_account(
             confirmed = purged.status < 400
         except StrongholdUnavailable:
             confirmed = False
-        if not confirmed:
+        if not confirmed and domain in ("brain/shares", "brain/proposals"):
+            await logs.error(admin.id, f"admin.{domain.replace('/', '_')}_purge", f"{what} were not purged")
+        elif not confirmed:
             await logs.error(
                 admin.id, f"admin.{domain}_purge", f"{what} of deleted account '{username}' were not purged (stronghold did not confirm)"
             )

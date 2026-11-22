@@ -39,4 +39,16 @@ export const STRONGHOLD_PAGES: StrongholdPage[] = [
     icon: ["M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3", "M1 14h6M9 8h6M17 16h6"],
     permission: "settings.manage",
   },
+  {
+    to: "/brain-settings",
+    label: "Brain settings",
+    icon: ["M12 18V5", "M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4", "M17.6 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.6 1.5 4 4 0 0 0-2.8 5.6 4 4 0 0 0 .6 6.9A4 4 0 0 0 12 20a4 4 0 0 0 7.8-1 4 4 0 0 0 .6-6.9 4 4 0 0 0-2.8-5.6"],
+    permission: "settings.manage",
+  },
+  {
+    to: "/tool-services",
+    label: "Tool services",
+    icon: ["M4 7h16", "M4 12h16", "M4 17h16", "M8 5v4", "M16 10v4", "M10 15v4"],
+    permission: "tool_services.manage",
+  },
 ];

@@ -20,7 +20,7 @@ INVITES_MANAGE = "invites.manage"
 SETTINGS_MANAGE = "settings.manage"
 CAPABILITIES_MANAGE = "capabilities.manage"
 USAGE_ALL_VIEW = "usage.all.view"
-EXTENSIONS_MANAGE = "extensions.manage"
+TOOL_SERVICES_MANAGE = "tool_services.manage"
 LOGS_VIEW = "logs.view"
 LOGS_ERRORS_VIEW = "logs.errors.view"
 LOGS_CHAT_VIEW = "logs.chat.view"
@@ -31,10 +31,10 @@ AGENTS_MANAGE = "agents.manage"
 TUNING_MANAGE = "tuning.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
-BRAIN_INSTANCE_PUBLISH = "brain.instance.publish"
+BRAIN_GLOBAL_WRITE = "brain.global.write"
 
 ALL_PERMISSIONS = MappingProxyType({
-    BRAIN_INSTANCE_PUBLISH: "Publish durable knowledge to the shared Instance Brain",
+    BRAIN_GLOBAL_WRITE: "Write the global brain and review what people share with it",
     CHAT_USE: "Chat with ai_agent instances",
     TOOLS_VIEW: "Browse tools, capabilities, help and resources",
     TOOLS_EXECUTE: "Run tools directly and through chat agents",
@@ -52,7 +52,7 @@ ALL_PERMISSIONS = MappingProxyType({
     SETTINGS_MANAGE: "Change workspace settings",
     CAPABILITIES_MANAGE: "Enable, disable and discover shared capabilities",
     USAGE_ALL_VIEW: "View usage across all accounts",
-    EXTENSIONS_MANAGE: "Add and remove mcp_server extensions (other MCP servers offered to every client)",
+    TOOL_SERVICES_MANAGE: "Add, test and remove the Bard, Scribe and Reader connections in Stronghold Admin",
     LOGS_VIEW: "Read the activity log (logins, account and admin changes)",
     LOGS_ERRORS_VIEW: "Read the error log",
     LOGS_CHAT_VIEW: "Read the chat-turn log (every account's questions and answers)",
@@ -69,9 +69,9 @@ ALL_PERMISSIONS = MappingProxyType({
 # config_app.json sets require_email_verification to false (see Account.permission_names).
 STAFF_PERMISSIONS = frozenset({
     ACCOUNTS_VIEW, ACCOUNTS_MANAGE, ACCOUNTS_DELETE, ROLES_VIEW, ROLES_MANAGE, ROLES_ASSIGN,
-    INVITES_MANAGE, SETTINGS_MANAGE, CAPABILITIES_MANAGE, EXTENSIONS_MANAGE, AGENTS_MANAGE, TUNING_MANAGE,
+    INVITES_MANAGE, SETTINGS_MANAGE, CAPABILITIES_MANAGE, TOOL_SERVICES_MANAGE, AGENTS_MANAGE, TUNING_MANAGE,
     LOGS_VIEW, LOGS_ERRORS_VIEW, LOGS_CHAT_VIEW, LOGS_CHAT_PROMPTS_VIEW, CONFIG_ISSUES_VIEW,
-    TRAFFIC_VIEW, USAGE_ALL_VIEW, TICKETS_MANAGE,
+    TRAFFIC_VIEW, USAGE_ALL_VIEW, TICKETS_MANAGE, BRAIN_GLOBAL_WRITE,
 })
 
 ADMIN_ROLE = "Administrator"

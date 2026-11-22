@@ -34,7 +34,7 @@ from src.providers.context_breakdown import ProviderCounter, breakdown_fields
 from src.providers.base_provider import (
     BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, cancel_on_stop, dispatch_with_progress, step_event,
 )
-from src.tools.mcp_client.mcp_upstream import call_tool, list_tools, tool_description
+from src.tools.mcp_client.mcp_upstream import NumberedFailureText, call_tool, list_tools, tool_description
 
 
 PROVIDER_NAME = "anthropic"
@@ -130,9 +130,7 @@ def _dispatch(name: str, arguments: dict[str, Any], depth: int) -> str:
     return call_tool(name, arguments)
 
 
-def _tool_schemas(
-    enabled_extensions: list[str] | None = None, roster: Sequence[RosterEntry] = ()
-) -> list[dict[str, Any]]:
+def _tool_schemas(roster: Sequence[RosterEntry] = ()) -> list[dict[str, Any]]:
     # display_label rides along on every schema dict returned here so
     # run_chat can build its step_start "label" lookup from the same
     # list it already has - it is NOT a real Anthropic tools= schema
@@ -146,7 +144,7 @@ def _tool_schemas(
             "input_schema": tool.inputSchema or {"type": "object", "properties": {}},
             "display_label": (tool.meta or {}).get("display_label") if hasattr(tool, "meta") else None,
         }
-        for tool in ([] if plan_mode else list_tools(enabled_extensions))
+        for tool in ([] if plan_mode else list_tools())
     ]
     # Only an orchestrator has a roster, so only it can delegate.
     if roster and not plan_mode:
@@ -301,7 +299,6 @@ async def run_chat(
     question: str,
     history: list[dict[str, Any]],
     model: str | None = None,
-    enabled_extensions: list[str] | None = None,
     request_id: str | None = None,
     depth: int = 0,
     on_event: OnEvent | None = None,
@@ -319,7 +316,7 @@ async def run_chat(
     messages: list[dict[str, Any]] = [*history, {"role": "user", "content": question}]
     tools_used: list[str] = []
     tool_calls: list[ToolCallRecord] = []
-    schemas = _tool_schemas(enabled_extensions, roster)
+    schemas = _tool_schemas(roster)
     # display_label isn't a real Anthropic tools= field (see _tool_schemas) -
     # pop it into this name->label lookup here, once, rather than sending it
     # to the API or re-deriving it per tool_use block below.
@@ -511,6 +508,9 @@ async def run_chat(
                             except Exception as error:
                                 result_text = f"Tool '{block.name}' failed: {error}"
                                 ok = False
+                    if isinstance(result_text, NumberedFailureText):
+                        guard.note_result(block.name, block.input, result_text)
+                        ok = False
                     if on_event:
                         await on_event(step_event("step_end", id=step_id, ok=ok, result=result_text))
                     tool_calls.append(ToolCallRecord(name=block.name, arguments=block.input, result=result_text))

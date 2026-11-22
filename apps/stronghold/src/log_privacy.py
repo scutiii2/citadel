@@ -1,6 +1,6 @@
 """Keeps account uids out of logged request lines.
 
-Stronghold calls Armory (`/memory/owners/<uid>`) and Portcullis (`/internal/accounts/<uid>/...`)
+Stronghold calls Portcullis (`/internal/accounts/<uid>/...`)
 with the uid in the path, and HTTPX logs every request URL at INFO.
 """
 
@@ -12,11 +12,18 @@ import re
 _UID_IN_PATH = re.compile(r"(/(?:owners|accounts)/)[^\s\"/?]+")
 
 
+_BRAIN_QUERY = re.compile(r'(/brain/[^?\s"]*)\?[^\s"]*')
+_BY_USERNAME = re.compile(r'(/by-username/)[^\s"?]+')
+
+
 class UidLogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         def redact(value):
             text = str(value)
-            return _UID_IN_PATH.sub(r"\1[redacted]", text) if "/owners/" in text or "/accounts/" in text else value
+            redacted = _BY_USERNAME.sub(r"\1[redacted]", text)
+            redacted = _UID_IN_PATH.sub(r"\1[redacted]", redacted)
+            redacted = _BRAIN_QUERY.sub(r"\1?[redacted]", redacted)
+            return redacted if redacted != text else value
 
         record.msg = redact(record.msg)
         if isinstance(record.args, tuple):

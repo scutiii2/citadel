@@ -1,7 +1,6 @@
 """Which of an account's tickets have staff activity it has not read yet.
 
-Armory owns the tickets and reports each one's `last_staff_activity_at`. Stronghold keeps only
-when the account last opened each ticket: one document per account and ticket in the
+Stronghold stores the last time an account opened a ticket in one document per account and ticket in the
 "ticket_seen" collection (key `<uid>:<ticket id>`).
 """
 
@@ -35,7 +34,7 @@ class TicketUnread:
         return {doc["ticket_id"]: datetime.fromisoformat(doc["last_seen_at"]) for doc in docs}
 
     async def unread_ids(self, owner: str, activity_times: dict[int, str | None]) -> set[int]:
-        """Of these tickets (each with Armory's last staff activity time), the ones with newer activity than the account saw."""
+        """Of these tickets (each with a last staff activity time), the ones with newer activity than the account saw."""
         active = {ticket_id: _naive_utc(value) for ticket_id, value in activity_times.items() if value}
         if not active:
             return set()

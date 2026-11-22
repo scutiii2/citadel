@@ -20,7 +20,9 @@ _NO_RECORD = "no record"
 
 
 class DbGatewayError(Exception):
-    pass
+    def __init__(self, message: str = "", *, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 class DbGatewayUnavailable(DbGatewayError):
@@ -67,7 +69,7 @@ class DbGatewayClient:
     @staticmethod
     def _check(response: httpx.Response) -> httpx.Response:
         if response.status_code >= 400:
-            raise DbGatewayError(f"db_gateway answered {response.status_code}: {_error_text(response)}")
+            raise DbGatewayError(f"db_gateway answered {response.status_code}: {_error_text(response)}", status=response.status_code)
         return response
 
     async def get(self, collection: str, key: str) -> Document | None:

@@ -195,7 +195,7 @@ class TrafficMiddleware:
     as an SSE stream, is counted when it starts, not when it ends)."""
 
     # Polled by the process supervisor; not traffic worth charting.
-    SKIPPED = frozenset({"/api/health"})
+    SKIPPED = frozenset({"/api/health", "/health"})
 
     def __init__(self, app) -> None:
         self._app = app

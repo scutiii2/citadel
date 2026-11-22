@@ -2,7 +2,7 @@
 
 Opt-in per agent (agent file key skill_learning). It never changes the turn: it runs in the
 background once the answer exists, costs one call to the tool-free context-summarizer agent,
-and every failure is silent. The draft is only a *proposal* (armory's tool_skill_propose); the
+and every failure is silent. The draft is only a *proposal* (Stronghold's tool_skill_propose); the
 user approves it on Ember's Skills page and nothing is used before that.
 
 What the drafting model sees is deliberately small: the user's request and the ordered tool
@@ -28,15 +28,15 @@ from src.tools.private_extensions import turn as private_turn
 _log = logging.getLogger(__name__)
 
 AGENT_ID = "context-summarizer"
-TOOL = "main__tool_skill_propose"
+TOOL = "stronghold__tool_skill_propose"
 MIN_TOOL_CALLS = 3
 REQUEST_CHARS = 1000
 TIMEOUT_SECONDS = 30
-# Same limits as armory's skill_store; a longer draft would be refused there anyway.
+# Same limits as Stronghold's skill store; a longer draft would be refused there anyway.
 LIMITS = {"title": 80, "when_to_use": 300, "steps": 1200, "tools": 200}
 
 # Bookkeeping that says nothing about how the task was done.
-_IGNORED_PREFIXES = ("tool_skill_", "tool_mem_")
+_IGNORED_PREFIXES = ("tool_skill_", "tool_mem_", "stronghold__tool_skill_", "stronghold__tool_brain_", "stronghold__tool_stack_")
 _IGNORED_NAMES = (delegation.TOOL_NAME, plan.TOOL_NAME, "ask_user")
 # Tools that bring in text somebody else wrote: such a turn is not learned from.
 _UNTRUSTED_PREFIXES = ("tool_web_", "tool_firecrawl_", "tool_email_")

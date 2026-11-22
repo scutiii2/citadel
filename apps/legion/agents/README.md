@@ -32,6 +32,11 @@ Gateway/model, generation and language fallback fields are rejected. Laya's
 internal service strategy is gateway config, read on each call. A router's
 `decision` policy selects its routing strategy/confidence separately.
 
+A tool from an outside MCP connection uses the name `<server-id>__<tool>`.
+Add a matching `tools.allow` glob such as `bard__*` to offer it to the agent.
+An empty allow list leaves outside connection tools hidden, and `tools.deny` still wins.
+Outside tools follow the normal approval policy, including in Auto mode.
+
 Keep deployment credentials outside tracked definitions. See `../README.md`
 for the field descriptions and examples.
 
@@ -39,8 +44,9 @@ The supervisor watches this directory and the overrides file and reconciles
 validated changes.
 
 `mathematician.json` defines the delegable mathematics specialist on port 29620.
-It permits only `tool_math_*` and the standard ticket support tool. Analyst also
-permits math tools for attached-table formulas. Ember routes using the live
+It permits `tool_math_*` and Stronghold’s `stronghold__tool_ticket_createTicket`.
+Data Analyst also permits math tools for attached-table formulas and reads the
+requester’s token usage with `stronghold__tool_usage_summary`. Ember routes using the live
 roster; Reviewer independently checks math through its existing permitted tools.
 Armory's Mathematics capability must be enabled for math tools to be offered.
 

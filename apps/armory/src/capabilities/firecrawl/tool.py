@@ -9,20 +9,25 @@ from pydantic import Field
 
 from src.capabilities.firecrawl import domain
 from src.capabilities.firecrawl.contract import CrawlResult, MapResult, ScrapeResult
-from src.capabilities.firecrawl.utils.firecrawl import FirecrawlClient
+from src.capabilities.firecrawl.utils.firecrawl import HOSTED_URL, FirecrawlClient, FirecrawlError
 from src.commands import command
 from src.config import settings
+from src.citadel_auth.failure import Code, Failure
+from src.errors import numbered_dependency
 from src.offload import offload
 from src.server import mcp
 
 
 def _client() -> FirecrawlClient:
     # Built per call so a missing key fails this tool, not server startup.
+    if not settings.firecrawl_api_key and (settings.firecrawl_api_url or HOSTED_URL).rstrip("/") == HOSTED_URL:
+        raise Failure(Code.DEP_NOT_CONFIGURED, "firecrawl")
     return FirecrawlClient(settings.firecrawl_api_key, settings.firecrawl_api_url)
 
 
 @command(name="page", description="Scrape a web page as markdown")
 @mcp.tool(meta={"keywords": ["scrape", "firecrawl", "web", "page", "url", "markdown", "extract", "article"], "display_label": "Scraping web page"})
+@numbered_dependency("firecrawl", FirecrawlError)
 @offload
 def tool_scrape_page(
     url: Annotated[str, Field(description="The full http:// or https:// address of the page.")],
@@ -36,6 +41,7 @@ def tool_scrape_page(
 
 @command(name="map", description="List the pages of a site")
 @mcp.tool(meta={"keywords": ["scrape", "firecrawl", "map", "sitemap", "site", "links", "urls", "pages"], "display_label": "Mapping web site"})
+@numbered_dependency("firecrawl", FirecrawlError)
 @offload
 def tool_scrape_map(
     url: Annotated[str, Field(description="The full http:// or https:// address of the site or section to map.")],
@@ -49,6 +55,7 @@ def tool_scrape_map(
 
 @command(name="crawl", description="Crawl a site and read its pages")
 @mcp.tool(meta={"keywords": ["scrape", "firecrawl", "crawl", "site", "docs", "documentation", "spider", "pages"], "display_label": "Crawling web site"})
+@numbered_dependency("firecrawl", FirecrawlError)
 @offload
 def tool_scrape_crawl(
     url: Annotated[str, Field(description="The full http:// or https:// address where the crawl starts.")],

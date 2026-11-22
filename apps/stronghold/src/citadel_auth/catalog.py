@@ -77,6 +77,28 @@ def logical_url(name: str) -> str:
     return f"http://{name}{LOGICAL_SUFFIX}"
 
 
+def _clean_outside(groups: object) -> list[dict]:
+    """Keep well-formed groups and addresses from Treasury or the local cache."""
+    if not isinstance(groups, list):
+        return []
+    cleaned = []
+    for group in groups:
+        if not isinstance(group, dict) or not isinstance(group.get("service_id"), str) or not isinstance(group.get("name"), str):
+            continue
+        origins = []
+        items = group.get("origins")
+        for item in items if isinstance(items, list) else []:
+            if not isinstance(item, dict) or not isinstance(item.get("origin_id"), str):
+                continue
+            try:
+                origin = checked_address(item.get("origin"))
+            except ValueError:
+                continue
+            origins.append({"origin_id": item["origin_id"], "origin": origin})
+        cleaned.append({"service_id": group["service_id"], "name": group["name"], "origins": origins})
+    return cleaned
+
+
 class ServiceCatalog:
     def __init__(
         self, keyring: Keyring, treasury_url: str, *, cache_path: Path | str | None = None,
@@ -92,6 +114,8 @@ class ServiceCatalog:
         self._transport = transport
         self._wake: asyncio.Event | None = None  # created in start(), inside the running loop
         self._task: asyncio.Task | None = None
+        self._refresh_lock = asyncio.Lock()
+        self._outside: list[dict] = []
         self._load_cache()
 
     def _load_cache(self) -> None:
@@ -101,15 +125,18 @@ class ServiceCatalog:
             stored = json.loads(self._cache_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return
-        self._merge(stored)
+        self._merge(self._known, stored)
+        if isinstance(stored, dict):
+            self._outside = _clean_outside(stored.get("_outside"))
 
-    def _merge(self, services: object) -> None:
+    @staticmethod
+    def _merge(known: dict[str, str], services: object) -> None:
         if not isinstance(services, dict):
             return
         for name, value in services.items():
-            if name in self._known and name != "treasury":
+            if name in known and name != "treasury":
                 try:
-                    self._known[name] = checked_address(value)
+                    known[name] = checked_address(value)
                 except ValueError:
                     continue
 
@@ -124,6 +151,31 @@ class ServiceCatalog:
     def mcp_url(self, name: str = "armory") -> str:
         return self.url(name) + "/mcp"
 
+    def outside_groups(self) -> list[dict]:
+        return [{**group, "origins": [dict(o) for o in group["origins"]]} for group in self._outside]
+
+    def outside_group(self, service_id: str) -> dict:
+        for group in self._outside:
+            if group["service_id"] == service_id:
+                return {**group, "origins": [dict(origin) for origin in group["origins"]]}
+        raise UnknownService(service_id)
+
+    def outside_origin(self, origin_id: str) -> str:
+        for group in self._outside:
+            for item in group["origins"]:
+                if item["origin_id"] == origin_id:
+                    return item["origin"]
+        raise UnknownService(origin_id)
+
+    async def _read_outside(self, client: httpx.AsyncClient) -> list[dict] | None:
+        """Keep the last snapshot when Treasury cannot serve the outside catalog."""
+        try:
+            response = await client.get("/outside")
+            groups = response.json().get("groups") if response.status_code == 200 else None
+        except (httpx.HTTPError, ValueError, AttributeError):
+            return None
+        return _clean_outside(groups) if isinstance(groups, list) else None
+
     def address(self, name: str) -> Callable[[], str]:
         return lambda: self.url(name)
 
@@ -133,29 +185,34 @@ class ServiceCatalog:
 
     async def refresh(self) -> bool:
         try:
-            async with self._client() as client:
+            async with self._refresh_lock, self._client() as client:
                 response = await client.get("/services")
-            if response.status_code != 200:
-                return False
-            services = response.json().get("services")
+                services = response.json().get("services") if response.status_code == 200 else None
+                services_ok = isinstance(services, dict)
+                if services_ok:
+                    known = dict(self._defaults)
+                    self._merge(known, services)
+                    if known != self._known or (self._cache_path is not None and not self._cache_path.exists()):
+                        await asyncio.to_thread(self._write_cache, known, self._outside)
+                    self._known = known
+
+                outside = await self._read_outside(client)
+                if outside is not None and outside != self._outside:
+                    await asyncio.to_thread(self._write_cache, self._known, outside)
+                    self._outside = outside
         except (httpx.HTTPError, ValueError, AttributeError):
             return False
-        if not isinstance(services, dict):
-            return False
-        before = dict(self._known)
-        self._known = dict(self._defaults)
-        self._merge(services)
-        if self._known != before or (self._cache_path is not None and not self._cache_path.exists()):
-            await asyncio.to_thread(self._write_cache)
-        return True
+        return services_ok
 
-    def _write_cache(self) -> None:
+    def _write_cache(self, known: dict[str, str], outside: list[dict]) -> None:
         if self._cache_path is None:
             return
         try:
             self._cache_path.parent.mkdir(parents=True, exist_ok=True)
             temporary = self._cache_path.with_suffix(".tmp")
-            temporary.write_text(json.dumps({k: v for k, v in self._known.items() if k != "treasury"}), encoding="utf-8")
+            stored = {key: value for key, value in known.items() if key != "treasury"}
+            stored["_outside"] = outside
+            temporary.write_text(json.dumps(stored), encoding="utf-8")
             os.replace(temporary, self._cache_path)
         except OSError:
             log.warning("could not save the service catalog cache at %s", self._cache_path)

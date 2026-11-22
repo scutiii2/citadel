@@ -77,6 +77,9 @@ class IpFilter:
         self._allow = _networks(allow)
         self._deny = _networks(deny)
 
+    def denies(self, address: str) -> bool:
+        return _in(address, self._deny)
+
     @property
     def active(self) -> bool:
         return bool(self._allow or self._deny)
@@ -111,6 +114,7 @@ class SecurityMiddleware:
         self.app = app
         self._resolver = ClientIpResolver(settings.trusted_proxies)
         self._filter = IpFilter(settings.ip_allow_list, settings.ip_deny_list)
+        self._outside_filter = IpFilter(settings.outside_ip_allow_list, settings.outside_ip_deny_list)
         self._headers = security_headers(settings)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -123,7 +127,12 @@ class SecurityMiddleware:
         state["client_ip"] = client_ip
         state["https"] = self._resolver.is_https(scope)
 
-        if self._filter.active and not self._filter.allows(client_ip):
+        if scope.get("path", "").startswith("/api/outside/"):
+            # Outside clients: the main deny list plus their own lists; the main allow list is for people.
+            refused = self._filter.denies(client_ip) or not self._outside_filter.allows(client_ip)
+        else:
+            refused = self._filter.active and not self._filter.allows(client_ip)
+        if refused:
             if scope["type"] == "websocket":
                 await send({"type": "websocket.close", "code": 1008})
                 return

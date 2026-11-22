@@ -9,13 +9,12 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from src.config import Settings
-from src.deps import get_settings, require_permission
+from src.deps import get_settings, get_stronghold, require_permission
 from src.models import Account
 from src.routes.connections import readiness
-from src.routes.server_info import get_server_info
 from src.services.config_validation import collect_issues_async
-from src.services.mcp_server_info import McpServerInfo
 from src.services.permissions import CONFIG_ISSUES_VIEW
+from src.services.stronghold_forwarder import StrongholdForwarder
 
 router = APIRouter(prefix="/api/config-issues", tags=["config"])
 
@@ -32,13 +31,13 @@ class ConfigIssueOut(BaseModel):
 @router.get("")
 async def list_config_issues(
     account: Account = Depends(require_config), settings: Settings = Depends(get_settings),
-    info: McpServerInfo = Depends(get_server_info),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> list[ConfigIssueOut]:
     issues = [
         ConfigIssueOut(file=i.file, key=i.key, message=i.message, severity=i.severity)  # type: ignore[arg-type]
         for i in await collect_issues_async(settings)
     ]
-    for name, state in (await readiness(info, account)).items():
+    for name, state in (await readiness(stronghold, account)).items():
         if state.reason:
-            issues.append(ConfigIssueOut(file="Armory Connections", key=name, message=state.reason, severity="error"))
+            issues.append(ConfigIssueOut(file="Stronghold Tool services", key=name, message=state.reason, severity="error"))
     return issues

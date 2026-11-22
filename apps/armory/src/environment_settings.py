@@ -3,7 +3,7 @@
 The `.env` file and the built-in defaults still give the starting value; a stored value wins over both. Removing a
 stored value puts the `.env` or default value back. A secret (signing key, API key) is write-only: the view says
 whether one is set and never returns it. Part of a value is read once when a capability starts (the semantic index,
-the link signing key, Laya, the Treasury registration), so a change to those is saved at once and used from the next start.
+the link signing key and the Treasury registration), so a change to those is saved at once and used from the next start.
 """
 
 from __future__ import annotations
@@ -48,25 +48,10 @@ SPECS: tuple[Spec, ...] = (
          "For the Firecrawl capability. Optional on a self-hosted server.", secret=True),
     Spec("firecrawl_api_url", "Firecrawl address", "Web research and scraping", "url",
          "Blank: the hosted API. Set it for a self-hosted server."),
-    Spec("laya_url", "Laya address (tickets)", "Tickets", "url",
-         "MCP address of Legion's triage agent. Blank: tickets are not tagged.", restart=True),
     Spec("db_gateway_instance", "Treasury instance name", "Services Armory calls", "text",
          "The name Armory registers itself under in Treasury.", restart=True),
     Spec("db_gateway_connection", "Treasury connection", "Services Armory calls", "text",
          "The connection the notes use.", restart=True),
-    Spec("obsidian_vault_path", "Vault folder for semantic search", "Obsidian", "path",
-         "A read-only vault mount. Blank: semantic search is not available.", restart=True),
-    Spec("obsidian_ollama_url", "Ollama address", "Obsidian", "url", "Makes the embeddings.", restart=True),
-    Spec("obsidian_embed_model", "Embedding model", "Obsidian", "text", "A model installed in Ollama.", restart=True),
-    Spec("obsidian_refresh_seconds", "Index refresh (seconds)", "Obsidian", "number", "", restart=True),
-    Spec("obsidian_base_url", "Local REST API address", "Obsidian", "url",
-         "For an account with no brain connection in Stronghold."),
-    Spec("obsidian_api_key", "Local REST API key", "Obsidian", "text", "", secret=True),
-    Spec("obsidian_timeout", "Local REST API timeout (seconds)", "Obsidian", "number"),
-    Spec("obsidian_verify_tls", "Check the TLS certificate", "Obsidian", "bool"),
-    Spec("obsidian_allow_write", "Allow writes to the vault", "Obsidian", "bool"),
-    Spec("vault_dir", "Vault folder (read-only tools)", "Folders the read-only tools look at", "path",
-         "Relative to apps/armory/ unless absolute."),
     Spec("workspace_dir", "Workspace folder (read-only tools)", "Folders the read-only tools look at", "path",
          "Relative to apps/armory/ unless absolute."),
 )

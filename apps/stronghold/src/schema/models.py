@@ -30,8 +30,6 @@ class ChatDoc(Doc):
     agent_id: str | None = None
     folder_id: int | None = None
     pinned: bool = False
-    save_to_second_brain: bool = False
-    second_brain_scope: str = Field(default="instance", pattern=r"^(instance|personal)$")
     message_count: int = Field(default=0, ge=0)
     created_at: str
     updated_at: str

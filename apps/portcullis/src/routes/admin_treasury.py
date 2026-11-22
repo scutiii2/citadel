@@ -7,10 +7,11 @@ keeps them in its settings database. Never a credential: a Postgres dsn is a ${N
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from pydantic import BaseModel
 
 from src.deps import get_db_gateway, get_log_writer, get_settings, require_permission
 from src.models import Account
@@ -116,4 +117,52 @@ async def delete_service(
     """Use the service's registered address again."""
     result = await _admin(store, "DELETE", f"/admin/services/{quote(name, safe='')}")
     await logs.action(account, "treasury.service_unpin", f"Unpinned Treasury service '{name}'")
+    return result
+
+
+OutsideId = Annotated[str, Path(pattern=r"^[0-9a-f]{32}$")]
+
+
+class OutsideRename(BaseModel):
+    name: str
+
+
+@router.get("/outside")
+async def outside(_account: Account = Depends(require_manage), store: Any = Depends(get_db_gateway)) -> Any:
+    """The outside service groups, their origins and which Citadel services use each."""
+    return await _admin(store, "GET", "/admin/outside")
+
+
+@router.patch("/outside/{service_id}")
+async def rename_outside(
+    service_id: OutsideId, spec: OutsideRename, account: Account = Depends(require_manage),
+    store: Any = Depends(get_db_gateway), logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Rename a group; its id, and so every consumer's reference, stays the same."""
+    result = await _admin(store, "PATCH", f"/admin/outside/{service_id}", {"name": spec.name})
+    await logs.action(account, "treasury.outside_rename", f"Renamed outside service '{service_id}'")
+    return result
+
+
+@router.delete("/outside/origins/{origin_id}")
+async def delete_outside_origin(
+    origin_id: OutsideId, confirm: bool = False, account: Account = Depends(require_manage),
+    store: Any = Depends(get_db_gateway), logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Remove one origin. Treasury refuses (400) while a service uses the group, unless confirm=true."""
+    suffix = "?confirm=true" if confirm else ""
+    result = await _admin(store, "DELETE", f"/admin/outside/origins/{origin_id}{suffix}")
+    await logs.action(account, "treasury.outside_origin_delete", f"Removed outside origin '{origin_id}'")
+    return result
+
+
+@router.delete("/outside/{service_id}")
+async def delete_outside_group(
+    service_id: OutsideId, confirm: bool = False, account: Account = Depends(require_manage),
+    store: Any = Depends(get_db_gateway), logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Remove a group with its origins. Treasury refuses (400) while a service uses it, unless confirm=true."""
+    suffix = "?confirm=true" if confirm else ""
+    result = await _admin(store, "DELETE", f"/admin/outside/{service_id}{suffix}")
+    await logs.action(account, "treasury.outside_delete", f"Removed outside service '{service_id}'")
     return result

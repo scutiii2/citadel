@@ -13,7 +13,7 @@ beforeAll(() => {
 });
 beforeEach(() => {
   setActivePinia(createPinia());
-  useAuthStore().account = { id: 1, username: "admin", email: "admin@example.com", email_verified: true, roles: [], permissions: ["extensions.manage", "tools.view", "tools.execute"] };
+  useAuthStore().account = { id: 1, username: "admin", email: "admin@example.com", email_verified: true, roles: [], permissions: ["capabilities.manage", "tools.view", "tools.execute"] };
   vi.spyOn(McpServerClient.prototype, "listTools").mockResolvedValue([TOOL, { ...TOOL, name: "another__add" }]);
 });
 async function setup(available = true) {
@@ -51,7 +51,7 @@ describe("IntegrationToolsModal", () => {
     expect(wrapper.text()).toContain("Testing requires Run tools access");
   });
   it("does not query MCP for management-only users or offline integrations", async () => {
-    useAuthStore().account!.permissions = ["extensions.manage"];
+    useAuthStore().account!.permissions = ["capabilities.manage"];
     const wrapper = await setup();
     expect(McpServerClient.prototype.listTools).not.toHaveBeenCalled();
     expect(wrapper.get(".tool-list button").attributes("disabled")).toBeDefined();

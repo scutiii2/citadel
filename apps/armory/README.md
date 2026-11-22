@@ -1,7 +1,6 @@
 # mcp_server
 
-A general-purpose MCP (Model Context Protocol) tool server: a proxy for other MCP
-servers' tools ("extensions"), and a `server_manager` capability for
+A general-purpose MCP (Model Context Protocol) tool server of built-in capabilities, among them `server_manager` for
 starting/stopping/restarting/listing managed apps. Built to be called by
 `chat_app` or any other MCP client speaking streamable HTTP.
 
@@ -31,10 +30,9 @@ Both loaded once at boot by `src/run.py`:
 
 - **`.env`** - credentials and deployment settings, gitignored. Copy
   `.env.example` to `.env`. See [`docs/secrets.md`](docs/secrets.md).
-- **Armory Admin pages** - capabilities, connections, deployment values, email, limits and ticket settings, saved in
+- **Armory Admin pages** - capabilities, deployment values, email and limits, saved in
   `.data/armory/settings.db`. See [`docs/settings.md`](docs/settings.md).
 
-The Connections page manages required Bard, Scribe, and Reader settings and optional shared MCP or REST connections. Armory keeps the addresses and credentials. Signed calls from Stronghold and Portcullis use the corresponding `/connections` routes. Existing shared MCP extensions keep their names after migration.
 
 ## Security
 
@@ -55,16 +53,7 @@ Each tool this server offers lives under its own folder in
 shape every capability follows and how to add a new one:
 
 - [`capabilities/server_manager`](src/capabilities/server_manager) - start/stop/restart/list managed apps (`/server ...`)
-- [`capabilities/tickets`](src/capabilities/tickets) - file bugs and feature suggestions, list and follow your own tickets (`/ticket ...`).
-
-Support tickets use the always-on `/tickets` reporter routes and `/ticket-admin`
-staff routes, even when the chat capability is offline. SQLite storage defaults
-to `tickets/tickets.db` in Armory's data folder, configurable with `MCP_TICKETS_DB_PATH`.
-Tags, automatic-report caps, elevation rules and Laya limits are saved in Armory's `settings.db` (table `settings`, key `tickets`); staff edit them on the Ticket settings page of Armory Admin. Optional `LAYA_URL` points at the
-Triage Assistant's MCP address (a Legion agent on port 29611, which asks the shared Laya service; in Docker use
-`http://legion:29611/mcp`, because 127.0.0.1 is the container itself) for advisory grouping and
-tagging; blank skips Laya. Armory holds no Laya model.
-Ember permissions and triage interfaces are planned separately.
+Stronghold serves support tickets and account usage tools. Ember’s Tickets and Usage pages replace the retired Armory `/ticket` and `/usage` slash commands. Armory Admin’s Ticket settings page still reaches Stronghold through Portcullis. Existing Armory ticket databases stay on disk without migration.
 
 Every capability can be turned off without touching code, live - no
 restart needed. `GET /capabilities` lists each one's current state
@@ -90,8 +79,8 @@ see [`src/resources/README.md`](src/resources/README.md).
 
 Runtime state is not kept in this folder. It lives in the Citadel root, one folder per service:
 
-- **`.data/armory/`** - databases (`memory/`, `skills/`, `tickets/`, `email/`), `uploads/`, `watchers/`, `pdf_merger/store/` and `logs/` (`server.log` plus one file per error reference id).
-- **`.cache/armory/`** - files Armory can make again: the Obsidian index and `media_downloader/store/`.
+- **`.data/armory/`** - databases (`email/`; old `memory/` and `skills/` files stay on disk, unused), `uploads/`, `watchers/`, `pdf_merger/store/` and `logs/` (`server.log` plus one file per error reference id).
+- **`.cache/armory/`** - files Armory can make again: `media_downloader/store/`.
 
 `CITADEL_DATA_DIR` and `CITADEL_CACHE_DIR` in the root `.env` move the two roots; each `MCP_*_DIR` / `MCP_*_PATH` setting still overrides one path. Configuration stays in the tracked `configs/` folders.
 
@@ -119,3 +108,21 @@ removing the file does not remove it from Git history.
 GIF or HEIC; at most 15 MB). It requires a service assertion and a signed requester token.
 Original bytes remain in Armory's native PDF store under the verified account UID.
 The response contains an opaque file ID, metadata and expiry; ownership checks apply to every operation.
+
+## Liveness, readiness, and tool failures
+
+`GET /health` is public and answers `{"status":"ok"}` while the process runs.
+`GET /ready` requires a signed Citadel service assertion. Authorized calls return
+HTTP 200 with dependency addresses and states (`configured`, `reachable`,
+`unreachable`, `not_configured`) even during an outage.
+
+| Code | Failure | Retryable |
+|---|---|---|
+| 1000 | `TOOL_INTERNAL` | No |
+| 1001 | `DEP_NOT_CONFIGURED` | No |
+| 1002 | `DEP_UNAVAILABLE` | Yes |
+| 1003 | `DEP_TIMEOUT` | Yes |
+| 1004 | `DEP_AUTH_REJECTED` | No |
+| 1005 | `DEP_ERROR` | Maybe |
+
+PDF and media tools keep their existing capability codes.

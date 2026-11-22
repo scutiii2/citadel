@@ -41,6 +41,8 @@ class SecuritySettings:
     # refuses everything not on it. Checked on every request (403).
     ip_allow_list: tuple[str, ...] = ()
     ip_deny_list: tuple[str, ...] = ()
+    outside_ip_allow_list: tuple[str, ...] = ()
+    outside_ip_deny_list: tuple[str, ...] = ()
     # nosniff / frame / referrer / CSP headers on every response.
     security_headers: bool = True
     # >0 adds Strict-Transport-Security; only once served over HTTPS.
@@ -54,6 +56,7 @@ class SecuritySettings:
     def from_config(cls, raw: dict) -> SecuritySettings:
         rate = raw.get("rate_limit", {})
         ip_filter = raw.get("ip_filter", {})
+        outside_ip_filter = raw.get("outside_ip_filter", {})
         headers = raw.get("headers", {})
         fingerprint = raw.get("fingerprint", {})
         scope = rate.get("scope", "both")
@@ -74,6 +77,8 @@ class SecuritySettings:
             trusted_proxies=tuple(raw.get("trusted_proxies", ("127.0.0.1", "::1"))),
             ip_allow_list=tuple(ip_filter.get("allow_list", ())),
             ip_deny_list=tuple(ip_filter.get("deny_list", ())),
+            outside_ip_allow_list=tuple(outside_ip_filter.get("allow_list", ())),
+            outside_ip_deny_list=tuple(outside_ip_filter.get("deny_list", ())),
             security_headers=bool(headers.get("enabled", True)),
             hsts_max_age=int(headers.get("hsts_max_age", 0)),
             fingerprint_enabled=bool(fingerprint.get("enabled", True)),

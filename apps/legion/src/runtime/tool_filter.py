@@ -4,6 +4,7 @@ ember_web lets each account turn a built-in capability off for itself; portculli
 passes the tool names of those capabilities to `ask()` as `disabled_tools`.
 This is the other half of `agents/<id>.json`'s `tools` scope: that one is the
 agent's own, fixed in its file, while this one belongs to the turn.
+An exact "!name" entry lets a tool through a "*" or exact-name block.
 
 The set travels in a ContextVar, like approvals.py's policy, so the providers'
 signatures stay as they are and the worker thread behind `delegate_to_agent`
@@ -34,7 +35,7 @@ def blocked() -> frozenset[str]:
 
 def is_blocked(name: str) -> bool:
     names = _blocked.get()
-    return "*" in names or name in names
+    return "!" + name not in names and ("*" in names or name in names)
 
 
 # A specialist the asking user switched off rides in the same set as "agent:<id>",

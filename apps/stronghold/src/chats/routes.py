@@ -7,6 +7,7 @@ which of the account's chats have an answer being written when a folder is delet
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
@@ -28,6 +29,7 @@ from src.chats.store import (
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chats", tags=["chats"])
 folder_router = APIRouter(prefix="/chat-folders", tags=["chat-folders"])
 
@@ -79,8 +81,6 @@ class UpdateBody(BaseModel):
     title: str | None = Field(default=None, max_length=TITLE_MAX)
     folder_id: int | None = None
     pinned: bool | None = None
-    save_to_second_brain: bool | None = None
-    second_brain_scope: Literal["instance", "personal"] | None = None
 
     @field_validator("title")
     @classmethod
@@ -89,9 +89,8 @@ class UpdateBody(BaseModel):
 
     @model_validator(mode="after")
     def something_to_change(self) -> UpdateBody:
-        if (self.title is None and self.pinned is None and self.save_to_second_brain is None
-                and self.second_brain_scope is None and "folder_id" not in self.model_fields_set):
-            raise ValueError("send a title, a folder_id, pinned or save_to_second_brain")
+        if self.title is None and self.pinned is None and "folder_id" not in self.model_fields_set:
+            raise ValueError("send a title, a folder_id or pinned")
         return self
 
 
@@ -107,6 +106,14 @@ def _chat_gone() -> HTTPException:
     return HTTPException(status.HTTP_404_NOT_FOUND, "Chat not found")
 
 
+async def _delete_stacks(request: Request, owner: str, chat_ids: list[str]) -> None:
+    for chat_id in chat_ids:
+        try:
+            await request.app.state.stacks.delete(owner, chat_id, orphan_only=True)
+        except Exception as error:
+            logger.warning("Stack cleanup after chat deletion failed: %s", type(error).__name__)
+
+
 # --- chats -----------------------------------------------------------------------------------
 
 
@@ -117,9 +124,9 @@ async def list_chats(who: Requester = Depends(current_requester), chats: ChatSto
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_all_chats(who: Requester = Depends(current_requester), chats: ChatStore = Depends(get_chats)) -> Response:
+async def delete_all_chats(request: Request, who: Requester = Depends(current_requester), chats: ChatStore = Depends(get_chats)) -> Response:
     """Every chat of the account, after revoking their share links."""
-    await chats.delete_all(who.uid)
+    await _delete_stacks(request, who.uid, await chats.delete_all(who.uid))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -197,13 +204,14 @@ async def branch_chat(body: BranchBody, chat_id: str = ChatId, who: Requester = 
 
 
 @router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_chat(chat_id: str = ChatId, who: Requester = Depends(current_requester),
+async def delete_chat(request: Request, chat_id: str = ChatId, who: Requester = Depends(current_requester),
                       chats: ChatStore = Depends(get_chats)) -> Response:
     """The chat and its share links."""
     try:
         await chats.delete(who.uid, chat_id)
     except ChatNotFound as error:
         raise _chat_gone() from error
+    await _delete_stacks(request, who.uid, [chat_id])
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -293,17 +301,18 @@ async def update_folder(body: UpdateFolderBody, folder_id: int = FolderId, who: 
 
 
 @folder_router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_folder(body: DeleteFolderBody | None = None, folder_id: int = FolderId,
+async def delete_folder(request: Request, body: DeleteFolderBody | None = None, folder_id: int = FolderId,
                         who: Requester = Depends(current_requester), chats: ChatStore = Depends(get_chats),
                         platform: PortcullisClient = Depends(get_platform)) -> Response:
     """The folder and every chat in it, after revoking their share links. Refused while one of those chats
     has an answer being written, so a live answer is never cut off."""
     try:
-        name, chat_count = await chats.delete_folder(who.uid, folder_id, set(body.running if body else []))
+        name, chat_ids = await chats.delete_folder(who.uid, folder_id, set(body.running if body else []))
     except FolderNotFound as error:
         raise _folder_gone() from error
     except FolderBusy as error:
         raise HTTPException(status.HTTP_409_CONFLICT,
                             "A chat in this folder is still writing an answer. Wait for it to finish.") from error
-    await platform.log_action(who.uid, "chat_folder.delete", f'Deleted folder "{name}" and its {chat_count} chat(s)')
+    await _delete_stacks(request, who.uid, chat_ids)
+    await platform.log_action(who.uid, "chat_folder.delete", f'Deleted folder "{name}" and its {len(chat_ids)} chat(s)')
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -23,4 +23,5 @@ export const TREASURY_PAGES: TreasuryPage[] = [
     permission: "settings.manage",
   },
   { to: "/services", label: "Services", icon: ["M4 4h16v6H4z", "M4 14h16v6H4z", "M8 7h1", "M8 17h1"], permission: "settings.manage" },
+  { to: "/outside", label: "Outside services", icon: ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18", "M3 12h18", "M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3"], permission: "settings.manage" },
 ];

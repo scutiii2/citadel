@@ -15,7 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from src.citadel_auth import ServiceCatalog, CatalogTransport, logical_url, advertised_url
 from src.citadel_auth.treasury import register_in_background
-from src.routes import brains, stronghold
+from src.routes import stronghold
 
 from src.config import Settings
 from src.db import Database
@@ -33,6 +33,9 @@ from src.routes import (
     admin_treasury,
     attachments,
     bard,
+    brain_files,
+    brain_proposals,
+    brain_sharing,
     capability_files,
     internal as internal_routes,
     auth,
@@ -43,16 +46,18 @@ from src.routes import (
     tickets as tickets_routes,
     logs,
     mcp,
-    memory,
     nav_preferences,
+    outside,
+    outside_clients_admin,
     account_tuning,
-    notes,
     server_info,
     app_policy_routes,
+    stronghold_brain_settings,
     stronghold_usage_settings,
     settings as settings_routes,
     shares,
     skills,
+    stack,
     templates,
     traffic as traffic_routes,
     triage,
@@ -71,6 +76,8 @@ from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
 from src.services import uid_log_filter, service_auth
 from src.services.otp_service import OtpService
+from src.services.legion_ask import LegionAsk
+from src.services.outside_guard import ClientRateLimiter, OutsideGuard
 from src.services.secret_box import SecretBox, ensure_secrets_key
 from src.services.public_rate_limiter import PublicReadLimiter
 from src.services.server_tools import McpServerTools, ServerTools
@@ -78,6 +85,8 @@ from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.usage_client import UsageUnavailable
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
+from src.citadel_auth.ready import Probe
+from src.routes import ready
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +144,7 @@ def create_app(
         await service_auth.keyring.ensure_identity()
         catalog = ServiceCatalog(service_auth.keyring, settings.treasury_url, cache_path=settings.database_path.parent / "catalog_cache.json")
         app.state.catalog = catalog
+        app.state.readiness = Probe("portcullis")
         if db_gateway is None:
             catalog.start("portcullis", advertised_url(settings.host, settings.port, settings.advertise_url))
         # Raises SecretBoxError (a clear one-line message) when .env holds a key that is not valid.
@@ -171,6 +181,8 @@ def create_app(
         app.state.traffic = recorder
         recorder.start()
         app.state.share_limiter = PublicReadLimiter()
+        app.state.outside_guard = OutsideGuard(ClientRateLimiter())
+        app.state.legion_ask = LegionAsk()
         from src.services.pricing import Pricing
 
         app.state.pricing = Pricing()
@@ -226,18 +238,19 @@ def create_app(
     app.include_router(agent_admin.router)
     app.include_router(app_policy_routes.router)
     app.include_router(stronghold_usage_settings.router)
+    app.include_router(stronghold_brain_settings.router)
     app.include_router(agent_admin.prompts_router)
     app.include_router(admin_tuning.router)
     app.include_router(admin_treasury.router)
     app.include_router(chats.router)
+    app.include_router(stack.router)
+    app.include_router(brain_files.router)
+    app.include_router(brain_sharing.router)
+    app.include_router(brain_proposals.router)
     app.include_router(chat_folders.router)
     app.include_router(templates.router)
     app.include_router(nav_preferences.router)
     app.include_router(account_tuning.router)
-    app.include_router(notes.router)
-    app.include_router(brains.router)
-    app.include_router(brains.admin_router)
-    app.include_router(memory.router)
     app.include_router(skills.router)
     app.include_router(triage.router)
     app.include_router(account_agents.router)
@@ -256,6 +269,9 @@ def create_app(
     app.include_router(capability_files.router)
     app.include_router(stronghold.router)
     app.include_router(internal_routes.router)
+    app.include_router(outside.router)
+    app.include_router(outside_clients_admin.router)
+    app.include_router(ready.router)
 
     @app.exception_handler(CapabilityFailure)
     async def capability_failure(_request: Request, error: CapabilityFailure):
@@ -269,6 +285,9 @@ def create_app(
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError):
+        if request.url.path.startswith("/api/outside/"):  # never echo an outside client's text (input, ctx)
+            return JSONResponse(status_code=422, content={"detail": [
+                {"loc": e["loc"], "msg": e["msg"], "type": e["type"]} for e in error.errors()]})
         return await request_validation_exception_handler(request, error)
 
     @app.exception_handler(UsageUnavailable)
@@ -299,6 +318,7 @@ def create_app(
             )
         return JSONResponse({"detail": "Internal server error"}, status_code=500)
 
+    @app.get("/health")
     @app.get("/api/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}

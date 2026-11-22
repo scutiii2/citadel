@@ -8,12 +8,9 @@ shows it.
 | Page | Table | What it holds |
 |---|---|---|
 | Capabilities | `capabilities` | Which capabilities are on. Every capability starts off. A capability with no entry is never loaded. |
-| Connections | `connections` | Required Bard, Scribe, and Reader settings and optional shared MCP or REST connections. Tool-service tokens come from each service's Tokens card and are sent as `X-Internal-Token`. Optional connections can use credential headers or a signed service assertion. Existing shared MCP records migrate from `extensions`. |
-| Brain | `instance_brain` | Shared Obsidian vault connection, publishing switch and encrypted API key. Requires `settings.manage`. See [Obsidian brains](../../../docs/obsidian-brains.md). |
-| Settings | `environment` | Deployment values: the Tavily and Firecrawl keys, the public addresses and signing keys of the PDF and video links, `LAYA_URL`, `DB_GATEWAY_INSTANCE`/`DB_GATEWAY_CONNECTION`, the `OBSIDIAN_*` values and `MCP_VAULT_DIR`/`MCP_WORKSPACE_DIR`. "Use the default" removes a saved value. A change is used at once, except what is read only at start (the signing keys, `LAYA_URL`, Treasury, the Obsidian index), which the page marks "after restart". See `src/environment_settings.py`. |
+| Settings | `environment` | Deployment values: the Tavily and Firecrawl keys, the public addresses and signing keys of the PDF and video links, `DB_GATEWAY_INSTANCE`/`DB_GATEWAY_CONNECTION`, `MCP_WORKSPACE_DIR`. "Use the default" removes a saved value. A change is used at once, except what is read only at start (the signing keys, Treasury restart". See `src/environment_settings.py`. |
 | Email | `email` (key `smtp`) | The SMTP server, port, connection (`ssl`, `starttls` or `none`), sender, password, standing recipients and allowed domains. Gmail `smtp.gmail.com` 465 ssl; Outlook / Microsoft 365 `smtp.office365.com` 587 starttls; Proton Mail needs Proton Mail Bridge running, then `127.0.0.1` 1025 starttls with the Bridge's own password. Gmail, Outlook, Yahoo and iCloud need an app password. A relay without a login needs none. A send uses the saved values at once. See `src/services/app_config.py`. |
 | Limits | `tuning` | Caps and lifetimes of PDF merging and video downloads (below). Used from Armory's next start. See `src/services/capability_tuning.py`. |
-| Ticket settings | `settings` (key `tickets`) | Tags, hourly cap, elevation and Laya limits. Used by the next ticket. The defaults are in `src/capabilities/tickets/utils/config.py`. |
 
 ## Limits
 
@@ -21,7 +18,7 @@ PDF merging (`pdf_merger`):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `file_ttl_hours` | 6 | How long an uploaded or merged file is kept. |
+| `file_ttl_hours` | 1 | How long an uploaded or merged file is kept. |
 | `sweep_interval_minutes` | 10 | How often expired files are removed. |
 | `download_link_minutes` | 60 | How long a signed download link works. |
 | `mcp_wait_seconds` | 100 | How long a tool call waits for a merge before it answers "still running" (at most 100). |
@@ -35,7 +32,7 @@ Video downloads (`media_downloader`):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `file_ttl_hours` | 6 | How long a finished download is kept. |
+| `file_ttl_hours` | 1 | How long a finished download is kept. |
 | `sweep_interval_minutes` | 10 | How often expired files are removed. |
 | `download_link_minutes` | 60 | How long a signed download link works. |
 | `limits.max_file_mb`, `limits.max_duration_minutes`, `limits.max_session_mb` | 500, 120, 2048 | Size and length caps for one file and for one account's stored files. |

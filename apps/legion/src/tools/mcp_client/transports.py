@@ -16,11 +16,14 @@ import asyncio
 import os
 from contextlib import AsyncExitStack
 from datetime import timedelta
+from functools import partial
 from urllib.parse import urlsplit
 
+import httpx
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamablehttp_client
+from mcp.shared._httpx_utils import create_mcp_http_client
 
 from src.tools.mcp_client.config import ServerConfig
 from src.citadel_auth import resolved
@@ -66,6 +69,21 @@ async def _check_tcp_reachable(url: str, timeout_seconds: float) -> None:
         pass
 
 
+def _origin_client(url: str, **options) -> httpx.AsyncClient:
+    """Reject any request that would carry credentials beyond the catalog origin."""
+    origin = httpx.URL(url)
+    expected = (origin.scheme, origin.host, origin.port)
+
+    async def check_origin(request: httpx.Request) -> None:
+        target = request.url
+        if (target.scheme, target.host, target.port) != expected:
+            raise AuthResolutionError("MCP request left its configured origin")
+
+    client = create_mcp_http_client(**options)
+    client.event_hooks["request"].append(check_origin)
+    return client
+
+
 async def open_session(
     stack: AsyncExitStack,
     config: ServerConfig,
@@ -80,10 +98,18 @@ async def open_session(
     if config.transport == "http":
         assert config.url is not None  # guaranteed by config.load_servers_config
         url = resolved(config.url)
-        await _check_tcp_reachable(url, timeout_seconds)
+        try:
+            await _check_tcp_reachable(url, timeout_seconds)
+        except OSError as error:
+            if not config.origins or isinstance(error, (ConnectionError, TimeoutError)):
+                raise
+            raise ConnectionError("Could not reach the MCP origin") from error
         headers = {**resolve_headers(config), **(extra_headers or {})}
+        options = {"auth": auth} if auth else {}
+        if config.origins or (config.id == "stronghold" and auth is not None):
+            options["httpx_client_factory"] = partial(_origin_client, url)
         read_stream, write_stream, _get_session_id = await stack.enter_async_context(
-            streamablehttp_client(url, headers=headers or None, **({"auth": auth} if auth else {}))
+            streamablehttp_client(url, headers=headers or None, **options)
         )
     else:
         params = StdioServerParameters(command=config.command, args=config.args or [])

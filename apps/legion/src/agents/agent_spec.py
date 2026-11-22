@@ -86,9 +86,9 @@ class LlmSpec:
 
 @dataclass(frozen=True)
 class ToolScope:
-    """Which mcp_server tools an agent may see and call, as fnmatch globs on
-    the tool name without the "main__" prefix. Empty allow = every tool;
-    deny always wins."""
+    """Tool scope expressed as fnmatch globs on names without the "main__" prefix.
+    Main and private tools permit empty allow lists. Outside connections require
+    a matching allow glob. Deny always wins."""
 
     allow: tuple[str, ...] = ()
     deny: tuple[str, ...] = ()
@@ -97,6 +97,11 @@ class ToolScope:
         if self.allow and not any(fnmatchcase(name, glob) for glob in self.allow):
             return False
         return not any(fnmatchcase(name, glob) for glob in self.deny)
+
+    def allows_explicitly(self, name: str) -> bool:
+        """True only when `allow` names the tool. Tools of an outside connection need this: an empty allow list,
+        which means every `main` tool, must not expose a connection an administrator added later."""
+        return bool(self.allow) and self.allows(name)
 
     def unmatched(self, names: Iterable[str]) -> list[str]:
         """Globs that match none of `names` - almost always a typo."""

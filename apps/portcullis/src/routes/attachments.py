@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Path, Request, Response, WebSocket
 from src.deps import get_stronghold, require_permission
 from src.models import Account
 from src.routes.stronghold import pass_on
-from src.services.armory_streams import ArmoryStreams
+from src.services.tool_streams import ToolStreams
 from src.services.capability_files import CapabilityFilesGateway
 from src.services.permissions import FILES_UPLOAD
 from src.services.session_service import SessionService
@@ -120,7 +120,7 @@ async def dictate_stream(websocket: WebSocket):
             await websocket.close(4403, "Missing upload permission")
             return
     await websocket.accept(subprotocol=subprotocol)
-    gateway = ArmoryStreams(state.upstream, state.catalog, state.keyring)
+    gateway = ToolStreams(state.upstream, state.catalog, state.keyring)
     try:
         async def log_final(byte_count):
             await state.logs.action(account, "attachments.dictate", f"Transcribed {byte_count:,} bytes of dictated audio")

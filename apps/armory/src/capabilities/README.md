@@ -8,16 +8,10 @@ what it does:
 - `web_research/` - web search and page read through Tavily (`/web ...`).
 - `media_downloader/` - public video/music/photo probes, queued downloads, status and signed file links (`/media ...`); photo carousels become numbered ZIPs.
 - `firecrawl/` - scrape and crawl through Firecrawl (`/scrape ...`).
-- `usage_report/` - token usage per agent, model or day (`/usage ...`).
-- `vault/` - read-only notes vault (`/vault ...`).
-- `obsidian/` - Local REST API vault listing, search and note read/write/append, with writes disabled by default (`/obsidian ...`).
 - `repo_reader/` - read-only git history and code (`/repo ...`).
 - `tables/` - questions about an attached CSV or Excel file (`/data ...`).
 - `math/` - direct/recursive equations, assumptions, cases, certificates, units, batch/table formulas, result continuation, matrices, calculus, and strict LaTeX (`/math ...`).
 - `email/` - shared outgoing email and threaded replies (`/email ...`).
-- `memory/` - per-user saved notes the model can search and forget (`/memory ...`).
-- `notes/` - the notes a user shared with agents on ember's Notes page, read-only (`/notes ...`).
-- `tickets/` - file bugs and feature suggestions, list and follow your own support tickets (`/ticket ...`).
 
 ## Shape of a capability
 
@@ -86,12 +80,8 @@ loader rather than each folder inventing its own.
 together: four tools, a domain module that imports only `services/`, and
 a contract of typed results.
 
-A different pattern lives at `src/services/extensions.py`: proxied
-external tools, connected out to other MCP servers as a client and
-re-exposed here under a namespaced name, rather than written by hand in
-this repo at all. Reach for a capability when you're wrapping logic
-that lives in this codebase; reach for an extension when you're
-exposing an MCP server that already exists elsewhere.
+Armory does not proxy other MCP servers. An outside MCP server is a
+Legion connection (Legion Admin, Connections).
 
 ## GUI pages
 
@@ -238,8 +228,7 @@ A tool that only reads, and changes nothing here or elsewhere, declares it:
 decision with a consequence: ember's **Auto** approval mode (ai_agent's `allow_read_only`) runs a
 built-in tool that declares it **without asking the user**, while every other tool still asks.
 So declare it only when running the tool unasked is harmless. A tool that writes, sends, deletes,
-runs a command, or spends credits or crawls (firecrawl) must not. Extension tools can never earn
-this: only built-in tools count. `tests/test_read_only_declarations.py` pins the exact list, so
+runs a command, or spends credits or crawls (firecrawl) must not. Only built-in tools count. `tests/test_read_only_declarations.py` pins the exact list, so
 adding or removing a declaration means changing that test too.
 
 ## Add a new capability

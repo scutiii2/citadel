@@ -21,7 +21,7 @@ The internal Router chooses specialists and model tiers through that arrangement
 
 1. Copy `.env.example` to `.env`.
    - **Anthropic-protocol agents** (`llm.provider: "anthropic"`) call their models through
-     ConversationGateway (`AI/ModelProviders/ConversationGateway`, port 29407). Their keys are saved
+     ConversationGateway (`AI/ModelProviders/ConversationGateway`, port 29407, reached inside Docker as `http://conversation-gateway:29407`). Their keys are saved
      there, not here: on its `/admin/gateways.html` page save a gateway with the same id as the file in
      `gateways/anthropic/` (`claude`, `openrouter`, ...) and create an access token for Legion. Then
      set the gateway's address and that token on the Legion admin app's **Connections** page. Legion
@@ -62,7 +62,7 @@ Failover reads the gateway's error `kind` (`rate_limit`, `quota`, `auth`, `unava
 
 Laya is gateway `laya` of provider `decision`; Jev is gateway `jev`. Legion loads no model and holds
 no address or key for either: both are entries saved in DecisionGateway
-(`AI/ModelProviders/DecisionGateway`, port 29406) under those two ids. Set that service's address and
+(`AI/ModelProviders/DecisionGateway`, port 29406, reached inside Docker as `http://decision-gateway:29406`) under those two ids. Set that service's address and
 Legion's token on the Legion admin app's **Connections** page (kept in Treasury, like
 ConversationGateway's). Laya's strategy and window, and Jev's model and key, are set on the
 gateway entry there.
@@ -136,7 +136,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `persona` | no | `""` | Persona text placed after the identity line in the system prompt. |
 | `instructions` | no | `""` (built-in default) | Tool-use instructions placed last in the system prompt. Empty uses `DEFAULT_INSTRUCTIONS` in `src/agents/agent_roles.py`. |
 | `focus` | no | `""` | One-line summary of what the agent is good at. Used for the orchestrator roster. Should be concrete. |
-| `tools.allow` | no | `[]` (all) | fnmatch globs on mcp_server tool names without the `main__` prefix. Empty means all tools. |
+| `tools.allow` | no | `[]` | fnmatch globs on tool names with the `main__` prefix removed. Outside MCP connection tools require a matching allow glob. |
 | `tools.deny` | no | `[]` | Globs removed after `allow`. Deny wins. |
 | `role` | yes | none | `orchestrator`, `router`, `specialist` or `architect`. Architects use a language provider, never entry, and require `tools.deny: ["*"]`; recall, learning and the plan tool must be off. The code pipeline is implemented; operations is reserved for a later phase. |
 | `mode` | orchestrator only | `legacy` | `legacy` preserves delegation and direct tools; `plan` offers only `ask_user` and `submit_plan`, with a live architect catalog. Automatic memory and skill recall remain runtime calls. |
@@ -144,9 +144,9 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `workers` | architect only, required | none | Non-empty list of existing specialist ids. |
 | `prefetch` | architect only | `[]` | Specialist ids allowed for pre-planning reads. Code uses the first only when a brief names a code file or conservative path. |
 | `limits` | architect only | see meaning | `max_units: 12`, `max_parallel: 3`, `unit_timeout_seconds: 120`, `max_retries: 1`. Counts are positive integers; retries may be zero; timeout is a finite positive number. Unknown fields are errors. |
-| `memory_recall` | no | `false` | At the start of each top-level turn, load the user's newest saved notes (`tool_mem_search`, up to 10) and put them in front of the question. Needs the `memory` capability online and an agent that may call `tool_mem_*`. Orchestrator role only. Only `ember` has it on. |
-| `skill_recall` | no | `false` | At the start of each top-level turn, search the user's **approved** skills with the question (`tool_skill_search`, up to 3) and put the matches in front of it, after any recalled notes. A proposal never loads before the user approves it on Ember's Skills page. Needs the armory `skills` capability online and an agent that may call `tool_skill_*`. Orchestrator role only. Only `ember` has it on. |
-| `skill_learning` | no | `false` | After a top-level turn that made at least 3 real tool calls and none failed, draft a reusable skill in the background and propose it (`tool_skill_propose`) for the user's approval. One extra call to the tool-free `context-summarizer` agent per qualifying turn, so it is billed: switch it on per agent, no tracked agent has it. The drafting model sees only the user's request and the tool names with argument names, never results, values or the answer. A turn that used web, Firecrawl, email or a private extension tool never qualifies. Calls made by delegated specialists are not seen, so it fits agents that call tools themselves. Needs `tool_skill_*` allowed and `context-summarizer` running. Orchestrator role only. |
+| `memory_recall` | no | `false` | At the start of each top-level turn, search the user's long-term Brain notes with the question (`stronghold__tool_brain_search`, up to 5) and put matching snippets in front of it. Needs the Stronghold connection and `stronghold__tool_brain_*` in the agent's allow list. Orchestrator role only. Only `ember` has it on. |
+| `skill_recall` | no | `false` | At the start of each top-level turn, search the user's **approved** skills with the question (`stronghold__tool_skill_search`, up to 3) and put the matches in front of it, after any recalled notes. A proposal never loads before the user approves it on Ember's Skills page. Needs the Stronghold connection and `stronghold__tool_skill_*` in the agent's allow list. Orchestrator role only. Only `ember` has it on. |
+| `skill_learning` | no | `false` | After a top-level turn that made at least 3 real tool calls and none failed, draft a reusable skill in the background and propose it (`stronghold__tool_skill_propose`) for the user's approval. One extra call to the tool-free `context-summarizer` agent per qualifying turn, so it is billed: switch it on per agent, no tracked agent has it. The drafting model sees only the user's request and the tool names with argument names, never results, values or the answer. A turn that used web, Firecrawl, email or a private extension tool never qualifies. Calls made by delegated specialists are not seen, so it fits agents that call tools themselves. Needs `stronghold__tool_skill_*` allowed and `context-summarizer` running. Orchestrator role only. |
 | `delegable` | no | `true` | `false` keeps the agent out of every orchestrator's roster: it is called directly (for example by portcullis), never delegated to. |
 | `plan_tool` | no | `true` (`false` for architects) | Offer the `update_plan` checklist tool (`src/agents/roles/orchestrator/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Plan mode fills the checklist at runtime instead of offering this tool to the model. |
 
@@ -243,7 +243,7 @@ needs the updated files and Armory workers before the new capability is usable.
 `server-ops` also covers app monitoring (the former `scheduler` / App Monitor agent, port 9114, now removed). It reports
 watched status, and starting an app also starts its owner notifications through ServerWatcher. URL/port monitoring and
 recurring schedules are unavailable. `data-analyst` (label "Analyst") also answers token-usage questions through
-`tool_usage_summary` (the former `usage-analyst`, port 9108). The `planner` agent is retired: Ember plans with its own
+`stronghold__tool_usage_summary` (the former `usage-analyst`, port 9108). The `planner` agent is retired: Ember plans with its own
 `update_plan` tool. An `agent:scheduler`, `agent:planner` or `agent:usage-analyst` entry in a user's saved agent switches no longer matches
 any agent. Restart the supervisor to load the updated definitions.
 
@@ -370,7 +370,7 @@ steps are read and may retry; operations and unknown kinds remain write. Unit-le
 escalate light to standard to heavy; writes are never retried automatically.
 
 Automatic memory and skill searches still run before the model. Skill recall
-omits its `tool_skill_mark` instruction only in plan mode; the runtime does not
+omits its `stronghold__tool_skill_mark` instruction only in plan mode; the runtime does not
 mark skills. The runtime fills the existing checklist when its agent/chat
 toggles allow it. Plan mode bypasses legacy entry routing. The code architect
 ships disabled; Ember remains in legacy mode. Operations has no pipeline yet.
@@ -547,12 +547,44 @@ not offer them (`list_tools`) and refuses a call to one the model names anyway.
 A delegated agent is told the same list. `status()` reports `tool_filter: true`
 so portcullis can refuse an agent that would ignore the option.
 `disabled_tools: ["*"]` blocks every built-in, shared-extension, and private-extension
-tool when the Ember account lacks `tools.execute`. `status()` also reports
+tool when the Ember account lacks `tools.execute`.
+A name that starts with `!` is an exception: `["*", "!stronghold__tool_brain_search"]` blocks everything except that one tool, for the model's own calls and for Legion's memory recall alike. An exception for a tool that is not blocked changes nothing, and a delegate gets the same list. Portcullis uses it for outside clients at the Stronghold level (five Brain tools). `status()` also reports
 `tool_filter_all: true`; portcullis and delegates refuse older agents without it
 before starting a restricted turn. The filter follows nested delegation.
 
 `ask` also accepts `private_extensions`, the user's own MCP servers for this
 turn; see the next section for its shape and behavior.
+
+## Outside MCP connections
+
+Legion Admin accepts an MCP address and uses Treasury to find or register its outside service.
+A saved HTTP entry holds `service_id`, a shared `path` (default `/mcp`), and an ordered
+`origins` list of `{origin_id, header_value?}`. Legion uses the entry's `auth` header
+as the connection token. An origin can override its header value. Stored tokens are write-only.
+
+Legion tries the listed origins in order. A connection failure or timeout puts the origin
+on a 30-second cooldown. A tool call that fails returns its error. The next call uses the
+backup when one is available. The MCP registry's tool listing checks whether a preferred origin has recovered
+after the cooldown. A protocol or HTTP refusal does not trigger failover.
+
+A tool from an outside MCP connection uses the name `<server-id>__<tool>`.
+Add a matching `tools.allow` glob such as `bard__*` to offer it to the agent.
+An empty allow list leaves outside connection tools hidden, and `tools.deny` still wins.
+Outside tools follow the normal approval policy, including in Auto mode.
+
+Edits apply the next time Legion starts. Armory's `main` connection still uses a `url` entry.
+
+### Stronghold MCP connection
+
+The built-in `stronghold` connection discovers Stronghold's `/mcp` address through
+Treasury. A saved server with the ID `stronghold` overrides the built-in address. Citadel
+credentials go only to the Stronghold address registered in Treasury.
+Legion starts without Stronghold and retries the connection in the background.
+
+Agents need `tools.allow: ["stronghold__*"]` or a matching individual tool entry
+to see and use stack tools. Stronghold supplies the optional `chat_id` argument
+of `ask`. Legion forwards it with the signed requester as Stronghold MCP call
+metadata so the tools can select the requester's chat.
 
 ## Private extensions
 
@@ -687,12 +719,22 @@ See
 [`docs/superpowers/specs/2026-09-07-ai-agent-mcp-layer-design.md`](../docs/superpowers/specs/2026-09-07-ai-agent-mcp-layer-design.md)
 for the full design rationale.
 
-## Scoped second-brain auto-save
-
-Ember's auto-save destination travels as trusted `X-Brain-Destination` identity
-metadata, then as `requester.brain_scope` on Armory calls and headers to delegated
-agents. A model cannot change a constrained personal/instance write destination.
-Normal calls retain their previous metadata shape when no destination is bound.
-See [Obsidian brains](../../docs/obsidian-brains.md).
-
 Treasury bootstrap address lives in tracked `configs/config_app.json` as `treasury_url`; `TREASURY_URL` overrides it. Legion entry agents register their base address in Treasury’s catalog. Treasury Admin, Services controls address pins; Legion Admin no longer edits Treasury’s address.
+
+## Liveness, readiness, and tool failures
+
+`GET /health` is public and answers `{"status":"ok"}` while the process runs.
+`GET /ready` requires a signed Citadel service assertion. Authorized calls return
+HTTP 200 with dependency addresses and states (`configured`, `reachable`,
+`unreachable`, `not_configured`) even during an outage.
+
+| Code | Failure | Retryable |
+|---|---|---|
+| 1000 | `TOOL_INTERNAL` | No |
+| 1001 | `DEP_NOT_CONFIGURED` | No |
+| 1002 | `DEP_UNAVAILABLE` | Yes |
+| 1003 | `DEP_TIMEOUT` | Yes |
+| 1004 | `DEP_AUTH_REJECTED` | No |
+| 1005 | `DEP_ERROR` | Maybe |
+
+Legion stops a repeated call with the same arguments when its previous failure was non-retryable.

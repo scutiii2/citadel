@@ -2,7 +2,7 @@
 
 Project note: `Brain/Projects/armory_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder), once it exists.
 
-Vue 3 + TypeScript admin app for Armory. All API calls go through Portcullis. Connections requires `extensions.manage` and manages required and optional shared connections. See [Armory settings](../armory/docs/settings.md) for the other pages and their storage.
+Vue 3 + TypeScript admin app for Armory. All API calls go through Portcullis. Its pages check `capabilities.manage`. See [Armory settings](../armory/docs/settings.md) for the other pages and their storage.
 
 ## Rules
 - Code is copied between the admin apps, not shared. Nothing here imports from another app. Apply a fix to a shared component (PageLayout, ToggleSwitch, BaseModal...) in every admin app that has a copy.

@@ -33,7 +33,5 @@ class Chat(Base):
         ForeignKey("chat_folders.id", ondelete="CASCADE"), index=True, default=None
     )
     pinned: Mapped[bool] = mapped_column(default=False, server_default=false())
-    save_to_second_brain: Mapped[bool] = mapped_column(default=False, server_default=false())
-    second_brain_scope: Mapped[str] = mapped_column(String(16), default="instance", server_default="instance")
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, index=True)

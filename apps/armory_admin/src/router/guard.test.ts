@@ -23,9 +23,9 @@ describe("resolveGuard", () => {
     expect(resolveGuard({ name: "no-access", fullPath: "/no-access" }, plain)).toBe(true);
   });
   it("moves an account off login and no-access to its first allowed page", () => {
-    const only = holds("extensions.manage");
-    const home = { path: "/connections" };
-    const first = holds("capabilities.manage", "extensions.manage");
+    const only = holds("tickets.manage");
+    const home = { path: "/tickets" };
+    const first = holds("capabilities.manage", "tickets.manage");
     expect(resolveGuard({ name: "login", fullPath: "/login", guestOnly: true }, only)).toEqual(home);
     expect(resolveGuard({ name: "no-access", fullPath: "/no-access" }, first)).toEqual({ path: "/capabilities" });
   });

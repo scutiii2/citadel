@@ -41,7 +41,7 @@ async def _call(awaitable) -> Any:
     except AgentAdminUnavailable as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ai_agent is unreachable") from error
     except AgentAdminRefused as error:
-        code = error.status if error.status in (404, 409) else status.HTTP_400_BAD_REQUEST
+        code = error.status if error.status in (404, 409, 502) else status.HTTP_400_BAD_REQUEST
         raise HTTPException(code, str(error)) from error
 
 
@@ -191,6 +191,20 @@ class ServerAuthIn(BaseModel):
     header_value: str | None = Field(default=None, max_length=2000, repr=False)
 
 
+class ServerAddressIn(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    address: str = Field(max_length=500)
+    name: str | None = Field(default=None, max_length=40)
+    header_value: str | None = Field(default=None, max_length=2000, repr=False)
+
+
+class LookupIn(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    address: str = Field(max_length=500)
+
+
 class ServerIn(BaseModel):
     """One MCP server legion connects to as a client; legion validates the combination."""
 
@@ -203,12 +217,22 @@ class ServerIn(BaseModel):
     command: str | None = Field(default=None, max_length=500)
     args: list[str] | None = Field(default=None, max_length=50)
     auth: ServerAuthIn | None = None
+    path: str | None = Field(default=None, max_length=200)
+    addresses: list[ServerAddressIn] | None = Field(default=None, max_length=10)
 
 
 @prompts_router.get("/servers")
 async def list_servers(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
     """The MCP servers legion connects to: `{servers: {id: entry}}`. No header value is returned."""
     return {"servers": await _call(admin.servers(account))}
+
+
+@prompts_router.post("/servers/lookup")
+async def lookup_server_address(
+    body: LookupIn, account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin),
+) -> Any:
+    """Is this address in Treasury's outside catalog? Legion asks; nothing is saved."""
+    return await _call(admin.lookup_origin(account, body.address))
 
 
 @prompts_router.put("/servers/{server_id}")

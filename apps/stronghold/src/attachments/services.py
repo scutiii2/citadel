@@ -1,4 +1,4 @@
-"""Signed Armory clients for chat uploads, speech, and file extraction."""
+"""Signed Armory clients for PDF and table uploads."""
 
 from __future__ import annotations
 
@@ -10,37 +10,6 @@ from src.requester import Requester
 from src.service_auth import authenticate
 
 _LONG = 120.0
-
-
-class ArmoryConnections:
-    """Send fixed feature calls with Stronghold's assertion and the original requester."""
-
-    def __init__(self, client: httpx.AsyncClient, keyring=None) -> None:
-        self._client = authenticate(client, "armory", keyring)
-
-    async def _request(self, method: str, path: str, *, json=None, content=None, headers=None) -> dict:
-        try:
-            response = await self._client.request(method, path, json=json, content=content,
-                headers={**requester_header(), **(headers or {})}, timeout=_LONG, follow_redirects=False)
-        except (httpx.HTTPError, UnicodeError) as error:
-            raise HTTPException(502, "Armory connections are unreachable. Try again.") from error
-        try:
-            body = response.json()
-        except ValueError:
-            body = None
-        if response.status_code == 200 and isinstance(body, dict):
-            return body
-        if response.status_code in (400, 413, 502):
-            detail = body.get("detail") if isinstance(body, dict) else None
-            raise HTTPException(response.status_code, detail if isinstance(detail, str) else "Armory refused the request.")
-        raise HTTPException(502, "Armory connections are unavailable. Check Armory Admin.")
-
-    async def call(self, method: str, path: str, body: dict | None = None) -> dict:
-        return await self._request(method, path, json=body)
-
-    async def post_file(self, path: str, filename: str, content: bytes) -> dict:
-        return await self._request("POST", path, content=content,
-                                   headers={"X-Filename": filename, "Content-Type": "application/octet-stream"})
 
 
 class ArmoryUploads:
