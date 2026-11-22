@@ -17,8 +17,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0029"
-NEXT = "0030"
+HEAD = "0030"
+NEXT = "0031"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -163,6 +163,7 @@ def test_0029_renames_extensions_manage_and_keeps_every_role_grant(tmp_path: Pat
                 await database.dispose()
         asyncio.run(go())
 
+    move_to("0029")  # 0030 renames Power User; this test reads the 0029 state
     names, holders, power = state()
     assert "tool_services.manage" in names and "extensions.manage" not in names
     assert {"Power User", "Operator"} <= holders
@@ -179,6 +180,88 @@ def test_0029_renames_extensions_manage_and_keeps_every_role_grant(tmp_path: Pat
         conn.commit()
     assert run_with(make_database(tmp_path)) == "upgraded"
     assert state()[1] == holders and state()[2] == "mine"
+
+
+def _move_to(tmp_path: Path, target: str) -> None:
+    from alembic import command
+
+    async def go() -> None:
+        database = make_database(tmp_path)
+        runner = MigrationRunner(database.engine)
+        try:
+            async with database.engine.connect() as conn:
+                await conn.run_sync(lambda sync: command.downgrade(runner._config(sync), target))
+        finally:
+            await database.dispose()
+
+    asyncio.run(go())
+
+
+def _roles(path: Path) -> dict[str, tuple[int, str, frozenset[str], frozenset[str]]]:
+    """name -> (id, description, permission names, holder emails-or-ids) for every role."""
+    with closing(sqlite3.connect(path)) as conn:
+        out = {}
+        for rid, name, description in conn.execute("SELECT id, name, description FROM roles"):
+            perms = frozenset(r[0] for r in conn.execute(
+                "SELECT p.name FROM role_permission rp JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = ?", (rid,)))
+            holders = frozenset(str(r[0]) for r in conn.execute("SELECT account_id FROM account_role WHERE role_id = ?", (rid,)))
+            out[name] = (rid, description, perms, holders)
+        return out
+
+
+_OPERATOR_OLD = "Run the platform: settings, capabilities and extensions. No account or role control."
+_OPERATOR_NEW = "Run the platform: settings, capabilities and tool services. No account or role control."
+
+
+def test_0030_renames_the_seeded_power_user_role_and_reverses(tmp_path: Path) -> None:
+    run_with(make_database(tmp_path))
+    path = tmp_path / "ember.db"
+    roles = _roles(path)
+    assert "Power User" not in roles
+    assert roles["Tool Services Manager"][1] == "Member access plus tool services management."
+    assert roles["Operator"][1] == _OPERATOR_NEW
+
+    _move_to(tmp_path, "0029")
+    before = _roles(path)
+    assert before["Power User"][1] == "Member access plus tool services management."
+    assert before["Operator"][1] == _OPERATOR_OLD
+    assert "Tool Services Manager" not in before
+
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    after = _roles(path)
+    # same id, permissions and holders under the new name
+    assert after["Tool Services Manager"][0] == before["Power User"][0]
+    assert after["Tool Services Manager"][2:] == before["Power User"][2:]
+    assert after["Operator"][2:] == before["Operator"][2:]
+
+
+def test_0030_leaves_an_edited_power_user_role_alone(tmp_path: Path) -> None:
+    run_with(make_database(tmp_path))
+    path = tmp_path / "ember.db"
+    _move_to(tmp_path, "0029")
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("UPDATE roles SET description = 'mine' WHERE name = 'Power User'")
+        conn.execute("UPDATE roles SET description = 'ops' WHERE name = 'Operator'")
+        conn.commit()
+
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    roles = _roles(path)
+    assert roles["Power User"][1] == "mine" and "Tool Services Manager" not in roles
+    assert roles["Operator"][1] == "ops"
+
+
+def test_0030_skips_the_rename_when_the_new_name_is_taken(tmp_path: Path) -> None:
+    run_with(make_database(tmp_path))
+    path = tmp_path / "ember.db"
+    _move_to(tmp_path, "0029")
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("INSERT INTO roles (name, description) VALUES ('Tool Services Manager', 'custom')")
+        conn.commit()
+
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    roles = _roles(path)
+    assert roles["Power User"][1] == "Member access plus tool services management."
+    assert roles["Tool Services Manager"][1] == "custom"
 
 
 def clear_access(conn: sqlite3.Connection) -> None:
@@ -564,7 +647,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*", "0025*", "0026*", "0027*", "0028*", "0029*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*", "0025*", "0026*", "0027*", "0028*", "0029*", "0030*"))
         calls: list[int] = []
 
         async def backup() -> None:
@@ -797,11 +880,11 @@ def test_starter_roles_are_seeded_once_and_edits_stick(tmp_path: Path) -> None:
             return found
 
     seeded = roles()
-    for name in ("Viewer", "Support", "Moderator", "Auditor", "Power User", "Operator"):
+    for name in ("Viewer", "Support", "Moderator", "Auditor", "Tool Services Manager", "Operator"):
         assert name in seeded
     assert seeded["Viewer"] == {"chat.use", "tools.view"}
-    assert "tool_services.manage" in seeded["Power User"] and "tickets.create" in seeded["Power User"]
-    for name in ("Viewer", "Support", "Moderator", "Auditor", "Power User", "Operator"):
+    assert "tool_services.manage" in seeded["Tool Services Manager"] and "tickets.create" in seeded["Tool Services Manager"]
+    for name in ("Viewer", "Support", "Moderator", "Auditor", "Tool Services Manager", "Operator"):
         assert not {p for p in seeded[name] if p.startswith(("logs.chat", "roles."))} - {"roles.view"}
 
     with closing(sqlite3.connect(path)) as conn:

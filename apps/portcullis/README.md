@@ -595,7 +595,7 @@ allowed in account usernames, so it can never equal an account) and an empty ema
   (`STAFF_PERMISSIONS` in `permissions.py`: `accounts.*`, `roles.*`, `invites.manage`, `settings.manage`,
   `capabilities.manage`, `tool_services.manage`, `agents.manage`, `logs.*`, `config.issues.view`, `traffic.view`,
   `usage.all.view`, `tickets.manage`), and a role holding one cannot be assigned to it (`409`).
-- **Starter roles:** migration `0019` creates `Viewer`, `Support`, `Moderator`, `Auditor`, `Power User` and `Operator` once,
+- **Starter roles:** migration `0019` creates `Viewer`, `Support`, `Moderator`, `Auditor`, `Tool Services Manager` (renamed from `Power User` by `0030`) and `Operator` once,
   with preset permissions (none holds `roles.manage`, `roles.assign`, `accounts.delete` or any `logs.chat.*`). An existing
   role of the same name is left alone, and edits or deletions later stick.
 - **Ticket permissions:** `tickets.create`: "Report bugs, suggest features and follow your own tickets";
