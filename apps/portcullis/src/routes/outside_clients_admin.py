@@ -123,12 +123,21 @@ async def rotate(client_id: int, response: Response, session=Depends(_session),
 
 
 @router.delete("/{client_id}", status_code=204)
-async def delete(client_id: int, session=Depends(_session), account: Account = Depends(require_manage),
+async def delete(client_id: int, request: Request, session=Depends(_session), account: Account = Depends(require_manage),
                  logs: LogWriter = Depends(get_log_writer)) -> Response:
     clients = OutsideClients(session)
     found = await _found(clients, client_id)
     label = f"{found.id} ({found.name})"
+    uid = found.uid
     await clients.delete(client_id)
     await session.commit()
+    for domain in ("brain", "stack", "brain/proposals", "brain/shares"):
+        try:
+            purged = await request.app.state.stronghold.forward("DELETE", f"/{domain}/accounts/{uid}", account)
+            confirmed = 200 <= purged.status < 300
+        except Exception:  # noqa: BLE001 - the client is already deleted, so finish the remaining purges
+            confirmed = False
+        if not confirmed:
+            await logs.error(account.id, "outside_client.purge", f"Outside client {client_id}: purge failed for {domain}")
     await logs.action(account, "outside_client.delete", f"Deleted outside client {label}")
     return Response(status_code=204)

@@ -57,8 +57,8 @@ class FakeLegion:
     fail: bool = False
     calls: list = field(default_factory=list)
 
-    async def ask(self, url, client, question, history):
-        self.calls.append({"url": url, "uid": client.uid, "question": question, "history": history})
+    async def ask(self, url, client, question, history, *, memory=False):
+        self.calls.append({"url": url, "uid": client.uid, "question": question, "history": history, "memory": memory})
         if self.fail:
             raise LegionUnavailable("Legion is unavailable")
         return LegionAnswer(text=self.next["text"], tokens=self.next["tokens"], request_id="req-1")
@@ -93,6 +93,7 @@ def test_a_valid_call_returns_the_answer_and_counts_the_tokens(client, fake_legi
     body = response.json()
     assert body["answer"] == "Four." and body["usage"] == {"total_tokens": 25, "budget_remaining": 975} and body["request_id"]
     assert fake_legion.calls[0]["question"] == "What is 2 + 2?" and fake_legion.calls[0]["url"] == ENTRY.url
+    assert fake_legion.calls[0]["memory"] is False
     assert used(client, client_id) == 25
 
 

@@ -73,7 +73,7 @@ async def test_rotating_the_key_ends_the_old_one(db):
 
 @pytest.mark.parametrize("extra, message", [
     ({"name": " "}, "name"), ({"name": "x" * 61}, "name"), ({"name": "bad/name"}, "name"),
-    ({"services": ["stronghold"]}, "service"), ({"services": []}, "service"), ({"services": ["legion", "legion"]}, "service"),
+    ({"services": ["other"]}, "service"), ({"services": []}, "service"), ({"services": ["legion", "legion"]}, "service"),
     ({"rate_per_minute": 0}, "rate"), ({"rate_per_minute": 601}, "rate"),
     ({"budget_tokens": 0}, "budget"), ({"budget_tokens": 100_000_001}, "budget"), ({"budget_days": 0}, "days"), ({"budget_days": 367}, "days"),
     ({"ip_allow": ["not-an-address"]}, "address"),
@@ -82,6 +82,13 @@ async def test_rotating_the_key_ends_the_old_one(db):
 async def test_a_bad_record_is_refused_in_words(db, extra, message):
     with pytest.raises(OutsideClientError, match=message):
         await make(db, **extra)
+
+
+@with_db
+async def test_stronghold_is_a_client_service(db):
+    client_id, _ = await make(db, services=["stronghold"])
+    async with db.sessions() as session:
+        assert (await OutsideClients(session).get(client_id)).services == ["stronghold"]
 
 
 @with_db

@@ -481,14 +481,25 @@ are refused. Answer: `{answer, usage: {total_tokens, budget_remaining}, request_
 
 Every check that cannot decide refuses (fail closed).
 
+### The Stronghold level: `POST /api/outside/stronghold/ask`
+
+Same body, answers, statuses, key, rate limit, budget and audit log as the Legion door; the client record must list the
+service `stronghold` (a client allowed `legion` only gets `403`). The agent may use five Stronghold Brain tools and
+nothing else: `tool_brain_search`, `tool_brain_read`, `tool_brain_list`, `tool_brain_write`, `tool_brain_update`, on the
+client's own Brain folder (its uid, `oc_<12 hex>`, created at the first write). Legion gets
+`disabled_tools = ["*", "!stronghold__tool_brain_search", ...]` (the `"!name"` exception form), and Stronghold refuses every
+other tool for an `oc_` uid on its own. The global brain, tickets, usage, skills, short-term memory, sharing and every
+Armory tool stay out of reach. Deleting the client also asks Stronghold to purge `/brain`, `/stack`, `/brain/proposals`
+and `/brain/shares` for its uid (best effort, one error log per failure; the delete still answers `204`). The path
+through a live Legion and Stronghold has not been run.
+
 ### Key and client record
 
 The key is `ock_` plus 43 URL-safe characters. It is shown once, on create and on rotate; Portcullis keeps only its
 SHA-256 and the 8-character prefix (`key_prefix`). It never appears in logs, errors or the audit log.
 
 A client is `{id, uid, name, key_prefix, services, ip_allow, rate_per_minute, enabled, created_at, last_used_at, budget}`:
-`name` 1 to 60 of letters, digits, space, `-_.`, unique ignoring case; `services` is `["legion"]` by default (the only
-service today); `ip_allow` a list of addresses or networks (empty = any address the IP lists let in); `rate_per_minute`
+`name` 1 to 60 of letters, digits, space, `-_.`, unique ignoring case; `services` is `["legion"]` by default (`legion` and `stronghold` are the two services); `ip_allow` a list of addresses or networks (empty = any address the IP lists let in); `rate_per_minute`
 1 to 600 (default 10); `budget_tokens` 1 to 100000000 (required on create); `budget_days` 1 to 366 (default 30).
 
 ### Budget

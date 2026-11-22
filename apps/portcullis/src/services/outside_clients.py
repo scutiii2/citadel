@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db import utcnow
 from src.models.outside_client import OutsideClient, OutsideClientEvent
 
-SERVICES = ("legion",)
+SERVICES = ("legion", "stronghold")
 FIELDS = ("name", "services", "ip_allow", "rate_per_minute", "budget_tokens", "budget_days", "enabled")
 DEFAULT_BUDGET_TOKENS = 100_000
 _NAME = re.compile(r"[A-Za-z0-9 _.\-]{1,60}")

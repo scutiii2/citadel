@@ -1,4 +1,4 @@
-"""The outside door: POST /api/outside/legion/ask, opened only by an outside client's key.
+"""The Legion and Stronghold ask routes, opened only by an outside client's key.
 
 No login, cookie or account token reaches it, and the key opens nothing else. Every check that
 cannot decide refuses, and an answer whose tokens cannot be recorded is withheld."""
@@ -17,9 +17,6 @@ from src.services.outside_clients import OutsideClients
 from src.services.outside_guard import OutsideRefused
 
 router = APIRouter(prefix="/api/outside")
-
-SERVICE = "legion"
-
 
 class Turn(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -47,9 +44,9 @@ def _unavailable(detail: str) -> JSONResponse:
     return JSONResponse({"detail": detail}, status_code=503)
 
 
-async def _upstream_refusal(session, clients: OutsideClients, client, ip: str) -> None:
+async def _upstream_refusal(session, clients: OutsideClients, client, ip: str, service: str) -> None:
     try:
-        await clients.record(client, service=SERVICE, action="refused", reason="upstream", status=503, ip=ip)
+        await clients.record(client, service=service, action="refused", reason="upstream", status=503, ip=ip)
         await session.commit()
     except Exception:  # noqa: BLE001 - the audit write never changes the refusal
         pass
@@ -57,13 +54,22 @@ async def _upstream_refusal(session, clients: OutsideClients, client, ip: str) -
 
 @router.post("/legion/ask")
 async def ask(body: AskBody, request: Request) -> JSONResponse:
+    return await _ask(request, body, service="legion", memory=False)
+
+
+@router.post("/stronghold/ask")
+async def ask_stronghold(body: AskBody, request: Request) -> JSONResponse:
+    return await _ask(request, body, service="stronghold", memory=True)
+
+
+async def _ask(request: Request, body: AskBody, *, service: str, memory: bool) -> JSONResponse:
     state = request.app.state
     ip = client_ip(request)
     try:
         async with state.database.sessions() as session:
             clients = OutsideClients(session)
             try:
-                client = await state.outside_guard.admit(clients, _bearer(request), SERVICE, ip)
+                client = await state.outside_guard.admit(clients, _bearer(request), service, ip)
             except OutsideRefused as error:
                 try:
                     await session.commit()  # keep the refusal event
@@ -74,15 +80,17 @@ async def ask(body: AskBody, request: Request) -> JSONResponse:
 
             entry = await state.agent_directory.entry()
             if entry is None:
-                await _upstream_refusal(session, clients, client, ip)
+                await _upstream_refusal(session, clients, client, ip, service)
                 return _unavailable("No agent is running")
             try:
-                answer = await state.legion_ask.ask(entry.url, client, body.question, [t.model_dump() for t in body.history])
+                answer = await state.legion_ask.ask(
+                    entry.url, client, body.question, [t.model_dump() for t in body.history], memory=memory,
+                )
             except LegionUnavailable:
-                await _upstream_refusal(session, clients, client, ip)
+                await _upstream_refusal(session, clients, client, ip, service)
                 return _unavailable("Legion is unavailable")
 
-            await clients.record(client, service=SERVICE, action="call", status=200, tokens=answer.tokens, ip=ip)
+            await clients.record(client, service=service, action="call", status=200, tokens=answer.tokens, ip=ip)
             used, _ = await clients.spent(client)
             await session.commit()
     except Exception:  # noqa: BLE001 - database down, or the tokens could not be recorded: no answer leaves

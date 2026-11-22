@@ -1,5 +1,4 @@
-"""One stateless ask to Legion's entry agent as an outside client: no extensions, every tool refused,
-no plan tool, no questions back, no memory of earlier calls beyond the history the client sends."""
+"""Ask Legion's entry agent as an outside client, optionally with access to its own Brain notes."""
 
 from __future__ import annotations
 
@@ -18,7 +17,10 @@ _log = logging.getLogger(__name__)
 
 ASK_SECONDS = 120
 _TIMEOUT = httpx.Timeout(30.0, read=ASK_SECONDS)
-DISABLED_TOOLS = ["*"]
+STRONGHOLD_ALLOWED = (
+    "stronghold__tool_brain_search", "stronghold__tool_brain_read", "stronghold__tool_brain_list",
+    "stronghold__tool_brain_write", "stronghold__tool_brain_update",
+)
 
 
 class LegionUnavailable(Exception):
@@ -40,15 +42,16 @@ def _tokens(data: dict) -> int:
 
 
 class LegionAsk:
-    async def ask(self, url: str, client: OutsideClient, question: str, history: list[dict]) -> LegionAnswer:
+    async def ask(self, url: str, client: OutsideClient, question: str, history: list[dict], *,
+                  memory: bool = False) -> LegionAnswer:
         request_id = uuid.uuid4().hex
+        allowed = list(STRONGHOLD_ALLOWED) if memory else []
         arguments = {
             "question": question, "history": history, "enabled_extensions": [], "approval_mode": "deny",
-            "allowed_tools": [], "plan": False, "ask_user": False, "caveman": False, "request_id": request_id,
-            # deny + allowed_tools=[] only gates the model's tool loop; Legion's memory recall, skill recall and
-            # skill learning call mcp_upstream.call_tool directly. "*" is Legion's tool_filter wildcard, checked
-            # first in call_tool, and delegation passes it on to every delegate.
-            "disabled_tools": DISABLED_TOOLS,
+            "allowed_tools": allowed, "plan": False, "ask_user": False, "caveman": False, "request_id": request_id,
+            # Approvals gate the model's tool loop. Recall and skill learning also call the upstream directly,
+            # so block every tool there too. The Brain search exception permits memory recall.
+            "disabled_tools": ["*", *(f"!{tool}" for tool in allowed)],
         }
         try:
             async with asyncio.timeout(ASK_SECONDS):
