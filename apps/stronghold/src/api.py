@@ -26,6 +26,8 @@ from src.bard import routes as bard_routes
 from src.brains import instance_migration, routes as brains_routes
 from src.brains.connections import BrainError
 from src.brains.gateway import BrainGateway
+from src import ready
+from src.citadel_auth.ready import Probe
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, ServiceCatalog, CatalogTransport, logical_url, advertised_url, from_env
 from src.citadel_auth.treasury import register_in_background
 from src.chats import routes as chats_routes
@@ -106,6 +108,7 @@ def create_app(
         app.state.keyring = keyring
         app.state.brain_migration_lock = asyncio.Lock()
         app.state.catalog = catalog
+        app.state.readiness = Probe("stronghold")
         if store is None:
             catalog.start("stronghold", advertised_url(settings.host, settings.port, settings.advertise_url))
         clients: list[httpx.AsyncClient] = []
@@ -184,18 +187,21 @@ def create_app(
             app.state.chats, app.state.usage, app.state.agent_gateway, settings.usage, PlatformLogs(app.state.platform),
             pricing=app.state.pricing, directory=app.state.agents, keyring=keyring,
             requester_refresh=app.state.platform.requester_token, compactor=app.state.compactor)
-        if registration is not None:
-            # Migrate only once Treasury knows this instance: a cold start would answer 404 and skip the migration.
-            try:
-                await asyncio.wait_for(asyncio.shield(registration), timeout=20)
-            except asyncio.TimeoutError:
-                pass  # shortcut: Treasury is slow to answer, so the migration may fail and is logged below; upgrade with a retry loop
         app.state.schema_version = None
-        try:
-            app.state.schema_version = (await migrations.migrate(app.state.store))["version"]
-        except (DbGatewayError, migrations.SchemaTooNew) as error:
-            # Storage down: Stronghold still starts (a feature fails alone). Data newer than this code: leave it alone.
-            logging.getLogger(__name__).error("schema migration not run: %s", error)
+
+        async def migrate_schema() -> None:
+            try:
+                if registration is not None:
+                    await registration
+                app.state.schema_version = (await migrations.migrate(app.state.store))["version"]
+            except (DbGatewayError, migrations.SchemaTooNew) as error:
+                logging.getLogger(__name__).error("schema migration not run: %s", error)
+
+        schema_task = None
+        if registration is None:
+            await migrate_schema()
+        else:
+            schema_task = asyncio.create_task(migrate_schema())
         app.state.mcp = build_server(app, settings.host)
         mcp_app = app.state.mcp.streamable_http_app()
         mount = Route("/mcp", LegionOnlyMcp(mcp_app))
@@ -206,8 +212,10 @@ def create_app(
         finally:
             app.router.routes.remove(mount)
             await catalog.stop()
-            if registration is not None:
+            if schema_task is not None and registration is not None:
+                schema_task.cancel()
                 registration.cancel()
+                await asyncio.gather(schema_task, registration, return_exceptions=True)
             await app.state.turns.shutdown()
             for client in clients:
                 await client.aclose()
@@ -258,6 +266,10 @@ def create_app(
     @app.exception_handler(DbGatewayUnavailable)
     async def storage_down(_request: Request, _error: DbGatewayUnavailable):
         return JSONResponse({"detail": "Storage is unavailable"}, status_code=503)
+
+    @app.get("/ready")
+    async def readiness() -> dict:
+        return await app.state.readiness.check(ready.dependencies(app.state.catalog))
 
     @app.get("/health")
     async def health() -> dict[str, str]:

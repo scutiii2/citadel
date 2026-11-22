@@ -268,13 +268,44 @@ def test_main_registers_with_the_spec_flags(monkeypatch):
     assert calls["deregister"] == server._AGENT_ID
 
 
-def test_laya_main_warms_before_registration_without_an_upstream_connection(monkeypatch):
+def test_laya_main_serves_health_while_warming_without_an_upstream_connection(monkeypatch):
     from src.providers.decision import provider
 
     calls = []
     monkeypatch.setattr(server.agent_config, "PROVIDER_ID", "decision")
     monkeypatch.setattr(server, "_OWN_TIERS", [])
-    monkeypatch.setattr(provider, "prepare", lambda: calls.append("warm"))
+    import asyncio
+    import threading
+    from contextlib import asynccontextmanager
+
+    import httpx
+
+    monkeypatch.setattr(server.mcp, "_session_manager", None)
+    warmed, serving = threading.Event(), threading.Event()
+
+    def prepare():
+        calls.append("warm")
+        warmed.set()
+        serving.wait(timeout=2)
+
+    @asynccontextmanager
+    async def no_remote_registration():
+        yield
+
+    def serve(app, **kwargs):
+        async def check():
+            async with app.router.lifespan_context(app):
+                assert await asyncio.to_thread(warmed.wait, 2)
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                                             base_url="http://legion") as client:
+                    assert (await client.get("/health")).json() == {"status": "ok"}
+                calls.append("serve")
+                serving.set()
+
+        asyncio.run(check())
+
+    monkeypatch.setattr(server, "_register_with_treasury", no_remote_registration)
+    monkeypatch.setattr(provider, "prepare", prepare)
 
     def forbidden():
         raise AssertionError("Laya must not connect to tools")
@@ -284,9 +315,9 @@ def test_laya_main_warms_before_registration_without_an_upstream_connection(monk
     monkeypatch.setattr(server.mcp_upstream, "close", forbidden)
     monkeypatch.setattr(server.agent_registry, "register", lambda *a, **k: calls.append("register"))
     monkeypatch.setattr(server.agent_registry, "deregister", lambda *a: calls.append("deregister"))
-    monkeypatch.setattr(server.uvicorn, "run", lambda *a, **k: calls.append("serve"))
+    monkeypatch.setattr(server.uvicorn, "run", serve)
     server.main()
-    assert calls == ["warm", "register", "serve", "deregister"]
+    assert calls == ["warm", "serve", "register", "deregister"]
 
 
 def test_laya_load_failure_does_not_register_an_unavailable_agent(monkeypatch):
@@ -294,13 +325,30 @@ def test_laya_load_failure_does_not_register_an_unavailable_agent(monkeypatch):
 
     monkeypatch.setattr(server.agent_config, "PROVIDER_ID", "decision")
 
+    monkeypatch.setattr(server.mcp, "_session_manager", None)
+
     def fail():
         raise RuntimeError("weights could not load")
 
     monkeypatch.setattr(provider, "prepare", fail)
+    import asyncio
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def no_remote_registration():
+        yield
+
+    def serve(app, **kwargs):
+        async def boot():
+            async with app.router.lifespan_context(app):
+                pass
+
+        asyncio.run(boot())
+
+    monkeypatch.setattr(server, "_register_with_treasury", no_remote_registration)
+    monkeypatch.setattr(server.uvicorn, "run", serve)
     with patch.object(server.agent_registry, "register") as register:
-        with pytest.raises(RuntimeError, match="weights could not load"):
-            server.main()
+        server.main()
         register.assert_not_called()
 
 

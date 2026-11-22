@@ -45,14 +45,13 @@ async def _serve() -> None:
     registration = register_in_background(
         keyring, settings.treasury_url, settings.db_gateway_instance, [settings.db_gateway_connection])
 
+    extensions_task = None
     try:
-        # Before tool_names on purpose: extensions register proxied tools onto `mcp`,
-        # so connecting first puts them in the merged list and the counts below.
-        extension_statuses = await extensions.install_extensions(mcp, settings.settings_db_path)
-
-        # Use extensions.merged_list_tools(), not mcp.list_tools(): proxied tools are visible only
-        # through the handlers install_extensions() installed.
-        tool_names = sorted(t.name for t in await extensions.merged_list_tools())
+        extensions_task = asyncio.create_task(
+            extensions.install_extensions(mcp, settings.settings_db_path, retry_interval=60),
+            name="Armory extensions",
+        )
+        tool_names = sorted(t.name for t in await mcp.list_tools())
 
         # Both calls are needed (verified against mcp==1.28.0): templated URIs appear only in
         # list_resource_templates() and fixed URIs only in list_resources().
@@ -89,7 +88,7 @@ async def _serve() -> None:
             f"  Tools    : {len(tool_names)}",
             *(f"    - {name}" for name in tool_names),
             f"  Resources: {resource_count}",
-            f"  Extensions: {', '.join(f'{s.id} ({s.status})' for s in extension_statuses) or 'none'}",
+            "  Extensions: connecting in the background",
         ]
         banner.append("  /mcp auth : signed Ed25519 service assertion required")
 
@@ -147,7 +146,11 @@ async def _serve() -> None:
     finally:
         await catalog.stop()
         registration.cancel()
-        # Mirrors install_extensions() at the top: subprocesses opened get closed on shutdown or startup failure.
+        if extensions_task is not None:
+            extensions_task.cancel()
+            await asyncio.gather(extensions_task, return_exceptions=True)
+        await asyncio.gather(registration, return_exceptions=True)
+        # Extension subprocesses stay owned by the registry until shutdown.
         await extensions.shutdown_extensions()
 
 

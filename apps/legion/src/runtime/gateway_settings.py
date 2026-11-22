@@ -136,6 +136,12 @@ def _fresh(which: str = KEY) -> GatewaySettings | None:
     return cached[0] if cached and time.monotonic() < cached[1] else None
 
 
+def last_known(which: str = KEY) -> GatewaySettings:
+    """Return cached settings or defaults without contacting Treasury."""
+    cached = _cache.get(which)
+    return cached[0] if cached else _from_doc(None, which)
+
+
 async def current(which: str = KEY) -> GatewaySettings:
     """The settings to use now (async callers: a streamed chat round)."""
     return _fresh(which) or _remember(await _read(which), which)

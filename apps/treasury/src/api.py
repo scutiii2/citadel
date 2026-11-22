@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, current_caller, data_dir, from_env, settings_store
 from src.backends.base import UnsupportedOperation
-from src import connection_admin, outside_catalog, service_catalog
+from src import connection_admin, outside_catalog, ready, service_catalog
 from src.registry import InstanceManager, RawSqlDisabled, UnknownConnection, UnknownInstance
 
 OUTSIDE_CONSUMERS = frozenset({"legion", "stronghold"})
@@ -105,6 +105,10 @@ def create_app(manager: InstanceManager, keyring: Keyring | None = None, setting
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/ready")
+    async def readiness() -> dict:
+        return await ready.report()
 
     @app.get("/instances")
     async def instances() -> dict[str, list[str]]:

@@ -85,6 +85,8 @@ from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.usage_client import UsageUnavailable
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
+from src.citadel_auth.ready import Probe
+from src.routes import ready
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +144,7 @@ def create_app(
         await service_auth.keyring.ensure_identity()
         catalog = ServiceCatalog(service_auth.keyring, settings.treasury_url, cache_path=settings.database_path.parent / "catalog_cache.json")
         app.state.catalog = catalog
+        app.state.readiness = Probe("portcullis")
         if db_gateway is None:
             catalog.start("portcullis", advertised_url(settings.host, settings.port, settings.advertise_url))
         # Raises SecretBoxError (a clear one-line message) when .env holds a key that is not valid.
@@ -270,6 +273,7 @@ def create_app(
     app.include_router(internal_routes.router)
     app.include_router(outside.router)
     app.include_router(outside_clients_admin.router)
+    app.include_router(ready.router)
 
     @app.exception_handler(CapabilityFailure)
     async def capability_failure(_request: Request, error: CapabilityFailure):
@@ -316,6 +320,7 @@ def create_app(
             )
         return JSONResponse({"detail": "Internal server error"}, status_code=500)
 
+    @app.get("/health")
     @app.get("/api/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}

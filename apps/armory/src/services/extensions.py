@@ -174,7 +174,7 @@ class ExtensionRegistry:
         self._statuses: list[ExtensionStatus] = []
         self._mcp: FastMCP | None = None
         # Guards add()/remove() (and the module-level wrappers, which hold it across the registry mutation and config.json write)
-        # against concurrent HTTP requests; connect_all() doesn't need it at startup.
+        # and background reconnects against concurrent HTTP requests.
         self._mutation_lock = asyncio.Lock()
 
     def statuses(self) -> list[ExtensionStatus]:
@@ -190,12 +190,16 @@ class ExtensionRegistry:
     async def connect_all(self, config_path: Path) -> None:
         """Connect to every extension in config.json's "extensions" section.
         Each is isolated (see _connect_one): a failure is recorded as its status, never raised, so siblings and our own tools still start."""
-        for extension_id, extension_config in (await asyncio.to_thread(load_extensions_config, config_path)).items():
-            await self._connect_one(extension_id, extension_config)
+        async with self._mutation_lock:
+            configs = await asyncio.to_thread(load_extensions_config, config_path)
+            for extension_id, extension_config in configs.items():
+                if extension_id not in self._sessions:
+                    self._statuses = [status for status in self._statuses if status.id != extension_id]
+                    await self._connect_one(extension_id, extension_config)
 
     async def _connect_one(self, extension_id: str, config: ExtensionConfig) -> ExtensionStatus:
         """Connect one extension, append its ExtensionStatus and return it.
-        Never raises (failures are recorded as status); not locked, since connect_all() runs it in a plain loop and add() locks around it."""
+        Connection failures are recorded as status. The caller holds the mutation lock."""
         stop = asyncio.Event()
         opened = asyncio.get_running_loop().create_future()
         worker = asyncio.create_task(self._serve_session(config, opened, stop))
@@ -411,15 +415,24 @@ class ExtensionRegistry:
 _registry: ExtensionRegistry | None = None
 
 
-async def install_extensions(mcp: FastMCP, config_path: Path) -> list[ExtensionStatus]:
-    """Connect every configured extension and merge their tools into `mcp`; called once at startup, before the tool-count banner (see run.py).
-    Always installs the merged handlers, even with zero extensions, so there is one code path."""
+async def install_extensions(
+    mcp: FastMCP, config_path: Path, *, retry_interval: float | None = None,
+) -> list[ExtensionStatus]:
+    """Install built-in handlers immediately and connect configured extensions in the serving loop."""
     global _registry
     registry = ExtensionRegistry()
-    await registry.connect_all(config_path)
     registry.install(mcp)
     _registry = registry
-    return registry.statuses()
+    while True:
+        try:
+            await registry.connect_all(config_path)
+        except Exception as error:
+            if retry_interval is None:
+                raise
+            logger.warning("Could not refresh extensions (%s)", type(error).__name__)
+        if retry_interval is None:
+            return registry.statuses()
+        await asyncio.sleep(retry_interval)
 
 
 async def merged_list_tools() -> list[types.Tool]:

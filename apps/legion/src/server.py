@@ -13,10 +13,12 @@ import argparse
 import asyncio
 from dataclasses import replace
 import json
+import logging
 import os
 import sys
 from uuid import uuid4
 from pathlib import Path
+from src import ready
 from src.providers import gateway_client
 from contextlib import asynccontextmanager, suppress
 from src.citadel_auth import settings_store, advertised_url
@@ -312,6 +314,16 @@ async def ask(
     if result.status is not None:
         reply.update(status=result.status, units=result.units)
     return reply
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(_request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok"})
+
+
+@mcp.custom_route("/ready", methods=["GET"])
+async def readiness(_request: Request) -> JSONResponse:
+    return JSONResponse(await ready.probe.check(ready.dependencies()))
 
 
 @mcp.custom_route("/registry", methods=["GET"])
@@ -718,27 +730,44 @@ def main() -> None:
     role_info = {}
     if SPEC.role == "architect":
         role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
-    if SPEC.internal_role == "router":
-        from src.agents.roles.router import router_service
+    decision = agent_config.PROVIDER_ID == "decision"
+    router = SPEC.internal_role == "router"
 
-        role_info = {"decision": router_service.status_summary()}
-    if agent_config.PROVIDER_ID == "decision" and SPEC.internal_role != "router":
-        from src.providers.decision import provider
+    def register_agent() -> None:
+        agent_registry.register(
+            _AGENT_ID, _AGENT_LABEL, _AGENT_URL,
+            entry=SPEC.entry, role=SPEC.role, focus=SPEC.focus,
+            tiers=_OWN_TIERS, efforts=_OWN_EFFORTS, tool_allow=list(SPEC.tools.allow),
+            delegable=SPEC.delegable,
+            **role_info,
+        )
 
-        provider.prepare()
-    elif agent_config.PROVIDER_ID != "decision":
-        if _args.mcp_url:
-            mcp_upstream.connect(_args.mcp_url)
-        else:
-            mcp_upstream.connect()
-        mcp_upstream.warn_unmatched_tool_globs()
-    agent_registry.register(
-        _AGENT_ID, _AGENT_LABEL, _AGENT_URL,
-        entry=SPEC.entry, role=SPEC.role, focus=SPEC.focus,
-        tiers=_OWN_TIERS, efforts=_OWN_EFFORTS, tool_allow=list(SPEC.tools.allow),
-        delegable=SPEC.delegable,
-        **role_info,
-    )
+    def prepare_dependencies() -> None:
+        if router:
+            from src.agents.roles.router import router_service
+
+            role_info["decision"] = router_service.status_summary()
+        elif decision:
+            from src.providers.decision import provider
+
+            provider.prepare()
+        if not decision:
+            if _args.mcp_url:
+                mcp_upstream.connect(_args.mcp_url)
+            else:
+                mcp_upstream.connect()
+            mcp_upstream.warn_unmatched_tool_globs()
+        if router or decision:
+            register_agent()
+
+    async def initialize() -> None:
+        try:
+            await asyncio.to_thread(prepare_dependencies)
+        except Exception as error:
+            logging.getLogger(__name__).warning("Legion dependency initialization failed (%s)", type(error).__name__)
+
+    if not router and not decision:
+        register_agent()
     try:
         # Same app, host, port and log level mcp.run(transport="streamable-http")
         # would use, built explicitly so middleware can be added here. No CORS:
@@ -753,13 +782,19 @@ def main() -> None:
         @asynccontextmanager
         async def lifespan(application):
             async with previous_lifespan(application), _register_with_treasury():
-                yield
+                initialization = asyncio.create_task(initialize(), name="Legion dependencies")
+                try:
+                    yield
+                finally:
+                    # The MCP connection thread owns its sessions. Let initialization
+                    # finish before main closes that thread.
+                    await initialization
 
         app.router.lifespan_context = lifespan
         uvicorn.run(app, host=HOST, port=PORT, log_level=mcp.settings.log_level.lower())
     finally:
         agent_registry.deregister(_AGENT_ID)
-        if agent_config.PROVIDER_ID != "decision":
+        if not decision:
             mcp_upstream.close()
 
 
