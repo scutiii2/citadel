@@ -251,8 +251,6 @@ export interface Conversation {
   /** Shown in the Pinned section, above the folders. */
   pinned?: boolean;
   /** Persisted on this chat in ember_api; absent means off. */
-  saveToSecondBrain?: boolean;
-  secondBrainScope?: "instance" | "personal";
   createdAt: number;
   updatedAt: number;
 }

@@ -10,7 +10,7 @@ export interface ConversationStorage {
   /** Every chat, newest first, with `messages` not loaded yet. */
   list(): Promise<Conversation[]>;
   /** A chat's transcript, and whether an answer is being written for it. */
-  detail(id: string): Promise<{ messages: ChatMessage[]; running: boolean; saveToSecondBrain?: boolean; secondBrainScope?: "instance" | "personal" }>;
+  detail(id: string): Promise<{ messages: ChatMessage[]; running: boolean }>;
   rename(id: string, title: string): Promise<void>;
   /** Moves a chat into a folder (null: out of its folder) and/or pins it. */
   update(id: string, changes: ChatChanges): Promise<void>;
@@ -24,9 +24,9 @@ export class ServerConversationStorage implements ConversationStorage {
     return (await chatsClient.list()).map(fromSummary);
   }
 
-  async detail(id: string): Promise<{ messages: ChatMessage[]; running: boolean; saveToSecondBrain?: boolean; secondBrainScope?: "instance" | "personal" }> {
+  async detail(id: string): Promise<{ messages: ChatMessage[]; running: boolean }> {
     const chat = await chatsClient.get(id);
-    return { messages: chat.messages, running: chat.running, saveToSecondBrain: chat.save_to_second_brain ?? false, secondBrainScope: chat.second_brain_scope ?? "instance" };
+    return { messages: chat.messages, running: chat.running };
   }
 
   async rename(id: string, title: string): Promise<void> {
@@ -66,8 +66,6 @@ function fromSummary(s: ChatSummary): Conversation {
     running: s.running,
     folderId: s.folder_id ?? null,
     pinned: s.pinned ?? false,
-    saveToSecondBrain: s.save_to_second_brain ?? false,
-    secondBrainScope: s.second_brain_scope ?? "instance",
     agentId: s.agent_id ?? undefined,
     createdAt: parseServerTime(s.created_at),
     updatedAt: parseServerTime(s.updated_at),

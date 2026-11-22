@@ -333,6 +333,6 @@ describe("pages hidden by the administrator", () => {
   });
 
   it("still applies the account's permissions to the pages left", () => {
-    expect(visiblePages((p) => p === "", ["/usage"]).map((p) => p.to)).toEqual(["/brains"]);
+    expect(visiblePages((p) => p === "", ["/usage"]).map((p) => p.to)).toEqual([]);
   });
 });

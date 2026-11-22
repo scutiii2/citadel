@@ -54,10 +54,6 @@ const {
   busy,
   caveman,
   independent,
-  secondBrainAvailable,
-  secondBrainScope,
-  saveToSecondBrain,
-  secondBrainPending,
   plan,
   planLean,
   listLoading,
@@ -97,7 +93,6 @@ onMounted(() => {
   void chat.loadCommands();
   void toolConnections.refresh();
 });
-onActivated(() => void chat.refreshSecondBrainAvailability());
 
 // Chat folders: the list, which of them are folded, and the new / rename /
 // delete dialogs the sidebar's menus open.
@@ -501,12 +496,6 @@ useChatShortcuts({
             <ChatSettingsMenu
               :caveman="caveman"
               :independent="independent"
-              :second-brain-scope="secondBrainScope"
-              @update:second-brain-scope="chat.setSecondBrainScope"
-              :second-brain-available="secondBrainAvailable"
-              :save-to-second-brain="saveToSecondBrain"
-              :second-brain-pending="secondBrainPending"
-              @update:save-to-second-brain="chat.setSaveToSecondBrain"
               :plan="plan"
               :plan-lean="planLean"
               :ask-before-tools="askBeforeTools"

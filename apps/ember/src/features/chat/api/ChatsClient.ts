@@ -14,8 +14,6 @@ export interface ChatSummary {
   /** The folder it is filed in; absent from an older ember_api. */
   folder_id?: number | null;
   pinned?: boolean;
-  save_to_second_brain?: boolean;
-  second_brain_scope?: "instance" | "personal";
 }
 
 interface ChatDetail extends ChatSummary {
@@ -33,8 +31,6 @@ interface TurnStart {
   caveman: boolean;
   /** Sent only when on: the agent gets no earlier messages of this chat. */
   independent?: boolean;
-  save_to_second_brain?: boolean;
-  second_brain_scope?: "instance" | "personal";
   /** Sent only when off: the agent may not keep a task checklist this turn. */
   plan?: boolean;
   /** Sent only when off: the agent may update its checklist on any step, not just a status change. */
@@ -88,8 +84,6 @@ export interface ChatChanges {
   title?: string;
   folder_id?: number | null;
   pinned?: boolean;
-  save_to_second_brain?: boolean;
-  second_brain_scope?: "instance" | "personal";
 }
 
 const path = (id: string) => `/api/chats/${encodeURIComponent(id)}`;
@@ -97,7 +91,6 @@ const path = (id: string) => `/api/chats/${encodeURIComponent(id)}`;
 /** ember_api's /api/chats routes (chat.use): this account's chat history
  * and the chat turns ember_api runs. */
 export const chatsClient = {
-  secondBrainAvailability: () => apiRequest<{ available: boolean }>("GET", "/api/chats/second-brain?scope=both"),
   list: () => apiRequest<ChatSummary[]>("GET", "/api/chats"),
   /** Titles and message text; needs at least 2 characters. */
   search: (query: string) =>
