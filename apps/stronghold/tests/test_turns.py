@@ -297,27 +297,6 @@ def test_the_account_limits_reach_the_agent(client: TestClient, agent: TurnAgent
     assert agent.asks[0]["limits"] == {"max_output_tokens": 500}
 
 
-def test_auto_save_needs_the_brain_that_portcullis_allows(client: TestClient, agent: TurnAgent) -> None:
-    chat_id = new_id()
-    refused = start(client, chat_id, "save this", save_to_second_brain=True, trusted={"second_brain_available": {"instance": False}})
-    assert refused.status_code == 409
-    assert start(client, chat_id, "save this", save_to_second_brain=True,
-                 trusted={"second_brain_available": {"instance": True}}).status_code == 202
-    events(client, chat_id)
-    assert "Save to second brain is ON" in agent.asks[0]["question"]
-    assert chat(client, chat_id)["messages"][0]["content"] == "save this"  # the stored question is unchanged
-    assert chat(client, chat_id)["save_to_second_brain"] is True
-
-
-def test_a_saved_preference_that_is_no_longer_allowed_is_switched_off_with_a_notice(client: TestClient, agent: TurnAgent) -> None:
-    chat_id = new_id()
-    start(client, chat_id, "q", save_to_second_brain=True, trusted={"second_brain_available": {"instance": True}})
-    events(client, chat_id)
-    start(client, chat_id, "q2", trusted={"second_brain_available": {"instance": False}})
-    stream = events(client, chat_id)
-    assert any(e["type"] == "notice" and e["notices"][0]["id"] == "brain" for e in stream)
-    assert "Save to second brain" not in agent.asks[1]["question"]
-
 
 # --- approvals and questions -----------------------------------------------------------
 

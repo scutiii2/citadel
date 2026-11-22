@@ -52,7 +52,7 @@ def test_put_creates_then_replaces(client: TestClient) -> None:
     created = put(client)
     assert created.status_code == 200
     assert created.json()["title"] == "First chat" and created.json()["message_count"] == 2
-    assert (created.json()["folder_id"], created.json()["pinned"], created.json()["second_brain_scope"]) == (None, False, "instance")
+    assert (created.json()["folder_id"], created.json()["pinned"]) == (None, False)
 
     replaced = put(client, title="  Renamed   chat ", messages=MESSAGES[:1], agent_id="claude-agent").json()
 
@@ -97,7 +97,7 @@ def test_list_is_newest_first_and_has_no_transcripts(client: TestClient, monkeyp
     assert [c["chat_id"] for c in listed] == [A, B]
     assert all("messages" not in c for c in listed)
     assert set(listed[0]) == {"chat_id", "title", "agent_id", "message_count", "folder_id", "pinned",
-                              "save_to_second_brain", "second_brain_scope", "created_at", "updated_at"}
+                              "created_at", "updated_at"}
 
 
 def test_chats_are_private_per_account(client: TestClient) -> None:
@@ -143,14 +143,12 @@ def test_update_changes_only_what_is_sent_and_leaves_the_time_alone(client: Test
     before = put(client).json()
 
     pinned = client.patch(f"/chats/{A}", json={"pinned": True, "title": " New  name "}).json()
-    brain = client.patch(f"/chats/{A}", json={"save_to_second_brain": True, "second_brain_scope": "personal"}).json()
 
     assert (pinned["pinned"], pinned["title"]) == (True, "New name")
-    assert (brain["save_to_second_brain"], brain["second_brain_scope"], brain["pinned"]) == (True, "personal", True)
-    assert brain["updated_at"] == before["updated_at"] and brain["message_count"] == 2
+    assert pinned["updated_at"] == before["updated_at"] and pinned["message_count"] == 2
 
 
-@pytest.mark.parametrize("body", [{}, {"title": ""}, {"second_brain_scope": "everyone"}, {"pinned": "maybe"}])
+@pytest.mark.parametrize("body", [{}, {"title": ""}, {"pinned": "maybe"}])
 def test_an_empty_or_bad_update_is_refused(client: TestClient, body: dict) -> None:
     put(client)
     assert client.patch(f"/chats/{A}", json=body).status_code == 422

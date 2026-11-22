@@ -91,7 +91,7 @@ def _encode(messages: list[ChatMessage]) -> None:
 
 def _details(doc: dict[str, Any]) -> dict[str, Any]:
     return {k: doc[k] for k in ("chat_id", "title", "agent_id", "message_count", "folder_id", "pinned",
-                                "save_to_second_brain", "second_brain_scope", "created_at", "updated_at")}
+                                "created_at", "updated_at")}
 
 
 def _snippet(text: str, start: int, length: int) -> dict[str, Any]:
@@ -170,7 +170,7 @@ class ChatStore:
             if len(await self._all(CHATS, owner)) + 1 > MAX_CHATS_PER_ACCOUNT:
                 raise ChatLimitError(f"At most {MAX_CHATS_PER_ACCOUNT} chats per account - delete some first")
             doc = {"key": key, "owner": owner, "chat_id": chat_id, "folder_id": None, "pinned": False,
-                   "save_to_second_brain": False, "second_brain_scope": "instance", "created_at": now}
+                   "created_at": now}
         if stack_tool_used:
             doc["stack_tool_used"] = True
         doc.update(title=title, agent_id=agent_id, message_count=len(messages), updated_at=now)
@@ -197,15 +197,14 @@ class ChatStore:
         return {**_details(doc), "messages": messages}
 
     async def update(self, owner: str, chat_id: str, changes: dict[str, Any]) -> dict[str, Any]:
-        """Title, folder (None takes it out; another account's folder is FolderNotFound), pin and the
-        second-brain settings. Filing a chat is not activity: updated_at stays."""
+        """Title, folder (None takes it out; another account's folder is FolderNotFound), and pin. Filing a chat is not activity: updated_at stays."""
         doc = await self._doc(owner, chat_id)
         if "folder_id" in changes:
             folder_id = changes["folder_id"]
             if folder_id is not None and await self._store.get(FOLDERS, _key(owner, folder_id)) is None:
                 raise FolderNotFound(folder_id)
             doc["folder_id"] = folder_id
-        for field in ("title", "pinned", "save_to_second_brain", "second_brain_scope"):
+        for field in ("title", "pinned"):
             if changes.get(field) is not None:
                 doc[field] = changes[field]
         await self._save(doc)

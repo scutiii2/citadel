@@ -24,7 +24,7 @@ def test_models_accept_the_documents_the_stores_write_and_keep_unknown_fields(cl
 
 
 def test_models_refuse_a_document_that_does_not_fit():
-    for bad in ({**CHAT, "owner": ""}, {**CHAT, "title": "x" * 121}, {**CHAT, "second_brain_scope": "all"},
+    for bad in ({**CHAT, "owner": ""}, {**CHAT, "title": "x" * 121},
                 {k: v for k, v in CHAT.items() if k != "chat_id"}):
         with pytest.raises(ValidationError):
             checked(ChatDoc, bad)
@@ -53,7 +53,7 @@ def test_catalog_names_are_unique_and_every_purge_route_exists(client):
     for collection in CATALOG:
         if collection.purge:
             answer = client.delete(collection.purge.format(uid="u-9"))
-            assert answer.status_code in (204, 502), (collection.name, answer.status_code)  # 502: brains, Armory not faked
+            assert answer.status_code == 204, (collection.name, answer.status_code)
 
 
 def test_every_collection_named_in_code_is_in_the_catalog():

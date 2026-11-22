@@ -21,7 +21,7 @@ import traceback
 import uuid
 from collections import deque
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import count
 from time import monotonic
 from typing import Any
@@ -30,7 +30,7 @@ from src.agents.directory import AgentDirectory, AgentEntry
 from src.agents.gateway import AgentCallError, AgentGateway, Caller
 from src.brain.compaction import CompactionError, StackCompactor
 from src.chats.store import ChatNotFound, ChatStore, message_time
-from src.turns import question_answers, second_brain, summarization
+from src.turns import question_answers, summarization
 from src.turns.logs import TurnLogs
 from src.turns.step_digest import is_private_memory_tool
 from src.usage.rows import stored_rows, usage_rows
@@ -89,9 +89,6 @@ class TurnOptions:
     caveman: bool = False
     # The agent gets no earlier messages (and nothing is summarized for it).
     independent: bool = False
-    save_to_second_brain: bool = False
-    second_brain_scope: str = "instance"
-    second_brain_notice: str = ""
     # Task checklist toggles: the agent may use update_plan, and updates it only on a status change.
     plan: bool = True
     plan_lean: bool = True
@@ -595,13 +592,6 @@ class TurnRegistry:
 
         if turn.options.private_skipped:
             await self._publish(turn, {"type": "notice", "notices": [dict(n) for n in turn.options.private_skipped]})
-        agent_question = question
-        if turn.options.second_brain_notice:
-            await self._publish(turn, {"type": "notice", "notices": [{"id": "brain", "label": "Auto-save", "error": turn.options.second_brain_notice}]})
-        if turn.options.save_to_second_brain:
-            agent_question = second_brain.save_request(
-                question, turn.chat_id, turn.request_id, str(messages[-1].get("at") or message_time()), turn.options.second_brain_scope,
-            )
         await self._compact_stack(turn)
         if turn.cancel_requested:
             await self._finish(turn, "⏹️ Cancelled.", status="cancelled", error=None, cancelled=True)
@@ -611,10 +601,8 @@ class TurnRegistry:
         try:
             result = await self._gateway.ask(
                 turn.agent.url,
-                Caller(turn.caller.username, turn.caller.email, turn.caller.uid,
-                       turn.options.second_brain_scope if turn.options.save_to_second_brain else "",
-                       chat_id=turn.chat_id),
-                question=agent_question,
+                replace(turn.caller, chat_id=turn.chat_id),
+                question=question,
                 history=summarization.history_for_agent(earlier),
                 request_id=turn.request_id,
                 caveman=turn.options.caveman,

@@ -81,8 +81,6 @@ class UpdateBody(BaseModel):
     title: str | None = Field(default=None, max_length=TITLE_MAX)
     folder_id: int | None = None
     pinned: bool | None = None
-    save_to_second_brain: bool | None = None
-    second_brain_scope: Literal["instance", "personal"] | None = None
 
     @field_validator("title")
     @classmethod
@@ -91,9 +89,8 @@ class UpdateBody(BaseModel):
 
     @model_validator(mode="after")
     def something_to_change(self) -> UpdateBody:
-        if (self.title is None and self.pinned is None and self.save_to_second_brain is None
-                and self.second_brain_scope is None and "folder_id" not in self.model_fields_set):
-            raise ValueError("send a title, a folder_id, pinned or save_to_second_brain")
+        if self.title is None and self.pinned is None and "folder_id" not in self.model_fields_set:
+            raise ValueError("send a title, a folder_id or pinned")
         return self
 
 

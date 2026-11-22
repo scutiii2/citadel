@@ -10,14 +10,14 @@ def test_armory_calls_use_current_catalog_address_on_each_request(tmp_path, monk
     seen = []
     def handler(request):
         seen.append(request.url.host)
-        return httpx.Response(200, json={})
+        return httpx.Response(200, json={"table_id": "table-id", "rows": 1, "columns": ["name"]})
     monkeypatch.setattr(httpx, "AsyncHTTPTransport", lambda **kw: httpx.MockTransport(handler))
     app = api.create_app(auth_stack["stronghold"], Settings(data_dir=tmp_path), store=db_gateway,
                          platform=platform, agent_gateway=agent)
     with TestClient(app, headers=identity()) as client:
         client.auth = service_auth()
         app.state.catalog._known["armory"] = "http://armory.test:29600"
-        assert client.delete("/brains/accounts/u-1").status_code == 204
+        assert client.post("/attachments/table", json={"filename": "sample.csv", "data": "bmFtZQpBZGEK"}).status_code == 200
         app.state.catalog._known["armory"] = "http://moved.test:29600"
-        assert client.delete("/brains/accounts/u-1").status_code == 204
+        assert client.post("/attachments/table", json={"filename": "sample.csv", "data": "bmFtZQpBZGEK"}).status_code == 200
     assert seen == ["armory.test", "moved.test"]

@@ -75,7 +75,6 @@ class Trusted(BaseModel):
     tools_execute: bool = False
     extension_ids: list[str] = Field(default_factory=list, max_length=500)
     # Whether auto-save may use each brain (permission, Obsidian write tool, brain connection).
-    second_brain_available: dict[str, bool] = Field(default_factory=dict)
 
 
 class TurnRequest(BaseModel):
@@ -83,8 +82,6 @@ class TurnRequest(BaseModel):
     caveman: bool = False
     independent: bool = False
     # None uses the chat's saved preference.
-    save_to_second_brain: bool | None = None
-    second_brain_scope: Literal["instance", "personal"] | None = None
     plan: bool = True
     plan_lean: bool = True
     exact_context: bool = False
@@ -237,22 +234,6 @@ async def start_turn(
         raise limit_reached(block)
     trusted = body.trusted
 
-    try:
-        saved = await chats.get(who.uid, chat_id)
-        saved_preference, saved_scope = saved["save_to_second_brain"], saved["second_brain_scope"]
-    except ChatNotFound:
-        saved_preference, saved_scope = False, "instance"
-    brain_scope = body.second_brain_scope or saved_scope
-    brain_notice = ""
-    auto_save = saved_preference if body.save_to_second_brain is None else body.save_to_second_brain
-    if auto_save:
-        permitted = bool(trusted.second_brain_available.get(brain_scope))
-        if body.save_to_second_brain is True and not permitted:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Activate Obsidian and enable its write tool before auto-saving")
-        if not permitted:
-            brain_notice = "Auto-save was disabled because the selected brain or publish permission is unavailable. No other destination was used."
-        auto_save = permitted
-
     question = {"role": "user", "content": body.question, "at": message_time()}
     try:
         try:
@@ -267,9 +248,6 @@ async def start_turn(
     except ChatLimitError as error:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, str(error)) from error
 
-    if body.save_to_second_brain is not None or body.second_brain_scope is not None or brain_notice:
-        chat = {**chat, **await chats.update(who.uid, chat_id, {"save_to_second_brain": auto_save, "second_brain_scope": brain_scope})}
-
     forced = trusted.forced_approval
     switched_off = await _switched_off_agents(request.app.state.store, directory, who)
     private_items, private_skipped = await _private_extensions(request, who)
@@ -278,9 +256,6 @@ async def start_turn(
             limits=await _own_limits(request, who),
             caveman=body.caveman,
             independent=body.independent,
-            save_to_second_brain=auto_save,
-            second_brain_scope=brain_scope,
-            second_brain_notice=brain_notice,
             plan=body.plan,
             plan_lean=body.plan_lean,
             exact_context=body.exact_context,

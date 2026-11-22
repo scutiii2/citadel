@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from src.brain.files_routes import BrainRoute, FileId, NewFile, full, row
 from src.brain.global_brain import GLOBAL_UID, GlobalBrain
 from src.brain.share_routes import Landing, ShareId, shares_of
-from src.brains.routes import need, permissions
+from src.brain.access import need, permissions
 from src.requester import Requester, current_requester
 from src.skills.routes import EditBody, SkillId, SkillOut, StatusBody, _out
 

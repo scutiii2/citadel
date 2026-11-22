@@ -43,7 +43,6 @@ class Caller:
     username: str
     email: str
     uid: str = ""
-    brain_scope: str = ""
     requester_token: str = field(default="", repr=False)
     chat_id: str = ""
 
@@ -92,10 +91,7 @@ class McpAgentGateway:
         self._keyring = keyring or service_auth.keyring
 
     def _headers(self, caller: Caller) -> dict[str, str]:
-        headers = requester_header(current_requester_token() or caller.requester_token)
-        if caller.brain_scope in {"instance", "personal"}:
-            headers["X-Brain-Destination"] = caller.brain_scope
-        return headers
+        return requester_header(current_requester_token() or caller.requester_token)
 
     async def _call(
         self,

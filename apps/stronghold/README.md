@@ -40,11 +40,9 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `GET /health` | Open. `{"status": "ok"}` |
 | `GET /whoami` | Echoes the requester. Portcullis exposes it as `GET /api/stronghold/whoami` |
 | `/stack/...` | Short-term memory for a single chat. Portcullis exposes this under `/api/chats/{id}/stack`. |
-| `DELETE /notes/accounts/{uid}` | Purges legacy private notes on account deletion until Plan 22b. |
 | `/tickets/...`, `/ticket-admin/...` | Support tickets, staff triage and the account's read receipts. Portcullis exposes them as `/api/tickets/...` (`tickets.create`) and `/api/admin/tickets...`, `/api/admin/ticket-groups...` (`tickets.manage`) |
 | `/triage/titles`, `/triage/ask` | Option titles from the `title-writer` agent and typed questions to the Triage Assistant (Laya); both count toward the token limits. Portcullis exposes them as `/api/triage/...` after checking `chat.use` |
 | `/attachments/...` | Text extraction (`text`), PDFs and tables stored by Armory (`pdf`, `table`), plus Stronghold calls for Scribe audio (`audio`, `dictate`, `dictate/partial`) or Reader documents (`document`). Portcullis forwards the JSON endpoints and dictation to Stronghold. Attachment previews retain the Armory content stream |
-| `/brains...` | Encrypted Personal Brain connections, browsing through Armory, Note publication and AI promotion suggestions. Portcullis exposes them as `/api/brains`. `POST /brains/resolve` authorizes shared access and resolves personal connections for Armory. Stronghold asks Portcullis for current account permissions and Armory for shared destination metadata |
 | `/chats...`, `/chat-folders...` | Chat history (details and transcript in separate documents), folders and search. Portcullis exposes them as `/api/chats` and `/api/chat-folders` and Stronghold runs the answers (`/turns`). Deleting chats revokes their share links first, inside the same call |
 | `/account-agents...` | The specialist agents an account switched off (Treasury, collection `account_agents`). Portcullis exposes it as `/api/account-agents` and reads the list when a chat turn starts |
 | `/user-extensions...` | An account's own MCP servers: stored with encrypted headers (collection `user_extensions`), probed through Legion for status and tools. Portcullis exposes them as `/api/user-extensions` (`chat.use` to read, `extensions.personal.manage` to change) and reads `GET /user-extensions/for-turn` when a chat turn starts |
@@ -52,11 +50,11 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/tuning/...` | An account's own response limits (`GET\|PUT\|DELETE /tuning/limits`, `GET /tuning/limits/own`), capped by Legion's tuning, which Stronghold reads from the entry agent. Portcullis exposes them as `/api/account/tuning` and reads `/tuning/limits/own` when a chat turn starts |
 | `/bard/...` | `POST /bard/speak` and `GET /bard/voices` call the configured Bard connection. Portcullis relays `/api/bard/audio/{id}` from Stronghold with Range |
 | `/shares...` | Share links to frozen chat snapshots (Treasury, collection `shared_chats`) and the public read of one (`GET /shares/public/{token}`, no requester). Portcullis exposes them as `/api/chats/{id}/shares`, `/api/shares...` and `/api/shared/{token}`. Deleting a chat revokes its links in the same call |
-| `/turns/...` | Chat turns, run here (one replica only: running turns live in memory). `POST /turns/{chat}` saves the question and starts the answer; `GET /turns/{chat}/events` is the SSE stream; `/approvals`, `/questions`, `/cancel`, `/summarize`, `/clear`, `/suggestion`; `GET /turns/running`; `DELETE /turns/{chat}` and `DELETE /turns` stop turns. The start body carries a `trusted` block (`forced_approval`, `tools_execute`, `extension_ids`, `second_brain_available`) that only Portcullis may fill. Error and chat-trace lines go to Portcullis's `POST /internal/logs`. Portcullis still runs its own copy until Plan 10.4 |
+| `/turns/...` | Chat turns, run here (one replica only: running turns live in memory). `POST /turns/{chat}` saves the question and starts the answer; `GET /turns/{chat}/events` is the SSE stream; `/approvals`, `/questions`, `/cancel`, `/summarize`, `/clear`, `/suggestion`; `GET /turns/running`; `DELETE /turns/{chat}` and `DELETE /turns` stop turns. The start body carries a `trusted` block (`forced_approval`, `tools_execute`, `extension_ids`) that only Portcullis may fill. Error and chat-trace lines go to Portcullis's `POST /internal/logs`. Portcullis still runs its own copy until Plan 10.4 |
 | `/usage/...` | Token usage and limits, kept in Treasury (collection `usage_records`). Portcullis exposes the reads as `/api/usage/...` and `/api/admin/usage/...`, and calls `POST /usage/check` and `POST /usage/records` around every agent call |
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
 | `/skills/...` | Learned skills kept in Stronghold’s Brain. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
-| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`notes`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `stack`, `brains`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
+| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `stack`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
 
 ## Support tickets
 
@@ -179,7 +177,7 @@ Treasury keeps any JSON, so `src/schema` is Stronghold's schema. `models.py` has
 
 ## Notes and memory
 
-The Brain replaces the private-notes and assistant-memory user routes. Existing notes stay in Treasury's `notes` collection. The notes purge route remains until Plan 22b, and Obsidian publishing still uses `src/notes/store.py`. Armory no longer has notes, memory or skills tools (Plan 22); its old `memory.db` and `skills.db` stay on disk, unused.
+The Brain replaces the private-notes and assistant-memory user routes. Existing notes stay in Treasury's `notes` collection. The legacy note store is retired. Armory no longer has notes, memory or skills tools (Plan 22); its old `memory.db` and `skills.db` stay on disk, unused.
 
 `src/agents/` is a copy of Portcullis's agent client. Change both until chats move here.
 

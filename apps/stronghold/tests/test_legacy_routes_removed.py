@@ -12,8 +12,9 @@ def test_the_old_routes_are_gone(client, method, path):
     assert client.request(method, path, json={}).status_code == 404
 
 
-def test_the_purge_routes_stay(client):
-    assert client.delete("/notes/accounts/u-9").status_code == 204
+def test_the_notes_and_brains_purge_routes_are_gone(client):
+    assert client.delete("/notes/accounts/u-9").status_code == 404
+    assert client.delete("/brains/accounts/u-9").status_code == 404
 
 
 def test_normalize_tags_lives_with_the_brain_records():

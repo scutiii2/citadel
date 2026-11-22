@@ -23,9 +23,6 @@ from src.attachments import routes as attachments_routes
 from src.usage import settings_routes as usage_settings_routes
 from src.attachments.services import ArmoryUploads
 from src.bard import routes as bard_routes
-from src.brains import instance_migration, routes as brains_routes
-from src.brains.connections import BrainError
-from src.brains.gateway import BrainGateway
 from src import ready
 from src.citadel_auth.ready import Probe
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, ServiceCatalog, CatalogTransport, logical_url, advertised_url, from_env
@@ -53,7 +50,6 @@ from src.mcp_tools.server import LegionOnlyMcp, build_server
 from src.document_store import DbGatewayClient, DbGatewayError, DbGatewayUnavailable, DocumentStore
 from src import log_privacy
 from src.keys import load_keys
-from src.notes import routes as notes_routes
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
 from src.schema import migrations
@@ -106,7 +102,6 @@ def create_app(
         await keyring.ensure_identity()
         catalog = ServiceCatalog(keyring, settings.treasury_url, cache_path=settings.data_dir / "catalog_cache.json")
         app.state.keyring = keyring
-        app.state.brain_migration_lock = asyncio.Lock()
         app.state.catalog = catalog
         app.state.readiness = Probe("stronghold")
         if store is None:
@@ -136,7 +131,6 @@ def create_app(
         )
         app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
         armory_client = armory or http_catalog("armory")
-        app.state.brain_gateway = BrainGateway(armory_client, keyring)
         app.state.ticket_unread = TicketUnread(app.state.store)
         app.state.limits = LimitsStore(app.state.store)
         app.state.legion = LegionTuning(legion or http(""), app.state.agents, keyring)
@@ -227,7 +221,6 @@ def create_app(
     app.include_router(attachments_routes.router)
     app.include_router(bard_routes.router)
     app.include_router(tool_services_routes.router)
-    app.include_router(brains_routes.router)
     app.include_router(stack_routes.router)
     app.include_router(brain_files_routes.router)
     app.include_router(brain_global_routes.router)
@@ -235,10 +228,8 @@ def create_app(
     app.include_router(brain_share_routes.blocks_router)
     app.include_router(brain_proposal_routes.router)
     app.include_router(brain_settings_routes.router)
-    app.include_router(instance_migration.router)
     app.include_router(chats_routes.router)
     app.include_router(chats_routes.folder_router)
-    app.include_router(notes_routes.router)
     app.include_router(skills_routes.router)
     app.include_router(templates_routes.router)
     app.include_router(usage_routes.router)
@@ -250,10 +241,6 @@ def create_app(
     app.include_router(triage_routes.router)
     app.include_router(turns_routes.router)
     app.include_router(tuning_routes.router)
-
-    @app.exception_handler(BrainError)
-    async def brain_error(_request: Request, error: BrainError):
-        return JSONResponse({"detail": str(error)}, status_code=error.status)
 
     @app.exception_handler(TicketError)
     async def ticket_refused(_request: Request, error: TicketError):

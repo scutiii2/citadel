@@ -78,7 +78,7 @@ class FakePlatform:
         self.actions: list[tuple[str, str, str]] = []
         self.logs: list[dict] = []
         # What each account may do; `granted[uid] = None` is an inactive or unverified account.
-        self.default_permissions = {"chat.use", "settings.manage", "brain.instance.publish", "tools.execute"}
+        self.default_permissions = {"chat.use", "settings.manage", "tools.execute"}
         self.granted: dict[str, set[str] | None] = {}
         self.usernames = {"bob": "u-2", "cyd": "u-3"}
 
