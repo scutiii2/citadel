@@ -28,6 +28,7 @@ from pathlib import Path
 DEPLOY_PATHS = [
     "docker-compose.yml",
     "docker-compose.zima.yml",
+    "docker-compose.gateway-admin.yml",
     ".env.example",
     "VERSION",
     "docker",
