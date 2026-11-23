@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from "vue";
 import type { AdminAccount, PermissionInfo, Role, RoleChanges } from "../../api/AdminClient";
 import { useAuthStore } from "../../stores/auth";
 import ToggleSwitch from "../ToggleSwitch.vue";
+import PanelHelp from "./PanelHelp.vue";
 import "./admin.css";
 
 /** One role in the record drawer: name and description, the grouped permission switches, the
@@ -90,16 +91,18 @@ const groups = computed(() => {
       <label>Name<input v-model="form.name" type="text" maxlength="80" required :disabled="busy || role.is_protected" /></label>
       <label>Description<input v-model="form.description" type="text" maxlength="255" :disabled="busy" /></label>
     </form>
-    <header v-else>
-      <b class="name">{{ role.name }}</b>
-      <span v-if="role.is_protected" class="badge">protected</span>
-      <span class="muted count">{{ role.account_count }} {{ role.account_count === 1 ? "account" : "accounts" }}</span>
+    <header v-else class="summary">
+      <p class="lede">{{ role.description || "No description." }}</p>
+      <ul class="facts" aria-label="Role facts">
+        <li>{{ role.account_count }} {{ role.account_count === 1 ? "user" : "users" }}</li>
+        <li>{{ role.is_protected ? "All" : draftPermissions.length }} {{ role.is_protected || draftPermissions.length !== 1 ? "permissions" : "permission" }}</li>
+        <li v-if="role.is_protected" class="protected"><span class="badge">protected</span><PanelHelp title="Protected role"><p>This role always holds every permission and can't be renamed or deleted.</p></PanelHelp></li>
+      </ul>
     </header>
-    <p v-if="!editing && role.description" class="muted description">{{ role.description }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="role.is_protected" class="muted note">This role always holds every permission and can't be renamed or deleted.</p>
-    <p v-else-if="!canManage" class="muted note">Read-only. Editing requires role management access and every permission held by this role.</p>
-    <p v-if="!role.is_protected && editing" class="impact">Changes apply to {{ role.account_count }} {{ role.account_count === 1 ? "account" : "accounts" }} when you save.</p>
+    <p v-if="role.is_protected && editing" class="muted note">This role always holds every permission and can't be renamed or deleted.</p>
+    <p v-else-if="!role.is_protected && !canManage" class="muted note">Read-only. Editing requires role management access and every permission held by this role.</p>
+    <p v-if="!role.is_protected && editing" class="impact">Changes apply to {{ role.account_count }} {{ role.account_count === 1 ? "user" : "users" }} when you save.</p>
     <p class="apply muted" role="status">
       <span v-if="editing">Changes are a draft until you save.</span>
       <span v-if="busy">Saving…</span>
@@ -145,9 +148,11 @@ const groups = computed(() => {
 .role-body { min-width: 0; padding-top: 4px; }
 .row-form { display: grid; gap: 10px; }
 .row-form label { display: grid; gap: 4px; font-size: 0.85em; }
-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
-.name { font-size: 1.05em; overflow-wrap: anywhere; }
-.count { margin-left: auto; font-size: 0.85em; }
+.summary { display: grid; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.lede { margin: 0; overflow-wrap: anywhere; }
+.facts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.facts li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--surface); color: var(--muted); font-size: 0.8em; }
+.facts li.protected { padding: 0 0 0 2px; border: 0; background: none; }
 .description { margin: 2px 0 0; font-size: 0.85em; }
 .note { margin: 8px 0 0; font-size: 0.85em; }
 .apply { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 0.85em; }
