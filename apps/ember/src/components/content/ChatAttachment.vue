@@ -67,6 +67,6 @@ button.attachment-image {
 .unavailable { color: var(--muted); font-size: 0.9em; }
 .attachment { margin-top: 6px; font-size: 0.85em; white-space: normal; }
 .attachment summary { cursor: pointer; color: var(--muted); overflow-wrap: anywhere; }
-.attachment pre { margin: 6px 0 0; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code-bg); border-radius: var(--radius-md); max-height: 240px; overflow-y: auto; }
+.attachment pre { margin: 6px 0 0; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code-bg); border-radius: var(--radius-md); max-height: 240px; overflow-y: auto; scrollbar-gutter: stable; }
 button.attachment-image:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>

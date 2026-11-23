@@ -181,7 +181,7 @@ function askedLines(step: ToolStep): string[] | null {
   max-height: 280px;
   margin: 0 0 6px;
   padding: 8px;
-  overflow: auto;
+  overflow: auto; scrollbar-gutter: stable;
   border-radius: var(--radius-sm);
   white-space: pre-wrap;
   font-family: var(--mono);

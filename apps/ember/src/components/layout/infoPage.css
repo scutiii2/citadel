@@ -8,7 +8,7 @@
 .info-page {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
 }
 
 
@@ -97,7 +97,7 @@
   max-height: 320px;
   margin: 6px 0 0;
   padding: 8px;
-  overflow: auto;
+  overflow: auto; scrollbar-gutter: stable;
   border-radius: var(--radius-md);
   font-family: var(--mono);
   font-size: 0.85em;

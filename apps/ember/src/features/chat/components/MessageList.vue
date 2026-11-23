@@ -448,7 +448,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
 .scroller {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
 }
 .new-pill {
   position: absolute;
@@ -698,7 +698,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
   max-height: 360px;
   margin: 8px 0 0;
   padding: 10px;
-  overflow: auto;
+  overflow: auto; scrollbar-gutter: stable;
   border-radius: var(--radius-md);
   white-space: pre-wrap;
   font-family: var(--mono);
@@ -737,7 +737,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
   max-height: 220px;
   margin: 6px 0 0;
   padding: 8px;
-  overflow: auto;
+  overflow: auto; scrollbar-gutter: stable;
   border-radius: calc(var(--radius-lg) - 10px);
   white-space: pre-wrap;
   overflow-wrap: anywhere;

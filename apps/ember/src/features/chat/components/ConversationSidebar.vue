@@ -576,7 +576,7 @@ watch(
   width: 260px;
   height: 100%;
   padding: 12px 8px;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
   border-right: 1px solid var(--border);
   background: var(--surface);
 }

@@ -97,7 +97,7 @@ onBeforeUnmount(() => {
 .shared {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
 }
 .column {
 

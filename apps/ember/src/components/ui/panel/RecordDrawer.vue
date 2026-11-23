@@ -100,7 +100,7 @@ dialog.record-drawer.expanded:modal { width: 90vw; }
 .record-drawer > :deep(header .close:hover) { background: var(--surface); color: var(--text); }
 .drawer-tools { position: absolute; inset: 12px 60px auto auto; display: flex; }
 .drawer-tools .admin-icon { width: 44px; height: 44px; }
-.drawer-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 24px 24px; }
+.drawer-body { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding: 0 24px 24px; }
 .drawer-footer { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border); padding: 12px 24px calc(12px + env(safe-area-inset-bottom, 0px)); }
 @media (max-width: 767px) {
   dialog.record-drawer.expanded:modal { width: 100vw; max-width: 100vw; }

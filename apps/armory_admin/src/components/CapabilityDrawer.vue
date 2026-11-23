@@ -160,7 +160,7 @@ h4, h5, p { margin: 0; }
 .tool-search svg { width: 16px; height: 16px; color: var(--muted); flex-shrink: 0; }
 .tools-modal .tool-search input[type="search"] { width: 100%; min-width: 0; padding: 0; border: none; background: transparent; border-radius: 0; font-size: 0.85em; }
 .browser-note { font-size: 0.85em; color: var(--muted); padding: 10px 4px; }
-.tool-list { max-height: 40dvh; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; }
+.tool-list { max-height: 40dvh; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
 .tool-list button { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 12px; border: 1px solid transparent; border-radius: var(--radius-lg); background: transparent; text-align: left; transition: background 0.15s ease, border-color 0.15s ease; }
 .tool-list button:hover { background: var(--surface); }
 .tool-list button[aria-pressed=true] { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
@@ -182,7 +182,7 @@ h4, h5, p { margin: 0; }
 .result { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
 .result strong { font-size: 0.8em; font-weight: 500; color: var(--muted); }
 .result.failed { border-color: var(--danger); }
-.result pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 280px; overflow-y: auto; margin: 8px 0 0; font: 0.85em/1.55 var(--mono); }
+.result pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 280px; overflow-y: auto; scrollbar-gutter: stable; margin: 8px 0 0; font: 0.85em/1.55 var(--mono); }
 .output-placeholder { font-size: 0.85em; color: var(--muted); padding: 18px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-lg); }
 .empty-selection { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px 32px; text-align: center; }
 .empty-selection h4 { font-size: 1em; font-weight: 600; }

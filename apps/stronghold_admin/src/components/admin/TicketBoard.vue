@@ -114,7 +114,7 @@ svg { flex-shrink: 0; }
 .resolved .column-head svg { color: var(--success); }
 .column-count { min-width: 22px; padding: 0 5px; border: 1px solid var(--border); border-radius: var(--radius-full); color: var(--muted); background: var(--bg); text-align: center; font-size: 0.75em; }
 .column-description { margin: 0; padding: 0 14px 13px; color: var(--muted); font-size: 0.75em; }
-.column-cards { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; min-height: 0; padding: 0 10px 10px; scrollbar-width: thin; }
+.column-cards { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; scrollbar-gutter: stable; flex: 1; min-height: 0; padding: 0 10px 10px; scrollbar-width: thin; }
 button.ticket-card { display: flex; flex-direction: column; flex-shrink: 0; gap: 12px; width: 100%; min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); color: var(--text); background: var(--bg); text-align: left; font: inherit; cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease; }
 button.ticket-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }

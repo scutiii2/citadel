@@ -126,7 +126,7 @@ async function confirmAction(): Promise<void> {
 <style scoped src="./components/mediaDownloader.css"></style>
 <style scoped>
 .media-workspace { --workspace-columns: minmax(0, 1fr) 300px; }
-.main-panel { padding: 22px 24px; min-width: 0; min-height: 0; overflow-y: auto; }
+.main-panel { padding: 22px 24px; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
 .desktop-tabs { margin-bottom: 22px; }
 .mobile-tabs { display: none; }
 .download-panel { min-width: 0; }
@@ -138,7 +138,7 @@ async function confirmAction(): Promise<void> {
 .section-heading h3 { margin: 0; }
 .list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
 .file-list { list-style: none; margin: 0; padding: 0; }
-.files-panel { border-left: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 45%, var(--bg)); padding: 22px 18px; min-width: 0; min-height: 0; overflow-y: auto; }
+.files-panel { border-left: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 45%, var(--bg)); padding: 22px 18px; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
 .files-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .files-heading h3 { margin: 0; }
 .files-heading h3 span { font-size: .8em; font-weight: 400; }

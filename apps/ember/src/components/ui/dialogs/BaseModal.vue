@@ -55,7 +55,7 @@ function onClick(event: MouseEvent): void {
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 64px);
   padding: 18px 20px 20px;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   color: var(--text);

@@ -8,6 +8,7 @@ import PanelHelp from "./admin/PanelHelp.vue";
 import RecordDrawer from "./admin/RecordDrawer.vue";
 import ConnectionTestCells from "./ConnectionTestCells.vue";
 import FieldLabel from "./FieldLabel.vue";
+import FormTabs from "./admin/FormTabs.vue";
 import PasswordInput from "./PasswordInput.vue";
 import { errorMessage } from "../utils/errors";
 
@@ -44,7 +45,7 @@ const extra = ref<Record<string, unknown>>({});
 const preset = ref("");
 const testing = ref(false);
 const draftTest = ref<{ ok: boolean; code: string; message: string } | null>(null);
-const tab = ref<"connection" | "models">("connection");
+const tab = ref("connection");
 
 const chat = computed(() => props.kind === "conversation");
 const types = computed(() => Object.keys(chat.value ? list.value?.form?.providers ?? {} : list.value?.kinds ?? {}));
@@ -98,7 +99,10 @@ const modelsUrl = computed(() => {
 });
 // A new chat gateway gets its models from a preset, so the Models tab waits for one.
 const modelsLocked = computed(() => needsModel.value && creating.value && !preset.value);
-const tabItems = [{ id: "connection", label: "Connection" }, { id: "models", label: "Models" }] as const;
+const tabItems = computed(() => [
+  { id: "connection", label: "Connection" },
+  { id: "models", label: "Models", disabled: modelsLocked.value, title: modelsLocked.value ? "Choose a preset on the Connection tab first" : undefined },
+]);
 const typeKey = computed(() => (chat.value ? "provider" : "kind"));
 
 const rows = computed(() => (list.value?.gateways ?? []).filter((row) => {
@@ -340,13 +344,7 @@ onMounted(load);
     <RecordDrawer ref="drawer" :open="open" :title="drawerTitle" editable :editing="editing" :busy="saving" :fallback-focus="() => searchField?.focus()"
       @edit="edit" @close="close" @discard="discard" @save="save">
       <form v-if="editing" :id="`${kind}-editor`" class="admin-editor" novalidate @submit.prevent="submit">
-        <div v-if="needsModel" class="tabs" role="tablist" :aria-label="`${title} settings`">
-          <button v-for="item in tabItems" :key="item.id" type="button" role="tab"
-            :id="`${kind}-tab-${item.id}`" :aria-selected="tab === item.id" :aria-controls="`${kind}-panel-${item.id}`" :tabindex="tab === item.id ? 0 : -1"
-            :data-test="`tab-${item.id}`" 
-            :disabled="item.id === 'models' && modelsLocked" :title="item.id === 'models' && modelsLocked ? 'Choose a preset on the Connection tab first' : undefined"
-            @click="tab = item.id" @keydown.right.prevent="!modelsLocked && (tab = 'models')" @keydown.left.prevent="tab = 'connection'">{{ item.label }}</button>
-        </div>
+        <FormTabs v-if="needsModel" v-model="tab" :items="tabItems" :prefix="kind" :label="`${title} settings`" />
         <section v-show="!needsModel || tab === 'connection'" :id="`${kind}-panel-connection`" class="pane" role="tabpanel" :aria-labelledby="`${kind}-tab-connection`">
           <template v-if="creating && presets.length">
             <FieldLabel :for="`${kind}-preset`" title="Preset" :help="['Fills the connection and the models for a known provider.', 'Choose one first: the Models tab stays locked until you do. Change any field afterwards if yours differs.']">Preset</FieldLabel>
@@ -445,10 +443,6 @@ onMounted(load);
 <style scoped>
 .admin-panel-card { margin-bottom: 14px; }
 .kind { margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
-.tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); }
-.tabs button { flex: 1; min-height: 36px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
-.tabs button[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
-.tabs button:hover:not([aria-selected="true"]) { color: var(--text); }
 .pane { display: grid; gap: 6px; min-width: 0; }
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .pair > div { display: grid; gap: 6px; min-width: 0; }

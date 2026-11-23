@@ -122,7 +122,7 @@ function formatPercent(percent: number): string {
   box-sizing: border-box;
   width: min(320px, calc(100vw - 32px));
   max-height: 65vh;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

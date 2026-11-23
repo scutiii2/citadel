@@ -315,7 +315,7 @@ onBeforeUnmount(() => {
 .type-picker { grid-area: type; padding: 22px 24px 0; min-width: 0; }
 .work-scroll { display: contents; }
 .mobile-type { display: none; }
-.result-panel { grid-area: result; padding: 30px 24px 24px; min-width: 0; min-height: 0; overflow-y: auto; }
+.result-panel { grid-area: result; padding: 30px 24px 24px; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
 h3 { margin: 0; font-size: 1em; font-weight: 600; }
 .intro { margin: 8px 0 24px; font-size: .85em; color: var(--muted); }
 .value-panel { padding: 22px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
@@ -335,7 +335,7 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 .empty-result { padding: 24px 20px; border: 1px dashed var(--border); border-radius: var(--radius-lg); color: var(--muted); font-size: .85em; }
 .empty-result p { margin: 0; }
 .empty-result p + p { margin-top: 12px; }
-.options-panel { grid-area: options; min-width: 0; min-height: 0; overflow-y: auto; border-left: 1px solid var(--border); padding: 22px 18px; background: color-mix(in srgb, var(--surface) 45%, var(--bg)); }
+.options-panel { grid-area: options; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; border-left: 1px solid var(--border); padding: 22px 18px; background: color-mix(in srgb, var(--surface) 45%, var(--bg)); }
 .options-description { color: var(--muted); font-size: .75em; margin: 8px 0 24px; }
 .options-disclosure { display: none; }
 .options-body { display: grid; gap: 16px; }
@@ -406,7 +406,7 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
   .desktop-types { display: none; }
   .mobile-type { display: grid; gap: 7px; color: var(--muted); font-size: .8em; }
   .mobile-type select { color: var(--text); min-height: 44px; }
-  .work-scroll { display: block; flex: 1; min-height: 0; overflow-y: auto; padding-top: 24px; }
+  .work-scroll { display: block; flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding-top: 24px; }
   .result-panel { padding: 0; overflow: visible; }
   .intro { margin-bottom: 18px; }
   .value-panel { padding: 18px 16px; }

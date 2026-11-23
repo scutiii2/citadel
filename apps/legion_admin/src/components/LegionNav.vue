@@ -41,7 +41,7 @@ a[aria-current="page"] { box-shadow: inset 2px 0 var(--accent); }
 svg { flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .initial { width: 18px; text-align: center; font-weight: 600; }
 @media (max-width: 767px) {
-  .sidebar.expanded { width: 100%; max-height: 45dvh; overflow: auto; border-inline-end: 0; border-bottom: 1px solid var(--border); }
+  .sidebar.expanded { width: 100%; max-height: 45dvh; overflow: auto; scrollbar-gutter: stable; border-inline-end: 0; border-bottom: 1px solid var(--border); }
   .sidebar a { min-height: 44px; }
 }
 </style>

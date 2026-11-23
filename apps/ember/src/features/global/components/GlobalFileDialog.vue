@@ -162,7 +162,7 @@ function remove(): void {
 .file-dialog .error { color: var(--text); }
 p, h4 { margin: 0; overflow-wrap: anywhere; }
 .meta, .label { font-size: .85em; color: var(--muted); }
-.text { margin: 0; max-height: 40dvh; overflow: auto; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--code-bg); font: inherit; font-size: .9em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.text { margin: 0; max-height: 40dvh; overflow: auto; scrollbar-gutter: stable; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--code-bg); font: inherit; font-size: .9em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field :is(input, textarea) { min-height: 44px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); font: inherit; }
 .problem { display: flex; align-items: flex-start; gap: 8px; }

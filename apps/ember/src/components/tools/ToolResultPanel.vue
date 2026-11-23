@@ -88,7 +88,7 @@ function copy(): Promise<void> {
 .json {
   margin: 0;
   max-height: 420px;
-  overflow: auto;
+  overflow: auto; scrollbar-gutter: stable;
   font-family: var(--mono);
   font-size: 0.85em;
 }

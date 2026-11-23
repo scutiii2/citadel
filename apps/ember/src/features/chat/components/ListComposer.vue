@@ -120,7 +120,7 @@ onBeforeUnmount(() => editor.value?.destroy());
 :deep(.list-composer) {
   width: 100%;
   max-height: calc(1.55em * 5);
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
   overflow-wrap: anywhere;
   padding: 6px 0;
   outline: none;

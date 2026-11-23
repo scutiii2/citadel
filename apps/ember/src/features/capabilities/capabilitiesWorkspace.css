@@ -15,7 +15,7 @@
 .list-heading { flex-shrink: 0; margin: 0 8px 10px; }
 .list-heading h3 { margin: 0; font-size: .87em; font-weight: 600; }
 .list-heading > span { color: var(--muted); font-size: .73em; white-space: nowrap; }
-.catalog { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.catalog { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
 .catalog-row { display: flex; align-items: center; gap: 10px; min-height: 67px; padding: 0 8px; border: 1px solid transparent; border-bottom-color: var(--border); }
 .catalog-row.active { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--accent) 5%, var(--bg)); box-shadow: inset 3px 0 var(--accent); }
 .item-link { display: flex; align-items: center; flex: 1; justify-content: flex-start; gap: 12px; min-width: 0; min-height: 64px; padding: 9px 0; border: 0; border-radius: var(--radius-md); color: var(--text); background: transparent; font: inherit; text-align: left; cursor: pointer; }
@@ -34,7 +34,7 @@
 .row-toggle :deep(.track) { --w: 36px; --h: 22px; }
 .offline .row-toggle :deep(input:checked + .track) { background: var(--muted); }
 .detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-left: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 40%, var(--bg)); }
-.detail-scroll { flex: 1; min-height: 0; padding: 22px 20px; overflow-y: auto; overscroll-behavior: contain; }
+.detail-scroll { flex: 1; min-height: 0; padding: 22px 20px; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
 .back.secondary { display: none; }
 .detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .detail-title { min-width: 0; margin: 0; font-size: 1.05em; font-weight: 600; overflow-wrap: anywhere; }

@@ -126,7 +126,7 @@ defineExpose({ clearDraft: (): void => { draft.value = ""; } });
   box-sizing: border-box;
   width: min(360px, calc(100vw - 32px));
   max-height: 70vh;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

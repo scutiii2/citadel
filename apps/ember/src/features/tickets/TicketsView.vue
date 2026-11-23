@@ -386,7 +386,7 @@ async function reopenTicket(): Promise<void> {
 .status-filters :deep(button.segment) { padding: 6px 12px; border: 1px solid var(--border); font-size: .75em; }
 .status-filters :deep(button.segment.active) { border-color: var(--accent); }
 .ticket-workspace { --workspace-columns: 300px minmax(0, 1fr); }
-.ticket-browser { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; padding: 18px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 45%, var(--bg)); }
+.ticket-browser { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding: 18px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 45%, var(--bg)); }
 .list { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .ticket-state { padding: 0; margin: 8px 10px; }
 .ticket-row { gap: 8px; padding: 15px 12px; }
@@ -403,8 +403,8 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 .detail-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 24px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: .75em; flex-shrink: 0; }
 .detail-head > .status { font-size: 1em; margin-left: auto; }
 .close { border: 0; padding: 2px 6px; border-radius: var(--radius-md); background: transparent; color: var(--muted); font: inherit; font-size: 1.8em; cursor: pointer; }
-.detail-error { flex-shrink: 0; max-height: 25%; overflow: auto; margin: 12px 20px 0; font-size: .85em; overflow-wrap: anywhere; }
-.conversation { flex: 1; min-height: 0; overflow: auto; padding: 24px 30px; overflow-wrap: anywhere; }
+.detail-error { flex-shrink: 0; max-height: 25%; overflow: auto; scrollbar-gutter: stable; margin: 12px 20px 0; font-size: .85em; overflow-wrap: anywhere; }
+.conversation { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; padding: 24px 30px; overflow-wrap: anywhere; }
 .detail-title { margin: 0 0 10px; font-size: 1.5em; font-weight: 600; line-height: 1.4; letter-spacing: -.02em; }
 .filed { margin: 0 0 20px; font-size: .75em; }
 .timeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; padding: 0; margin: 0 0 24px; list-style: none; font-size: .75em; }
@@ -433,7 +433,7 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 .reply .actions { justify-content: space-between; }
 .reply .manage-ticket { border-color: transparent; padding-left: 0; }
 .send-reply { min-width: 76px; min-height: 40px; }
-.notice { max-height: 20%; overflow: auto; }
+.notice { max-height: 20%; overflow: auto; scrollbar-gutter: stable; }
 .tickets button:focus-visible, .tickets input:focus-visible, .tickets select:focus-visible, .tickets textarea:focus-visible, .conversation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: ticket-spin .7s linear infinite; }
 @keyframes ticket-spin { to { transform: rotate(360deg); } }

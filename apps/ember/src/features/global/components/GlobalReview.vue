@@ -145,7 +145,7 @@ h4 { font-size: .85em; color: var(--muted); }
 .meta { font-size: .9em; color: var(--muted); }
 .untrusted { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: .85em; }
 .untrusted .line-icon { flex-shrink: 0; margin-top: 2px; color: var(--warning); }
-.text { margin: 0; max-height: 40dvh; overflow: auto; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--code-bg); font: inherit; font-size: .9em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.text { margin: 0; max-height: 40dvh; overflow: auto; scrollbar-gutter: stable; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--code-bg); font: inherit; font-size: .9em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .label { font-size: .85em; color: var(--muted); }
 .field input { padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); font: inherit; }

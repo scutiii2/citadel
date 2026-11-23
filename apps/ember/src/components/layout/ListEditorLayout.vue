@@ -53,11 +53,11 @@ defineEmits<{ back: []; submit: [] }>();
 </template>
 
 <style scoped>
-.list-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; background: color-mix(in srgb, var(--surface) 50%, var(--bg)); border-right: 1px solid var(--border); padding: 20px 12px; }
+.list-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; background: color-mix(in srgb, var(--surface) 50%, var(--bg)); border-right: 1px solid var(--border); padding: 20px 12px; }
 .editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
 .editor-head { display: flex; align-items: center; gap: 16px; padding: 16px 28px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .editor-scroll { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-wrap: anywhere; scroll-padding: 20px; }
-.editor-scroll:not(.pane-scroll) { overflow-y: auto; }
+.editor-scroll:not(.pane-scroll) { overflow-y: auto; scrollbar-gutter: stable; }
 .actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 28px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg); }
 .actions .primary { min-width: 76px; min-height: 40px; }
 .list-editor :is(button, summary, input, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

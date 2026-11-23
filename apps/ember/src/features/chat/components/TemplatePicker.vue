@@ -160,7 +160,7 @@ useOutsideClose(root, open, close);
   max-height: 260px;
   margin: 6px 0 0;
   padding: 0;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
   list-style: none;
 }
 .item {

@@ -118,7 +118,7 @@ const tokensText = (day: HeatDay) => `${day.tokens.toLocaleString()} ${day.token
   font-size: 0.75em;
   color: var(--muted);
 }
-.daily-table { max-height: 320px; overflow: auto; max-width: 100%; }
+.daily-table { max-height: 320px; overflow: auto; scrollbar-gutter: stable; max-width: 100%; }
 .daily-table th, .daily-table td { padding: 6px 12px; text-align: left; }
 .daily-values summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 </style>

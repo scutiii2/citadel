@@ -504,7 +504,7 @@ legend { padding: 0 6px; color: var(--muted); font-size: 0.85em; }
 .tier-preview .where { color: var(--muted); text-decoration: none; }
 .switches { display: grid; gap: 8px; }
 .preview-bar { align-items: center; justify-content: space-between; }
-.prompt-text { max-height: 280px; margin: 0; padding: 10px 12px; overflow: auto; border-radius: var(--radius-md); background: var(--code-bg); color: var(--text); font-family: var(--mono); font-size: 0.8em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt-text { max-height: 280px; margin: 0; padding: 10px 12px; overflow: auto; scrollbar-gutter: stable; border-radius: var(--radius-md); background: var(--code-bg); color: var(--text); font-family: var(--mono); font-size: 0.8em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .unsaved { margin-right: auto; color: var(--muted); font-size: 0.8em; }
 .unsaved::first-letter { color: var(--accent); }
 .primary { padding: 6px 16px; border: none; border-radius: var(--radius-md); cursor: pointer; font: inherit; font-weight: 600; color: var(--accent-contrast); background: var(--accent); }

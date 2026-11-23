@@ -707,7 +707,7 @@ button.dictation.ending { color: var(--danger); }
   min-height: 0;
   margin: 0;
   padding: 4px;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
   list-style: none;
 }
 .suggestions li {
@@ -939,7 +939,7 @@ textarea {
   .extra-tools :deep(.popover) {
     left: 0;
     max-height: min(400px, calc(100dvh - var(--rail-height) - 220px));
-    overflow-y: auto;
+    overflow-y: auto; scrollbar-gutter: stable;
   }
   .round { width: 44px; height: 44px; }
   .attach { width: 44px; min-height: 44px; border-radius: var(--radius-md); }
@@ -956,7 +956,7 @@ textarea {
     width: auto;
     max-width: none;
     max-height: min(400px, calc(100dvh - var(--rail-height) - 160px));
-    overflow-y: auto;
+    overflow-y: auto; scrollbar-gutter: stable;
     overscroll-behavior: contain;
   }
   .attach:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

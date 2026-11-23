@@ -156,7 +156,7 @@
 
 .table-wrap {
   max-height: 260px;
-  overflow: auto;
+  overflow: auto; scrollbar-gutter: stable;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
