@@ -335,6 +335,7 @@ function previewPrompt(): void {
             <small>Leave blank to use each model's own thresholds (Laya per model, Jev 0.9). Or enter a number above 0 and at most 1.</small>
           </label>
         </div>
+        <p v-if="!isDecision && !gateways.length" class="muted" data-test="no-gateway">No {{ provider }} gateway is set up yet. Add one under Connections, then pick it here.</p>
         <AgentGatewayList v-if="!isDecision" v-model="gatewayRows" :gateways="gateways" :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" />
         <template v-else>
           <label class="field"><span>Gateway</span><select v-model="gateway" data-test="gateway" disabled><option value="">Local</option><option value="local">Local</option></select></label>

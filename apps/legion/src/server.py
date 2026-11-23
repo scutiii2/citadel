@@ -351,9 +351,9 @@ async def _json_object(request: Request) -> dict[str, Any] | None:
 
 @mcp.custom_route("/agents/gateways", methods=["GET"])
 async def agent_gateways(_request: Request) -> JSONResponse:
-    """Providers and their gateways, for the admin UI's pickers."""
+    """Providers and their set-up gateways, for the admin UI's pickers."""
     try:
-        return JSONResponse({"providers": await asyncio.to_thread(agent_store.gateway_catalog)})
+        return JSONResponse({"providers": await asyncio.to_thread(agent_store.gateway_catalog, True)})
     except agent_store.AgentStoreError as error:
         return _store_error(error)
 

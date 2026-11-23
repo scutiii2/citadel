@@ -211,3 +211,30 @@ def test_interrupted_migration_retries_without_overwriting_completed_files(gatew
     monkeypatch.setattr(llm_config, "_publish_missing", publish)
     assert llm_config.gateway("anthropic", "claude")["model"] == "edited"
     assert llm_config.gateway("anthropic", "custom")["model"] == "second"
+
+
+def test_a_saved_gateway_overrides_tier_models_and_descriptions():
+    from src import gateway
+
+    base = llm_config.tiers("anthropic", "claude")
+    assert base["standard"].use_for == "most tasks"
+    gateway.chat_store().put("claude", {"provider": "anthropic", "model": "m", "api_key": "k",
+                                        "models": {"standard": "my-sonnet"},
+                                        "descriptions": {"standard": "day-to-day work", "heavy": "audits"}})
+    tiers = llm_config.tiers("anthropic", "claude")
+    assert (tiers["standard"].id, tiers["standard"].use_for) == ("my-sonnet", "day-to-day work")
+    assert (tiers["heavy"].id, tiers["heavy"].use_for) == (base["heavy"].id, "audits")
+    assert tiers["light"] == base["light"]
+
+
+def test_a_saved_gateway_without_a_template_builds_its_tiers_from_the_page():
+    from src import gateway
+
+    with pytest.raises(KeyError):
+        llm_config.tiers("openai", "mine")
+    gateway.chat_store().put("mine", {"provider": "openai", "base_url": "http://host.docker.internal:1/v1", "model": "x",
+                                      "models": {"light": "small"}, "descriptions": {"light": "quick things"}})
+    assert llm_config.tiers("openai", "mine") == {"light": llm_config.TierModel("small", "quick things")}
+    gateway.chat_store().put("mine2", {"provider": "openai", "base_url": "http://host.docker.internal:1/v1", "model": "x",
+                                       "models": {"heavy": "big"}})
+    assert llm_config.tiers("openai", "mine2")["heavy"].use_for.startswith("multi-step")

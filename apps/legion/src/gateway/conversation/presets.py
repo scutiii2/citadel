@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 PRESETS: dict[str, dict] = {
-    "claude": {"provider": "anthropic", "auth": "key", "label": "Claude", "model": "claude-sonnet-5-5"},
+    "claude": {"provider": "anthropic", "auth": "key", "label": "Claude", "model": "claude-sonnet-5-5",
+               "models": {"light": "claude-haiku-5-5", "standard": "claude-sonnet-5-5", "heavy": "claude-opus-5-5", "extreme": "claude-fable-5-1"}},
     "bedrock": {"provider": "anthropic", "auth": "bedrock", "label": "AWS Bedrock", "model": "anthropic.claude-sonnet-5-5", "aws_region": "us-east-1"},
     "vertex": {"provider": "anthropic", "auth": "vertex", "label": "Google Vertex AI", "model": "claude-sonnet-5-5", "region": "us-east5"},
-    "gpt": {"provider": "openai", "auth": "key", "api": "responses", "label": "GPT", "model": "gpt-6.1-sol"},
+    "gpt": {"provider": "openai", "auth": "key", "api": "responses", "label": "GPT", "model": "gpt-6.1-sol",
+            "models": {"light": "gpt-6-luna", "standard": "gpt-6.1-sol", "heavy": "gpt-6-astra"}},
     "azure": {"provider": "openai", "auth": "azure", "api": "responses", "label": "Azure OpenAI", "model": ""},
     # unverified: confirm against Google's OpenAI-compatibility docs
     "gemini": {"provider": "openai", "auth": "key", "api": "chat", "label": "Google Gemini",

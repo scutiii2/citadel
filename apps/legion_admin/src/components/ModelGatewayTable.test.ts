@@ -10,7 +10,7 @@ beforeAll(() => {
 
 const list = {
   gateways: [],
-  presets: { ollama: { provider: "openai", auth: "key", api: "chat", label: "Ollama", base_url: "http://host.docker.internal:11434/v1", model: "qwen" } },
+  presets: { ollama: { provider: "openai", auth: "key", api: "chat", label: "Ollama", base_url: "http://host.docker.internal:11434/v1", model: "qwen", models: { light: "qwen-small" }, descriptions: { light: "quick" } } },
   form: {
     providers: { openai: { key: [["api_key", "API key", true, false], ["base_url", "Base address", false, false]] }, scuti: { "": [["url", "Model service address", false, true]] } },
     choices: { api: ["chat", "responses"] },
@@ -27,12 +27,17 @@ it("adds a chat gateway from a preset and sends only what the form holds", async
   await wrapper.get('[data-test="preset"]').setValue("ollama");
   await wrapper.get('[data-test="preset"]').trigger("change");
   expect((wrapper.get('[data-test="id"]').element as HTMLInputElement).value).toBe("ollama");
+  expect((wrapper.get('[data-test="tier-light"]').element as HTMLInputElement).value).toBe("qwen-small");
+  expect((wrapper.get('[data-test="note-light"]').element as HTMLInputElement).value).toBe("quick");
+  await wrapper.get('[data-test="tier-heavy"]').setValue("qwen-big");
+  await wrapper.get('[data-test="note-heavy"]').setValue("  audits ");
   await wrapper.get('[data-test="api_key"]').setValue("secret");
   await wrapper.get("form").trigger("submit");
   wrapper.findComponent({ name: "RecordDrawer" }).vm.$emit("save");
   await flushPromises();
   expect(save).toHaveBeenCalledWith("conversation", "ollama", expect.objectContaining({
     provider: "openai", auth: "key", api: "chat", model: "qwen", label: "Ollama", base_url: "http://host.docker.internal:11434/v1", api_key: "secret",
+    models: { light: "qwen-small", heavy: "qwen-big" }, descriptions: { light: "quick", heavy: "audits" },
   }));
   wrapper.unmount();
 });

@@ -47,4 +47,5 @@ Copy rule: take the standalone file, rewrite `from src.X` to `from src.gateway.<
 - Legion's copy has no token layer, no admin password, no usage counters, no playground, no admin-editable settings, no `/health`.
 - Limits come from the `Settings` defaults in `settings.py`; the standalone ones can be changed on its admin page or by `SERVICE_*` variables.
 - `store.py` keeps entries (keys and tokens included, write-only) as rows of Legion's `settings.db` through `settings_store` (tables `conversation_gateways`, `decision_gateways`), not in a JSON file; a secret field may also hold `env:NAME`.
+- Legion's chat `store.py` also keeps `descriptions` (tier -> what it is for, up to 300 characters; not for Scuti). The standalone gateway has no such field. `providers/llm_config.tiers()` overlays a saved entry's `models` (ids) and `descriptions` on the `gateways/` template file, so agents choose a tier from what the page says.
 - All calls run on one background event loop (`src/gateway/__init__.py`: `call`, `call_sync`, `stream`) because the services hold loop-bound HTTP pools. Never create a service or call one from another loop directly.

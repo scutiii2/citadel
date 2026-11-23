@@ -133,33 +133,59 @@ def _text(entry: dict[str, Any], key: str, where: str) -> str:
     return value.strip()
 
 
+# What a tier is for when neither the template file nor the admin page says.
+_DEFAULT_USE_FOR = {
+    "light": "lookups, extraction, short rewrites, simple formatting",
+    "standard": "most tasks",
+    "heavy": "multi-step reasoning, hard code or data analysis",
+    "extreme": "the hardest problems: deep research, long-horizon planning",
+}
+
+
+def _saved_entry(provider: str, gateway_name: str) -> dict[str, Any]:
+    """The gateway as set up on the Model gateways page, or {} when it is not saved there."""
+    from src import gateway
+
+    entry = gateway.chat_store().all().get(gateway_name)
+    return entry if isinstance(entry, dict) and entry.get("provider") == provider else {}
+
+
 def tiers(provider: str, gateway_name: str) -> dict[str, TierModel]:
     """The strength tiers one gateway offers, e.g. tiers("anthropic",
     "claude") - {"light": TierModel(...), ...} in ladder order (light,
-    standard, heavy), from the block's optional `models` map. A tier whose
-    `id` is an {ENV_VAR} placeholder that is unset is left out. Returns {}
-    when the block has no `models`. Raises KeyError if provider/gateway_name
-    isn't in gateways/ and ValueError for a malformed `models`."""
-    models = load_gateways()[provider][gateway_name].get("models")
-    if models is None:
-        return {}
+    standard, heavy). The gateways/ template file gives the base (its optional
+    `models` map); a gateway saved on the Model gateways page overrides each
+    tier's model id and its `use_for` description. A tier whose `id` is an
+    {ENV_VAR} placeholder that is unset is left out. Returns {} when neither
+    defines tiers. Raises KeyError if the gateway is in neither place and
+    ValueError for a malformed template `models`."""
+    saved = _saved_entry(provider, gateway_name)
+    try:
+        models = load_gateways()[provider][gateway_name].get("models")
+    except KeyError:
+        if not saved:
+            raise
+        models = None
     where = f"gateways/{provider}/{gateway_name}.json {provider}.{gateway_name}.models"
-    if not isinstance(models, dict):
+    if models is not None and not isinstance(models, dict):
         raise ValueError(f"{where} must be an object")
+    models = models or {}
     for name in models:
         if name not in TIERS:
             raise ValueError(f"{where}.{name} is not a tier (use: {', '.join(TIERS)})")
     found: dict[str, TierModel] = {}
     for name in TIERS:
-        if name not in models:
-            continue
-        entry = models[name]
-        if not isinstance(entry, dict):
-            raise ValueError(f"{where}.{name} must be an object")
-        use_for = _text(entry, "use_for", f"{where}.{name}")
-        model_id = _resolve(_text(entry, "id", f"{where}.{name}"))
+        base = None
+        if name in models:
+            entry = models[name]
+            if not isinstance(entry, dict):
+                raise ValueError(f"{where}.{name} must be an object")
+            base = TierModel(_resolve(_text(entry, "id", f"{where}.{name}")), _text(entry, "use_for", f"{where}.{name}"))
+        own_id = (saved.get("models") or {}).get(name) if isinstance(saved.get("models"), dict) else None
+        own_note = (saved.get("descriptions") or {}).get(name) if isinstance(saved.get("descriptions"), dict) else None
+        model_id = own_id or (base.id if base else None)
         if model_id:
-            found[name] = TierModel(model_id, use_for)
+            found[name] = TierModel(model_id, own_note or (base.use_for if base else _DEFAULT_USE_FOR[name]))
     return found
 
 

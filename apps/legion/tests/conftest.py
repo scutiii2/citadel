@@ -60,6 +60,16 @@ def _default_classifier_settings(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolated_gateway_database(monkeypatch, tmp_path):
+    """Gateway entries come from an empty per-test database, never the developer's real settings.db."""
+    from src import gateway
+
+    monkeypatch.setattr(gateway, "_database", lambda: tmp_path / "gateways.db")
+    for name in ("_chat", "_chat_store", "_decision", "_decision_store"):
+        monkeypatch.setattr(gateway, name, None)
+
+
+@pytest.fixture(autouse=True)
 def _isolated_agent_registry(monkeypatch, tmp_path):
     """Point the agent registry at empty, per-test files so no test reads or
     rewrites the developer's real agent registry (roster_for and

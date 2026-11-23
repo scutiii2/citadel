@@ -143,3 +143,20 @@ def test_gateway_catalog_lists_providers_and_local_laya():
     assert any(g["id"] == "openrouter" for g in catalog["anthropic"])
     assert {g["id"] for g in catalog["decision"]} == {"laya", "jev"}
     assert "api_key" not in json.dumps(catalog)
+
+
+def test_saved_only_catalog_lists_just_the_gateways_that_are_set_up(tmp_path, monkeypatch):
+    from src import gateway
+
+    monkeypatch.setattr(gateway, "_database", lambda: tmp_path / "settings.db")
+    for name in ("_chat", "_chat_store", "_decision", "_decision_store"):
+        monkeypatch.setattr(gateway, name, None)
+    assert all(not entries for entries in agent_store.gateway_catalog(saved_only=True).values())
+    gateway.chat_store().put("claude", {"provider": "anthropic", "model": "m", "api_key": "sekret-value"})
+    gateway.chat_store().put("mine", {"provider": "openai", "base_url": "http://host.docker.internal:1/v1", "model": "x", "label": "Mine"})
+    gateway.decision_store().put("laya", {"kind": "scuti", "url": "http://host.docker.internal:29220"})
+    catalog = agent_store.gateway_catalog(saved_only=True)
+    assert [g["id"] for g in catalog["anthropic"]] == ["claude"] and catalog["anthropic"][0]["tiers"]
+    assert catalog["openai"] == [{"id": "mine", "label": "Mine", "model": "x", "tiers": []}]
+    assert [g["id"] for g in catalog["decision"]] == ["laya"]
+    assert "sekret-value" not in json.dumps(catalog)

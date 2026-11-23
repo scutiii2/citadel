@@ -105,7 +105,7 @@ function drop(key: number): void {
           <label class="gateway-field">
             <span class="sr-only">{{ index === 0 ? 'Primary gateway' : `Backup gateway ${index}` }}</span>
             <select :value="row.gateway" :data-test="index === 0 ? 'gateway' : 'backup-gateway'" :disabled="busy" @change="update(row.key, 'gateway', $event)">
-              <option value="" :disabled="usedElsewhere(defaultGateway, row.key)">Provider default ({{ defaultGateway }})</option>
+              <option value="" :disabled="usedElsewhere(defaultGateway, row.key) || !gateways.some((g) => g.id === defaultGateway)">Provider default ({{ defaultGateway }})</option>
               <option v-if="row.gateway && !gateways.some((g) => g.id === row.gateway)" :value="row.gateway">{{ row.gateway }} (unavailable)</option>
               <option v-for="gateway in gateways" :key="gateway.id" :value="gateway.id" :disabled="usedElsewhere(gateway.id, row.key)">{{ gateway.label }}</option>
             </select>
