@@ -1,0 +1,12 @@
+# ServiceHub overlay: publishes the two gateway admin pages on the LAN so ServiceHub can probe and open them.
+# Start:  docker compose -f docker-compose.yml -f docker-compose.gateway-hub.yml up -d conversation-gateway decision-gateway
+# Not for use with docker-compose.gateway-admin.yml (same host ports). Anyone on the LAN can then reach the gateway
+# admin pages and API: they are protected only by the admin password and the access tokens.
+
+services:
+  conversation-gateway:
+    ports:
+      - "29407:29407"
+  decision-gateway:
+    ports:
+      - "29406:29406"
