@@ -4,6 +4,7 @@ import { adminClient, type AdminAccount, type PermissionInfo, type Role } from "
 import { useAuthStore } from "../../stores/auth";
 import { errorMessage } from "../../utils/errors";
 import AdminSearch from "./AdminSearch.vue";
+import PanelHelp from "./PanelHelp.vue";
 import ConfirmModal from "./ConfirmModal.vue";
 import RecordDrawer from "./RecordDrawer.vue";
 import RoleEditor from "./RoleEditor.vue";
@@ -203,7 +204,8 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
       <header class="admin-panel-head">
         <h2 id="role-roster">Role roster</h2>
         <div class="admin-panel-tools">
-          <button v-if="auth.hasPermission('roles.manage')" type="button" class="primary" data-test="new-role" :disabled="loading || !!loadError" @click="openCreate">New role</button>
+          <PanelHelp title="Role roster">A role is a named set of permissions. Open a role to change what it allows, and see which accounts hold it. Changes apply to every holder at once.</PanelHelp>
+          <button v-if="auth.hasPermission('roles.manage')" type="button" class="admin-icon accent" data-test="new-role" aria-label="New role" title="New role" :disabled="loading || !!loadError" @click="openCreate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
           <AdminSearch ref="searchField" v-model="search" label="Search roles" />
         </div>
       </header>

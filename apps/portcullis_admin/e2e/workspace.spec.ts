@@ -155,7 +155,7 @@ test("deleting a role: one that accounts hold needs its name typed, an unused on
 test('overview shortcuts retain account filters across reload and legacy links open their new page', async ({ page }) => {
   const api = await installFakeApi(page);
   await logInAdmin(page);
-  await page.locator('.admin-info').getByRole('link', { name: 'Review accounts' }).click();
+  await page.locator('.attention').getByRole('link', { name: 'Review', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/accounts\?status=unverified/);
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await expect(page.locator('tbody')).toContainText('joe');

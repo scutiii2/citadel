@@ -35,6 +35,6 @@ describe("router", () => {
   it("guards the redirected servers URL with agents.manage", async () => {
     const router = await freshRouter(["tuning.manage"]);
     await router.push("/servers");
-    expect(router.currentRoute.value.name).toBe("tuning");
+    expect(router.currentRoute.value.name).toBe("overview");
   });
 });

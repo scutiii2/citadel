@@ -50,11 +50,12 @@ describe("SidebarPagesPanel", () => {
   });
 
   it("says the setting hides the page from the sidebar for every account", async () => {
-    const text = (await panel()).text();
+    const wrapper = await panel();
 
-    expect(text).toContain("Applies to all accounts");
-    expect(text).toContain("Show in the sidebar for everyone");
-    expect(text).toContain("still open");
+    expect(wrapper.text()).toContain("Applies to all accounts");
+    await wrapper.get('[data-test="panel-help"]').trigger("click");
+    expect(document.body.textContent).toContain("remove its button from every account");
+    expect(document.body.textContent).toContain("still opens");
   });
 
   it("holds a flip as an unsaved change until Save", async () => {

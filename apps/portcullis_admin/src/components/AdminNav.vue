@@ -23,7 +23,7 @@ const pages = computed(() => {
   const groups = railPages(ADMIN_NAV_PAGES.filter((page) => page.to !== "/overview" && allowed(page.permission)), navPrefs.prefs);
   return [...(overview.value ? [overview.value] : []), ...groups.pinned, ...groups.rest];
 });
-const showConfigAlert = computed(() => configIssues.issues.length > 0);
+const showConfigAlert = computed(() => configIssues.active.length > 0);
 const alertLabel = computed(() => {
   const parts = ([[configIssues.errorCount, "error"], [configIssues.warningCount, "warning"]] as const)
     .filter(([n]) => n)
@@ -48,7 +48,7 @@ watch([() => route.path, pages], async () => {
         :title="alertLabel" :aria-label="alertLabel" :aria-current="route.path === '/config-issues' ? 'page' : undefined">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path v-for="d in CONFIG_ISSUES_ICON" :key="d" :d="d" /></svg>
         <span v-if="expanded">Config issues</span>
-        <span class="count">{{ configIssues.issues.length }}</span>
+        <span class="count">{{ configIssues.active.length }}</span>
       </RouterLink>
     </nav>
     <nav v-if="shortcuts.length" class="shortcuts" aria-label="Other admin apps">

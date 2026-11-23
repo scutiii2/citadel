@@ -4,7 +4,9 @@ import { appConfigClient, type AppConfig, type AppConfigChanges } from "../api/A
 import { useDraftPanel } from "../composables/useDraftPanel";
 import { errorMessage } from "../utils/errors";
 import AdminSearch from "./admin/AdminSearch.vue";
+import PanelHelp from "./admin/PanelHelp.vue";
 import ConfirmModal from "./admin/ConfirmModal.vue";
+import ToggleSwitch from "./ToggleSwitch.vue";
 import DraftActions from "./admin/DraftActions.vue";
 import "./admin/admin.css";
 
@@ -13,6 +15,10 @@ import "./admin/admin.css";
  * addresses stay in configs/config_app.json. Search only hides groups: every field stays mounted, and a save
  * checks all of them, revealing the first invalid one if search had hidden it. */
 const SIGNALS = ["user_agent", "accept_language", "ip_subnet"];
+function setSignal(signal: string, on: boolean): void {
+  const f = form.value;
+  if (f) f.signals = on ? [...f.signals, signal] : f.signals.filter((s) => s !== signal);
+}
 const GROUPS = [
   { id: "accounts", title: "Accounts", words: "session length hours role new account" },
   { id: "rate", title: "Login rate limit", words: "failed logins count failures address account lockout window" },
@@ -162,6 +168,7 @@ async function useDefaults() {
     <header class="admin-panel-head">
       <h2 id="app-config-title">Sessions, login protection and backups</h2>
       <div class="admin-panel-tools tools">
+        <PanelHelp title="Sessions, login protection and backups"><p>Server-wide settings for sessions, failed-login limits, IP filters, security headers and database backups.</p><p>Saved in Portcullis\'s database and used from its next start.</p></PanelHelp>
         <DraftActions :dirty="changed" :saving="saving" label="app configuration changes" @cancel="discardOpen = true" @save="save" />
         <AdminSearch ref="searchField" v-model="search" label="Search app configuration" />
       </div>
@@ -169,7 +176,6 @@ async function useDefaults() {
     <p v-if="loading" class="admin-panel-text muted">Loading…</p>
     <p v-else-if="error && !form" class="admin-panel-text error" role="alert">{{ error }}</p>
     <template v-else-if="form">
-      <p class="help intro">Saved in Portcullis's database and used from its next start.</p>
       <p v-if="!anyShown" class="admin-panel-text muted">No settings match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
       <form ref="formEl" class="fields" data-test="form" novalidate @submit.prevent="save">
         <fieldset v-show="groupShown(GROUPS[0])" class="group">
@@ -179,7 +185,7 @@ async function useDefaults() {
         </fieldset>
         <fieldset v-show="groupShown(GROUPS[1])" class="group">
           <legend>Login rate limit</legend>
-          <label class="check"><input v-model="form.rl_enabled" type="checkbox" :disabled="saving" data-test="rl_enabled" /> Limit failed logins</label>
+          <ToggleSwitch :checked="form.rl_enabled" :disabled="saving" data-test="rl_enabled" @change="form.rl_enabled = ($event.target as HTMLInputElement).checked">Limit failed logins</ToggleSwitch>
           <div class="field"><label for="ac-scope">Count failures by</label>
             <select id="ac-scope" v-model="form.rl_scope" :disabled="saving" data-test="rl_scope"><option value="both">address and account</option><option value="ip">address</option><option value="account">account</option></select></div>
           <div class="field"><label for="ac-max">Failures allowed</label><input id="ac-max" v-model="form.rl_max" type="number" min="1" :disabled="saving" data-test="rl_max" /></div>
@@ -194,17 +200,17 @@ async function useDefaults() {
         </fieldset>
         <fieldset v-show="groupShown(GROUPS[3])" class="group">
           <legend>Security headers and devices</legend>
-          <label class="check"><input v-model="form.hd_enabled" type="checkbox" :disabled="saving" data-test="hd_enabled" /> Send security headers</label>
+          <ToggleSwitch :checked="form.hd_enabled" :disabled="saving" data-test="hd_enabled" @change="form.hd_enabled = ($event.target as HTMLInputElement).checked">Send security headers</ToggleSwitch>
           <div class="field"><label for="ac-hsts">HSTS (seconds, 0 = off)</label><input id="ac-hsts" v-model="form.hsts" type="number" min="0" :disabled="saving" data-test="hsts" />
             <p class="help">Turn on only once the site is served over HTTPS.</p></div>
-          <label class="check"><input v-model="form.fp_enabled" type="checkbox" :disabled="saving" data-test="fp_enabled" /> Log a login from a new device</label>
+          <ToggleSwitch :checked="form.fp_enabled" :disabled="saving" data-test="fp_enabled" @change="form.fp_enabled = ($event.target as HTMLInputElement).checked">Log a login from a new device</ToggleSwitch>
           <div class="signals">
-            <label v-for="signal in SIGNALS" :key="signal" class="check"><input v-model="form.signals" type="checkbox" :value="signal" :disabled="saving" :data-test="`signal-${signal}`" /> {{ signal }}</label>
+            <ToggleSwitch v-for="signal in SIGNALS" :key="signal" :checked="form.signals.includes(signal)" :disabled="saving" :data-test="`signal-${signal}`" @change="setSignal(signal, ($event.target as HTMLInputElement).checked)">{{ signal }}</ToggleSwitch>
           </div>
         </fieldset>
         <fieldset v-show="groupShown(GROUPS[4])" class="group">
           <legend>Backups</legend>
-          <label class="check"><input v-model="form.bk_enabled" type="checkbox" :disabled="saving" data-test="bk_enabled" /> Back up the database</label>
+          <ToggleSwitch :checked="form.bk_enabled" :disabled="saving" data-test="bk_enabled" @change="form.bk_enabled = ($event.target as HTMLInputElement).checked">Back up the database</ToggleSwitch>
           <div class="field"><label for="ac-keep">Backups to keep</label><input id="ac-keep" v-model="form.bk_keep" type="number" min="1" :disabled="saving" data-test="bk_keep" /></div>
           <div class="field"><label for="ac-every">Hours between backups</label><input id="ac-every" v-model="form.bk_every" type="number" min="1" :disabled="saving" data-test="bk_every" /></div>
         </fieldset>
@@ -221,14 +227,12 @@ async function useDefaults() {
 
 <style scoped>
 .app-config { margin-bottom: 14px; }
-.intro { margin: 0; padding: 12px 14px 0; }
 .fields { display: grid; gap: 16px; padding: 14px; max-width: 760px; }
 .group { display: grid; gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .group legend { padding: 0 6px; font-size: 0.9em; font-weight: 600; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }
 .field > input, .field > select, .field > textarea { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; }
-.check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
 .signals { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
 .error { margin: 0; color: var(--danger); }

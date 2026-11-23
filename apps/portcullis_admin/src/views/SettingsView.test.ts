@@ -28,17 +28,17 @@ async function show() {
 
 it("applies theme immediately while keeping sidebar changes as drafts until Save", async () => {
   const { wrapper } = await show();
-  expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
+  expect(wrapper.find(".draft-actions button").exists()).toBe(false);
   await wrapper.get('button[data-value="dark"]').trigger("click");
   await wrapper.get('input[aria-label="Show Invites in the sidebar"]').setValue(false);
   expect(useTheme().theme.value).toBe("dark");
   expect(useNavPrefsStore().prefs.hidden).toEqual([]);
   expect(localStorage.getItem("ember_admin.nav.1")).toBeNull();
-  await wrapper.get("button.save").trigger("click");
+  await wrapper.get('button[data-test="save"]').trigger("click");
   expect(useTheme().theme.value).toBe("dark");
   expect(useNavPrefsStore().prefs.hidden).toEqual(["/admin/invites"]);
   expect(JSON.parse(localStorage.getItem("ember_admin.nav.1")!).hidden).toEqual(["/admin/invites"]);
-  expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
+  expect(wrapper.find(".draft-actions button").exists()).toBe(false);
   wrapper.unmount();
 });
 
@@ -46,10 +46,11 @@ it("Revert restores saved preferences and clears the unsaved bar", async () => {
   const { wrapper } = await show();
   await wrapper.get('button[data-value="dark"]').trigger("click");
   await wrapper.get('input[aria-label="Show Invites in the sidebar"]').setValue(false);
-  await wrapper.get("button.revert").trigger("click");
+  await wrapper.get('button[data-test="cancel"]').trigger("click");
+  await wrapper.get("button.confirm").trigger("click");
   expect(wrapper.get('button[data-value="dark"]').attributes("aria-pressed")).toBe("true");
   expect((wrapper.get('input[aria-label="Show Invites in the sidebar"]').element as HTMLInputElement).checked).toBe(true);
-  expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
+  expect(wrapper.find(".draft-actions button").exists()).toBe(false);
   wrapper.unmount();
 });
 
@@ -66,7 +67,7 @@ it("asks before leaving with drafts and protects reload", async () => {
   await wrapper.get("button.cancel").trigger("click");
   await navigation;
   expect(router.currentRoute.value.path).toBe("/settings");
-  expect(wrapper.find(".settings-save-bar").exists()).toBe(true);
+  expect(wrapper.find(".draft-actions button").exists()).toBe(true);
   const leave = router.push("/profile");
   await flushPromises();
   await wrapper.get("button.confirm").trigger("click");
@@ -83,14 +84,14 @@ it("applies and resets theme without unsaved changes or leave protection", async
   expect(useTheme().theme.value).toBe("dark");
   expect(localStorage.getItem("ember_admin.theme")).toBe("dark");
   expect(document.documentElement.style.colorScheme).toBe("dark");
-  expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
+  expect(wrapper.find(".draft-actions button").exists()).toBe(false);
   const unload = new Event("beforeunload", { cancelable: true });
   window.dispatchEvent(unload);
   expect(unload.defaultPrevented).toBe(false);
   await wrapper.get('button[aria-label="Reset Theme to its default"]').trigger("click");
   expect(useTheme().theme.value).toBe("system");
   expect(localStorage.getItem("ember_admin.theme")).toBe("system");
-  expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
+  expect(wrapper.find(".draft-actions button").exists()).toBe(false);
   await router.push("/profile");
   expect(router.currentRoute.value.path).toBe("/profile");
   wrapper.unmount();

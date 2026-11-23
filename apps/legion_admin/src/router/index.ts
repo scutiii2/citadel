@@ -7,14 +7,15 @@ declare module "vue-router" {
     /** Reachable without logging in (login). */
     guestOnly?: boolean;
     /** The portcullis permission the page needs. */
-    permission?: string;
+    permission?: string | string[];
   }
 }
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/", redirect: "/agents" },
+    { path: "/", redirect: "/overview" },
+    { path: "/overview", name: "overview", component: () => import("../views/OverviewView.vue"), meta: { permission: ["agents.manage", "tuning.manage"] } },
     { path: "/agents", name: "agents", component: () => import("../views/AgentsAdminView.vue"), meta: { permission: "agents.manage" } },
     { path: "/connections", name: "connections", component: () => import("../views/ConnectionsView.vue"), meta: { permission: "agents.manage" } },
     { path: "/servers", name: "servers", redirect: (to) => ({ name: "connections", query: to.query, hash: "#mcp-servers" }) },

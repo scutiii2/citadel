@@ -40,8 +40,9 @@ describe("SettingsPanel", () => {
     const off = await panel(false);
     expect(isOn(off)).toBe(false);
     expect(off.text()).toContain("Require approval for every tool");
-    expect(off.text()).toContain("Allow for this chat");
     expect(off.text()).toContain("Applies to all accounts");
+    await off.get('[data-test="panel-help"]').trigger("click");
+    expect(document.body.textContent).toContain("Allow for this chat");
   });
 
   it("reserves both icon slots and shows Cancel × then Save only while dirty", async () => {

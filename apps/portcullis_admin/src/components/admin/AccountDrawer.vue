@@ -87,10 +87,9 @@ function requestActive(event: Event): void {
       </template>
       <fieldset v-if="canAssign || account.roles.length" class="roles-edit">
         <legend>Roles</legend>
-        <label v-for="role in choices" :key="role.id" class="role-choice">
-          <input type="checkbox" :checked="draft.roleIds.includes(role.id)" :disabled="disabledChoice(role)" @change="toggleRole(role.id, ($event.target as HTMLInputElement).checked)" />
-          {{ role.name }}
-        </label>
+        <div v-for="role in choices" :key="role.id" class="role-choice">
+          <ToggleSwitch small :checked="draft.roleIds.includes(role.id)" :disabled="disabledChoice(role)" @change="toggleRole(role.id, ($event.target as HTMLInputElement).checked)">{{ role.name }}</ToggleSwitch>
+        </div>
         <p v-if="!choices.length" class="muted">No roles</p>
       </fieldset>
     </form>

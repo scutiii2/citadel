@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import { emberWebUrl } from "../utils/webLink";
 import ThemeSelect from "./ThemeSelect.vue";
 
-/** The Profile popover's content: identity, the personal pages, Ember, theme and Log out.
+/** The Profile popover's content: identity, the personal pages, theme and Log out.
  * The header owns opening, Escape and focus return. */
 defineProps<{ username: string; email: string }>();
 const emit = defineEmits<{ logout: []; navigate: [] }>();
-const webUrl = emberWebUrl();
 </script>
 
 <template>
@@ -16,7 +14,6 @@ const webUrl = emberWebUrl();
     <nav aria-label="Account pages">
       <RouterLink to="/profile" @click="emit('navigate')">Profile</RouterLink>
       <RouterLink to="/settings" @click="emit('navigate')">Settings</RouterLink>
-      <a :href="webUrl" target="_blank" rel="noopener noreferrer" class="web-link" @click="emit('navigate')">Ember</a>
     </nav>
     <ThemeSelect />
     <button type="button" class="chip logout" @click="emit('logout')">Log out</button>

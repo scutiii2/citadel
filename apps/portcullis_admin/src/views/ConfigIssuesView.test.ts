@@ -30,7 +30,7 @@ beforeEach(() => vi.restoreAllMocks());
 it("groups issues by file and counts the filters", async () => {
   const { wrapper } = await show();
   expect(wrapper.findAll(".file").map((f) => f.get("code").text())).toEqual(["config_app.json", "secrets.json"]);
-  expect(wrapper.findAll(".filters button").map((b) => b.text())).toEqual(["All 3", "Errors 2", "Warnings 1"]);
+  expect(wrapper.findAll(".filters button").map((b) => b.text())).toEqual(["All 3", "Errors 2", "Warnings 1", "Ignored 0"]);
 });
 
 it("combines search over file, key and message with the severity filter", async () => {
@@ -66,4 +66,28 @@ it("returns home after a successful check that finds nothing", async () => {
   await wrapper.get('[data-test="check"]').trigger("click");
   await flushPromises();
   expect(router.currentRoute.value.path).toBe("/");
+});
+
+it("ignores a warning on this browser, drops it from the counts and restores it", async () => {
+  localStorage.clear();
+  const { wrapper, store } = await show();
+  expect(wrapper.findAll('[data-test="ignore"]')).toHaveLength(1);
+  await wrapper.get('[data-test="ignore"]').trigger("click");
+  expect(store.active).toHaveLength(2);
+  expect(wrapper.findAll(".filters button").map((b) => b.text())).toEqual(["All 2", "Errors 2", "Warnings 0", "Ignored 1"]);
+  expect(JSON.parse(localStorage.getItem("ember_admin.ignoredIssues.1")!)).toHaveLength(1);
+  await wrapper.findAll(".filters button")[3]!.trigger("click");
+  expect(wrapper.findAll(".row")).toHaveLength(1);
+  await wrapper.get('[data-test="restore"]').trigger("click");
+  expect(store.active).toHaveLength(3);
+  expect(wrapper.findAll(".filters button")[0]!.text()).toBe("All 3");
+});
+
+it("links an issue to the page that fixes it only when it can be fixed there", async () => {
+  const { wrapper } = await show(async () => [...ISSUES, { file: "Stronghold Tool services", key: "bard", severity: "error", message: "Configure Bard." }]);
+  const rows = wrapper.findAll(".row");
+  const fix = (key: string) => rows.find((r) => r.text().includes(key))!.find('[data-test="fix"]');
+  expect(fix("backup.keep").exists()).toBe(false); // needs settings.manage, which this account lacks
+  expect(fix("smtp_password").exists()).toBe(false);
+  expect(fix("bard").attributes("href")).toContain(":26504");
 });

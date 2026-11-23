@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
-import { LEGION_PAGES } from "../router/pages";
+import { canOpen, LEGION_PAGES } from "../router/pages";
 import { ADMIN_APPS, adminAppUrl } from "../utils/siblings";
 import { useAuthStore } from "../stores/auth";
 
 defineProps<{ expanded: boolean }>();
 const auth = useAuthStore();
 const route = useRoute();
-const pages = computed(() => LEGION_PAGES.filter((page) => auth.hasPermission(page.permission)));
+const pages = computed(() => LEGION_PAGES.filter((page) => canOpen(page.permission, auth.hasPermission)));
 const shortcuts = ADMIN_APPS.filter((app) => app.port !== 26500);
 </script>
 

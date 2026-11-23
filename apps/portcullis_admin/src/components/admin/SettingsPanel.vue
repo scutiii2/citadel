@@ -5,6 +5,7 @@ import { useDraftPanel } from "../../composables/useDraftPanel";
 import { errorMessage } from "../../utils/errors";
 import LockSwitch from "../LockSwitch.vue";
 import AdminSearch from "./AdminSearch.vue";
+import PanelHelp from "./PanelHelp.vue";
 import ConfirmModal from "./ConfirmModal.vue";
 import DraftActions from "./DraftActions.vue";
 import "./admin.css";
@@ -84,6 +85,7 @@ onMounted(load);
     <header class="admin-panel-head">
       <h2 id="tool-approval-title"><span v-if="storedOn" class="dot" title="Changed from the default" aria-hidden="true" /> Tool approval</h2>
       <div class="admin-panel-tools tools">
+        <PanelHelp title="Tool approval"><p>Chooses which tool actions need approval before they run. Edit, then Save to apply to every account.</p><p>When on, every account's answers ask before each tool the agent runs, whatever the account chose, and "Allow for this chat" is not offered. A tool runs only after its own "Allow once". Typed commands (such as /tool) are not affected: the person types the exact command themselves.</p></PanelHelp>
         <DraftActions :dirty="dirty" :saving="saving" label="tool approval changes" @cancel="discardOpen = true" @save="save" />
         <AdminSearch ref="searchField" v-model="search" label="Search tool approval" />
       </div>
@@ -97,11 +99,6 @@ onMounted(load);
         <span v-if="saved && !dirty" class="chip saved" role="status">Saved</span>
       </div>
       <LockSwitch v-if="settings" :checked="draft" :disabled="saving" @change="setDraft($event.target as HTMLInputElement)">Require approval for every tool</LockSwitch>
-      <p class="muted">
-        When on, every account's answers ask before each tool the agent runs, whatever the account chose, and "Allow
-        for this chat" is not offered. A tool runs only after its own "Allow once". Typed commands (such as /tool) are
-        not affected: the person types the exact command themselves.
-      </p>
       <p v-if="dirty" class="unsaved" role="status">You have an unsaved change. Turning it {{ draft ? "on" : "off" }} applies to every account.</p>
       <p v-if="saveError" class="error" role="alert">{{ saveError }}</p>
     </div>

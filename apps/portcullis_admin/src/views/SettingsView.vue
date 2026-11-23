@@ -2,7 +2,11 @@
 import PageLayout from "../components/PageLayout.vue";
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
+import AdminSearch from "../components/admin/AdminSearch.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
+import DraftActions from "../components/admin/DraftActions.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
+import "../components/admin/admin.css";
 import SettingRow from "../components/SettingRow.vue";
 import SidebarEditor from "../components/SidebarEditor.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
@@ -50,6 +54,7 @@ function beforeUnload(event: BeforeUnloadEvent): void {
 onMounted(() => window.addEventListener("beforeunload", beforeUnload));
 onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); answerDiscard(false); });
 const query = ref("");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
 const onlyModified = ref(false);
 const options: { value: Theme; label: string }[] = [
   { value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" },
@@ -65,54 +70,36 @@ const showSidebar = computed(() => matches("sidebar pages order pin hide navigat
 </script>
 
 <template>
-  <PageLayout class="settings-view" title="Settings" description="Adjust appearance and navigation preferences for Ember Admin." :class="{ dirty }">
-    <template #toolbar><div class="search-bar">
-        <input v-model="query" type="search" aria-label="Search settings" placeholder="Search settings" @keydown.esc="query = ''" />
-        <button v-if="count || onlyModified" type="button" :aria-pressed="onlyModified" @click="onlyModified = !onlyModified">{{ count }} modified</button>
-      </div></template>
-    <div class="column">
-
-
-      <p class="scope">Theme applies instantly. Saved on this device. Sidebar preferences apply when you save and are separate for each account and from Ember Web.</p>
-      <p v-if="navPrefs.error" class="save-error" role="alert">{{ navPrefs.error }}</p>
-
-      <section v-if="showTheme" aria-label="Appearance">
-        <h3>Appearance</h3>
-        <div class="card"><SettingRow setting-id="appearance-theme" label="Theme" description="Light, dark, or follow your system." :modified="themeModified" @reset="setTheme(DEFAULT_THEME)">
-          <SegmentedControl :model-value="theme" @update:model-value="setTheme" :options="options" aria-label="Theme" />
-        </SettingRow></div>
-      </section>
-      <section v-if="showSidebar" aria-label="Sidebar"><h3>Sidebar</h3><div class="card"><SidebarEditor v-model="draft.sidebar" /></div></section>
-      <p v-if="!showTheme && !showSidebar" class="scope">No settings match your filters. <button type="button" @click="query = ''; onlyModified = false">Clear filters</button></p>
-
-    <div v-if="dirty" class="settings-save-bar" role="group" aria-label="Unsaved settings">
-      <span>Unsaved changes</span>
-      <button type="button" class="revert" @click="revert">Revert</button>
-      <button type="button" class="save" @click="save">Save</button>
-    </div>
+  <PageLayout class="settings-view admin-panel" title="Settings" wide>
+    <section class="admin-panel-card" aria-labelledby="settings-title">
+      <header class="admin-panel-head">
+        <h2 id="settings-title">Preferences</h2>
+        <div class="admin-panel-tools tools">
+          <PanelHelp title="Preferences"><p>Your own appearance and navigation settings for Portcullis Admin.</p><p>Theme applies instantly and is saved on this device. Sidebar preferences apply when you save. They are separate for each account.</p></PanelHelp>
+          <button v-if="count || onlyModified" type="button" class="chip" :aria-pressed="onlyModified" @click="onlyModified = !onlyModified">{{ count }} modified</button>
+          <DraftActions :dirty="dirty" :saving="false" label="settings changes" @cancel="discardOpen = true" @save="save" />
+          <AdminSearch ref="searchField" v-model="query" label="Search settings" />
+        </div>
+      </header>
+      <div class="settings-body">
+        <p v-if="navPrefs.error" class="error" role="alert">{{ navPrefs.error }}</p>
+        <section v-if="showTheme" aria-label="Appearance">
+          <h3>Appearance</h3>
+          <div class="card"><SettingRow setting-id="appearance-theme" label="Theme" description="Light, dark, or follow your system." :modified="themeModified" @reset="setTheme(DEFAULT_THEME)">
+            <SegmentedControl :model-value="theme" @update:model-value="setTheme" :options="options" aria-label="Theme" />
+          </SettingRow></div>
+        </section>
+        <section v-if="showSidebar" aria-label="Sidebar"><h3>Sidebar</h3><div class="card"><SidebarEditor v-model="draft.sidebar" /></div></section>
+        <p v-if="!showTheme && !showSidebar" class="muted">No settings match your filters. <button type="button" class="chip" @click="query = ''; onlyModified = false; searchField?.focus()">Clear filters</button></p>
+      </div>
+    </section>
     <ConfirmModal v-if="discardOpen" :open="discardOpen" title="Discard unsaved settings?" message="Your settings changes have not been saved." confirm-label="Discard changes" @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
-
-    </div>
-
   </PageLayout>
 </template>
 
 <style scoped>
-.settings-view { flex: 1; min-height: 0; overflow-y: auto; }
-.settings-view.dirty .column { padding-bottom: 110px; }
-.settings-save-bar { position: fixed; bottom: 0; left: 52px; right: 0; z-index: 25; display: flex; align-items: center; gap: 12px; padding: 14px 32px; border-top: 1px solid var(--border); background: var(--surface); }
-.settings-save-bar > span { flex: 1; min-width: 0; }
-.settings-save-bar button { padding: 8px 20px; color: var(--text); }
-.settings-save-bar button.save { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 600; }
-.save-error { margin: 0; color: var(--danger); }
-@media (max-width: 767px) { .settings-save-bar { left: 0; bottom: var(--rail-height); padding: 12px 16px; gap: 8px; } }
-.column { display: flex; flex-direction: column; gap: 16px; }
-.scope { margin: 0; color: var(--muted); font-size: .9em; }
-h3 { margin: 0 0 8px; font-size: 1em; }
+.settings-body { display: grid; gap: 16px; padding: 14px; }
+.settings-body h3 { margin: 0 0 8px; font-size: 1em; }
 .card { padding: 4px 16px 6px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
-.search-bar { display: flex; gap: 8px; flex-wrap: wrap; }
-input { flex: 1; min-width: 160px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); font: inherit; }
-button { padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-full); background: transparent; color: var(--accent); cursor: pointer; font: inherit; }
-button[aria-pressed="true"] { background: var(--accent); color: var(--accent-contrast); }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
 </style>

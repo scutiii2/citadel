@@ -36,7 +36,7 @@ it("shows the title, toggles the sidebar and keeps theme and logout inside Profi
   expect(wrapper.find(".logout").exists()).toBe(false);
   await wrapper.get('[aria-label="Profile"]').trigger("click");
   expect(wrapper.get(".identity").text()).toContain("ada@example.com");
-  expect(wrapper.findAll(".account-menu nav a").map((a) => a.text())).toEqual(["Profile", "Settings", "Ember"]);
+  expect(wrapper.findAll(".account-menu nav a").map((a) => a.text())).toEqual(["Profile", "Settings"]);
   await wrapper.get("select").setValue("light");
   expect(localStorage.getItem("ember_admin.theme")).toBe("light");
   await wrapper.get(".logout").trigger("click");
@@ -68,7 +68,7 @@ it("hides config notifications without permission and links real issues with it"
   await wrapper.get('[aria-label="Notifications"]').trigger("click");
   await flushPromises();
   expect(wrapper.get(".header-popover a").attributes("href")).toBe("/config-issues");
-  expect(wrapper.get(".header-popover a").text()).toBe("Config issues: 1 error");
+  expect(wrapper.get(".header-popover a.notice").text()).toContain("1 error");
   wrapper.unmount();
 });
 

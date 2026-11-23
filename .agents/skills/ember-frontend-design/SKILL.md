@@ -133,6 +133,8 @@ Use these existing pages as implementation references:
 
 ## 4. Rules that cost us before
 
+- Every panel header carries a `PanelHelp` icon first among its tools: a click opens a popover saying what the panel is for. Add it to each new panel.
+- No checkboxes in admin panels, drawers or settings: an on/off or a choice from a list is a `ToggleSwitch` (a `small` one in dense lists). A checkbox is only for a form acknowledgement or checklist, such as agreeing to a policy or confirming something was read.
 - Radius only via `--radius-*`, colour only via tokens. `radiusScale.test.ts` in each app fails on a literal radius.
 - Scoped CSS that a parent page also styles: use the more specific selector (`button.delete-button`).
 - A switch that calls the server stays pending until the server answers; never show unconfirmed state. Browser-local settings apply instantly ("Applies instantly. Saved on this device."); settings that reach other accounts are a draft with an unsaved bar and Save.

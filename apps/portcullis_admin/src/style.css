@@ -147,6 +147,7 @@ button[aria-busy="true"]::before {
 .admin-table-scroll:focus-visible { outline-offset: -2px; }
 table.admin-records { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; }
 table.admin-records :is(th, td) { padding: 10px 14px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+table.admin-records thead th { overflow-wrap: normal; white-space: nowrap; }
 .admin-records thead { color: var(--muted); background: var(--surface); font-size: 0.8rem; }
 .admin-records tbody tr { position: relative; }
 .admin-records tbody tr:last-child > * { border-bottom: 0; }
@@ -158,8 +159,11 @@ table.admin-records :is(th, td) { padding: 10px 14px; border-bottom: 1px solid v
 .admin-record-name { display: flex; align-items: center; gap: 10px; }
 .admin-record-name p, .admin-record-name code { display: block; margin: 2px 0 0; color: var(--muted); font-size: 0.8rem; font-weight: 400; }
 .admin-record-badge { display: grid; flex: none; place-items: center; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--muted); background: var(--surface); font-size: 0.72rem; font-weight: 650; }
-.admin-icon { position: relative; display: grid; flex: none; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--radius-md); color: var(--muted); background: transparent; cursor: pointer; }
+.admin-icon { position: relative; text-decoration: none; display: grid; flex: none; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--radius-md); color: var(--muted); background: transparent; cursor: pointer; }
 .admin-icon:is(:hover, [aria-expanded="true"]) { color: var(--text); background: var(--surface); }
+.admin-icon.accent { color: var(--accent-contrast); background: var(--accent); }
+.admin-icon.accent:hover:not(:disabled) { color: var(--accent-contrast); background: var(--accent); filter: brightness(1.08); }
+.admin-icon:disabled { opacity: 0.55; cursor: default; }
 .admin-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 767px) {
   .admin-icon { width: 44px; height: 44px; }
@@ -173,7 +177,7 @@ table.admin-records :is(th, td) { padding: 10px 14px; border-bottom: 1px solid v
   min-height: 36px; padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-full);
   color: var(--text); background: transparent; cursor: pointer; font: inherit; font-size: 0.84rem;
 }
-.admin-panel-card .primary, .record-drawer .primary { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); font-weight: 650; }
+.admin-panel-card .primary, .record-drawer .primary { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); font-weight: 650; border-radius: var(--radius-md); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .record-drawer .danger { color: var(--danger); border-color: var(--danger); }
 .admin-panel-card button:disabled, .record-drawer button:disabled { opacity: 0.55; cursor: default; }
 .admin-panel-card .muted, .record-drawer .muted { color: var(--muted); }

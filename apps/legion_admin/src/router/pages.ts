@@ -5,10 +5,20 @@ export interface LegionPage {
   label: string;
   /** SVG path data (24x24, stroked) drawn as the page's icon. */
   icon: string[];
-  permission: string;
+  /** The portcullis permission the page needs; a list = any one of them. */
+  permission: string | string[];
 }
 
+/** True when `has` grants the permission, or any one of a list. */
+export const canOpen = (permission: string | string[], has: (name: string) => boolean): boolean => [permission].flat().some(has);
+
 export const LEGION_PAGES: LegionPage[] = [
+  {
+    to: "/overview",
+    label: "Overview",
+    icon: ["M3 11 12 3l9 8", "M5 10v10h14V10", "M10 20v-6h4v6"],
+    permission: ["agents.manage", "tuning.manage"],
+  },
   {
     to: "/agents",
     label: "Agents",

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { adminClient, type Invite } from "../../api/AdminClient";
 import { errorMessage, formatUtc } from "../../utils/errors";
 import AdminSearch from "./AdminSearch.vue";
+import PanelHelp from "./PanelHelp.vue";
 import ConfirmModal from "./ConfirmModal.vue";
 import RecordDrawer from "./RecordDrawer.vue";
 import "./admin.css";
@@ -130,7 +131,8 @@ onMounted(loadInvites);
       <header class="admin-panel-head">
         <h2 id="invite-roster">Open invites</h2>
         <div class="admin-panel-tools">
-          <button type="button" class="primary" data-test="invite-member" @click="openCreate">Invite member</button>
+          <PanelHelp title="Open invites"><p>Invitations that have been sent and not used yet. Open one to copy its link or revoke it.</p><p>Invites work once and expire after 7 days. New accounts receive the configured default role.</p></PanelHelp>
+          <button type="button" class="admin-icon accent" data-test="invite-member" aria-label="Invite member" title="Invite member" @click="openCreate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19 8v6M16 11h6" /></svg></button>
           <AdminSearch ref="searchField" v-model="search" label="Search invites" />
         </div>
       </header>

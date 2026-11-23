@@ -20,11 +20,9 @@ watch(() => route.query.create, createFromLink);
 
 <template>
   <PageLayout class="admin-panel" title="Invites" wide>
-    <div class="admin-info"><div><h3>Invites work once and expire after 7 days</h3><p>New accounts receive the configured default role.</p></div></div>
     <InvitesPanel ref="panel" />
   </PageLayout>
 </template>
 
 <style scoped>
-.admin-info { margin-bottom: 14px; }
 </style>

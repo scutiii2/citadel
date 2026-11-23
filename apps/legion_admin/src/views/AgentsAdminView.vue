@@ -3,6 +3,7 @@ import PageLayout from "../components/PageLayout.vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AdminSearch from "../components/admin/AdminSearch.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
 import StatusFilters from "../components/admin/StatusFilters.vue";
 import RecordDrawer from "../components/admin/RecordDrawer.vue";
 import {
@@ -261,8 +262,9 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
       <header class="admin-panel-head">
         <h2 id="agent-roster">Agent roster</h2>
         <div class="admin-panel-tools">
-          <button type="button" class="chip" data-test="shared-prompts" @click="promptsOpen = true">Shared prompts</button>
-          <button type="button" class="primary" data-test="new" :disabled="loading || !!error" @click="openCreate">New agent</button>
+          <PanelHelp title="Agent roster">Every agent Legion can run, with its status. Open an agent to edit its model, tools and prompts. Shared prompts apply to all agents and restart them.</PanelHelp>
+          <button type="button" class="admin-icon" data-test="shared-prompts" aria-label="Shared prompts" title="Shared prompts" @click="promptsOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7" /></svg></button>
+          <button type="button" class="admin-icon accent" data-test="new" aria-label="New agent" title="New agent" :disabled="loading || !!error" @click="openCreate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
           <AdminSearch ref="searchField" v-model="search" label="Search agents" />
         </div>
       </header>
