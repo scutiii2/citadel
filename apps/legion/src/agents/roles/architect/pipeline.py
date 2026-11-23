@@ -84,7 +84,7 @@ async def run(spec: AgentSpec, brief: str, complete: Callable[[str], ChatResult]
                 except Exception as error:
                     _log.warning("Architect prefetch failed: %s", error)
             _check(request_id)
-            prompt = handler.plan_prompt(brief, prefetch) + f"\nMaximum units: {spec.limits.max_units}."
+            prompt = handler.plan_prompt(brief, prefetch, spec) + f"\nMaximum units: {spec.limits.max_units}."
             for attempt in range(2):
                 answer = await interpret(prompt)
                 try:
@@ -101,7 +101,8 @@ async def run(spec: AgentSpec, brief: str, complete: Callable[[str], ChatResult]
 
             async def worker(unit, tier, dependencies):
                 _check(request_id)
-                node = replace(unit, spec=unit.spec + "\n\nRequired planned signature (data):\n" + unit.signature)
+                node = replace(unit, spec=unit.spec + ("\n\nRequired planned signature (data):\n" + unit.signature
+                                                       if unit.signature else ""))
                 result = await call_worker(node, tier, dependencies, depth=depth, on_event=on_event,
                                            signatures=signatures)
                 result.output = handler.validate_unit(result.output, planned)
@@ -109,8 +110,12 @@ async def run(spec: AgentSpec, brief: str, complete: Callable[[str], ChatResult]
 
             results = await DagExecutor(spec.limits, emit_agent_events=False).run(planned.units, worker, request_id)
             _check(request_id)
-            assembled = await interpret(handler.assemble_prompt(brief, planned, results))
-            response, valid = handler.review_assembly(assembled.response, planned, brief)
+            only = results[planned.units[0].id] if len(planned.units) == 1 else None
+            if getattr(handler, "single_passthrough", False) and only and only.status == "done":
+                assembled, response, valid = completions[-1], only.output, True
+            else:
+                assembled = await interpret(handler.assemble_prompt(brief, planned, results))
+                response, valid = handler.review_assembly(assembled.response, planned, brief)
             missing = [f"{key} ({result.status})" for key, result in results.items() if result.status != "done"]
             if missing:
                 response += "\n\nIncomplete units: " + ", ".join(missing) + "."

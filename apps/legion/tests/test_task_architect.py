@@ -1,0 +1,86 @@
+"""TaskArchitect picks specialists from its workers list; canned completions, no network."""
+
+import asyncio
+import json
+from dataclasses import replace
+
+import pytest
+
+from src.agents import agent_registry, agent_spec
+from src.agents.roles.architect import pipeline, registry
+from src.agents.roles.orchestrator import delegation
+from src.providers.base_provider import ChatResult
+
+
+def unit(id="a", agent="mathematician", **extra):
+    return {"id": id, "agent": agent, "spec": f"Do {id}.", "depends_on": [], "effect": "read",
+            "tier_hint": "light", **extra}
+
+
+def plan(*units):
+    return json.dumps({"units": list(units or [unit()])})
+
+
+@pytest.fixture
+def spec(monkeypatch):
+    value = replace(agent_spec.current(), id="task-architect", role="architect", kind="task", entry=False,
+                    workers=("mathematician", "researcher"), prefetch=(), plan_tool=False)
+    monkeypatch.setattr(agent_spec, "_current", value)
+    return value
+
+
+def run(spec, responses, worker):
+    responses, prompts = iter(responses), []
+    def complete(prompt):
+        prompts.append(prompt)
+        return ChatResult(response=next(responses), total_tokens=15, input_tokens=10, output_tokens=5)
+    delegation_call = delegation.call
+    delegation.call = worker
+    try:
+        return asyncio.run(pipeline.run(spec, "brief", complete)), prompts
+    finally:
+        delegation.call = delegation_call
+
+
+def test_registered_and_spec_accepts_the_kind():
+    assert "task" in registry.KINDS and "task" in agent_spec.ARCHITECT_KINDS
+
+
+def test_one_unit_returns_the_specialist_answer_without_assembly(spec):
+    calls = []
+    def worker(agent_id, question, depth, model_tier=None, reasoning_effort=None):
+        calls.append((agent_id, question))
+        return "42"
+    result, prompts = run(spec, [plan()], worker)
+    assert result.response == "42" and result.status == "done"
+    assert calls == [("mathematician", "Do a.")] and len(prompts) == 1
+
+
+def test_chain_passes_results_on_and_assembles(spec):
+    calls = []
+    def worker(agent_id, question, depth, model_tier=None, reasoning_effort=None):
+        calls.append((agent_id, question))
+        return "first result" if agent_id == "researcher" else "second result"
+    nodes = plan(unit("a", "researcher"), unit("b", depends_on=["a"]))
+    result, prompts = run(spec, [nodes, "final reply"], worker)
+    assert result.response == "final reply" and len(prompts) == 2
+    assert calls[1][0] == "mathematician" and "first result" in calls[1][1]
+
+
+@pytest.mark.parametrize("bad,message", [
+    (plan(unit(agent="server-ops")), "must be one of"),
+    (json.dumps({"units": [{**unit(), "extra": 1}]}), "unknown or missing field"),
+    (plan(unit(effect="maybe")), "effect must be read or write"),
+    (plan(unit(depends_on=["missing"])), "unknown dependency"),
+    ("not json", "Invalid plan JSON"),
+])
+def test_invalid_plans_are_refused(spec, bad, message):
+    with pytest.raises(ValueError, match=message):
+        registry.KINDS["task"].parse_plan(bad, spec)
+
+
+def test_plan_prompt_lists_only_registered_workers(monkeypatch, spec):
+    monkeypatch.setattr(agent_registry, "get_agent",
+                        lambda key: {"focus": f"{key} focus"} if key == "mathematician" else None)
+    prompt = registry.KINDS["task"].plan_prompt("2+2", "", spec)
+    assert "mathematician focus" in prompt and "researcher" not in prompt

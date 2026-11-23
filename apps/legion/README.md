@@ -135,7 +135,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `tools.deny` | no | `[]` | Globs removed after `allow`. Deny wins. |
 | `role` | yes | none | `orchestrator`, `router`, `specialist` or `architect`. Architects use a language provider, never entry, and require `tools.deny: ["*"]`; recall, learning and the plan tool must be off. The code pipeline is implemented; operations is reserved for a later phase. |
 | (roster) | whole folder | none | One architecture only. The enabled agents must hold exactly one orchestrator (the entry agent), exactly one router, at least one architect and at least one specialist; a save or an agent file that breaks this is refused. The retired `mode` key is ignored. |
-| `kind` | architect only, required | none | Registered kind: `code` or `operations`. At most one enabled architect per kind. |
+| `kind` | architect only, required | none | Registered kind: `code` or `task` (`operations` is reserved, no pipeline yet). At most one enabled architect per kind. |
 | `workers` | architect only, required | none | Non-empty list of existing specialist ids. |
 | `prefetch` | architect only | `[]` | Specialist ids allowed for pre-planning reads. Code uses the first only when a brief names a code file or conservative path. |
 | `limits` | architect only | see meaning | `max_units: 12`, `max_parallel: 3`, `unit_timeout_seconds: 120`, `max_retries: 1`. Counts are positive integers; retries may be zero; timeout is a finite positive number. Unknown fields are errors. |
@@ -213,8 +213,13 @@ not its model (`ember`, `server-ops`, `reviewer`). Exactly one enabled file
 sets `entry: true`. Add
 more specialists as extra files.
 
-`code-architect` (port 29621, disabled) plans multi-function code and assembles
+`code-architect` (port 29621) plans multi-function code and assembles
 `code-writer` outputs, with optional read-only context from `repo-helper`.
+
+`task-architect` (port 29622) is the general fallback. It plans one unit, or a short chain, over any
+specialist in its `workers` list; each unit names its `agent`, effect and tier. A single finished unit is returned
+as the reply with no assembly completion; chains are assembled from the results. Add a specialist to `workers`
+to make it reachable from Ember.
 
 `mathematician` (port 29620) handles standalone mathematical questions through
 Armory's `tool_math_*` tools: equations, units, matrices, calculus, and repeated
