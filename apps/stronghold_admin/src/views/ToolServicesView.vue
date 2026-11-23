@@ -247,14 +247,17 @@ watch(selectedName, () => { tab.value = "general"; });
           <tbody>
             <tr v-for="draft in visible" :key="draft.saved.name" :data-test="'row-' + draft.saved.name">
               <th scope="row">
-                <div class="admin-record-name"><div>
+                <div class="admin-record-name"><span class="admin-record-badge" aria-hidden="true">{{ draft.saved.label.slice(0, 2).toUpperCase() }}</span><div>
                   <button type="button" class="admin-row-button" aria-haspopup="dialog" :aria-label="`Open ${draft.saved.label}`" @click="selectedName = draft.saved.name">{{ draft.saved.label }}</button>
                   <code>{{ draft.saved.name }}</code>
                 </div></div>
               </th>
-              <td><span class="state" :class="{ ready: draft.saved.ready }"><span aria-hidden="true">{{ draft.saved.ready ? "✓" : "○" }}</span> {{ draft.saved.ready ? "Ready" : draft.saved.reason ?? "Not ready" }}</span></td>
-              <td>{{ draft.saved.enabled ? "On" : "Off" }}</td>
-              <td>{{ draft.saved.origins.length }}</td>
+              <td>
+                <div class="status-cell"><span class="pill" :class="{ ready: draft.saved.ready }"><span aria-hidden="true">{{ draft.saved.ready ? "✓" : "○" }}</span> {{ draft.saved.ready ? "Ready" : "Not ready" }}</span>
+                <span v-if="!draft.saved.ready && draft.saved.reason" class="reason">{{ draft.saved.reason }}</span></div>
+              </td>
+              <td><span class="pill" :class="{ on: draft.saved.enabled }">{{ draft.saved.enabled ? "On" : "Off" }}</span></td>
+              <td class="count">{{ draft.saved.origins.length }}</td>
               <TestResultCells :id="draft.saved.name" :label="draft.saved.label" :testing="draft.pending === 'test'" :busy="!!draft.pending"
                 :result="draft.result" @test="test(draft)" />
             </tr>
@@ -268,11 +271,15 @@ watch(selectedName, () => { tab.value = "general"; });
       <form v-if="selected" class="service" :aria-label="selected.saved.label" :data-test="'service-' + selected.saved.name" @submit.prevent="drawer?.requestSave()">
         <FormTabs v-model="tab" :items="tabItems" prefix="tool" label="Service settings" />
         <section v-show="tab === 'general'" id="tool-panel-general" class="pane" role="tabpanel" aria-labelledby="tool-tab-general">
-        <p class="state" :class="{ ready: selected.saved.ready }">
-          <span aria-hidden="true">{{ selected.saved.ready ? "✓" : "○" }}</span>
-          {{ selected.saved.ready ? "Ready" : selected.saved.reason ?? "Not ready" }}
-        </p>
+        <div class="summary">
+          <span class="admin-record-badge big" aria-hidden="true">{{ selected.saved.label.slice(0, 2).toUpperCase() }}</span>
+          <div class="summary-copy"><span class="eyebrow">Tool service</span><code>{{ selected.saved.name }}</code></div>
+          <span class="pill" :class="{ ready: selected.saved.ready }"><span aria-hidden="true">{{ selected.saved.ready ? "✓" : "○" }}</span> {{ selected.saved.ready ? "Ready" : "Not ready" }}</span>
+        </div>
+        <p v-if="!selected.saved.ready && selected.saved.reason" class="help">{{ selected.saved.reason }}</p>
 
+        <section class="group">
+        <h4>Connection</h4>
         <ToggleSwitch
           :checked="selected.enabled"
           :disabled="!!selected.pending"
@@ -286,9 +293,14 @@ watch(selectedName, () => { tab.value = "general"; });
           :placeholder="selected.saved.has_token ? 'Leave empty to keep the saved token' : undefined"
           :disabled="!!selected.pending"
         />
+        <p class="help">The token is saved in Stronghold and never shown again.</p>
+        </section>
 
         </section>
         <section v-show="tab === 'addresses'" id="tool-panel-addresses" class="pane" role="tabpanel" aria-labelledby="tool-tab-addresses">
+        <section class="group">
+        <h4>Addresses</h4>
+        <p class="help">Tried in order. The first is primary; the rest are used when the one before it is down.</p>
         <div class="field">
           <label for="tool-preset">Preset</label>
           <select id="tool-preset" v-model="preset" data-test="preset" :disabled="!!selected.pending" @change="usePreset(selected)">
@@ -351,9 +363,11 @@ watch(selectedName, () => { tab.value = "general"; });
           </button>
         </div>
         </section>
+        </section>
         <p v-if="selected.error" class="error" role="alert">{{ selected.error }}</p>
         <p v-if="selected.notice" class="help" role="status">{{ selected.notice }}</p>
-        <div v-if="selected.result" data-test="test-result" role="status">
+        <div v-if="selected.result" class="result" :class="selected.result.ok ? 'ok' : 'bad'" data-test="test-result" role="status">
+          <strong>{{ selected.result.ok ? "Connected" : "Test failed" }}</strong>
           <p>{{ selected.result.message }}</p>
           <ul v-if="selected.result.origins.length">
             <li v-for="origin in selected.result.origins" :key="origin.origin_id">
@@ -361,9 +375,11 @@ watch(selectedName, () => { tab.value = "general"; });
             </li>
           </ul>
         </div>
-        <div v-if="selected.saved.origins.length || selected.saved.has_token || !selected.saved.enabled" class="remove">
+        <section v-if="selected.saved.origins.length || selected.saved.has_token || !selected.saved.enabled" class="danger-zone">
+          <h4>Danger zone</h4>
+          <p class="help">Clears the saved addresses and tokens from Stronghold. The addresses stay in Treasury.</p>
           <button class="danger" type="button" data-test="clear" :disabled="!!selected.pending" @click="removing = selected">Remove connection</button>
-        </div>
+        </section>
       </form>
       <template v-if="selected" #footer>
         <button class="chip" type="button" data-test="test" :disabled="!!selected.pending" :aria-busy="selected.pending === 'test'" @click="test(selected)">{{ selected.pending === "test" ? "Testing…" : "Test" }}</button>
@@ -386,12 +402,33 @@ watch(selectedName, () => { tab.value = "general"; });
 </template>
 
 <style scoped>
-.pane { display: grid; gap: 12px; min-width: 0; }
+.pane { display: grid; gap: 16px; min-width: 0; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); font-size: 0.8em; color: var(--muted); white-space: nowrap; }
+.pill.ready { color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--bg)); }
+.pill.on { color: var(--text); }
+.status-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.reason { font-size: 0.78em; color: var(--muted); }
+.count { font-variant-numeric: tabular-nums; }
+.summary { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.summary-copy { flex: 1; min-width: 0; }
+.summary-copy { display: grid; gap: 2px; }
+.eyebrow { font-size: 0.75em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.summary code { font-size: 0.95em; color: var(--text); }
+.admin-record-badge.big { width: 44px; height: 44px; color: var(--accent); }
+.group { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.group h4 { margin: 0; font-size: 0.9em; }
+.result { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.result.ok { border-color: color-mix(in srgb, var(--success) 50%, var(--border)); }
+.result.bad { border-color: var(--danger); }
+.result strong { font-size: 0.85em; }
+.result ul { margin: 4px 0 0; padding-left: 18px; font-size: 0.9em; }
+.danger-zone { display: grid; gap: 8px; justify-items: start; padding: 14px; border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border)); border-radius: var(--radius-lg); }
+.danger-zone h4 { margin: 0; font-size: 0.9em; color: var(--danger); }
 .service { display: grid; gap: 12px; min-width: 0; padding-top: 4px; }
 .service p { margin: 0; overflow-wrap: anywhere; }
 .state, .help { color: var(--muted); font-size: 0.9em; }
 .state.ready { color: var(--success); }
-.address-row { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.address-row { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .address-row legend { padding: 0 4px; font-size: 0.9em; font-weight: 600; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field label { font-size: 0.9em; font-weight: 600; }

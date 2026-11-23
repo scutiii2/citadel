@@ -128,7 +128,7 @@ watch(range, load);
       <div class="analytics-body">
       <template v-if="tab === 'overview'">
         <p v-if="error" class="error">{{ error }}</p>
-        <p v-else-if="!report" class="muted">loading ...</p>
+        <p v-else-if="!report" class="muted" role="status">Loading analytics…</p>
         <div v-if="report" :class="['overview', { dim: loading }]">
           <div class="tiles">
             <KindStatTile

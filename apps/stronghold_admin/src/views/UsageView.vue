@@ -5,6 +5,7 @@ import { usageClient, type AccountUsage, type MyUsage, type UsageGroupBy, type U
 import { ApiError } from "../api/http";
 import AdminSearch from "../components/admin/AdminSearch.vue";
 import PanelHelp from "../components/admin/PanelHelp.vue";
+import StatTile from "../components/admin/StatTile.vue";
 import RecordDrawer from "../components/admin/RecordDrawer.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
 import UsageDetails from "../components/usage/UsageDetails.vue";
@@ -35,6 +36,12 @@ const visible = computed(() => {
   const query = search.value.trim().toLowerCase();
   return accounts.value.filter((user) => user.username.toLowerCase().includes(query));
 });
+const totals = computed(() => ({
+  tokens: accounts.value.reduce((sum, user) => sum + user.tokens, 0),
+  turns: accounts.value.reduce((sum, user) => sum + user.turns, 0),
+  active: accounts.value.filter((user) => user.tokens > 0).length,
+  top: Math.max(1, ...accounts.value.map((user) => user.tokens)),
+}));
 const selected = ref<AccountUsage | null>(null);
 const summaryLoading = ref(false);
 const summaryError = ref("");
@@ -164,6 +171,12 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
 
 <template>
   <PageLayout class="usage-view admin-panel" title="Usage" wide>
+    <div v-if="accounts.length && !summaryError" class="stats" aria-label="Totals for the period">
+      <StatTile label="Accounts" :value="accounts.length" />
+      <StatTile label="Accounts with usage" :value="totals.active" />
+      <StatTile label="Tokens" :value="totals.tokens" />
+      <StatTile label="Answers" :value="totals.turns" />
+    </div>
     <section class="admin-panel-card" aria-labelledby="usage-title" :aria-busy="summaryLoading">
       <header class="admin-panel-head">
         <h2 id="usage-title">All users</h2>
@@ -185,8 +198,13 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
           <thead><tr><th scope="col">User</th><th scope="col" class="num">Tokens</th><th scope="col" class="num">Answers</th><th scope="col">Last used in period</th></tr></thead>
           <tbody>
             <tr v-for="user in visible" :key="user.account_id">
-              <th scope="row"><button type="button" class="admin-row-button" aria-haspopup="dialog" :aria-label="`View usage for ${user.username}`" @click="selected = user">{{ user.username }}</button></th>
-              <td class="num">{{ user.tokens.toLocaleString() }}</td>
+              <th scope="row">
+                <div class="admin-record-name">
+                  <span class="admin-record-badge" aria-hidden="true">{{ user.username.slice(0, 2).toUpperCase() }}</span>
+                  <button type="button" class="admin-row-button" aria-haspopup="dialog" :aria-label="`View usage for ${user.username}`" @click="selected = user">{{ user.username }}</button>
+                </div>
+              </th>
+              <td class="num"><span class="tokens">{{ user.tokens.toLocaleString() }}</span><span class="share" aria-hidden="true"><span :style="{ width: `${Math.round((user.tokens / totals.top) * 100)}%` }"></span></span></td>
               <td class="num">{{ user.turns.toLocaleString() }}</td>
               <td>{{ user.last_used_at ? formatUtc(user.last_used_at) : "No usage" }}</td>
             </tr>
@@ -212,6 +230,10 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
 .ranges { min-width: 0; max-width: 100%; }
 .ranges > .segmented-control { flex: 1 1 auto; }
 .num { text-align: right; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.tokens { display: block; font-variant-numeric: tabular-nums; }
+.share { display: block; height: 4px; margin: 4px 0 0 auto; width: 100%; max-width: 140px; border-radius: var(--radius-full); background: var(--code-bg); overflow: hidden; }
+.share > span { display: block; height: 100%; background: var(--accent); }
 .drawer-actions { display: flex; justify-content: flex-end; padding-top: 8px; }
 .muted { color: var(--muted); }
 .error { color: var(--danger); }

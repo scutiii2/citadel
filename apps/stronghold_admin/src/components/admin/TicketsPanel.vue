@@ -264,22 +264,6 @@ function setPinned(group: TicketGroup, event: Event): void {
           <p>A clear view of what needs attention and what is moving forward.</p>
           <p>Board shows tickets by status, Groups gathers similar reports, and Review lists tickets that may belong to another group. Open a ticket to read it, change it and reply.</p>
         </PanelHelp>
-        <SegmentedControl v-model="mode" :options="MODE_OPTIONS" aria-label="Ticket view" />
-        <template v-if="mode === 'groups'">
-          <SegmentedControl v-model="status" :options="STATUS_OPTIONS" label="Status" aria-label="Ticket status" />
-        </template>
-        <label class="field">
-          <select v-model="priority" aria-label="Priority filter">
-            <option value="all">All priorities</option>
-            <option v-for="p in PRIORITIES" :key="p" :value="p">{{ PRIORITY_LABELS[p] }}</option>
-          </select>
-        </label>
-        <label class="field">
-          <select v-model="tag" aria-label="Tag filter">
-            <option value="">All tags</option>
-            <option v-for="t in tagOptions" :key="t" :value="t">{{ t }}</option>
-          </select>
-        </label>
         <button type="button" class="admin-icon refresh" title="Refresh" aria-label="Refresh" :disabled="loading || busy" :aria-busy="loading" @click="load">
           <svg :class="{ spinning: loading }" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 3M18 18a8 8 0 0 1-13-3" /></svg>
         </button>
@@ -287,6 +271,25 @@ function setPinned(group: TicketGroup, event: Event): void {
       </div>
     </header>
     <div class="tickets-body">
+
+    <div class="ticket-toolbar" role="group" aria-label="Ticket filters">
+      <SegmentedControl v-model="mode" :options="MODE_OPTIONS" aria-label="Ticket view" />
+      <template v-if="mode === 'groups'">
+        <SegmentedControl v-model="status" :options="STATUS_OPTIONS" label="Status" aria-label="Ticket status" />
+      </template>
+      <label class="field">
+        <select v-model="priority" aria-label="Priority filter">
+          <option value="all">All priorities</option>
+          <option v-for="p in PRIORITIES" :key="p" :value="p">{{ PRIORITY_LABELS[p] }}</option>
+        </select>
+      </label>
+      <label class="field">
+        <select v-model="tag" aria-label="Tag filter">
+          <option value="">All tags</option>
+          <option v-for="t in tagOptions" :key="t" :value="t">{{ t }}</option>
+        </select>
+      </label>
+    </div>
 
     <div class="ticket-summary">
       <span v-if="mode === 'groups'"><strong>{{ visibleGroups.length }}</strong> groups</span>
@@ -408,7 +411,10 @@ function setPinned(group: TicketGroup, event: Event): void {
 .refresh svg { width: 16px; height: 16px; }
 .spinning { animation: ticket-refresh 0.8s linear infinite; }
 @keyframes ticket-refresh { to { transform: rotate(360deg); } }
-.ticket-summary { display: flex; align-items: center; gap: 16px; color: var(--muted); font-size: 0.8em; margin-bottom: 22px; }
+.ticket-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.ticket-toolbar .field select { min-height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); font: inherit; }
+.ticket-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--muted); font-size: 0.8em; margin-bottom: 16px; }
+.ticket-summary > span:not(.summary-sort) { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--surface); }
 .ticket-summary strong { color: var(--text); font-weight: 500; }
 .summary-urgent { display: inline-flex; align-items: center; gap: 5px; color: var(--status-failed); }
 .summary-urgent svg { width: 14px; height: 14px; }
