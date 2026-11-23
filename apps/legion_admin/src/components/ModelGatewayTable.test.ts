@@ -52,3 +52,20 @@ it("refuses a name the gateway would not accept before asking to save", async ()
   expect(wrapper.get('[data-test="error"]').text()).toContain("lowercase");
   wrapper.unmount();
 });
+
+it("splits a chat gateway into Connection and Models tabs and returns to Connection for a missing field", async () => {
+  vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue(list as never);
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
+  await flushPromises();
+  await wrapper.get('[data-test="add-conversation"]').trigger("click");
+  await wrapper.get('[data-test="type"]').setValue("openai");
+  await wrapper.get('[data-test="tab-models"]').trigger("click");
+  expect(wrapper.get('[data-test="tab-models"]').attributes("aria-selected")).toBe("true");
+  expect(wrapper.get("#conversation-panel-models").isVisible()).toBe(true);
+  expect(wrapper.get("#conversation-panel-connection").isVisible()).toBe(false);
+  await wrapper.get('[data-test="id"]').setValue("Bad Name");
+  await wrapper.get("form").trigger("submit");
+  expect(wrapper.get('[data-test="tab-connection"]').attributes("aria-selected")).toBe("true");
+  expect(wrapper.get('[data-test="error"]').text()).toContain("lowercase");
+  wrapper.unmount();
+});
