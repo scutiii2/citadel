@@ -124,6 +124,8 @@ function discard() {
 
       <section v-show="panel?.matches('Prices', 'Model', ...prices.map((row) => row.model))" class="group" aria-labelledby="prices-title">
         <h3 id="prices-title">Prices</h3>
+        <p class="help">US dollars per 1,000,000 tokens. A model that is not listed has no cost estimate.</p>
+        <div v-if="prices.length" class="price price-head" aria-hidden="true"><span>Model</span><span>Input</span><span>Output</span><span></span></div>
         <div v-for="row in prices" :key="row.key" class="price" data-test="price">
           <input v-model="row.model" aria-label="Model name" placeholder="Model name" autocomplete="off" spellcheck="false" :disabled="saving" data-test="price-model" />
           <input v-model="row.input" aria-label="Input price" type="number" min="0" step="any" placeholder="Input" :disabled="saving" data-test="price-input" />
@@ -132,7 +134,7 @@ function discard() {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" /></svg>
           </button>
         </div>
-        <div>
+        <div class="add">
           <button type="button" class="admin-icon" title="Add a model" aria-label="Add a model" :disabled="saving" data-test="price-add" @click="addPrice">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
           </button>
@@ -147,7 +149,10 @@ function discard() {
 .error { color: var(--danger); }
 .muted { color: var(--muted); }
 .form { display: grid; }
-.group { display: grid; gap: 12px; max-width: 720px; padding: 16px; }
+.group { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px 20px; align-content: start; padding: 20px 16px; }
+.group > h3, .group > .help, .group > .path, .group > .price, .group > .price-head, .group > .add { grid-column: 1 / -1; }
+.group > h3 { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.field > input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .group + .group { border-top: 1px solid var(--border); }
 .group h3 { margin: 0; font-size: 1em; }
 .field { display: grid; gap: 4px; min-width: 0; }
@@ -155,6 +160,8 @@ function discard() {
 .field > input, .price > input { min-width: 0; min-height: 44px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
 .price { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
+.price-head { font-size: 0.8em; font-weight: 600; color: var(--muted); margin-bottom: -8px; }
+.price-head span:last-child { width: 44px; }
 @media (max-width: 560px) {
   .price { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
   .price > input:first-child { grid-column: 1 / -1; }

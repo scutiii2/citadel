@@ -421,6 +421,10 @@ onMounted(load);
         <dl>
           <dt>{{ chat ? "Provider" : "Kind" }}</dt><dd>{{ selected.provider ?? selected.kind }}</dd>
           <template v-if="summary(selected)"><dt>{{ selected.model ? "Model" : "Address" }}</dt><dd><code>{{ summary(selected) }}</code></dd></template>
+          <dt>ID</dt><dd><code>{{ selected.id }}</code></dd>
+          <template v-if="selected.label && selected.label !== selected.id"><dt>Label</dt><dd>{{ selected.label }}</dd></template>
+          <template v-if="selected.auth"><dt>Authentication</dt><dd>{{ selected.auth }}</dd></template>
+          <template v-if="selected.timeout_s"><dt>Timeout</dt><dd>{{ selected.timeout_s }} seconds</dd></template>
           <dt>Reachable</dt><dd>{{ selected.reachable === undefined ? "Not checked" : selected.reachable ? "Yes" : "No" }}</dd>
         </dl>
         <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>

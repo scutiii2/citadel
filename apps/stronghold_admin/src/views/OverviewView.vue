@@ -110,7 +110,7 @@ onMounted(async () => {
 
 <style scoped>
 .error { margin: 0 0 12px; color: var(--danger); }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .stat { display: grid; gap: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); text-decoration: none; }
 .stat:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
 .stat:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

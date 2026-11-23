@@ -190,9 +190,13 @@ function discard(): void {
 .error { color: var(--danger); }
 .muted { color: var(--muted); }
 .form { display: grid; }
-.group { display: grid; gap: 12px; max-width: 720px; padding: 16px; }
+.group { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px 20px; align-content: start; padding: 20px 16px; }
+.group > h3, .group > .help, .group > .path, .group > .price, .group > .price-head, .group > .add { grid-column: 1 / -1; }
+.group > h3 { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.field > input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .group + .group { border-top: 1px solid var(--border); }
 .group h3 { margin: 0; font-size: 1em; }
+.group > .help { margin-top: -8px; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }
 .field > input { min-width: 0; min-height: 44px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
