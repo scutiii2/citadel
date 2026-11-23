@@ -445,6 +445,27 @@ def test_auto_summarize_when_the_context_is_nearly_full(make_client, agent: Turn
     assert agent.asks[1]["history"][0]["content"] == "SUMMARY"
 
 
+def test_early_compaction_preserves_the_active_turn(make_client, agent: TurnAgent, tmp_path, monkeypatch) -> None:
+    from src.triage.questions import AskOutcome, TriageQuestions
+
+    async def decide(self, caller, kind, text, question, options):
+        choice = "keep_2" if any(option.title == "keep_2" for option in options) else "wait"
+        return AskOutcome({"choice": choice, "uncertain": False, "confidence": 0.95}, {})
+
+    monkeypatch.setattr(TriageQuestions, "ask", decide)
+    client = make_client(usage=UsageSettings(max_context_tokens_per_chat=2000, auto_summarize_ratio=0.5))
+    add_summarizer(tmp_path)
+    agent.result_extra["context_tokens"] = 850
+    chat_id = two_turns(client)
+    start(client, chat_id, "continue second task")
+
+    assert events(client, chat_id)[-1]["type"] == "final"
+    assert [message["content"] for message in agent.asks[-1]["history"]] == ["SUMMARY", "second", "Hello!"]
+    messages = chat(client, chat_id)["messages"]
+    assert messages[1]["kind"] == "log_attachment" and "first" in messages[1]["content"]
+    assert "second" not in messages[1]["content"] and messages[2]["content"] == "second"
+
+
 def test_an_auto_summarize_failure_still_answers(make_client, agent: TurnAgent, tmp_path) -> None:
     client = make_client(usage=UsageSettings(max_context_tokens_per_chat=1000, auto_summarize_ratio=0.5))
     add_summarizer(tmp_path)

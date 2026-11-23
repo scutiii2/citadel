@@ -13,8 +13,19 @@ NOW = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
 
 
 class FakeClassifier:
-    def __init__(self, tag=None, verdicts=None, down=False):
+    def __init__(self, tag=None, verdicts=None, down=False, priority="normal", reportable=True):
         self.tag, self.verdicts, self.down, self.tuned = tag, list(verdicts or []), down, None
+        self.priority, self.reportable = priority, reportable
+
+    async def pick_priority(self, caller, ticket):
+        if self.down:
+            raise ClassifierUnavailable("down")
+        return self.priority
+
+    async def reportable_failure(self, caller, tool, error):
+        if self.down:
+            raise ClassifierUnavailable("down")
+        return self.reportable
 
     async def pick_tag(self, caller, ticket, tags):
         if self.down:
@@ -47,6 +58,32 @@ async def test_a_ticket_is_filed_with_its_own_group_and_the_requester_as_owner(d
     outcome = await file(service)
     assert outcome.ticket["owner"] == "u-1" and outcome.ticket["reporter"] == "ana"
     assert outcome.duplicate is False and outcome.group_size == 1
+
+
+async def test_priority_is_stored_without_changing_the_pinned_group(db_gateway):
+    classifier = FakeClassifier(tag="email", verdicts=["yes"])
+    service = make(db_gateway, classifier)
+    first = await file(service)
+    group_id = first.ticket["group_id"]
+    await service.set_group_priority(group_id, priority="low")
+    classifier.priority = "urgent"
+
+    next_ticket = (await file(service, owner="u-2")).ticket
+    assert next_ticket["group_id"] == group_id
+    assert next_ticket["priority"] == "urgent"
+    assert next_ticket["effective_priority"] == "urgent"
+    group = await service._store.get_group(group_id)
+    assert group["priority"] == "low" and group["priority_pinned"]
+
+
+async def test_only_reportable_failures_make_automatic_tickets(db_gateway):
+    classifier = FakeClassifier(reportable=False)
+    service = make(db_gateway, classifier)
+    context = {"tool_name": "tool_mail", "error_text": "Mail connector failed"}
+    with pytest.raises(TicketError, match="require evidence"):
+        await file(service, source="ai_auto", context=context)
+    classifier.reportable = True
+    assert (await file(service, source="ai_auto", context=context)).ticket["id"] == 1
 
 
 @pytest.mark.parametrize("extra, message", [

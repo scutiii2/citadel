@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from src.turns import step_digest, summarization
+from src.triage.questions import AskOutcome
 
 
 def tool_step(tool="search", result="found 3"):
@@ -16,6 +17,27 @@ def answer(text, steps=None):
     if steps is not None:
         message["steps"] = steps
     return message
+
+
+@pytest.mark.parametrize(("choice", "uncertain", "expected"), [
+    ("keep_2", False, 4), ("all", False, 6), ("wait", False, None), ("all", True, None),
+])
+async def test_compaction_only_cuts_at_an_offered_user_turn(choice, uncertain, expected):
+    class Triage:
+        async def ask(self, caller, kind, text, question, options):
+            assert kind == "choice"
+            assert {option.title for option in options} == {"wait", "all", "keep_2"}
+            assert "raw log" not in text and "latest request" in text
+            return AskOutcome({"choice": choice, "uncertain": uncertain, "confidence": 0.95}, {})
+
+    earlier = [
+        {"role": "assistant", "kind": summarization.SUMMARY, "content": "summary"},
+        {"role": "assistant", "kind": summarization.LOG_ATTACHMENT, "content": "raw log"},
+        {"role": "user", "content": "old request"}, answer("old response"),
+        {"role": "user", "content": "active request"}, answer("active response"),
+    ]
+    cut, _ = await summarization.choose_summary_cut(Triage(), None, earlier, {"content": "latest request"})
+    assert cut == expected
 
 
 def test_history_is_unchanged_without_steps():

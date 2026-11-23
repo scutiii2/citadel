@@ -130,6 +130,9 @@ async def choose_summary_cut(
     excerpts = []
     for number, (index, message) in enumerate(recent_users, 1):
         excerpts.append(f"Earlier request {number}: {str(message.get('content') or '')[:450]}")
+        if index + 1 < len(earlier) and earlier[index + 1].get("role") == "assistant":
+            reply = str(earlier[index + 1].get("content") or "")
+            excerpts.append(f"Reply {number} ending: {reply[-240:]}")
         if index > offset:
             label = f"keep_{number}"
             cuts[label] = index

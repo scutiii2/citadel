@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from src.agents.gateway import Caller
+from src.citadel_auth.failure import Code, Failure
 from src.tickets.classifier import ClassifierUnavailable, TicketClassifier
 from src.triage.questions import AskOutcome, TriageUnavailable
 
@@ -99,3 +100,22 @@ async def test_an_out_of_range_confidence_is_not_a_verdict():
     triage = FakeTriage({"kind": "yes_no", "answer": "yes", "confidence": 2, "uncertain": False})
     classifier, _ = make(triage)
     assert await classifier.same_issue(CALLER, NEW, OLD) == "uncertain"
+
+
+async def test_priority_defaults_to_normal_on_uncertainty():
+    triage = FakeTriage({"choice": "urgent", "confidence": 0.95, "uncertain": True})
+    classifier, _ = make(triage)
+    assert await classifier.pick_priority(CALLER, NEW) == "normal"
+    triage.answer["uncertain"] = False
+    assert await classifier.pick_priority(CALLER, NEW) == "urgent"
+
+
+async def test_failure_uses_numbered_codes_and_only_accepts_reportable_model_choices():
+    triage = FakeTriage({"choice": "input", "confidence": 0.95, "uncertain": False})
+    classifier, _ = make(triage)
+    assert not await classifier.reportable_failure(CALLER, "mail", Failure(Code.DEP_TIMEOUT).text)
+    assert await classifier.reportable_failure(CALLER, "mail", Failure(Code.DEP_NOT_CONFIGURED).text)
+    assert not triage.calls
+    assert not await classifier.reportable_failure(CALLER, "mail", "Validation failed.")
+    triage.answer["choice"] = "bug"
+    assert await classifier.reportable_failure(CALLER, "mail", "Unhandled exception.")

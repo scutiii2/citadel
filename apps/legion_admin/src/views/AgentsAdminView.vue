@@ -90,6 +90,10 @@ const roster = computed(() => agents.value.map((agent) => ({
   role: roles[roleKey(agent)],
 })).sort((a, b) => roleOrder.indexOf(a.roleKey) - roleOrder.indexOf(b.roleKey) ||
   (a.agent.label || a.agent.id).localeCompare(b.agent.label || b.agent.id)));
+const roleOptions = computed(() => [
+  { id: "all" as const, label: "All roles", count: roster.value.length },
+  ...roleOrder.map((id) => ({ id, label: roles[id], count: roster.value.filter((row) => row.roleKey === id).length, tone: "muted" as const })),
+]);
 const totals = computed(() => {
   const counts = { all: roster.value.length, running: 0, offline: 0, disabled: 0, unknown: 0 };
   for (const row of roster.value) counts[row.status]++;
@@ -270,18 +274,12 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 <template>
   <PageLayout class="agents-admin" title="Agents" wide>
     <StatusFilters :model-value="filter" label="Filter agents" :options="filterOptions" @update:model-value="setFilter" />
+    <StatusFilters v-model="roleFilter" label="Filter agents by role" :options="roleOptions" data-test="role-filter" />
     <p v-if="notice" class="notice" role="status" data-test="notice">{{ notice }}</p>
     <section class="admin-panel-card" aria-labelledby="agent-roster">
       <header class="admin-panel-head">
         <h2 id="agent-roster">Agents</h2>
         <div class="admin-panel-tools">
-          <label class="role-filter">
-            <span class="sr-only">Filter by role</span>
-            <select v-model="roleFilter" data-test="role-filter">
-              <option value="all">All roles</option>
-              <option v-for="(name, key) in roles" :key="key" :value="key">{{ name }}</option>
-            </select>
-          </label>
           <PanelHelp title="Agents">Every agent Legion can run, with its status. Open an agent to edit its model, tools and prompts. Shared prompts apply to all agents and restart them.</PanelHelp>
           <button type="button" class="admin-icon" data-test="shared-prompts" aria-label="Shared prompts" title="Shared prompts" @click="promptsOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7" /></svg></button>
           <button type="button" class="admin-icon accent" data-test="new" aria-label="New agent" title="New agent" :disabled="loading || !!error" @click="openCreate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
@@ -358,7 +356,5 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 .agent-state.offline span { color: var(--warning); }
 .count { border-top: 1px solid var(--border); font-size: 0.8rem; }
 .notice { color: var(--muted); }
-.role-filter select { min-height: 36px; padding: 4px 28px 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); font: inherit; font-size: 0.85rem; }
-.role-filter select:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 400px) { .admin-record-badge { display: none; } }
 </style>
