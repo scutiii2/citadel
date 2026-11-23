@@ -5,7 +5,7 @@ import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import AdminSearch from "../components/admin/AdminSearch.vue";
 import PanelHelp from "../components/admin/PanelHelp.vue";
 import RecordDrawer from "../components/admin/RecordDrawer.vue";
-import ConnectionTest from "../components/ConnectionTest.vue";
+import ConnectionTestCells from "../components/ConnectionTestCells.vue";
 import PasswordInput from "../components/PasswordInput.vue";
 import { errorMessage } from "../utils/errors";
 
@@ -277,7 +277,7 @@ async function remove() {
     </p>
     <div v-else-if="loaded" class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="mcp-servers-title">
       <table class="admin-records">
-        <thead><tr><th scope="col">Name</th><th scope="col">{{ rows.some(([, server]) => server.transport === "stdio") ? "Connection URL or command" : "Connection URL" }}</th><th scope="col">Test</th></tr></thead>
+        <thead><tr><th scope="col">Name</th><th scope="col">{{ rows.some(([, server]) => server.transport === "stdio") ? "Connection URL or command" : "Connection URL" }}</th><th scope="col">Test</th><th scope="col">Result</th></tr></thead>
         <tbody>
           <tr v-for="[serverId, server] in rows" :key="serverId" :data-test="`row-${serverId}`">
             <th scope="row">
@@ -288,7 +288,7 @@ async function remove() {
               </div>
             </th>
             <td><code>{{ endpoint(server) }}</code></td>
-            <td><ConnectionTest :label="server.label" :run="() => agentsAdminClient.testServer(serverId)" /></td>
+            <ConnectionTestCells :label="server.label" :run="() => agentsAdminClient.testServer(serverId)" />
           </tr>
         </tbody>
       </table>

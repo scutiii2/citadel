@@ -39,6 +39,28 @@ def _parts(kind: str) -> tuple[Any, Any] | None:
     return None
 
 
+def _with_tiers(presets: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Each chat preset that has a template file in gateways/<provider>/<name>.json also carries that file's tier models
+    and descriptions, so Start from fills the whole Models tab."""
+    from src.providers import llm_config
+
+    try:
+        templates = llm_config.load_gateways()
+    except (OSError, ValueError):
+        return presets
+    result = {}
+    for key, preset in presets.items():
+        block = templates.get(preset.get("provider"), {}).get(key)
+        models = block.get("models") if isinstance(block, dict) else None
+        if isinstance(models, dict):
+            tiers = {name: tier for name, tier in models.items() if isinstance(tier, dict) and isinstance(tier.get("id"), str)}
+            preset = {**preset,
+                      "models": {name: tier["id"] for name, tier in tiers.items() if not tier["id"].startswith("{")},
+                      "descriptions": {name: tier["use_for"] for name, tier in tiers.items() if isinstance(tier.get("use_for"), str)}}
+        result[key] = preset
+    return result
+
+
 def _forget() -> None:
     from src.providers import gateway_client
     from src.providers.decision import gateway_client as decision_client
@@ -55,7 +77,7 @@ def register(mcp: FastMCP) -> None:
             return JSONResponse({"error": "unknown gateway"}, status_code=404)
         rows = await gateway.call(parts[0].gateways())
         if kind == "conversation":
-            return JSONResponse({"gateways": rows, "form": CONVERSATION_FORM, "presets": CONVERSATION_PRESETS})
+            return JSONResponse({"gateways": rows, "form": CONVERSATION_FORM, "presets": _with_tiers(CONVERSATION_PRESETS)})
         return JSONResponse({"gateways": rows, "kinds": {k: DECISION_FORM[k] for k in DECISION_KINDS},
                              "presets": DECISION_PRESETS, "model_lists": MODEL_LISTS})
 
@@ -86,7 +108,7 @@ def register(mcp: FastMCP) -> None:
         try:
             message = await gateway.call(parts[0].test(request.path_params["gateway_id"]))
         except (GatewayError, DecisionGatewayError) as error:  # each service raises its own class
-            return JSONResponse({"ok": False, "message": error.message})
+            return JSONResponse({"ok": False, "code": str(error.status), "message": error.message})
         return JSONResponse({"ok": True, "message": message})
 
     @mcp.custom_route("/agents/model-gateways/conversation/{gateway_id}/models", methods=["GET"])
@@ -94,5 +116,5 @@ def register(mcp: FastMCP) -> None:
         try:
             names = await gateway.call(gateway.chat_service().models(request.path_params["gateway_id"]))
         except GatewayError as error:
-            return JSONResponse({"ok": False, "message": error.message})
+            return JSONResponse({"ok": False, "code": str(error.status), "message": error.message})
         return JSONResponse({"ok": True, "models": names})

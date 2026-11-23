@@ -1,6 +1,6 @@
 """Reachability check for the Connections page: one MCP server, changing nothing.
 
-The check asks each address for any answer and reports `{ok, message, origins?}`. A token is only sent to the address it belongs to, and
+The check asks each address for any answer and reports `{ok, message, code?, origins?}`; `code` is the HTTP status of a refusal, or NET, TIME, GONE, STDIO. A token is only sent to the address it belongs to, and
 never appears in a result.
 """
 
@@ -17,21 +17,21 @@ _TIMEOUT = httpx.Timeout(5.0, connect=3.0)
 _TRANSPORT: httpx.AsyncBaseTransport | None = None
 
 
-async def _get(address: str, headers: dict[str, str]) -> httpx.Response | str:
-    """The answer to one GET, or the reason there was none."""
+async def _get(address: str, headers: dict[str, str]) -> httpx.Response | tuple[str, str]:
+    """The answer to one GET, or `(code, reason)` when there was none."""
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT, transport=_TRANSPORT, follow_redirects=False) as client:
             return await client.get(address, headers=headers)
     except httpx.TimeoutException:
-        return "No answer within 5 seconds."
+        return "TIME", "No answer within 5 seconds."
     except httpx.HTTPError:
-        return "Could not connect to this address."
+        return "NET", "Could not connect to this address."
 
 
 async def probe_server(entry: dict[str, Any]) -> dict[str, Any]:
     """Any HTTP answer below 500 from each address of an MCP server shows it is up; 401 and 403 mean the token is refused."""
     if entry.get("transport") != "http":
-        return {"ok": False, "message": "Only http connections can be tested from here.", "origins": []}
+        return {"ok": False, "code": "STDIO", "message": "Only http connections can be tested from here.", "origins": []}
     auth = entry.get("auth") if isinstance(entry.get("auth"), dict) else {}
     path = entry.get("path") or "/mcp"
     targets: list[tuple[str, str | None]] = []
@@ -43,18 +43,20 @@ async def probe_server(entry: dict[str, Any]) -> dict[str, Any]:
     results = []
     for address, own_token in targets:
         if not address:
-            results.append({"ok": False, "message": "This address left Treasury's catalog."})
+            results.append({"ok": False, "code": "GONE", "message": "This address left Treasury's catalog."})
             continue
         token = own_token or auth.get("header_value")
         headers = {auth["header_name"]: token} if auth.get("type") == "header" and auth.get("header_name") and token else {}
         answer = await _get(address, headers)
-        if isinstance(answer, str):
-            results.append({"ok": False, "message": answer})
+        if isinstance(answer, tuple):
+            results.append({"ok": False, "code": answer[0], "message": answer[1]})
         elif answer.status_code in (401, 403):
-            results.append({"ok": False, "message": "The token was refused."})
+            results.append({"ok": False, "code": str(answer.status_code), "message": "The token was refused."})
         elif answer.status_code >= 500:
-            results.append({"ok": False, "message": f"The server answered {answer.status_code}."})
+            results.append({"ok": False, "code": str(answer.status_code), "message": f"The server answered {answer.status_code}."})
         else:
             results.append({"ok": True, "message": "The server answers."})
     ok = bool(results) and all(result["ok"] for result in results)
-    return {"ok": ok, "message": "Every address answers." if ok else "Some addresses do not answer.", "origins": results}
+    failed = next((result for result in results if not result["ok"]), None)
+    return {"ok": ok, "message": "Every address answers." if ok else "Some addresses do not answer.",
+            **({"code": failed["code"]} if failed else {}), "origins": results}
