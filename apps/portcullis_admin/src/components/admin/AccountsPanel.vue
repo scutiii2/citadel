@@ -56,6 +56,14 @@ const drawer = ref<InstanceType<typeof RecordDrawer>>();
 const searchField = ref<InstanceType<typeof AdminSearch>>();
 
 const myId = computed(() => auth.account?.id ?? null);
+type RowStatus = "active" | "unverified" | "disabled";
+const statusOf = (a: AdminAccount): RowStatus => !a.is_active ? "disabled" : !a.email_verified ? "unverified" : "active";
+/** What each status means and what to do about it, shown in the helper popover beside the status. */
+const STATUS_HELP: Record<RowStatus, string> = {
+  active: "The account can sign in. Nothing to do.",
+  unverified: "The email address is not confirmed yet, so sign-in is held back. Ask the person to open the verification link in their email, or invite them again.",
+  disabled: "The account cannot sign in. Open it and turn Active on to let the person back in.",
+};
 const selected = computed(() => (selectedId.value === null ? null : known.value.get(selectedId.value) ?? null));
 const canEdit = computed(() => !!selected.value && !selected.value.is_protected && (auth.hasPermission("accounts.manage") || auth.hasPermission("roles.assign")));
 
@@ -314,11 +322,12 @@ async function confirm(): Promise<void> {
                 </div>
               </th>
               <td class="role-cell"><span v-for="r in a.roles" :key="r.id" class="chip fixed">{{ r.name }}</span><span v-if="!a.roles.length" class="muted">No roles</span></td>
-              <td>
+              <td><div class="status-cell">
                 <span v-if="!a.is_active" class="account-status disabled"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0" /></svg>disabled</span>
                 <span v-else-if="!a.email_verified" class="account-status unverified"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0" /></svg>unverified</span>
                 <span v-else class="account-status active"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>active</span>
-              </td>
+                <PanelHelp :title="statusOf(a)"><p>{{ STATUS_HELP[statusOf(a)] }}</p></PanelHelp>
+              </div></td>
             </tr>
           </tbody>
         </table>
@@ -353,6 +362,7 @@ async function confirm(): Promise<void> {
 </template>
 
 <style scoped>
+.status-cell { display: flex; align-items: center; gap: 4px; }
 .accounts-panel { min-width: 0; }
 .admin-records tbody tr.selected { background: var(--surface); }
 .mobile-roles { display: none; }
