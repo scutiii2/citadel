@@ -39,7 +39,7 @@ async def _call(awaitable) -> Any:
     try:
         return await awaitable
     except AgentAdminUnavailable as error:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ai_agent is unreachable") from error
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Legion is unreachable") from error
     except AgentAdminRefused as error:
         code = error.status if error.status in (404, 409, 502) else status.HTTP_400_BAD_REQUEST
         raise HTTPException(code, str(error)) from error
