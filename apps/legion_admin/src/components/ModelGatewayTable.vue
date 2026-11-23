@@ -33,6 +33,9 @@ const auth = ref("key");
 const model = ref("");
 const api = ref("chat");
 const timeout = ref(0);
+const TIERS = ["light", "standard", "heavy", "extreme"] as const;
+const tiers = ref<Record<string, string>>({});
+const notes = ref<Record<string, string>>({});
 const values = ref<Record<string, string>>({});
 const secrets = ref<Record<string, string>>({});
 // Preset keys the form has no input for (label, capabilities, token limits) travel along unchanged.
@@ -77,8 +80,12 @@ function fill(source: Record<string, unknown>) {
   timeout.value = Number(source.timeout_s ?? 0);
   values.value = {};
   secrets.value = {};
+  const models = source.models && typeof source.models === "object" ? source.models as Record<string, unknown> : {};
+  tiers.value = Object.fromEntries(TIERS.map((tier) => [tier, String(models[tier] ?? "")]));
+  const described = source.descriptions && typeof source.descriptions === "object" ? source.descriptions as Record<string, unknown> : {};
+  notes.value = Object.fromEntries(TIERS.map((tier) => [tier, String(described[tier] ?? "")]));
   for (const [name, , secret] of fields.value) if (!secret) values.value[name] = String(source[name] ?? "");
-  const known = new Set([typeKey.value, "auth", "model", "api", "timeout_s", ...fields.value.map(([name]) => name)]);
+  const known = new Set([typeKey.value, "auth", "model", "models", "descriptions", "api", "timeout_s", ...fields.value.map(([name]) => name)]);
   extra.value = Object.fromEntries(Object.entries(source).filter(([name]) => !known.has(name) && !name.startsWith("has_") && name !== "id" && name !== "reachable" && name !== "streams" && name !== "images" && name !== "types"));
 }
 
@@ -132,6 +139,8 @@ const entry = computed(() => {
   if (chat.value && type.value !== "scuti") body.auth = auth.value;
   if (needsModel.value) body.model = model.value.trim();
   if (chat.value && type.value === "openai") body.api = api.value;
+  if (needsModel.value) body.models = Object.fromEntries(TIERS.map((tier) => [tier, (tiers.value[tier] ?? "").trim()]).filter(([, name]) => name));
+  if (needsModel.value) body.descriptions = Object.fromEntries(TIERS.map((tier) => [tier, (notes.value[tier] ?? "").trim()]).filter(([, text]) => text));
   if (timeout.value) body.timeout_s = timeout.value;
   for (const [name, , secret] of fields.value) {
     if (secret) { if (secrets.value[name]) body[name] = secrets.value[name]; } else body[name] = (values.value[name] ?? "").trim();
@@ -257,6 +266,16 @@ onMounted(load);
           <label :for="`${kind}-model`">Model</label>
           <input :id="`${kind}-model`" v-model="model" maxlength="200" autocomplete="off" spellcheck="false" data-test="model" :disabled="saving" />
         </template>
+        <fieldset v-if="needsModel" class="tiers">
+          <legend>Model for each tier</legend>
+          <p class="muted">Optional. The orchestrator picks the lightest tier whose description fits a task, and every agent that delegates reads these descriptions. An empty model uses the one above; an empty description keeps the default.</p>
+          <div v-for="tier in TIERS" :key="tier" class="tier">
+            <label :for="`${kind}-tier-${tier}`">{{ tier[0]?.toUpperCase() }}{{ tier.slice(1) }} model</label>
+            <input :id="`${kind}-tier-${tier}`" v-model="tiers[tier]" maxlength="200" autocomplete="off" spellcheck="false" :data-test="`tier-${tier}`" :disabled="saving" />
+            <label :for="`${kind}-note-${tier}`">When to use {{ tier }}</label>
+            <input :id="`${kind}-note-${tier}`" v-model="notes[tier]" maxlength="300" autocomplete="off" :data-test="`note-${tier}`" :disabled="saving" placeholder="Default description" />
+          </div>
+        </fieldset>
         <template v-if="chat && type === 'openai'">
           <label :for="`${kind}-api`">API style</label>
           <select :id="`${kind}-api`" v-model="api" :disabled="saving">
@@ -299,5 +318,9 @@ onMounted(load);
 
 <style scoped>
 .admin-panel-card { margin-bottom: 14px; }
+.tiers { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.tiers legend { padding: 0; margin-bottom: 4px; font-weight: 600; }
+.tiers p { margin: 0 0 4px; font-size: 0.85rem; }
+.tier { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
 .kind { margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
 </style>

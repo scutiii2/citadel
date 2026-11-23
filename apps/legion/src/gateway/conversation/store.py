@@ -157,6 +157,13 @@ class GatewayStore:
                 raise ValueError("The models are text of at most 200 characters for: " + ", ".join(TIERS) + " (not for a Scuti service).")
             if models := {k: v.strip() for k, v in models.items() if v.strip()}:
                 entry["models"] = models
+        notes = pick("descriptions")  # Legion only: what each tier is for, read by the agents that choose a tier
+        if notes is not None:
+            if (not isinstance(notes, dict) or set(notes) - set(TIERS) or provider == "scuti"
+                    or not all(isinstance(v, str) and len(v.strip()) <= 300 for v in notes.values())):
+                raise ValueError("The tier descriptions are text of at most 300 characters for: " + ", ".join(TIERS) + " (not for a Scuti service).")
+            if notes := {k: v.strip() for k, v in notes.items() if v.strip()}:
+                entry["descriptions"] = notes
         if (label := text("label", "The label", False, 80)) is not None:
             entry["label"] = label
         timeout = pick("timeout_s") if pick("timeout_s") is not None else DEFAULT_TIMEOUT

@@ -38,10 +38,12 @@ class AgentStoreError(Exception):
         self.status = status
 
 
-def gateway_catalog() -> dict[str, list[dict[str, Any]]]:
+def gateway_catalog(saved_only: bool = False) -> dict[str, list[dict[str, Any]]]:
     """Providers and gateways from gateways/<provider>/<gateway>.json.
     Decision presets list Laya and Jev without language tiers. Credentials
-    are never returned: only id, label, default model and tier ids."""
+    are never returned: only id, label, default model and tier ids.
+    `saved_only`: only gateways that are set up on the Model gateways page (a saved
+    gateway without a template file is listed with its own label and model)."""
     try:
         raw = llm_config.load_gateways()
     except (OSError, ValueError) as error:
@@ -64,7 +66,27 @@ def gateway_catalog() -> dict[str, list[dict[str, Any]]]:
                 "tiers": tiers,
             })
         catalog[provider] = gateways
-    return catalog
+    return _saved(catalog) if saved_only else catalog
+
+
+def _saved(catalog: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    """`catalog` cut down to the gateways saved in Legion's chat and decision gateways."""
+    from src import gateway
+
+    chat = gateway.chat_store().all()
+    decision = set(gateway.decision_store().all())
+    result: dict[str, list[dict[str, Any]]] = {}
+    for provider, entries in catalog.items():
+        ids = decision if provider == "decision" else {gid for gid, entry in chat.items() if entry.get("provider") == provider}
+        kept = [entry for entry in entries if entry["id"] in ids]
+        listed = {entry["id"] for entry in kept}
+        for gid in sorted(ids - listed):
+            saved = chat.get(gid, {})
+            kept.append({"id": gid, "label": saved.get("label") or gid,
+                         "model": saved.get("model") if isinstance(saved.get("model"), str) else "",
+                         "tiers": [{"tier": name, "id": tier.id} for name, tier in llm_config.tiers(provider, gid).items()]})
+        result[provider] = kept
+    return result
 
 
 def list_agents(directory: Path = agent_spec.AGENTS_DIR) -> list[dict[str, Any]]:
