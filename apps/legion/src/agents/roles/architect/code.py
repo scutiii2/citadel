@@ -189,7 +189,7 @@ class CodeArchitect:
                           "results": {key: asdict(value) for key, value in results.items()}}, ensure_ascii=False)
         )
 
-    def review_assembly(self, response: str, plan: UnitPlan, brief: str) -> tuple[str, bool]:
+    def review_assembly(self, response: str, plan: UnitPlan, brief: str, results=None) -> tuple[str, bool]:
         if plan.language in ("python", "py", "python3"):
             try:
                 merged = ast.parse(extract_code(response))

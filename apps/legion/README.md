@@ -135,7 +135,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `tools.deny` | no | `[]` | Globs removed after `allow`. Deny wins. |
 | `role` | yes | none | `orchestrator`, `router`, `specialist` or `architect`. Architects use a language provider, never entry, and require `tools.deny: ["*"]`; recall, learning and the plan tool must be off. The code pipeline is implemented; operations is reserved for a later phase. |
 | (roster) | whole folder | none | One architecture only. The enabled agents must hold exactly one orchestrator (the entry agent), exactly one router, at least one architect and at least one specialist; a save or an agent file that breaks this is refused. The retired `mode` key is ignored. |
-| `kind` | architect only, required | none | Registered kind: `code` or `task` (`operations` is reserved, no pipeline yet). At most one enabled architect per kind. |
+| `kind` | architect only, required | none | Registered kind: `code`, `task`, `review`, `writing` or `operations`. At most one enabled architect per kind. |
 | `workers` | architect only, required | none | Non-empty list of existing specialist ids. |
 | `prefetch` | architect only | `[]` | Specialist ids allowed for pre-planning reads. Code uses the first only when a brief names a code file or conservative path. |
 | `limits` | architect only | see meaning | `max_units: 12`, `max_parallel: 3`, `unit_timeout_seconds: 120`, `max_retries: 1`. Counts are positive integers; retries may be zero; timeout is a finite positive number. Unknown fields are errors. |
@@ -220,6 +220,13 @@ more specialists as extra files.
 specialist in its `workers` list; each unit names its `agent`, effect and tier. A single finished unit is returned
 as the reply with no assembly completion; chains are assembled from the results. Add a specialist to `workers`
 to make it reachable from Ember.
+
+The other task-shaped kinds share the `task` plan format and add one rule each, checked when the plan is parsed:
+`review` (answering units, one per part of the question, checked by a reviewer unit that depends on them and cites sources),
+`writing` (one outline unit, then sections that depend only on it) and `operations` (reads first; every write depends on a
+read and is followed by a read that verifies it; the reply lists changes and how to undo them). Chains of every kind except
+`writing` flag a figure in the reply that no specialist result contains. There is still no approval step for writes.
+The tool-free `writer` specialist (port 29623) drafts prose for `writing` and `review`.
 
 `mathematician` (port 29620) handles standalone mathematical questions through
 Armory's `tool_math_*` tools: equations, units, matrices, calculus, and repeated

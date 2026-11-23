@@ -30,7 +30,7 @@ AGENTS_DIR = PROJECT_ROOT / "agents"
 
 PROVIDERS = ("anthropic", "openai", "decision")
 ROLES = ("orchestrator", "router", "specialist", "architect")
-ARCHITECT_KINDS = ("code", "task", "operations")
+ARCHITECT_KINDS = ("code", "task", "review", "writing", "operations")
 REASONING_EFFORTS = ("off", "low", "medium", "high")
 # Model strength, weakest to strongest. Fixed so min_tier/max_tier can be
 # compared and the orchestrator sees one vocabulary across every gateway.
