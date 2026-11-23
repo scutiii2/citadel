@@ -153,6 +153,15 @@ class AgentAdmin:
         """Legion's answer about an address: whether Treasury's outside catalog knows it, and its group."""
         return await self._request("POST", "/agents/servers/lookup", account, json={"address": address})
 
+    async def test_gateway(self, account: Account, decision: bool) -> dict[str, Any]:
+        """Does the saved ConversationGateway (or DecisionGateway) answer? {ok, message}; changes nothing."""
+        path = "/agents/decision-gateway-settings/test" if decision else "/agents/gateway-settings/test"
+        return await self._request("POST", path, account, timeout=15.0)
+
+    async def test_server(self, account: Account, server_id: str) -> dict[str, Any]:
+        """Does each address of this MCP server answer? {ok, message, origins}; changes nothing."""
+        return await self._request("POST", f"/agents/servers/{quote(server_id, safe='')}/test", account, timeout=30.0)
+
     async def delete_server(self, account: Account, server_id: str) -> None:
         await self._request("DELETE", f"/agents/servers/{quote(server_id, safe='')}", account)
 

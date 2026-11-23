@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import type { GatewaySettingsPatch, GatewaySettingsView } from "../api/AgentsAdminClient";
+import type { ConnectionTestResult, GatewaySettingsPatch, GatewaySettingsView } from "../api/AgentsAdminClient";
+import ConnectionTest from "./ConnectionTest.vue";
 import PasswordInput from "./PasswordInput.vue";
 import RecordDrawer from "./admin/RecordDrawer.vue";
 import { errorMessage } from "../utils/errors";
@@ -13,6 +14,7 @@ const props = defineProps<{
   fallbackFocus?: () => void;
   load: () => Promise<GatewaySettingsView>;
   store: (changes: GatewaySettingsPatch) => Promise<GatewaySettingsView>;
+  test: () => Promise<ConnectionTestResult>;
 }>();
 const emit = defineEmits<{ visible: [visible: boolean] }>();
 const saved = ref<GatewaySettingsView>();
@@ -124,6 +126,7 @@ onMounted(load);
         <button class="chip" type="button" @click="load">Retry</button>
       </template>
     </td>
+    <td><ConnectionTest v-if="saved" :label="title" :run="test" /></td>
   </tr>
   <Teleport to="body">
     <RecordDrawer ref="drawer" :open="open" :title="title" editable :editing="editing" :busy="saving" :fallback-focus="fallbackFocus"

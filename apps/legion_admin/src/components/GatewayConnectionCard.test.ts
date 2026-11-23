@@ -11,7 +11,7 @@ beforeAll(() => {
 
 async function open(store = vi.fn(), view = SAVED) {
   const wrapper = mount(GatewayConnectionCard, {
-    props: { id: "gw", title: "ConversationGateway", example: SAVED.url, search: "", load: async () => view, store },
+    props: { id: "gw", title: "ConversationGateway", example: SAVED.url, search: "", load: async () => view, store, test: async () => ({ ok: true, message: "ok" }) },
     global: { stubs: { Teleport: true } },
   });
   await flushPromises();

@@ -120,6 +120,16 @@ describe("ToolServicesView", () => {
     expect(card.get('[data-test="test-result"]').text()).toContain("The token was refused.");
   });
 
+  it("tests a service from its row without opening it", async () => {
+    const test = vi.spyOn(toolServicesClient, "test").mockResolvedValue({ ok: true, message: "Every address is ready.", origins: [] });
+    const { wrapper } = await mounted(false);
+    await wrapper.get('[data-test="row-test-bard"]').trigger("click");
+    await flushPromises();
+    expect(test).toHaveBeenCalledWith("bard");
+    expect(wrapper.get('[data-test="row-result-bard"]').text()).toContain("Every address is ready.");
+    expect(wrapper.find('[data-test="service-bard"]').exists()).toBe(false);
+  });
+
   it("keeps the draft after Treasury refuses a save", async () => {
     vi.spyOn(toolServicesClient, "save").mockRejectedValue(new Error(unavailable));
     const { wrapper, card } = await mounted();

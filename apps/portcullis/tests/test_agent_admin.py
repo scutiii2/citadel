@@ -373,3 +373,16 @@ def test_gateway_settings_forward_partial_descriptions_to_the_matching_route(cli
         assert refused.status_code == 422
         assert invalid_token not in refused.text
     assert len(seen) == 2
+
+
+def test_connection_tests_reach_legion_and_need_agents_manage(client_factory, client, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    upstream.handler = lambda request: (httpx.Response(200, json={"ok": True, "message": request.url.path})
+                                        if request.url.path.endswith("/test") else ai_agent(request))
+    as_admin(client)
+    assert client.post("/api/admin/gateway-settings/test", json={}).json()["message"] == "/agents/gateway-settings/test"
+    assert client.post("/api/admin/decision-gateway-settings/test", json={}).json()["message"] == "/agents/decision-gateway-settings/test"
+    assert client.post("/api/admin/servers/docs/test", json={}).json()["message"] == "/agents/servers/docs/test"
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.post("/api/admin/gateway-settings/test", json={}).status_code == 403

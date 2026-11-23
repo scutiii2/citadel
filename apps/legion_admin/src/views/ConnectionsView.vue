@@ -15,9 +15,9 @@ const matches = ref<Record<string, boolean>>({});
 const servers = ref<InstanceType<typeof ServersView>>();
 const gateways = [
   { id: "conversation-gateway", title: "ConversationGateway", example: "http://conversation-gateway:29407",
-    load: agentsAdminClient.gatewaySettings, store: agentsAdminClient.setGatewaySettings },
+    load: agentsAdminClient.gatewaySettings, store: agentsAdminClient.setGatewaySettings, test: agentsAdminClient.testGateway },
   { id: "decision-gateway", title: "DecisionGateway", example: "http://decision-gateway:29406",
-    load: agentsAdminClient.decisionGatewaySettings, store: agentsAdminClient.setDecisionGatewaySettings },
+    load: agentsAdminClient.decisionGatewaySettings, store: agentsAdminClient.setDecisionGatewaySettings, test: agentsAdminClient.testDecisionGateway },
 ];
 
 watch(() => route.hash, async (hash) => {
@@ -36,12 +36,12 @@ watch(() => route.hash, async (hash) => {
       </header>
       <div class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="model-gateways">
         <table class="admin-records">
-          <thead><tr><th scope="col">Name</th><th scope="col">Connection URL</th></tr></thead>
+          <thead><tr><th scope="col">Name</th><th scope="col">Connection URL</th><th scope="col">Test</th></tr></thead>
           <tbody>
             <GatewayConnectionCard v-for="gateway in gateways" :key="gateway.id" v-bind="gateway"
               :search="search" :fallback-focus="() => searchField?.focus()" @visible="matches[gateway.id] = $event" />
             <tr v-if="gateways.every(({ id }) => matches[id] === false)">
-              <td colspan="2">No gateways match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></td>
+              <td colspan="3">No gateways match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></td>
             </tr>
           </tbody>
         </table>

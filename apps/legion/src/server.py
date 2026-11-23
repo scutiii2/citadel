@@ -24,7 +24,7 @@ from contextlib import asynccontextmanager, suppress
 from src.citadel_auth import settings_store, advertised_url
 from src.citadel_auth.treasury import register_instance
 from src.runtime.service_catalog import catalog
-from src.runtime import config_files, gateway_settings, outside_origins, tuning_overrides
+from src.runtime import config_files, connection_probe, gateway_settings, outside_origins, tuning_overrides
 from src.tools.mcp_client import config as mcp_config
 from typing import Any
 from urllib.parse import urlsplit
@@ -496,6 +496,27 @@ async def decision_gateway_settings_put(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(error)}, status_code=400)
     decision_gateway.reset_cache()
     return JSONResponse(gateway_settings.view(saved))
+
+
+@mcp.custom_route("/agents/gateway-settings/test", methods=["POST"])
+async def gateway_settings_test(_request: Request) -> JSONResponse:
+    """Is ConversationGateway reachable with the saved address and token? Changes nothing."""
+    return JSONResponse(await connection_probe.probe_gateway(await gateway_settings.current()))
+
+
+@mcp.custom_route("/agents/decision-gateway-settings/test", methods=["POST"])
+async def decision_gateway_settings_test(_request: Request) -> JSONResponse:
+    """Same check for DecisionGateway."""
+    return JSONResponse(await connection_probe.probe_gateway(await gateway_settings.current(gateway_settings.DECISION_KEY)))
+
+
+@mcp.custom_route("/agents/servers/{server_id}/test", methods=["POST"])
+async def servers_test(request: Request) -> JSONResponse:
+    """Does each saved address of this MCP server answer? Changes nothing."""
+    entry = (await asyncio.to_thread(settings_store.read_all, config_files.SETTINGS_DB, "servers")).get(request.path_params["server_id"])
+    if entry is None:
+        return JSONResponse({"error": "unknown server"}, status_code=404)
+    return JSONResponse(await connection_probe.probe_server(entry))
 
 
 @mcp.custom_route("/agents/servers", methods=["GET"])
