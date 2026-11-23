@@ -1,0 +1,29 @@
+{
+  "label": "Writing Architect",
+  "role": "architect",
+  "kind": "writing",
+  "port": 29627,
+  "enabled": true,
+  "entry": false,
+  "plan_tool": false,
+  "llm": {
+    "provider": "anthropic",
+    "gateway": "omniroute"
+  },
+  "workers": [
+    "writer"
+  ],
+  "limits": {
+    "max_units": 8,
+    "max_parallel": 3,
+    "unit_timeout_seconds": 180,
+    "max_retries": 1
+  },
+  "focus": "Long documents, reports and emails: outlines first, drafts the sections in parallel, then joins them in one consistent tone.",
+  "tools": {
+    "allow": [],
+    "deny": [
+      "*"
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "label": "Operations Architect",
+  "role": "architect",
+  "kind": "operations",
+  "port": 29628,
+  "enabled": true,
+  "entry": false,
+  "plan_tool": false,
+  "llm": {
+    "provider": "anthropic",
+    "gateway": "omniroute"
+  },
+  "workers": [
+    "server-ops",
+    "log-analyst",
+    "repo-helper"
+  ],
+  "limits": {
+    "max_units": 6,
+    "max_parallel": 3,
+    "unit_timeout_seconds": 180,
+    "max_retries": 1
+  },
+  "focus": "Multi-step server work such as an app that is down or an update across apps: diagnoses with read-only steps first, changes things only after a justifying read, verifies each change and reports how to undo it.",
+  "tools": {
+    "allow": [],
+    "deny": [
+      "*"
+    ]
+  }
+}

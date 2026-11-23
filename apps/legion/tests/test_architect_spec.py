@@ -32,7 +32,7 @@ def test_architect_defaults_and_supervisor_startup(tmp_path):
     ({"llm": {"provider": "decision"}}, "llm.provider"),
     ({"entry": True}, "entry"), ({"tools": {}}, "tools.deny"),
     *[({field: True}, field) for field in ("memory_recall", "skill_recall", "skill_learning", "plan_tool")],
-    ({"kind": None}, "kind"), ({"kind": "research"}, "kind"),
+    ({"kind": None}, "kind"), ({"kind": "nonsense"}, "kind"),
     ({"workers": []}, "workers"), ({"workers": "worker"}, "workers"),
     ({"workers": [3]}, "workers"), ({"workers": [""]}, "workers"),
     ({"prefetch": "worker"}, "prefetch"), ({"prefetch": [None]}, "prefetch"),

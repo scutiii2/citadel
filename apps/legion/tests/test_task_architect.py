@@ -84,3 +84,46 @@ def test_plan_prompt_lists_only_registered_workers(monkeypatch, spec):
                         lambda key: {"focus": f"{key} focus"} if key == "mathematician" else None)
     prompt = registry.KINDS["task"].plan_prompt("2+2", "", spec)
     assert "mathematician focus" in prompt and "researcher" not in prompt
+
+
+from src.agents.roles.architect.types import NodeResult
+
+
+def kind_spec(spec, kind, *workers):
+    return replace(spec, kind=kind, workers=workers)
+
+
+@pytest.mark.parametrize("kind,workers,good,bad", [
+    ("review", ("mathematician", "researcher", "reviewer"),
+     [unit("a", "researcher"), unit("b", "researcher"), unit("c", "reviewer", depends_on=["a", "b"])],
+     [unit("a", "researcher")]),
+    ("review", ("mathematician", "reviewer"),
+     [unit("a"), unit("b", "reviewer", depends_on=["a"])],
+     [unit("a", "reviewer")]),
+    ("writing", ("researcher", "mathematician"),
+     [unit("o"), unit("s1", depends_on=["o"]), unit("s2", depends_on=["o"])],
+     [unit("o"), unit("s1", depends_on=["o"]), unit("s2")]),
+    ("operations", ("researcher", "mathematician"),
+     [unit("r"), unit("w", effect="write", depends_on=["r"]), unit("v", depends_on=["w"])],
+     [unit("r"), unit("w", effect="write", depends_on=["r"])]),
+])
+def test_kind_rules_accept_a_good_plan_and_refuse_a_bad_one(spec, kind, workers, good, bad):
+    handler, current = registry.KINDS[kind], kind_spec(spec, kind, *workers)
+    assert len(handler.parse_plan(plan(*good), current).units) == len(good)
+    with pytest.raises(ValueError):
+        handler.parse_plan(plan(*bad), current)
+
+
+def test_operations_refuses_a_write_with_no_read_before_it(spec):
+    current = kind_spec(spec, "operations", "mathematician")
+    with pytest.raises(ValueError, match="depend on a read unit"):
+        registry.KINDS["operations"].parse_plan(plan(unit("w", effect="write")), current)
+
+
+def test_data_flags_figures_no_specialist_produced(spec):
+    handler = registry.KINDS["task"]
+    results = {"a": NodeResult("done", output="The total is 1,250 across 8 rows.")}
+    kept, _ = handler.review_assembly("Total 1250 over 8 rows.", None, "sum the table", results)
+    assert "Figures not found" not in kept
+    flagged, _ = handler.review_assembly("Total 9999 over 8 rows.", None, "sum the table", results)
+    assert "Figures not found in any specialist result" in flagged and "9999" in flagged and "1250" not in flagged.split("result")[-1]

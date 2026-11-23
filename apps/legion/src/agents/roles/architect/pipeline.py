@@ -115,7 +115,7 @@ async def run(spec: AgentSpec, brief: str, complete: Callable[[str], ChatResult]
                 assembled, response, valid = completions[-1], only.output, True
             else:
                 assembled = await interpret(handler.assemble_prompt(brief, planned, results))
-                response, valid = handler.review_assembly(assembled.response, planned, brief)
+                response, valid = handler.review_assembly(assembled.response, planned, brief, results)
             missing = [f"{key} ({result.status})" for key, result in results.items() if result.status != "done"]
             if missing:
                 response += "\n\nIncomplete units: " + ", ".join(missing) + "."

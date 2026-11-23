@@ -1,0 +1,34 @@
+{
+  "label": "Review Architect",
+  "role": "architect",
+  "kind": "review",
+  "port": 29626,
+  "enabled": true,
+  "entry": false,
+  "plan_tool": false,
+  "llm": {
+    "provider": "anthropic",
+    "gateway": "omniroute"
+  },
+  "workers": [
+    "reviewer",
+    "mathematician",
+    "researcher",
+    "data-analyst",
+    "code-writer",
+    "writer"
+  ],
+  "limits": {
+    "max_units": 6,
+    "max_parallel": 3,
+    "unit_timeout_seconds": 180,
+    "max_retries": 1
+  },
+  "focus": "Answers that must be checked or researched from several angles: specialists answer, or research the parts in parallel, a reviewer checks the result and its sources, and the answer is rewritten when the check finds a problem.",
+  "tools": {
+    "allow": [],
+    "deny": [
+      "*"
+    ]
+  }
+}
