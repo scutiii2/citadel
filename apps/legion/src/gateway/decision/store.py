@@ -76,11 +76,21 @@ class GatewayStore:
         if kind not in KINDS:
             raise ValueError("The kind must be typesafe, ollama, scuti or freellmapi.")
         with self._lock:
-            gateways = self._read()
-            old = gateways.get(gid, {}) if gateways.get(gid, {}).get("kind") == kind else {}
-            entry = self._clean(kind, data, old)
+            entry = self._entry(gid, kind, data)
             settings_store.put(self._path, self._table, gid, entry)
         return self._public(gid, entry)
+
+    def draft(self, gid: Any, data: Any) -> dict[str, Any]:
+        """The entry `put` would save, checked the same way but not saved, with secrets resolved: a test before saving."""
+        if not isinstance(data, dict) or data.get("kind") not in KINDS:
+            raise ValueError("The kind must be typesafe, ollama, scuti or freellmapi.")
+        with self._lock:
+            return resolve(self._entry(gid, data["kind"], data))
+
+    def _entry(self, gid: str, kind: str, data: dict[str, Any]) -> dict[str, Any]:
+        gateways = self._read()
+        old = gateways.get(gid, {}) if gateways.get(gid, {}).get("kind") == kind else {}
+        return self._clean(kind, data, old)
 
     @staticmethod
     def _clean(kind: str, data: dict[str, Any], old: dict[str, Any]) -> dict[str, Any]:

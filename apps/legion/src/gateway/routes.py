@@ -105,8 +105,20 @@ def register(mcp: FastMCP) -> None:
     async def test(request: Request) -> JSONResponse:
         if (parts := _parts(request.path_params["kind"])) is None:
             return JSONResponse({"error": "unknown gateway"}, status_code=404)
+        gid = request.path_params["gateway_id"]
         try:
-            message = await gateway.call(parts[0].test(request.path_params["gateway_id"]))
+            data: Any = await request.json() if await request.body() else None
+        except ValueError:
+            data = None
+        try:
+            if data is None:  # no body: test the saved gateway
+                message = await gateway.call(parts[0].test(gid))
+            else:  # a body: test the form as filled in, before it is saved
+                try:
+                    entry = await asyncio.to_thread(parts[1].draft, gid, data)
+                except ValueError as error:
+                    return JSONResponse({"ok": False, "code": "422", "message": str(error)})
+                message = await gateway.call(parts[0].test_entry(gid, entry))
         except (GatewayError, DecisionGatewayError) as error:  # each service raises its own class
             return JSONResponse({"ok": False, "code": str(error.status), "message": error.message})
         return JSONResponse({"ok": True, "message": message})

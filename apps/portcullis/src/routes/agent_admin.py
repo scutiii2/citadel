@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from pydantic import BaseModel, Field
 
 from src.deps import get_log_writer, require_permission
@@ -167,12 +167,13 @@ async def delete_model_gateway(
 
 @prompts_router.post("/model-gateways/{kind}/{gateway_id}/test")
 async def test_model_gateway(
+    entry: dict[str, Any] | None = Body(default=None),
     kind: str = Path(pattern=KIND_PATTERN),
     gateway_id: str = Path(pattern=GATEWAY_ID_PATTERN),
     account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin),
 ) -> Any:
-    """Whether this saved gateway answers: `{ok, message}`."""
-    return await _call(admin.test_model_gateway(account, kind, gateway_id))
+    """Whether this gateway answers: `{ok, message}`. A body is the unsaved form, tested as filled in."""
+    return await _call(admin.test_model_gateway(account, kind, gateway_id, entry))
 
 
 @prompts_router.get("/model-gateways/conversation/{gateway_id}/models")

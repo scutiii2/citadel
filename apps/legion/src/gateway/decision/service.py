@@ -120,6 +120,16 @@ class DecisionService:
         return [{**row, "streams": g.streams, "images": g.images, "types": sorted(g.types), "reachable": ok}
                 for row, g, ok in zip(rows, built, reachable)]
 
+    async def test_entry(self, gateway_id: str, entry: dict[str, Any]) -> str:
+        """Probe an entry that is not saved yet, on a gateway built for this one call and closed after it."""
+        gateway = build_gateway(gateway_id, entry, self._transport)
+        try:
+            return await asyncio.wait_for(gateway.probe(), TEST_SECONDS)
+        except asyncio.TimeoutError:
+            raise GatewayError(504, "gateway_timeout", f"No answer within {TEST_SECONDS:.0f} seconds. Check the address and that the service is running.") from None
+        finally:
+            await gateway._client.aclose()
+
     async def test(self, gateway_id: str) -> str:
         try:
             gateway = await self._gateway(gateway_id)

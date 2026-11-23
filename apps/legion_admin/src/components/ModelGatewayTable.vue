@@ -42,6 +42,8 @@ const secrets = ref<Record<string, string>>({});
 // Preset keys the form has no input for (label, capabilities, token limits) travel along unchanged.
 const extra = ref<Record<string, unknown>>({});
 const preset = ref("");
+const testing = ref(false);
+const draftTest = ref<{ ok: boolean; code: string; message: string } | null>(null);
 const tab = ref<"connection" | "models">("connection");
 
 const chat = computed(() => props.kind === "conversation");
@@ -118,6 +120,7 @@ async function load() {
 }
 
 function fill(source: Record<string, unknown>) {
+  draftTest.value = null;
   type.value = String(source[typeKey.value] ?? types.value[0] ?? "");
   auth.value = String(source.auth ?? "key");
   model.value = String(source.model ?? "");
@@ -197,6 +200,28 @@ const entry = computed(() => {
   }
   return body;
 });
+
+/** Try the form as filled in, before saving. A saved secret left empty stays; the name is only needed to find it. */
+async function testDraft() {
+  if (testing.value || saving.value) return;
+  draftTest.value = null;
+  const missing = fields.value.find(([name, , secret, required]) => required && !secret && !(values.value[name] ?? "").trim());
+  if (missing) {
+    tab.value = "connection";
+    draftTest.value = { ok: false, code: "SETUP", message: `${missing[1]} is required.` };
+    return;
+  }
+  testing.value = true;
+  try {
+    const gid = /^[a-z0-9][a-z0-9_-]{0,47}$/.test(id.value) ? id.value : "draft";
+    const result = await agentsAdminClient.testModelGateway(props.kind, gid, entry.value);
+    draftTest.value = { ok: result.ok, code: result.code ?? (result.ok ? "" : "ERR"), message: result.message };
+  } catch (err) {
+    draftTest.value = { ok: false, code: "ERR", message: errorMessage(err) };
+  } finally {
+    testing.value = false;
+  }
+}
 
 function submit() {
   if (saving.value) return;
@@ -377,6 +402,12 @@ onMounted(load);
           </div>
         </section>
         <p v-if="error" class="error" role="alert" data-test="error">{{ error }}</p>
+        <p v-if="draftTest" class="draft-test" :class="draftTest.ok ? 'ok' : 'bad'" role="status" data-test="draft-result">
+          <svg v-if="draftTest.ok" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.7 2.7L16 9.8" /></svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
+          <code v-if="!draftTest.ok" class="code" data-test="draft-code">{{ draftTest.code }}</code>
+          <span>{{ draftTest.message }}</span>
+        </p>
       </form>
       <div v-else-if="open && selected" class="admin-details">
         <dl>
@@ -391,6 +422,7 @@ onMounted(load);
         </section>
       </div>
       <template v-if="editing" #footer>
+        <button type="button" class="chip" :disabled="saving || testing" data-test="test-draft" title="Check the connection before saving" @click="testDraft">{{ testing ? "Testing…" : "Test" }}</button>
         <button type="button" class="chip" :disabled="saving" data-test="cancel-edit" @click="drawer?.requestCancel()">Cancel</button>
         <button type="submit" :form="`${kind}-editor`" class="primary" data-test="save" :disabled="saving || !type" :aria-busy="saving">Save</button>
       </template>
@@ -412,6 +444,12 @@ onMounted(load);
 .pair > div { display: grid; gap: 6px; min-width: 0; }
 .tier { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .tier h4 { margin: 0; font-size: 0.9rem; }
+.draft-test { display: flex; align-items: flex-start; gap: 8px; margin: 0; overflow-wrap: anywhere; }
+.draft-test svg { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.draft-test.ok { color: var(--success); }
+.draft-test.bad { color: var(--danger); }
+.draft-test .code { flex: none; padding: 1px 6px; border: 1px solid currentColor; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 600; }
+.draft-test span { color: var(--text); }
 .hint { margin: 0; font-size: 0.85rem; color: var(--muted); }
 .req { color: var(--accent); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

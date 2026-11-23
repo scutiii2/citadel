@@ -147,9 +147,9 @@ class AgentAdmin:
     async def delete_model_gateway(self, account: Account, kind: str, gateway_id: str) -> dict[str, Any]:
         return await self._request("DELETE", f"/agents/model-gateways/{kind}/{quote(gateway_id, safe='')}", account)
 
-    async def test_model_gateway(self, account: Account, kind: str, gateway_id: str) -> dict[str, Any]:
-        """Does this saved entry answer? {ok, message}; changes nothing."""
-        return await self._request("POST", f"/agents/model-gateways/{kind}/{quote(gateway_id, safe='')}/test", account, timeout=30.0)
+    async def test_model_gateway(self, account: Account, kind: str, gateway_id: str, entry: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Does this entry answer? {ok, message}; changes nothing. With `entry`, tests the form as filled in, before it is saved."""
+        return await self._request("POST", f"/agents/model-gateways/{kind}/{quote(gateway_id, safe='')}/test", account, json=entry, timeout=30.0)
 
     async def model_gateway_models(self, account: Account, gateway_id: str) -> dict[str, Any]:
         return await self._request("GET", f"/agents/model-gateways/conversation/{quote(gateway_id, safe='')}/models", account, timeout=30.0)
