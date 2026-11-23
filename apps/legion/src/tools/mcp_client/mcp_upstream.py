@@ -179,24 +179,35 @@ class NumberedFailureText(str):
     """Error content emitted by a Citadel MCP tool."""
 
 
-def _screen_output(text: str, *, public_page_body: str | None = None) -> str:
-    """Runs on the MCP dispatch worker. Only fetched web page body may go to Jev."""
-    sample = text if public_page_body is None else public_page_body
+def _screen_output(text: str, *, public_snippets: str = "") -> str:
+    """Runs on the MCP dispatch worker. Only public search snippets may go to Jev."""
+    if public_snippets and _injection_detected("jev", public_snippets):
+        return _flag_output(text)
+    return _flag_output(text) if _injection_detected("laya", text) else text
+
+
+def _injection_detected(provider: str, sample: str) -> bool:
     if not sample.strip() or sample == "(no output)":
-        return text
+        return False
     if len(sample) > _SCREEN_MAX_CHARS:
         half = (_SCREEN_MAX_CHARS - 5) // 2
         sample = f"{sample[:half]}\n...\n{sample[-half:]}"
     try:
         reply = gateway_client.decide(
-            "laya" if public_page_body is None else "jev", sample, _SCREEN_QUESTIONS,
+            provider, sample, _SCREEN_QUESTIONS,
             min_confidence=_SCREEN_CONFIDENCE, timeout=_SCREEN_TIMEOUT_SECONDS,
         )
     except DecisionError:
-        return text
+        return False
     answer = reply["answers"].get("injection") or {}
-    if answer.get("uncertain", True) or answer.get("unknown") or answer.get("noul", 0) < _SCREEN_CONFIDENCE:
-        return text
+    return (
+        not answer.get("uncertain", True)
+        and not answer.get("unknown")
+        and answer.get("noul", 0) >= _SCREEN_CONFIDENCE
+    )
+
+
+def _flag_output(text: str) -> str:
     approvals.mark_tainted()
     return f"{_INJECTION_NOTICE}\n\n{text}"
 
@@ -232,15 +243,15 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
     )
     if citadel_tool and getattr(result, "isError", False) and parse(text) is not None:
         return NumberedFailureText(text)
-    if name == f"{_PREFIX}tool_web_readPage":
+    if name == f"{_PREFIX}tool_web_search":
         structured = getattr(result, "structuredContent", None) or {}
-        content = structured.get("content")
-        if isinstance(content, str) and content.startswith("--- BEGIN REMOTE OUTPUT ("):
-            # Drop Armory's fence lines, which include the caller's URL.
-            return _screen_output(text, public_page_body="\n".join(content.splitlines()[1:-1]))
-        return _screen_output(text)
+        hits = structured.get("results", [])
+        snippets = "\n\n".join(
+            hit["snippet"] for hit in hits if isinstance(hit, dict) and isinstance(hit.get("snippet"), str)
+        ) if isinstance(hits, list) else ""
+        return _screen_output(text, public_snippets=snippets)
     if not name.startswith(_STRONGHOLD_PREFIX) and (
-        not citadel_tool or name == f"{_PREFIX}tool_web_search" or "--- BEGIN REMOTE OUTPUT (" in text
+        not citadel_tool or name == f"{_PREFIX}tool_web_readPage" or "--- BEGIN REMOTE OUTPUT (" in text
     ):
         return _screen_output(text)
     return text
