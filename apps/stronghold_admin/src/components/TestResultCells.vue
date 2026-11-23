@@ -43,7 +43,7 @@ function hide() {
 <template>
   <td class="test-cell">
     <button type="button" class="admin-icon test-button" :class="{ running: testing }" :data-test="`row-test-${id}`" :aria-label="`Test ${label}`"
-      :title="`Test ${label}`" :disabled="busy" :aria-busy="testing" @click="$emit('test')">
+      :title="`Test ${label}`" :disabled="busy" @click="$emit('test')">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path class="beat" d="M3 12h4l2.5-6 4 12 2.5-6H21" /></svg>
     </button>
   </td>
@@ -71,6 +71,7 @@ function hide() {
 <style scoped>
 .test-cell, .result-cell { vertical-align: middle; }
 .test-button svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.test-button.running, .test-button.running:disabled { opacity: 1; }
 .test-button.running { color: var(--accent); animation: test-press 900ms ease-in-out infinite; }
 .test-button.running .beat { stroke-dasharray: 8 6; animation: test-beat 700ms linear infinite; }
 @keyframes test-press { 50% { transform: scale(0.92); } }
