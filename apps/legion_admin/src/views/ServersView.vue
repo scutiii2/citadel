@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { agentsAdminClient, type McpServer } from "../api/AgentsAdminClient";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import AdminSearch from "../components/admin/AdminSearch.vue";
 import PanelHelp from "../components/admin/PanelHelp.vue";
 import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import FormTabs from "../components/admin/FormTabs.vue";
 import ConnectionTestCells from "../components/ConnectionTestCells.vue";
 import PasswordInput from "../components/PasswordInput.vue";
 import { errorMessage } from "../utils/errors";
@@ -26,6 +27,8 @@ const selected = ref<string | null>(null);
 const selectedServer = computed(() => selected.value ? servers.value[selected.value] : undefined);
 defineExpose({ focusPanel: () => panelTitle.value?.focus() });
 
+const tab = ref("general");
+const tabItems = [{ id: "general", label: "General" }, { id: "connection", label: "Connection" }];
 const editing = ref<string | null>(null); // the id being edited; "" while adding
 const id = ref("");
 const label = ref("");
@@ -257,6 +260,7 @@ async function remove() {
     removing.value = null;
   }
 }
+watch(editing, () => { tab.value = "general"; });
 </script>
 
 <template>
@@ -299,6 +303,8 @@ async function remove() {
       :editable="!!selectedServer" :editing="editing !== null" :busy="saving" :fallback-focus="() => searchField?.focus()"
       @edit="selected && open(selected)" @discard="discard" @close="close" @save="save">
     <form v-if="editing !== null" id="mcp-server-editor" class="admin-editor" data-test="form" @submit.prevent="submit">
+      <FormTabs v-model="tab" :items="tabItems" prefix="server" label="Server settings" />
+      <section v-show="tab === 'general'" id="server-panel-general" class="pane" role="tabpanel" aria-labelledby="server-tab-general">
       <div class="field">
         <label for="server-id">Id</label>
         <input id="server-id" v-model="id" :disabled="!isNew || saving" autocomplete="off" spellcheck="false" data-test="id" />
@@ -312,6 +318,8 @@ async function remove() {
         <label for="server-description">Description</label>
         <input id="server-description" v-model="description" :disabled="saving" autocomplete="off" data-test="description" maxlength="500" />
       </div>
+      </section>
+      <section v-show="tab === 'connection'" id="server-panel-connection" class="pane" role="tabpanel" aria-labelledby="server-tab-connection">
       <div class="field">
         <label for="server-transport">Connects by</label>
         <select id="server-transport" v-model="transport" :disabled="saving" data-test="transport">
@@ -374,6 +382,7 @@ async function remove() {
       <p v-if="overrideNeedsConnectionToken" class="help">
         Set a connection token header and value to use address overrides.
       </p>
+      </section>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
     </form>
     <div v-else-if="selectedServer" class="admin-details">
@@ -408,6 +417,7 @@ async function remove() {
 </template>
 
 <style scoped>
+.pane { display: grid; gap: 12px; min-width: 0; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }
 .field > input, .field > select { width: 100%; min-width: 0; min-height: 44px; }

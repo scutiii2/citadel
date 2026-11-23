@@ -89,6 +89,31 @@ const tierPreview = computed(() => {
 });
 const providerIds = computed(() => Object.keys(props.providers));
 
+type TabId = "general" | "model" | "limits" | "behaviour" | "prompt";
+const tab = ref<TabId>("general");
+const tabItems = computed(() => [
+  { id: "general", label: "General", show: true },
+  { id: "model", label: "Model", show: !isRouter.value },
+  { id: "limits", label: "Run limits", show: !isDecision.value },
+  { id: "behaviour", label: isRouter.value ? "Routing" : "Behaviour", show: true },
+  { id: "prompt", label: "Prompt", show: !isRouter.value },
+].filter((item) => item.show) as { id: TabId; label: string }[]);
+// A tab that disappears (role or provider changed) hands back to General.
+watch(tabItems, (items) => { if (!items.some((item) => item.id === tab.value)) tab.value = "general"; });
+/** Open the tab that holds the field a failed check names, so the error is not about something hidden. */
+function showErrorTab(): void {
+  const message = localError.value;
+  if (/^Port/.test(message)) tab.value = "general";
+  else if (/tier|gateway|confidence|Temperature|effort/i.test(message)) tab.value = "model";
+  else if (message) tab.value = isRouter.value ? "behaviour" : "limits";
+}
+function moveTab(step: number): void {
+  const items = tabItems.value;
+  const next = items[(items.findIndex((item) => item.id === tab.value) + step + items.length) % items.length];
+  tab.value = next.id;
+  document.getElementById(`agent-tab-${next.id}`)?.focus();
+}
+
 function joined(globs: string[] | undefined): string {
   return (globs ?? []).join(", ");
 }
@@ -114,6 +139,7 @@ watch(
     const a = props.initial;
     decision.value = routerPolicyDefaults(a?.decision);
     localError.value = "";
+    tab.value = "general";
     id.value = a?.id ?? "";
     label.value = a?.label ?? "";
     port.value = String(a?.port ?? props.suggestedPort);
@@ -289,16 +315,24 @@ function submit(): void {
   if (props.busy) return;
   const config = buildConfig();
   if (config) emit("save", id.value.trim(), config);
+  else showErrorTab();
 }
 
 function previewPrompt(): void {
   const config = buildConfig();
+  if (!config) showErrorTab();
   if (config) emit("preview", id.value.trim() || "draft", config, previewCaveman.value);
 }
 </script>
 
 <template>
     <form id="agent-editor" class="agent-form" @submit.prevent="submit">
+      <div class="tabs" role="tablist" aria-label="Agent settings">
+        <button v-for="item in tabItems" :key="item.id" type="button" role="tab" :id="`agent-tab-${item.id}`"
+          :aria-selected="tab === item.id" :aria-controls="`agent-panel-${item.id}`" :tabindex="tab === item.id ? 0 : -1" :data-test="`tab-${item.id}`"
+          @click="tab = item.id" @keydown.right.prevent="moveTab(1)" @keydown.left.prevent="moveTab(-1)">{{ item.label }}</button>
+      </div>
+      <section v-show="tab === 'general'" id="agent-panel-general" class="pane" role="tabpanel" aria-labelledby="agent-tab-general">
       <label class="field">
         <span>Id</span>
         <input v-model="id" data-test="id" type="text" required maxlength="63" pattern="[a-z0-9][a-z0-9\-]*" autocomplete="off" :disabled="editing" placeholder="data-analyst" />
@@ -315,6 +349,24 @@ function previewPrompt(): void {
         <small>Where ember and the other agents reach this agent. Leave empty to use this machine and the port above; set it for an agent behind another host or a proxy.</small>
       </label>
 
+      <div class="switches">
+        <ToggleSwitch :checked="enabled" data-test="enabled" @change="enabled = ($event.target as HTMLInputElement).checked">Enabled</ToggleSwitch>
+        <label class="field"><span>Role</span>
+          <select v-model="role" data-test="role" :disabled="busy">
+            <option value="orchestrator" :disabled="isDecision">Orchestrator</option>
+            <option value="router">Router</option>
+            <option value="specialist">Specialist</option>
+          </select>
+        </label>
+        <ToggleSwitch v-if="!isRouter" :checked="planTool" :disabled="isDecision" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
+        <ToggleSwitch v-if="!isRouter" :checked="entry" :disabled="isDecision" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
+      </div>
+      <p v-if="planTool && !isDecision" class="hint" data-test="plan-tool-cost">Task checklist costs about 200 input tokens on every model call of this agent, plus about 15-25 output tokens per item each time it updates the list. Turn it off for agents that only do short tasks.</p>
+      <p v-if="entry" class="hint">Only one enabled agent can be the entry agent. To move it, unset it on the current one first.</p>
+
+      </section>
+
+      <section v-show="tab === 'model'" id="agent-panel-model" class="pane" role="tabpanel" aria-labelledby="agent-tab-model">
       <fieldset v-if="!isRouter">
         <legend>Model</legend>
         <div class="row">
@@ -365,7 +417,9 @@ function previewPrompt(): void {
         </label>
         <small v-if="!isDecision">The orchestrator picks the lightest tier in this range that fits each task. Tier models are set per gateway in ai_agent's gateways directory.</small>
       </fieldset>
+      </section>
 
+      <section v-show="tab === 'limits'" id="agent-panel-limits" class="pane" role="tabpanel" aria-labelledby="agent-tab-limits">
       <fieldset v-if="!isDecision" :disabled="busy" :aria-busy="busy" data-test="run-limits">
         <legend>Run limits</legend>
         <p class="hint">Limits apply to each turn this agent runs. Leave a field blank to use its default. Changes apply after Save.</p>
@@ -390,7 +444,9 @@ function previewPrompt(): void {
           <input v-model="maxToolRounds" class="limit-input" aria-label="Model/tool rounds" data-test="max-tool-rounds" type="text" inputmode="numeric" autocomplete="off" placeholder="Gateway default" />
         </SettingRow>
       </fieldset>
+      </section>
 
+      <section v-show="tab === 'behaviour'" id="agent-panel-behaviour" class="pane" role="tabpanel" aria-labelledby="agent-tab-behaviour">
       <RouterPolicyForm v-if="isRouter" v-model="decision" :busy="busy" />
       <fieldset v-else>
         <legend>Behaviour</legend>
@@ -405,21 +461,9 @@ function previewPrompt(): void {
         </div>
       </fieldset>
 
-      <div class="switches">
-        <ToggleSwitch :checked="enabled" data-test="enabled" @change="enabled = ($event.target as HTMLInputElement).checked">Enabled</ToggleSwitch>
-        <label class="field"><span>Role</span>
-          <select v-model="role" data-test="role" :disabled="busy">
-            <option value="orchestrator" :disabled="isDecision">Orchestrator</option>
-            <option value="router">Router</option>
-            <option value="specialist">Specialist</option>
-          </select>
-        </label>
-        <ToggleSwitch v-if="!isRouter" :checked="planTool" :disabled="isDecision" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
-        <ToggleSwitch v-if="!isRouter" :checked="entry" :disabled="isDecision" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
-      </div>
-      <p v-if="planTool && !isDecision" class="hint" data-test="plan-tool-cost">Task checklist costs about 200 input tokens on every model call of this agent, plus about 15-25 output tokens per item each time it updates the list. Turn it off for agents that only do short tasks.</p>
-      <p v-if="entry" class="hint">Only one enabled agent can be the entry agent. To move it, unset it on the current one first.</p>
+      </section>
 
+      <section v-show="tab === 'prompt'" id="agent-panel-prompt" class="pane" role="tabpanel" aria-labelledby="agent-tab-prompt">
       <fieldset v-if="!isRouter" class="preview">
         <legend>Prompt preview</legend>
         <p class="hint">The system prompt the model receives, built from this form and the shared prompts.</p>
@@ -430,6 +474,7 @@ function previewPrompt(): void {
         <p v-if="previewError" class="error" role="alert" data-test="preview-error">{{ previewError }}</p>
         <pre v-if="previewText" class="prompt-text" data-test="preview-text">{{ previewText }}</pre>
       </fieldset>
+      </section>
 
       <p v-if="localError || error" class="error" role="alert" data-test="form-error">{{ localError || error }}</p>
       <span v-if="modified" class="unsaved" role="status" data-test="unsaved">● Unsaved changes</span>
@@ -438,6 +483,11 @@ function previewPrompt(): void {
 
 <style scoped>
 .agent-form { display: grid; gap: 12px; }
+.tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); overflow-x: auto; }
+.tabs button { flex: 1 0 auto; min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.tabs button[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
+.tabs button:hover:not([aria-selected="true"]) { color: var(--text); }
+.pane { display: grid; gap: 12px; min-width: 0; }
 .row { display: flex; flex-wrap: wrap; gap: 10px; }
 .grow { flex: 1 1 160px; }
 .port { flex: 0 0 110px; }

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { toolServicesClient, type ToolSaveBody, type ToolService, type ToolTestResult } from "../api/ToolServicesClient";
 import AdminSearch from "../components/admin/AdminSearch.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import PanelHelp from "../components/admin/PanelHelp.vue";
 import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import FormTabs from "../components/admin/FormTabs.vue";
 import StatusFilters from "../components/admin/StatusFilters.vue";
 import TestResultCells from "../components/TestResultCells.vue";
 import PageLayout from "../components/PageLayout.vue";
@@ -46,6 +47,8 @@ const filter = ref<"all" | "enabled" | "disabled">("all");
 const searchField = ref<InstanceType<typeof AdminSearch>>();
 const drawer = ref<InstanceType<typeof RecordDrawer>>();
 const selectedName = ref<string | null>(null);
+const tab = ref("general");
+const tabItems = [{ id: "general", label: "General" }, { id: "addresses", label: "Addresses" }];
 const selected = computed(() => cards.value.find((draft) => draft.saved.name === selectedName.value) ?? null);
 const options = computed(() => [
   { id: "all" as const, label: "All", count: cards.value.length },
@@ -218,6 +221,7 @@ function closeDrawer() {
 function resultAddress(draft: Draft, originId: string): string {
   return draft.saved.origins.find((origin) => origin.origin_id === originId)?.origin ?? "Unavailable address";
 }
+watch(selectedName, () => { tab.value = "general"; });
 </script>
 
 <template>
@@ -262,6 +266,8 @@ function resultAddress(draft: Draft, originId: string): string {
     <RecordDrawer ref="drawer" :open="selected !== null" :title="selected?.saved.label ?? 'Tool service'" :editing="!!selected && isDirty(selected)" :busy="!!selected?.pending"
       :fallback-focus="() => searchField?.focus()" @discard="selected && discard(selected)" @save="selected && save(selected)" @close="closeDrawer">
       <form v-if="selected" class="service" :aria-label="selected.saved.label" :data-test="'service-' + selected.saved.name" @submit.prevent="drawer?.requestSave()">
+        <FormTabs v-model="tab" :items="tabItems" prefix="tool" label="Service settings" />
+        <section v-show="tab === 'general'" id="tool-panel-general" class="pane" role="tabpanel" aria-labelledby="tool-tab-general">
         <p class="state" :class="{ ready: selected.saved.ready }">
           <span aria-hidden="true">{{ selected.saved.ready ? "✓" : "○" }}</span>
           {{ selected.saved.ready ? "Ready" : selected.saved.reason ?? "Not ready" }}
@@ -281,6 +287,8 @@ function resultAddress(draft: Draft, originId: string): string {
           :disabled="!!selected.pending"
         />
 
+        </section>
+        <section v-show="tab === 'addresses'" id="tool-panel-addresses" class="pane" role="tabpanel" aria-labelledby="tool-tab-addresses">
         <div class="field">
           <label for="tool-preset">Preset</label>
           <select id="tool-preset" v-model="preset" data-test="preset" :disabled="!!selected.pending" @change="usePreset(selected)">
@@ -342,6 +350,7 @@ function resultAddress(draft: Draft, originId: string): string {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
           </button>
         </div>
+        </section>
         <p v-if="selected.error" class="error" role="alert">{{ selected.error }}</p>
         <p v-if="selected.notice" class="help" role="status">{{ selected.notice }}</p>
         <div v-if="selected.result" data-test="test-result" role="status">
@@ -377,6 +386,7 @@ function resultAddress(draft: Draft, originId: string): string {
 </template>
 
 <style scoped>
+.pane { display: grid; gap: 12px; min-width: 0; }
 .service { display: grid; gap: 12px; min-width: 0; padding-top: 4px; }
 .service p { margin: 0; overflow-wrap: anywhere; }
 .state, .help { color: var(--muted); font-size: 0.9em; }
