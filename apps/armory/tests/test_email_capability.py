@@ -85,6 +85,24 @@ def test_offline_then_reload_preserves_shared_delivery(capability):
     assert call(server, "tool_email_sendEmail", {"to": "alice@example.com", "subject": "Update", "body_text": "Body"})[1]["message_id"]
 
 
+def test_health_tool_stays_callable_when_email_is_offline(capability, monkeypatch):
+    from src.capabilities.email.health_tool import register_health_tool
+    from src.services.email import health
+
+    server, loader, smtp = capability
+    monkeypatch.setattr(health, "settings", email_delivery.settings)
+    register_health_tool(server)
+    tool = next(tool for tool in asyncio.run(server.list_tools()) if tool.name == "tool_email_checkHealth")
+    assert tool.meta["hidden"] and tool.annotations.readOnlyHint
+    assert call(server, tool.name, {})[1] == {"ready": True, "message": "Email is ready."}
+    smtp.return_value.__enter__.return_value.sendmail.assert_not_called()
+
+    asyncio.run(loader.set_online("email", False))
+    assert call(server, tool.name, {})[1] == {
+        "ready": False, "message": "The Email capability is switched off in Armory.",
+    }
+
+
 def test_invalid_reply_and_recipient_do_not_connect(capability):
     server, _, smtp = capability
     for name, args in [

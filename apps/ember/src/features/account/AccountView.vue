@@ -49,7 +49,6 @@ const emailForm = reactive({
   password: "",
   busy: false,
   error: "",
-  success: "",
 });
 const passwordForm = reactive({
   next: "",
@@ -68,7 +67,6 @@ const passwordMismatch = computed(
 
 async function changeEmail(): Promise<void> {
   emailForm.error = "";
-  emailForm.success = "";
   emailForm.busy = true;
   try {
     const result = await auth.changeEmail(
@@ -79,15 +77,8 @@ async function changeEmail(): Promise<void> {
     emailForm.password = "";
     if (result.account.email_verified) {
       emailForm.error = "That is already your email.";
-    } else if (result.account.email_verification_required === false) {
-      emailForm.success =
-        "Email changed. You can verify it any time from this page.";
     } else {
-      // Permissions are off until the new address is verified.
-      await router.replace({
-        name: "verify-email",
-        query: result.verification_email_sent ? {} : { unsent: "1" },
-      });
+      await router.replace({ name: "verify-email" });
     }
   } catch (err) {
     emailForm.error = errorMessage(err);
@@ -158,11 +149,7 @@ async function changePassword(): Promise<void> {
     </template>
     <div class="column">
       <div v-if="!account.email_verified" class="banner" role="status">
-        <span>{{
-          auth.needsVerification
-            ? "Your email isn't verified. Permissions are paused until you enter the code."
-            : "Your email isn't verified. Verifying it is optional."
-        }}</span>
+        <span>Verify your email address to use Ember.</span>
         <ActionButton
           labelled
           icon="verify"
@@ -193,13 +180,7 @@ async function changePassword(): Promise<void> {
               <path v-if="account.email_verified" d="m8.5 12 2.5 2.5 4.5-5" />
               <path v-else d="M12 8v5m0 3v.1" />
             </svg>
-            {{
-              account.email_verified
-                ? "Verified address"
-                : auth.needsVerification
-                  ? "Verification needed"
-                  : "Verification optional"
-            }}
+            {{ account.email_verified ? "Verified address" : "Verification needed" }}
           </p>
         </div>
       </div>
@@ -326,17 +307,10 @@ async function changePassword(): Promise<void> {
                 required
               />
               <p class="muted small">
-                {{
-                  account.email_verification_required === false
-                    ? "You'll get a code at the new address. Verifying it is optional."
-                    : "You'll get a code at the new address. Until you enter it, your permissions are paused."
-                }}
+                Verify the new address with its emailed code before using Ember.
               </p>
               <p v-if="emailForm.error" class="error" role="alert">
                 {{ emailForm.error }}
-              </p>
-              <p v-else-if="emailForm.success" class="notice" role="status">
-                {{ emailForm.success }}
               </p>
               <button
                 class="primary"

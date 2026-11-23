@@ -15,8 +15,7 @@ Capabilities, Agents and Analytics go there, not in ember_web):
   so the `HttpOnly` session cookie just works and no server URL, token or
   key is ever in the bundle.
 - **portcullis/** - FastAPI + async SQLAlchemy (SQLite/aiosqlite). Owns
-  accounts, sessions, roles/permissions, invites, email verification (can be
-  switched off with `require_email_verification: false`), and
+  accounts, sessions, roles/permissions, emailed invites, required email verification, and
   proxies MCP to ai_agent (`/api/mcp/agents/{id}`) and mcp_server
   (`/api/mcp/server`). Auth logic lives in its own database.
 
@@ -103,7 +102,7 @@ in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
    and an unreachable or `5xx` upstream to `502`/`503`, and logs ids and field
    names only, never user text.
 4. **Route**: gate with `Depends(require_permission(NAME))` (it also
-   rejects unverified emails, unless `require_email_verification` is false) or `Depends(current_account)` for any
+   rejects unverified accounts) or `Depends(current_account)` for any
    logged-in user. Request/response bodies are pydantic models; response
    models get a `@classmethod of(cls, row)`. Register a new router in
    `src/app.py` (`app.include_router(...)`). New app-wide dependencies

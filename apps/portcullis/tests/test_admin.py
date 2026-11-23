@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select, update
+
+from src.models import Account, InviteCode
 
 from src.services.permissions import ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS
 from tests.conftest import ADMIN_USERNAME, FakeEmailSender
@@ -10,14 +13,26 @@ from tests.test_registration import as_admin, new_invite, register
 MEMBER_PASSWORD = "long enough pw"
 
 
-def make_member(client: TestClient, email: FakeEmailSender, username: str = "alice", verify: bool = True) -> int:
-    """Registers `username` (verified unless told not to), logs out, returns its id."""
-    response = register(client, new_invite(client), username=username, email=f"{username}@example.com")
+def make_member(
+    client: TestClient, email: FakeEmailSender, username: str = "alice", verify: bool = True,
+    *, send_verification: bool = True,
+) -> int:
+    """Registers a member, optionally with the state of an older unverified account."""
+    address = f"{username}@example.com"
+    response = register(client, new_invite(client, address), username=username, email=address)
     assert response.status_code == 201, response.text
-    if verify:
-        assert client.post("/api/auth/verify-email", json={"code": email.last_code("verify")}).status_code == 200
+    account_id = response.json()["account"]["id"]
+    if not verify:
+        async def mark_unverified():
+            async with client.app.state.database.sessions() as session:
+                await session.execute(update(Account).where(Account.id == account_id).values(email_verified=False))
+                await session.commit()
+
+        client.portal.call(mark_unverified)
+        if send_verification:
+            assert client.post("/api/auth/verify-email/resend", json={}).status_code == 200
     client.post("/api/auth/logout", json={})
-    return response.json()["account"]["id"]
+    return account_id
 
 
 def login(client: TestClient, username: str, password: str = MEMBER_PASSWORD) -> None:
@@ -45,6 +60,7 @@ def role_by_name(client: TestClient, name: str) -> dict:
         ("delete", "/api/admin/accounts/1"),
         ("delete", "/api/admin/roles/1"),
         ("delete", "/api/admin/invites/1"),
+        ("get", "/api/admin/invites/email-status"),
     ],
 )
 def test_admin_routes_need_login_and_admin_manage(
@@ -119,7 +135,7 @@ def test_summary_counts(client: TestClient, email: FakeEmailSender) -> None:
     as_admin(client)
     bob = account_by_name(client, "bob")["id"]
     assert client.patch(f"/api/admin/accounts/{bob}", json={"is_active": False}).status_code == 200
-    assert client.post("/api/admin/invites", json={}).status_code == 201
+    assert client.post("/api/admin/invites", json={"invitee_email": "new@example.com"}).status_code == 201
 
     summary = client.get("/api/admin/summary").json()
     roles = client.get("/api/admin/roles").json()
@@ -316,6 +332,70 @@ def test_admin_cannot_revoke_or_delete_own_only_admin_access(client: TestClient,
 # --- invites ------------------------------------------------------------------
 
 
+def test_email_invite_requires_an_address(client: TestClient) -> None:
+    as_admin(client)
+    assert client.post("/api/admin/invites", json={}).status_code == 422
+
+
+def test_email_invite_only_exposes_metadata(client: TestClient, email: FakeEmailSender) -> None:
+    as_admin(client)
+    created = client.post("/api/admin/invites", json={"invitee_email": "new@example.com"})
+
+    assert created.status_code == 201
+    assert set(created.json()) == {"id", "invitee_email", "delivery_method", "created_at", "expires_at"}
+    assert created.json()["delivery_method"] == "email"
+    assert len(email.sent) == 1 and email.sent[0][:2] == ("invite", "new@example.com")
+    listed = client.get("/api/admin/invites")
+    assert listed.json() == [created.json()]
+    assert email.last_code("invite") not in created.text + listed.text, "Admin responses exposed the code"
+
+
+_NOT_CONFIGURED = "Email is not set up. Fill in the Email page of Armory Admin."
+_ARMORY_UNREACHABLE = "Armory could not be reached. Check that Armory is running and Portcullis can call it."
+
+
+@pytest.mark.parametrize("ready", [True, False])
+def test_invite_email_status(client: TestClient, email: FakeEmailSender, ready: bool) -> None:
+    as_admin(client)
+    email.health_reason = None if ready else _NOT_CONFIGURED
+
+    response = client.get("/api/admin/invites/email-status")
+
+    assert response.status_code == 200
+    assert response.json() == {"ready": ready, "reason": email.health_reason}
+    assert not email.sent
+
+
+def test_invite_email_status_sanitizes_exceptions(client: TestClient, email: FakeEmailSender) -> None:
+    as_admin(client)
+    email.health_error = RuntimeError("private transport details")
+
+    response = client.get("/api/admin/invites/email-status")
+
+    assert response.status_code == 200
+    assert response.json() == {"ready": False, "reason": _ARMORY_UNREACHABLE}
+
+
+@pytest.mark.parametrize("blocked", [True, False])
+def test_failed_email_does_not_leave_an_invite(client: TestClient, email: FakeEmailSender, blocked: bool) -> None:
+    as_admin(client)
+    email.health_reason = _NOT_CONFIGURED if blocked else None
+    email.fail = not blocked
+
+    response = client.post("/api/admin/invites", json={"invitee_email": "new@example.com"})
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (_NOT_CONFIGURED if blocked else
+        "Email could not be sent. Check MCP Server connectivity, its Email capability and SMTP configuration; check delivery status before retrying.")
+    assert not email.sent
+
+    async def count_invites():
+        async with client.app.state.database.sessions() as session:
+            return await session.scalar(select(func.count()).select_from(InviteCode))
+
+    assert client.portal.call(count_invites) == 0
+
+
 def test_revoke_invite(client: TestClient) -> None:
     code = new_invite(client)
     as_admin(client)
@@ -329,10 +409,11 @@ def test_revoke_invite(client: TestClient) -> None:
 
 def test_used_invite_cannot_be_revoked(client: TestClient, email: FakeEmailSender) -> None:
     as_admin(client)
-    response = client.post("/api/admin/invites", json={})
-    invite_id, code = response.json()["invite"]["id"], response.json()["code"]
+    response = client.post("/api/admin/invites", json={"invitee_email": "new@example.com"})
+    invite_id = response.json()["id"]
+    code = email.last_code("invite")
     client.post("/api/auth/logout", json={})
-    register(client, code)
+    assert register(client, code, email="new@example.com").status_code == 201
     client.post("/api/auth/logout", json={})
     as_admin(client)
 

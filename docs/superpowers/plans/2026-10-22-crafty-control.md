@@ -707,7 +707,7 @@ async def resolve_connection(request: Request, service=Depends(connections),
         raise HTTPException(401, "Valid internal authentication required")
     uid = request.headers.get("X-Requester-Uid", "")
     account = await session.scalar(select(Account).where(Account.uid == uid)) if uid else None
-    if account is None or not account.is_active or settings.require_email_verification and not account.email_verified:
+    if account is None or not account.is_active or not account.email_verified:
         raise HTTPException(403, "A valid signed-in requester is required")
     return await service.resolve(account.uid)
 ```

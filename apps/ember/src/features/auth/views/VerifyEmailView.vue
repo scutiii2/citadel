@@ -1,20 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import AuthCard from "../../../components/auth/AuthCard.vue";
 import { errorMessage } from "../../../utils/errors";
 import { useLogout } from "../../../composables/useLogout";
 import { useAuthStore } from "../../../stores/auth";
 
 const auth = useAuthStore();
-const route = useRoute();
 const router = useRouter();
 
 const code = ref("");
 const error = ref("");
-const notice = ref(
-  route.query.unsent ? "The verification email couldn't be sent. Try \"Send a new code\"." : "",
-);
+const codeSent = ref(false);
 const busy = ref(false);
 const action = ref<"verify" | "resend" | null>(null);
 const codeError = ref(false);
@@ -39,11 +36,11 @@ async function submit(): Promise<void> {
 async function resend(): Promise<void> {
   if (busy.value) return;
   error.value = "";
-  notice.value = ""; codeError.value = false;
+  codeError.value = false;
   busy.value = true; action.value = "resend";
   try {
     await auth.resendVerification();
-    notice.value = "A new code is on its way.";
+    codeSent.value = true;
   } catch (err) {
     error.value = errorMessage(err);
   } finally {
@@ -55,19 +52,20 @@ const logout = useLogout();
 </script>
 
 <template>
-  <AuthCard title="Verify your email" :subtitle="`We sent a code to ${email}. It expires in 15 minutes.`">
+  <AuthCard title="Verify your email" :subtitle="`Confirm ${email} to use Ember.`">
     <form @submit.prevent="submit">
+      <button type="button" class="primary" :disabled="busy" :aria-busy="action === 'resend'" @click="resend">
+        {{ action === 'resend' ? "Sending…" : codeSent ? "Send a new code" : "Email me a code" }}
+      </button>
+      <p v-if="codeSent && !error && action !== 'resend'" class="notice" role="status">A code was sent to {{ email }}. It expires in 15 minutes.</p>
       <label>
         Verification code
         <input v-model="code" :aria-invalid="codeError" :aria-describedby="codeError ? 'verification-error' : undefined" autocomplete="one-time-code" spellcheck="false" required autofocus />
       </label>
       <p v-if="error" class="error" role="alert" id="verification-error">{{ error }}</p>
-      <p v-else-if="notice" class="notice">{{ notice }}</p>
-      <button class="primary" :disabled="busy" :aria-busy="busy && action === 'verify'">{{ action === 'verify' ? "Verifying…" : "Verify" }}</button>
+      <button type="submit" class="primary" :disabled="busy" :aria-busy="action === 'verify'">{{ action === 'verify' ? "Verifying…" : "Verify" }}</button>
     </form>
     <template #footer>
-      <button type="button" class="link-button" :disabled="busy" :aria-busy="busy && action === 'resend'" @click="resend">{{ action === 'resend' ? "Sending…" : "Send a new code" }}</button>
-      &middot;
       <RouterLink to="/account">Change email</RouterLink>
       &middot;
       <button type="button" class="link-button" @click="logout">Log out</button>

@@ -7,7 +7,7 @@ import { authClient } from "./AuthClient";
 import { sessionToken } from "../../utils/server";
 
 const input = { username: "ada", email: "ada@example.com", password: "a-long-password", invite_code: "CODE" };
-const registered = { account: { id: 1, username: "ada" }, verification_email_sent: true, email_error: null };
+const registered = { account: { id: 1, username: "ada", email_verified: true } };
 
 function desktop(on: boolean): void {
   if (on) vi.stubGlobal("__TAURI_INTERNALS__", {});

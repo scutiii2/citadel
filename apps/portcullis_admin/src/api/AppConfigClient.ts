@@ -4,7 +4,6 @@ import { apiRequest } from "./http";
 export interface AppConfig {
   session_hours: number;
   default_role: string;
-  require_email_verification: boolean;
   rate_limit: { enabled: boolean; scope: "ip" | "account" | "both"; max_attempts: number; window_seconds: number; lockout_seconds: number };
   ip_filter: { allow_list: string[]; deny_list: string[] };
   headers: { enabled: boolean; hsts_max_age: number };

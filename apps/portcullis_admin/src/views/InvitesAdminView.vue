@@ -17,6 +17,6 @@ watch(() => route.query.create, createFromLink);
 </script>
 <template>
   <PageLayout class="admin-panel" title="Invites" description="Give someone access to your workspace.">
-    <template #actions><button type="button" class="primary" @click="panel?.openCreate()">＋ Create invite</button></template><div class="admin-info"><div><h3>Invites work once and expire after 7 days</h3><p>New accounts receive the configured default role.</p></div></div><InvitesPanel ref="panel" :show-heading="false" drawer />
+    <template #actions><button type="button" class="primary" @click="panel?.openCreate()">Invite member</button></template><div class="admin-info"><div><h3>Invites work once and expire after 7 days</h3><p>New accounts receive the configured default role.</p></div></div><InvitesPanel ref="panel" />
   </PageLayout>
 </template>

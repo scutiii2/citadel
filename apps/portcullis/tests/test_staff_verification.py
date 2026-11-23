@@ -1,14 +1,18 @@
-"""Staff permissions need a verified email, even when require_email_verification is off."""
+"""Protected routes always require a verified email."""
 
 from __future__ import annotations
+
+from datetime import timedelta
 
 from fastapi.testclient import TestClient
 
 from src.models.account import Account
 from src.models.role import Permission, Role
+from src.routes.internal import _is_usable
+from src.services import otp_service
 from src.services.permissions import STAFF_PERMISSIONS
 from tests.conftest import FakeEmailSender
-from tests.test_admin import make_member, role_by_name
+from tests.test_admin import login, make_member, role_by_name
 from tests.test_registration import as_admin
 
 
@@ -46,3 +50,35 @@ def test_a_verified_account_can_be_given_a_staff_role(client: TestClient, email:
     granted = client.put(f"/api/admin/accounts/{account_id}/roles/{role_by_name(client, 'Administrator')['id']}")
 
     assert granted.status_code == 200
+
+
+def test_only_an_active_verified_account_is_usable_internally() -> None:
+    assert not _is_usable(None)
+    unverified = _account("chat.use", verified=False)
+    unverified.is_active = True
+    assert not _is_usable(unverified)
+    account = _account("chat.use", verified=True)
+    account.is_active = True
+    assert _is_usable(account)
+    account.is_active = False
+    assert not _is_usable(account)
+
+
+def test_unverified_member_can_request_and_use_a_code(client, email, monkeypatch) -> None:
+    make_member(client, email, verify=False, send_verification=False)
+    login(client, "alice")
+    monkeypatch.setattr(otp_service, "VERIFICATION_COOLDOWN", timedelta(seconds=30))
+    assert [kind for kind, _, _ in email.sent] == ["invite"]
+
+    forbidden = client.get("/api/admin/invites")
+    assert forbidden.status_code == 403 and forbidden.json()["detail"] == "Email not verified"
+    resent = client.post("/api/auth/verify-email/resend", json={})
+    assert resent.status_code == 200 and resent.json() == {"sent": True}
+    assert email.sent[-1][:2] == ("verify", "alice@example.com")
+    cooldown = client.post("/api/auth/verify-email/resend", json={})
+    assert cooldown.status_code == 429
+    assert 1 <= int(cooldown.headers["retry-after"]) <= 30
+
+    verified = client.post("/api/auth/verify-email", json={"code": email.last_code("verify")})
+    assert verified.status_code == 200 and verified.json()["email_verified"] is True
+    assert client.get("/api/admin/invites").json()["detail"] == "Missing permission: invites.manage"

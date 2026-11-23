@@ -1,5 +1,7 @@
 You've been invited to Ember.
 
-Invite code: $code
+1. Open Ember and choose "Create an account".
+2. Enter this invite code: $code
+3. Use this email address for your account: $email
 
-It works once and expires at $expires_at UTC.
+The code works once and expires at $expires_at UTC. Do not share it.

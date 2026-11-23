@@ -10,6 +10,7 @@ standard [capability conventions](../README.md).
 | `tool_email_sendEmail` | Send one email and return its Message-ID | SMTP |
 | `tool_email_replyEmail` | Send a threaded reply and return its Message-ID | SMTP |
 | `tool_email_getAuditLog` | MCP-only, owner-scoped delivery metadata | Local SQLite |
+| `tool_email_checkHealth` | MCP-only, no mail sent, used by Portcullis before an invite | SMTP |
 
 ## Slash commands
 

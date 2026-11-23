@@ -62,7 +62,7 @@ def test_role_manager_cannot_grant_permission_they_lack(client, email):
 
 def test_inviter_cannot_delegate_stronger_default_role(client, email):
     limited_account(client, email, "invites.manage")
-    assert client.post("/api/admin/invites", json={}).status_code == 403
+    assert client.post("/api/admin/invites", json={"invitee_email": "new@example.com"}).status_code == 403
 
 
 def test_tool_view_allows_discovery_but_refuses_calls_and_batches(client, email, upstream):

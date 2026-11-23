@@ -11,7 +11,7 @@ declare module "vue-router" {
     guestOnly?: boolean;
     /** The Windows app's connect screen: open before a server has answered. */
     connect?: boolean;
-    /** Open to everyone, logged in or not, and left as it is: a shared chat. */
+    /** A shared chat can open without signing in. */
     public?: boolean;
     /** The ember_api permission the page needs; a list = any one of them. */
     permission?: string | string[];
@@ -141,24 +141,21 @@ router.beforeEach(async (to): Promise<true | RouteLocationRaw> => {
   if (isDesktop() && !(await ensureServer())) {
     return { name: "connect", query: to.fullPath === "/" ? {} : { redirect: to.fullPath } };
   }
-  // A shared chat is read by anyone holding the link: no login, and no
-  // redirect for someone who is logged in either.
-  if (to.meta.public) return true;
   const auth = useAuthStore();
   await auth.ensureLoaded();
   const account = auth.account;
 
   if (!account) {
-    return to.meta.guestOnly ? true : { name: "login", query: to.fullPath === "/" ? {} : { redirect: to.fullPath } };
+    return to.meta.guestOnly || to.meta.public
+      ? true
+      : { name: "login", query: to.fullPath === "/" ? {} : { redirect: to.fullPath } };
   }
   if (auth.needsVerification) {
     return to.name === "verify-email" || to.meta.anyAccount ? true : { name: "verify-email" };
   }
 
   const home = HOME_PAGES.find((p) => auth.hasPermission(p.permission));
-  // The verify page stays open to an unverified account even when verification
-  // is optional (the Account page links to it).
-  if (to.meta.guestOnly || (to.name === "verify-email" && account.email_verified)) {
+  if (to.meta.guestOnly || to.name === "verify-email") {
     return { name: home?.name ?? "no-access" };
   }
   const needed = to.meta.permission;

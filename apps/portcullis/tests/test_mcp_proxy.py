@@ -9,7 +9,8 @@ import httpx
 from fastapi.testclient import TestClient
 
 from tests.conftest import AGENTS, MCP_SERVER_URL, FakeUpstream
-from tests.test_registration import as_admin, new_invite, register
+from tests.test_admin import login, make_member
+from tests.test_registration import as_admin
 
 AGENT_PATH = "/api/mcp/agents/claude-agent"
 SERVER_PATH = "/api/mcp/server"
@@ -305,8 +306,9 @@ def test_proxy_requires_login(client: TestClient, upstream: FakeUpstream) -> Non
     assert upstream.requests == []
 
 
-def test_unverified_account_cannot_use_the_proxy(client: TestClient, upstream: FakeUpstream) -> None:
-    register(client, new_invite(client))  # logged in, email not verified
+def test_unverified_account_cannot_use_the_proxy(client: TestClient, upstream: FakeUpstream, email) -> None:
+    make_member(client, email, verify=False)
+    login(client, "alice")
 
     response = post(client, AGENT_PATH, rpc("initialize", {}))
 

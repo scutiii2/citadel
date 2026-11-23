@@ -1,42 +1,55 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { adminClient, type CreatedInvite, type Invite } from "../../api/AdminClient";
+import { computed, onMounted, ref } from "vue";
+import { adminClient, type Invite } from "../../api/AdminClient";
 import { errorMessage, formatUtc } from "../../utils/errors";
-import CopyButton from "../CopyButton.vue";
-import ToggleSwitch from "../ToggleSwitch.vue";
 import BaseModal from "../BaseModal.vue";
 import ConfirmModal from "./ConfirmModal.vue";
 import "./admin.css";
 
 /** The overview counts (OverviewView) change whenever an invite does. */
 const emit = defineEmits<{ changed: [] }>();
-withDefaults(defineProps<{ showHeading?: boolean; drawer?: boolean }>(), { showHeading: true, drawer: false });
+type EmailStatus = { kind: "checking" | "ready" } | { kind: "blocked"; reason: string };
+const statusUnavailable = "Armory could not be reached. Check that Armory is running and Portcullis can call it.";
 const createOpen = ref(false);
-function openCreate(): void {
-  inviteeEmail.value = "";
-  byEmail.value = false;
-  created.value = null;
-  createError.value = "";
-  createOpen.value = true;
-}
-defineExpose({ openCreate });
-
+const emailStatus = ref<EmailStatus>({ kind: "checking" });
+let emailCheck = 0;
 const invites = ref<Invite[]>([]);
 const listError = ref("");
-
 const inviteeEmail = ref("");
-const byEmail = ref(false);
+const emailInput = ref<HTMLInputElement | null>(null);
 const creating = ref(false);
 const createError = ref("");
-// The code is only ever shown here, right after creation.
-const created = ref<CreatedInvite | null>(null);
+const sentTo = ref("");
 const pendingRevoke = ref<Invite | null>(null);
 const revoking = ref(false);
 
-// Emailing needs an address: clearing it switches the option off.
-watch(inviteeEmail, (email) => {
-  if (!email.trim()) byEmail.value = false;
-});
+const canSend = computed(() => (
+  emailStatus.value.kind === "ready" && !creating.value
+  && inviteeEmail.value.trim() !== "" && emailInput.value?.validity.valid === true
+));
+
+async function checkEmailStatus(): Promise<void> {
+  const check = ++emailCheck;
+  emailStatus.value = { kind: "checking" };
+  createError.value = "";
+  let status: EmailStatus;
+  try {
+    const result = await adminClient.inviteEmailStatus();
+    status = result.ready ? { kind: "ready" } : { kind: "blocked", reason: result.reason ?? statusUnavailable };
+  } catch {
+    status = { kind: "blocked", reason: statusUnavailable };
+  }
+  if (check === emailCheck) emailStatus.value = status;
+}
+
+function openCreate(): void {
+  inviteeEmail.value = "";
+  sentTo.value = "";
+  createOpen.value = true;
+  void checkEmailStatus();
+}
+
+defineExpose({ openCreate });
 
 async function loadInvites(): Promise<void> {
   listError.value = "";
@@ -48,12 +61,14 @@ async function loadInvites(): Promise<void> {
 }
 
 async function createInvite(): Promise<void> {
+  if (!canSend.value) return;
   createError.value = "";
-  created.value = null;
+  sentTo.value = "";
   creating.value = true;
   try {
-    const email = inviteeEmail.value.trim() || null;
-    created.value = await adminClient.createInvite(email, byEmail.value ? "email" : "manual");
+    const email = inviteeEmail.value.trim();
+    const invite = await adminClient.createInvite(email);
+    sentTo.value = invite.invitee_email ?? email;
     inviteeEmail.value = "";
     emit("changed");
     await loadInvites();
@@ -78,7 +93,6 @@ async function confirmRevoke(): Promise<void> {
   try {
     await adminClient.revokeInvite(invite.id);
     invites.value = invites.value.filter((i) => i.id !== invite.id);
-    if (created.value?.invite.id === invite.id) created.value = null;
     emit("changed");
   } catch (err) {
     listError.value = errorMessage(err);
@@ -93,39 +107,25 @@ onMounted(loadInvites);
 
 <template>
   <div class="admin-panel">
-    <header v-if="showHeading" class="section-head"><div><h3>Invites</h3><p>Give someone access to your workspace.</p></div></header>
-    <component :is="drawer ? BaseModal : 'section'" class="card invite-create admin-panel" :open="createOpen" title="Create invite" :side="drawer" @close="createOpen = false">
-      <h3 v-if="!drawer">Create an invite</h3>
-      <p class="muted">Codes are valid for 7 days and can be used once.</p>
+    <BaseModal class="card invite-create admin-panel" :open="createOpen" title="Invite member" side @close="!creating && (createOpen = false)">
+      <p class="muted">We email a one-time code. It works for 7 days. The person must register with this email address.</p>
       <form class="row-form" @submit.prevent="createInvite">
-        <input v-model="inviteeEmail" type="email" placeholder="Invitee email (optional)" aria-label="Invitee email" />
-        <ToggleSwitch
-          small
-          :checked="byEmail"
-          :disabled="!inviteeEmail.trim()"
-          @change="byEmail = ($event.target as HTMLInputElement).checked"
-        >
-          Email the code
-        </ToggleSwitch>
-        <button class="primary" :disabled="creating">
-          {{ creating ? "Creating ..." : "Create invite" }}
+        <label for="invite-member-email">Email of the new member</label>
+        <input id="invite-member-email" ref="emailInput" v-model="inviteeEmail" type="email" required :disabled="creating" />
+        <p v-if="emailStatus.kind === 'checking'" class="muted" role="status">Checking email availability…</p>
+        <template v-else-if="emailStatus.kind === 'blocked'">
+          <p class="error" role="alert">{{ emailStatus.reason }}</p>
+          <button type="button" class="small" @click="checkEmailStatus">Check again</button>
+        </template>
+        <p v-if="createError" class="error" role="alert">{{ createError }}</p>
+        <button type="submit" class="primary" :disabled="!canSend" :aria-busy="creating">
+          {{ creating ? "Sending ..." : "Send invite" }}
         </button>
       </form>
-      <p v-if="createError" class="error">{{ createError }}</p>
-
-      <div v-if="created" class="created">
-        <p v-if="!created.email_sent">
-          Invite code (shown only now, valid 7 days, works once):
-          <code class="code">{{ created.code }}</code>
-          <CopyButton :text="created.code" label="Copy invite code" />
-        </p>
-        <p v-if="created.email_sent" class="muted">Emailed to {{ created.invite.invitee_email }}.</p>
-        <p v-else-if="created.email_error" class="error">
-          Email failed: {{ created.email_error }} - pass the code on by hand.
-        </p>
+      <div v-if="sentTo" class="created" role="status">
+        <p>Invitation sent to {{ sentTo }}.</p>
       </div>
-      <p class="notice">The invite code appears only once, immediately after creation.</p>
-    </component>
+    </BaseModal>
 
     <h3>Open invites</h3>
     <p v-if="listError" class="error">error: {{ listError }}</p>
@@ -133,12 +133,11 @@ onMounted(loadInvites);
     <div v-if="invites.length" class="table-wrap">
       <table>
         <thead>
-          <tr><th>Invitee</th><th>Delivery</th><th>Created</th><th>Expires</th><th></th></tr>
+          <tr><th>Invitee</th><th>Created</th><th>Expires</th><th></th></tr>
         </thead>
         <tbody>
           <tr v-for="i in invites" :key="i.id">
             <td class="invitee">{{ i.invitee_email ?? "-" }}</td>
-            <td><span class="badge">{{ i.delivery_method }}</span></td>
             <td>{{ formatUtc(i.created_at) }}</td>
             <td>{{ formatUtc(i.expires_at) }}</td>
             <td>
@@ -163,20 +162,10 @@ onMounted(loadInvites);
 </template>
 
 <style scoped>
-.invite-create.card {
-
-  padding: 20px;
-
-  background: var(--bg);
-
-}
 .invite-create.side-modal.card { margin: 0; padding: 24px; background: var(--bg); }
 .invite-create.side-modal .row-form { flex-direction: column; align-items: stretch; }
 .invite-create.side-modal .row-form input { flex: none; width: 100%; }
 .invite-create.side-modal .row-form .primary { align-self: flex-start; }
-.invite-create h3 {
-  margin: 0 0 4px;
-}
 .invite-create > p {
   margin: 0;
   font-size: 0.9em;
@@ -185,9 +174,11 @@ onMounted(loadInvites);
   margin-top: 18px;
   gap: 14px;
 }
-.invite-create > .notice {
-  margin-top: 16px;
-  font-size: 0.8em;
+.invite-create .row-form p {
+  margin: 0;
+}
+.invite-create .row-form button {
+  align-self: flex-start;
 }
 .table-wrap {
   border: 1px solid var(--border);
@@ -202,14 +193,6 @@ onMounted(loadInvites);
 }
 .created p {
   margin: 0.3em 0;
-}
-.code {
-  margin: 0 6px;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  font-family: var(--mono);
-  font-size: 1.05em;
-  background: var(--code-bg);
 }
 .table-wrap {
   overflow-x: auto;

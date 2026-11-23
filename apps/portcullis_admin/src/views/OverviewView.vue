@@ -17,7 +17,7 @@ const destinations = computed(() => ADMIN_NAV_PAGES.filter(s => s.to !== "/overv
 const descriptions: Record<string, string> = {
   "/admin/accounts": "Manage profiles, account status, and assigned roles.",
   "/admin/roles": "Define exactly what each role can view and change.",
-  "/admin/invites": "Create an invite, check expiry, or revoke access.",
+  "/admin/invites": "Invite a member, check expiry, or revoke access.",
   "/admin/settings": "Control approval requirements for every account.",
 };
 onMounted(async () => {
@@ -29,7 +29,7 @@ onMounted(async () => {
 
 <template>
   <PageLayout class="admin-overview admin-panel" title="Workspace overview" description="Manage people, access, integrations, and activity.">
-    <template #actions><RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">＋ Create invite</RouterLink></template>
+    <template #actions><RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">Invite member</RouterLink></template>
 
     <p v-if="error" class="error" role="alert">Couldn't load the overview: {{ error }}</p>
     <div v-if="auth.hasPermission('accounts.view') || auth.hasPermission('invites.manage')" class="stats">

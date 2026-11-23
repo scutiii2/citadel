@@ -24,7 +24,7 @@ from src.services.migrations import MigrationRunner
 from src.config import BackupSettings, SecuritySettings, Settings
 from src.services import otp_service
 from src.services.caller import Caller
-from src.services.email_service import EmailDeliveryError
+from src.services.email_service import EmailDeliveryError, EmailHealth
 from src.services.server_tools import ServerUnavailable
 from src.services.traffic import TrafficRecorder
 from tests.fake_turns import FakeTurns
@@ -40,6 +40,13 @@ class FakeEmailSender:
 
     sent: list[tuple[str, str, str]] = field(default_factory=list)  # (kind, to, code)
     fail: bool = False
+    health_reason: str | None = None
+    health_error: Exception | None = None
+
+    async def health(self) -> EmailHealth:
+        if self.health_error is not None:
+            raise self.health_error
+        return EmailHealth(self.health_reason is None, self.health_reason or "Email is ready.")
 
     async def send_invite(self, to: str, code: str, expires_at: datetime) -> None:
         self._record("invite", to, code)
@@ -266,11 +273,10 @@ def make_settings(
     session_hours: int = 12,
     security: SecuritySettings | None = None,
     backup: BackupSettings | None = None,
-    require_email_verification: bool = True,
 ) -> Settings:
     registry = tmp_path / "config_agents.json"
     registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
-    env_path = tmp_path / ".env"
+    env_path = tmp_path / "bootstrap-config"
     env_path.write_text(
         f"BOOTSTRAP_ADMIN_USERNAME={ADMIN_USERNAME}\n"
         "BOOTSTRAP_ADMIN_EMAIL=root@example.com\n"
@@ -288,7 +294,6 @@ def make_settings(
         session_cookie_name="ember_session",
         session_hours=session_hours,
         cookie_secure=False,  # TestClient talks plain http
-        require_email_verification=require_email_verification,
         env_path=env_path,
         agents_registry_path=registry,
         security=security or SecuritySettings(),

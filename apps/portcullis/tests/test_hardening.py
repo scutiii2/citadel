@@ -281,7 +281,7 @@ class TestRegistrationCase:
         make_member(client, email, "alice")
         as_admin(client)
 
-        response = register(client, new_invite(client), username="ALICE", email="other@example.com")
+        response = register(client, new_invite(client, "other@example.com"), username="ALICE", email="other@example.com")
 
         assert response.status_code == 409
         assert "Username" in response.json()["detail"]
@@ -298,8 +298,8 @@ class TestRegistrationCase:
     def test_the_invite_survives_a_refusal(self, client: TestClient, email: FakeEmailSender) -> None:
         make_member(client, email, "alice")
         as_admin(client)
-        invite = new_invite(client)
-        assert register(client, invite, username="ALICE", email="o@example.com").status_code == 409
+        invite = new_invite(client, "fresh@example.com")
+        assert register(client, invite, username="ALICE", email="fresh@example.com").status_code == 409
 
         assert register(client, invite, username="fresh", email="fresh@example.com").status_code == 201
 
@@ -307,7 +307,7 @@ class TestRegistrationCase:
         make_member(client, email, "alice")
         as_admin(client)
 
-        assert register(client, new_invite(client), username="alicia", email="alicia@example.com").status_code == 201
+        assert register(client, new_invite(client, "alicia@example.com"), username="alicia", email="alicia@example.com").status_code == 201
 
 
 # --- old login attempts ------------------------------------------------------------------------

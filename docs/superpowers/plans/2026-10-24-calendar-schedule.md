@@ -2463,7 +2463,7 @@ def build_calendar_runtime(
             account = await session.scalar(select(Account).where(Account.uid == uid))
         if account is None or not account.is_active:
             return None
-        if settings.require_email_verification and not account.email_verified:
+        if not account.email_verified:
             return None
         if CALENDAR_USE not in account.permission_names:
             return None

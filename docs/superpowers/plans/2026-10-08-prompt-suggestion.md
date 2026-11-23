@@ -162,7 +162,6 @@ In `apps/ember_api/src/routes/auth.py` add the field after `email_verification_r
             email_verified=account.email_verified,
             roles=sorted(r.name for r in account.roles),
             permissions=sorted(account.permission_names),
-            email_verification_required=settings.require_email_verification,
             prompt_suggestions=account.prompt_suggestions,
         )
 ```

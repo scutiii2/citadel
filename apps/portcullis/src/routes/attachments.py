@@ -115,8 +115,7 @@ async def dictate_stream(websocket: WebSocket):
         if account is None:
             await websocket.close(4401, "Not logged in")
             return
-        if ((settings.require_email_verification and not account.email_verified)
-                or FILES_UPLOAD not in account.permission_names):
+        if not account.email_verified or FILES_UPLOAD not in account.permission_names:
             await websocket.close(4403, "Missing upload permission")
             return
     await websocket.accept(subprotocol=subprotocol)

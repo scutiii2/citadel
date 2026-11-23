@@ -12,7 +12,7 @@ import math
 import secrets
 from datetime import timedelta
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import utcnow
@@ -71,10 +71,20 @@ class OtpService:
             )
         )
 
-    def mark_invite_used(self, invite: InviteCode) -> None:
-        """Marks only; the caller commits, so registration and consuming the
-        invite succeed or fail together."""
-        invite.used_at = utcnow()
+    async def discard_invite(self, invite: InviteCode) -> None:
+        """Remove an invite whose delivery failed."""
+        await self._session.delete(invite)
+        await self._session.commit()
+
+    async def claim_invite(self, invite: InviteCode) -> bool:
+        """Consume a valid invite once, in the same transaction as account creation."""
+        now = utcnow()
+        result = await self._session.execute(
+            update(InviteCode)
+            .where(InviteCode.id == invite.id, InviteCode.used_at.is_(None), InviteCode.expires_at > now)
+            .values(used_at=now)
+        )
+        return result.rowcount == 1
 
     async def open_invites(self) -> list[InviteCode]:
         return list(

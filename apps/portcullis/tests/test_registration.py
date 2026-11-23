@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 
 from src.db import utcnow
-from src.models import InviteCode
+from src.models import EmailVerificationCode, InviteCode
+from src.services.otp_service import OtpService
 from src.services.permissions import DEFAULT_ROLE_PERMISSIONS
 from tests.conftest import ADMIN_PASSWORD, ADMIN_USERNAME, FakeEmailSender
 
@@ -18,13 +20,13 @@ def as_admin(client: TestClient) -> TestClient:
     return client
 
 
-def new_invite(client: TestClient, **body) -> str:
+def new_invite(client: TestClient, email: str = "alice@example.com") -> str:
     """Creates an invite as admin and returns its code; leaves the client logged out."""
     as_admin(client)
-    response = client.post("/api/admin/invites", json=body)
+    response = client.post("/api/admin/invites", json={"invitee_email": email})
     assert response.status_code == 201, response.text
     client.post("/api/auth/logout", json={})
-    return response.json()["code"]
+    return client.app.state.email_sender.last_code("invite")
 
 
 def register(client: TestClient, code: str, username: str = "alice", email: str = "alice@example.com"):
@@ -46,17 +48,32 @@ def expire_all_invites(client: TestClient) -> None:
 # --- registration ------------------------------------------------------------
 
 
-def test_register_logs_in_unverified_member_and_emails_code(client: TestClient, email: FakeEmailSender) -> None:
-    response = register(client, new_invite(client))
+def test_registration_verifies_the_invited_email_without_a_second_code(client: TestClient, email: FakeEmailSender) -> None:
+    response = register(client, new_invite(client), email="ALICE@Example.com")
 
     assert response.status_code == 201
     body = response.json()
-    assert body["verification_email_sent"] is True
-    assert body["account"]["email_verified"] is False
+    assert set(body) == {"account"}
+    assert body["account"]["email_verified"] is True
     assert body["account"]["roles"] == ["Member"]
     assert body["account"]["permissions"] == sorted(DEFAULT_ROLE_PERMISSIONS)
-    assert client.get("/api/auth/me").json()["username"] == "alice"  # session started
-    assert email.sent[-1][:2] == ("verify", "alice@example.com")
+    assert client.get("/api/auth/me").json()["username"] == "alice"
+    assert [kind for kind, _, _ in email.sent] == ["invite"]
+
+    async def count_codes():
+        async with client.app.state.database.sessions() as session:
+            return await session.scalar(select(func.count()).select_from(EmailVerificationCode))
+
+    assert client.portal.call(count_codes) == 0
+
+
+def test_an_invite_refuses_a_different_email_and_remains_unused(client: TestClient) -> None:
+    code = new_invite(client)
+    refused = register(client, code, email="other@example.com")
+
+    assert refused.status_code == 409
+    assert refused.json() == {"detail": "This invite was sent to a different email address"}
+    assert register(client, code).status_code == 201
 
 
 def test_bad_invite_is_rejected(client: TestClient) -> None:
@@ -74,7 +91,7 @@ def test_invite_lasts_a_week_but_verification_code_fifteen_minutes(client: TestC
     from datetime import datetime
 
     as_admin(client)
-    invite = client.post("/api/admin/invites", json={}).json()["invite"]
+    invite = client.post("/api/admin/invites", json={"invitee_email": "alice@example.com"}).json()
     lifetime = datetime.fromisoformat(invite["expires_at"]) - datetime.fromisoformat(invite["created_at"])
 
     assert abs(lifetime - timedelta(days=7)) < timedelta(seconds=5)
@@ -92,18 +109,35 @@ def test_invite_works_only_once(client: TestClient) -> None:
     assert register(client, code, username="bob", email="bob@example.com").status_code == 400
 
 
+def test_a_stale_registration_cannot_claim_a_consumed_invite(client: TestClient) -> None:
+    code = new_invite(client)
+
+    async def claim_from_two_sessions():
+        async with client.app.state.database.sessions() as first, client.app.state.database.sessions() as stale:
+            first_otp, stale_otp = OtpService(first), OtpService(stale)
+            invite = await first_otp.find_valid_invite(code)
+            stale_invite = await stale_otp.find_valid_invite(code)
+            assert invite is not None and stale_invite is not None
+            assert await first_otp.claim_invite(invite)
+            await first.commit()
+            assert not await stale_otp.claim_invite(stale_invite)
+
+    client.portal.call(claim_from_two_sessions)
+
+
 def test_duplicate_username_and_email_keep_the_invite_unused(client: TestClient) -> None:
     assert register(client, new_invite(client)).status_code == 201
     client.post("/api/auth/logout", json={})
-    code = new_invite(client)
-
-    taken_name = register(client, code, username="alice", email="other@example.com")
-    taken_email = register(client, code, username="other", email="alice@example.com")
-
-    assert taken_name.status_code == taken_email.status_code == 409
+    other_invite = new_invite(client, "other@example.com")
+    taken_name = register(client, other_invite, username="alice", email="other@example.com")
+    assert taken_name.status_code == 409
     assert taken_name.json()["detail"] == "Username is already taken"
+    assert register(client, other_invite, username="other", email="other@example.com").status_code == 201
+    client.post("/api/auth/logout", json={})
+
+    taken_email = register(client, new_invite(client), username="carol")
+    assert taken_email.status_code == 409
     assert taken_email.json()["detail"] == "Email is already registered"
-    assert register(client, code, username="carol", email="carol@example.com").status_code == 201
 
 
 def test_invalid_registration_fields_are_rejected(client: TestClient) -> None:
@@ -118,85 +152,22 @@ def test_invalid_registration_fields_are_rejected(client: TestClient) -> None:
     assert short.status_code == 422
 
 
-# --- email verification --------------------------------------------------------
-
-
-def test_permissions_are_inactive_until_email_verified(client: TestClient, email: FakeEmailSender) -> None:
-    register(client, new_invite(client))
-
-    # A permission-gated route: blocked while unverified.
-    assert client.get("/api/admin/invites").json()["detail"] == "Email not verified"
-
-    verified = client.post("/api/auth/verify-email", json={"code": email.last_code("verify")})
-
-    assert verified.status_code == 200
-    assert verified.json()["email_verified"] is True
-    # Verified now, but a Member still lacks admin.manage.
-    assert client.get("/api/admin/invites").json()["detail"] == "Missing permission: invites.manage"
-
-
-def test_wrong_verification_code_is_rejected(client: TestClient) -> None:
-    register(client, new_invite(client))
-
-    assert client.post("/api/auth/verify-email", json={"code": "wrong"}).status_code == 400
-    assert client.get("/api/auth/me").json()["email_verified"] is False
-
-
-def test_registration_survives_email_failure_and_resend_recovers(client: TestClient, email: FakeEmailSender) -> None:
+def test_registration_validation_does_not_echo_invite_codes(client: TestClient) -> None:
     code = new_invite(client)
-    email.fail = True
+    response = client.post("/api/auth/register", json={"invite_code": code})
 
-    response = register(client, code)
+    assert response.status_code == 422
+    if code in response.text:
+        pytest.fail("Validation errors exposed the invite code")
 
-    assert response.status_code == 201
-    assert response.json()["verification_email_sent"] is False
-    assert "SMTP is down" in response.json()["email_error"]
-    assert client.post("/api/auth/verify-email/resend", json={}).status_code == 503
 
-    email.fail = False
-    assert client.post("/api/auth/verify-email/resend", json={}).json() == {"sent": True}
-    assert client.post("/api/auth/verify-email", json={"code": email.last_code("verify")}).status_code == 200
+# --- email verification --------------------------------------------------------
 
 
 def test_resend_when_already_verified_is_409(client: TestClient) -> None:
     as_admin(client)  # bootstrap admin is verified from the start
 
     assert client.post("/api/auth/verify-email/resend", json={}).status_code == 409
-
-
-# --- admin invites ---------------------------------------------------------------
-
-
-def test_email_invite_is_sent_and_listed_without_its_code(client: TestClient, email: FakeEmailSender) -> None:
-    as_admin(client)
-
-    created = client.post(
-        "/api/admin/invites", json={"invitee_email": "new@example.com", "delivery_method": "email"}
-    ).json()
-    listed = client.get("/api/admin/invites").json()
-
-    assert created["email_sent"] is True
-    assert email.sent[-1] == ("invite", "new@example.com", created["code"])
-    assert [i["id"] for i in listed] == [created["invite"]["id"]]
-    assert "code" not in listed[0]
-
-
-def test_email_invite_without_address_is_422(client: TestClient) -> None:
-    as_admin(client)
-
-    assert client.post("/api/admin/invites", json={"delivery_method": "email"}).status_code == 422
-
-
-def test_failed_invite_email_still_returns_the_code(client: TestClient, email: FakeEmailSender) -> None:
-    as_admin(client)
-    email.fail = True
-
-    created = client.post(
-        "/api/admin/invites", json={"invitee_email": "new@example.com", "delivery_method": "email"}
-    ).json()
-
-    assert created["email_sent"] is False
-    assert created["code"]
 
 
 def test_invites_require_login(client: TestClient) -> None:

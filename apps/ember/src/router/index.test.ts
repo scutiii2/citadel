@@ -34,14 +34,14 @@ beforeEach(async () => {
 });
 
 describe("shared chat route", () => {
-  it("opens for someone who is not logged in, without asking who they are", async () => {
+  it("opens for someone who is not logged in", async () => {
     me.mockRejectedValue(new UnauthorizedError(401, "Not logged in"));
 
     await router.push("/shared/abc123");
 
     expect(router.currentRoute.value.name).toBe("shared");
     expect(router.currentRoute.value.params.token).toBe("abc123");
-    expect(me).not.toHaveBeenCalled();
+    expect(me).toHaveBeenCalledOnce();
   });
 
   it("stays put for a logged-in user, instead of redirecting them home", async () => {
@@ -52,12 +52,12 @@ describe("shared chat route", () => {
     expect(router.currentRoute.value.name).toBe("shared");
   });
 
-  it("stays put for an account whose email is not verified yet", async () => {
+  it("redirects an unverified account even when the chat is shared", async () => {
     me.mockResolvedValue({ ...ACCOUNT, email_verified: false });
 
     await router.push("/shared/abc123");
 
-    expect(router.currentRoute.value.name).toBe("shared");
+    expect(router.currentRoute.value.name).toBe("verify-email");
   });
 
   it("stays put for an account with no permissions", async () => {
@@ -135,40 +135,27 @@ describe("the rest of the app stays behind the login", () => {
 describe("email verification", () => {
   const UNVERIFIED = { ...ACCOUNT, email_verified: false };
 
-  it("sends an unverified account to the verify page when verification is required", async () => {
-    me.mockResolvedValue({ ...UNVERIFIED, email_verification_required: true });
+  it.each(["/", "/chat/123", "/tools", "/capabilities/pdf_merger"])(
+    "sends an unverified account to verification from %s", async (path) => {
+      me.mockResolvedValue(UNVERIFIED);
 
-    await router.push("/");
+      await router.push(path);
 
-    expect(router.currentRoute.value.name).toBe("verify-email");
-  });
+      expect(router.currentRoute.value.name).toBe("verify-email");
+    },
+  );
 
-  it("treats a missing flag as required", async () => {
+  it("keeps the account page reachable to update an email or log out", async () => {
     me.mockResolvedValue(UNVERIFIED);
 
-    await router.push("/");
+    await router.push("/account");
 
-    expect(router.currentRoute.value.name).toBe("verify-email");
-  });
-
-  it("lets an unverified account use the app when verification is not required", async () => {
-    me.mockResolvedValue({ ...UNVERIFIED, email_verification_required: false });
-
-    await router.push("/");
-
-    expect(router.currentRoute.value.name).toBe("chat");
-  });
-
-  it("still opens the verify page for an unverified account when it is optional", async () => {
-    me.mockResolvedValue({ ...UNVERIFIED, email_verification_required: false });
-
-    await router.push("/verify-email");
-
-    expect(router.currentRoute.value.name).toBe("verify-email");
+    expect(router.currentRoute.value.name).toBe("account");
+    expect(router.getRoutes().filter((route) => route.meta.anyAccount).map((route) => route.name)).toEqual(["account"]);
   });
 
   it("sends a verified account away from the verify page", async () => {
-    me.mockResolvedValue({ ...ACCOUNT, email_verification_required: false });
+    me.mockResolvedValue(ACCOUNT);
 
     await router.push("/verify-email");
 

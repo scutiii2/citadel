@@ -1827,7 +1827,7 @@ Expected: 404 for the new routes.
 
 ```python
 def _is_usable(account: Account | None, settings: Settings) -> bool:
-    return account is not None and account.is_active and not (settings.require_email_verification and not account.email_verified)
+    return account is not None and account.is_active and account.email_verified
 ```
 
 (and let `_usable_account` use it), then

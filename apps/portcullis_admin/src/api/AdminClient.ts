@@ -8,14 +8,6 @@ export interface Invite {
   expires_at: string;
 }
 
-export interface CreatedInvite {
-  invite: Invite;
-  /** Shown once: portcullis stores only its hash. */
-  code: string;
-  email_sent: boolean;
-  email_error: string | null;
-}
-
 export interface RoleRef {
   id: number;
   name: string;
@@ -84,8 +76,8 @@ const enc = encodeURIComponent;
 /** portcullis's /api/admin routes (separate administrative permissions). */
 export const adminClient = {
   listInvites: () => apiRequest<Invite[]>("GET", "/api/admin/invites"),
-  createInvite: (invitee_email: string | null, delivery_method: "manual" | "email") =>
-    apiRequest<CreatedInvite>("POST", "/api/admin/invites", { invitee_email, delivery_method }),
+  inviteEmailStatus: () => apiRequest<{ ready: boolean; reason: string | null }>("GET", "/api/admin/invites/email-status"),
+  createInvite: (invitee_email: string) => apiRequest<Invite>("POST", "/api/admin/invites", { invitee_email }),
   revokeInvite: (id: number) => apiRequest<void>("DELETE", `/api/admin/invites/${id}`),
 
   summary: () => apiRequest<AdminSummary>("GET", "/api/admin/summary"),

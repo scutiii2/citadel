@@ -33,14 +33,13 @@ function toggle(form: "email" | "password"): void {
   openForm.value = openForm.value === form ? null : form;
 }
 
-const emailForm = reactive({ email: "", password: "", busy: false, error: "", success: "" });
+const emailForm = reactive({ email: "", password: "", busy: false, error: "" });
 const passwordForm = reactive({ next: "", confirm: "", current: "", busy: false, error: "", done: false });
 
 const passwordMismatch = computed(() => passwordForm.confirm !== "" && passwordForm.next !== passwordForm.confirm);
 
 async function changeEmail(): Promise<void> {
   emailForm.error = "";
-  emailForm.success = "";
   emailForm.busy = true;
   try {
     const result = await auth.changeEmail(emailForm.password, emailForm.email.trim());
@@ -48,8 +47,6 @@ async function changeEmail(): Promise<void> {
     emailForm.password = "";
     if (result.account.email_verified) {
       emailForm.error = "That is already your email.";
-    } else if (result.account.email_verification_required === false) {
-      emailForm.success = "Email changed. You can verify it any time from this page.";
     } else {
       // Permissions are off until the new address is verified.
       await router.replace({ name: "verify-email", query: result.verification_email_sent ? {} : { unsent: "1" } });
@@ -117,9 +114,7 @@ async function changePassword(): Promise<void> {
 
 
       <div v-if="!account.email_verified" class="banner" role="status">
-        <span>{{ auth.needsVerification
-          ? "Your email isn't verified. Permissions are paused until you enter the code."
-          : "Your email isn't verified. Verifying it is optional." }}</span>
+        <span>Verify your email address to use this workspace.</span>
         <ActionButton labelled icon="verify" class="account-action verify" @click="router.push('/verify-email')">Verify now</ActionButton>
       </div>
 
@@ -138,7 +133,7 @@ async function changePassword(): Promise<void> {
           <p class="eyebrow">Email status</p>
           <p class="state" :class="{ verified: account.email_verified }">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" /><path v-if="account.email_verified" d="m8.5 12 2.5 2.5 4.5-5" /><path v-else d="M12 8v5m0 3v.1" /></svg>
-            {{ account.email_verified ? 'Verified address' : auth.needsVerification ? 'Verification needed' : 'Verification optional' }}
+            {{ account.email_verified ? 'Verified address' : 'Verification needed' }}
           </p>
         </div>
       </div>
@@ -176,11 +171,8 @@ async function changePassword(): Promise<void> {
             <form v-if="openForm === 'email'" id="account-email-form" class="stack" :aria-busy="emailForm.busy" @submit.prevent="changeEmail">
               <label>New email<input v-model="emailForm.email" type="email" autocomplete="email" required /></label>
               <PasswordInput label="Current password" v-model="emailForm.password" autocomplete="current-password" required />
-              <p class="muted small">{{ account.email_verification_required === false
-                ? "You'll get a code at the new address. Verifying it is optional."
-                : "You'll get a code at the new address. Until you enter it, your permissions are paused." }}</p>
+              <p class="muted small">Verify the new address with its emailed code before using the workspace.</p>
               <p v-if="emailForm.error" class="error" role="alert">{{ emailForm.error }}</p>
-              <p v-else-if="emailForm.success" class="notice" role="status">{{ emailForm.success }}</p>
               <button class="primary" :disabled="emailForm.busy" :aria-busy="emailForm.busy"><span v-if="emailForm.busy" class="spinner" aria-hidden="true" />{{ emailForm.busy ? 'Changing email…' : 'Change email' }}</button>
             </form>
             <div class="row">

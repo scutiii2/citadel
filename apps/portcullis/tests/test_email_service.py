@@ -45,7 +45,8 @@ def test_invite_uses_template_and_mcp_config(transport) -> None:
     calls, setup, _ = transport
     name, args = calls[0]
     body = args["body_text"]
-    assert "Invite code: ABC123" in body
+    assert "Enter this invite code: ABC123" in body
+    assert "Use this email address for your account: a@x.com" in body
     assert "2026-10-05 12:30 UTC" in body
     assert "Do not reply" not in body  # The common MCP transport adds the notice once.
     assert name == "tool_email_sendEmail"
@@ -112,3 +113,41 @@ def test_cancellation_propagates(transport):
     state["error"] = asyncio.CancelledError()
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(email_service.McpEmailSender("http://mcp.test/mcp", None).send_invite("a@x.com", "ABC123", EXPIRES))
+
+
+@pytest.mark.parametrize("ready, message", [
+    (True, "Email is ready."),
+    (False, "The Email capability is switched off in Armory."),
+])
+def test_health_returns_the_armory_answer(transport, ready, message):
+    calls, _, state = transport
+    state["result"] = SimpleNamespace(isError=False, structuredContent={"ready": ready, "message": message})
+    sender = email_service.McpEmailSender("http://mcp.test/mcp", None)
+
+    health = asyncio.run(sender.health())
+
+    assert (health.ready, health.reason) == (ready, message)
+    assert calls == [("tool_email_checkHealth", {})]
+
+
+@pytest.mark.parametrize("case", ["exception", "error", "missing", "unrecognized_reason", "malformed"])
+def test_health_fails_closed_with_a_fixed_reason(transport, case):
+    _, _, state = transport
+    data = {"ready": True, "message": "Email is ready."}
+    state["result"] = SimpleNamespace(isError=False, structuredContent=data)
+    if case == "exception":
+        state["error"] = RuntimeError("private SMTP details")
+    elif case == "error":
+        state["result"].isError = True
+    elif case == "missing":
+        del state["result"].isError
+    elif case == "unrecognized_reason":
+        data.update(ready=False, message="private SMTP details")
+    else:
+        data["ready"] = "true"
+
+    health = asyncio.run(email_service.McpEmailSender("http://mcp.test/mcp", None).health())
+
+    assert (health.ready, health.reason) == (
+        False, "Armory could not be reached. Check that Armory is running and Portcullis can call it.",
+    )

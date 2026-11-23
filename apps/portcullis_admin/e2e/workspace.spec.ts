@@ -173,16 +173,16 @@ test('a role viewer sees only the permitted pages and cannot change permissions'
   expect(api.unexpected).toEqual([]);
 });
 
-test('invite creation uses a focus-trapped drawer and reveals the new code', async ({ page }) => {
+test('Invite member uses a focus-trapped drawer and confirms delivery', async ({ page }) => {
   const api = await installFakeApi(page);
   await logInAdmin(page);
-  await page.getByRole('link', { name: '＋ Create invite', exact: true }).click();
+  await page.getByRole('link', { name: 'Invite member', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/invites$/);
-  const dialog = page.getByRole('dialog', { name: 'Create invite', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Invite member', exact: true });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole('textbox', { name: 'Invitee email' }).fill('new@example.com');
-  await dialog.getByRole('button', { name: 'Create invite', exact: true }).click();
-  await expect(dialog).toContainText('TEST-INVITE-123');
+  await dialog.getByRole('textbox', { name: 'Email of the new member' }).fill('new@example.com');
+  await dialog.getByRole('button', { name: 'Send invite', exact: true }).click();
+  await expect(dialog).toContainText('Invitation sent to new@example.com.');
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
   expect(api.unexpected).toEqual([]);

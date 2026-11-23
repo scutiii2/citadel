@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from src.config import load_settings
 from src.services import app_policy
 
 from tests.test_admin import login, make_member
@@ -13,7 +12,9 @@ def test_the_defaults_are_listed_and_a_change_is_saved_for_the_next_start(client
     admin = as_admin(client_factory())
 
     first = admin.get("/api/admin/app-config").json()
-    assert (first["session_hours"], first["default_role"], first["require_email_verification"]) == (12, "Member", True)
+    assert (first["session_hours"], first["default_role"]) == (12, "Member")
+    assert set(first) == {"session_hours", "default_role", "rate_limit", "ip_filter", "outside_ip_filter",
+                          "headers", "fingerprint", "backup", "stored"}
     assert first["rate_limit"]["max_attempts"] == 5 and (first["backup"]["keep"], first["backup"]["every_hours"]) == (14, 24)
     assert first["stored"] == []
     assert first["outside_ip_filter"] == {"allow_list": [], "deny_list": []}
@@ -64,7 +65,7 @@ def test_a_bad_change_is_refused_and_saves_nothing(client_factory) -> None:
 
     for bad in (
         {}, {"made_up": 1}, {"session_hours": 0}, {"session_hours": "12"}, {"session_hours": True},
-        {"default_role": " "}, {"require_email_verification": "yes"},
+        {"default_role": " "},
         {"rate_limit": {"scope": "everyone"}}, {"rate_limit": {"max_attempts": 0}}, {"rate_limit": {"nope": 1}}, {"rate_limit": []},
         {"ip_filter": {"deny_list": ["not-an-address"]}}, {"ip_filter": {"allow_list": "10.0.0.1"}},
         {"outside_ip_filter": {"deny_list": ["not-an-address"]}}, {"outside_ip_filter": {"allow_list": "10.0.0.1"}},

@@ -12,7 +12,7 @@ from src.services.otp_service import OtpService
 
 
 class RegistrationError(ValueError):
-    """Username or email already taken; the message is safe to show."""
+    """The invite email does not match, or the username or email is taken."""
 
 
 class RegistrationService:
@@ -22,8 +22,8 @@ class RegistrationService:
         self._default_role = default_role
 
     async def register(self, username: str, email: str, password: str, invite_code: str) -> Account | None:
-        """The new (unverified) account, None for a bad/expired/used invite,
-        or RegistrationError for a taken username/email.
+        """The new verified account, or None for a bad/expired/used invite,
+        or RegistrationError for an email mismatch or taken username/email.
 
         The invite is checked first, so whether a username exists is only
         revealed to invite holders. On any failure the invite stays unused.
@@ -31,17 +31,22 @@ class RegistrationService:
         invite = await self._otp.find_valid_invite(invite_code)
         if invite is None:
             return None
+        if invite.invitee_email is None or email.lower() != invite.invitee_email.lower():
+            raise RegistrationError("This invite was sent to a different email address")
 
         taken = await self._taken_message(username, email)
         if taken:
             raise RegistrationError(taken)
 
-        account = Account(username=username, email=email, password_hash=await hash_password(password))
+        account = Account(
+            username=username, email=email, email_verified=True, password_hash=await hash_password(password),
+        )
         role = await self._session.scalar(select(Role).where(Role.name == self._default_role))
+        if not await self._otp.claim_invite(invite):
+            return None
         if role is not None:
             account.roles.append(role)
         self._session.add(account)
-        self._otp.mark_invite_used(invite)
         try:
             await self._session.commit()
         except IntegrityError as error:

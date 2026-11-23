@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import json
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from string import Template
@@ -24,6 +25,20 @@ _TIMEOUT = httpx.Timeout(30.0, read=60.0)
 _MESSAGE_ID = re.compile(r"<[^<>\s@\x00-\x1f\x7f]+@[^<>\s@\x00-\x1f\x7f]+>")
 
 
+ARMORY_UNREACHABLE = "Armory could not be reached. Check that Armory is running and Portcullis can call it."
+EMAIL_DELIVERY_FAILURE = (
+    "Email could not be sent. Check MCP Server connectivity, its Email capability and SMTP configuration; "
+    "check delivery status before retrying."
+)
+_READY_MESSAGE = "Email is ready."
+_BLOCKED_MESSAGES = frozenset({
+    "The Email capability is switched off in Armory.",
+    "Email is not set up. Fill in the Email page of Armory Admin.",
+    "The email settings are invalid. Check the Email page of Armory Admin.",
+    "Armory could not log in to the mail server. Check the Email page of Armory Admin.",
+})
+
+
 def render_template(name: str, **values: str) -> str:
     """Fill ``email_templates/<name>.txt``. ``KeyError`` on a missing value."""
     source = (TEMPLATE_DIR / f"{name}.txt").read_text(encoding="utf-8")
@@ -34,7 +49,15 @@ class EmailDeliveryError(RuntimeError):
     """Sending failed (SMTP not configured, unreachable, auth rejected, ...)."""
 
 
+@dataclass(frozen=True)
+class EmailHealth:
+    ready: bool
+    reason: str
+
+
 class EmailSender(Protocol):
+    async def health(self) -> EmailHealth: ...
+
     async def send_invite(self, to: str, code: str, expires_at: datetime) -> None: ...
 
     async def send_email_verification(self, to: str, code: str, expires_at: datetime) -> None: ...
@@ -50,11 +73,31 @@ class McpEmailSender:
         self._identity = identity
         self._traffic = traffic or TrafficRecorder()
 
+    async def health(self) -> EmailHealth:
+        """Probe SMTP without sending mail. Expose only known readiness messages."""
+        try:
+            with self._traffic.timed("mcp_server", "email.health"):
+                async with mcp_session(resolved(self._url), {}, _TIMEOUT) as session:
+                    result = await session.call_tool("tool_email_checkHealth", {})
+                if getattr(result, "isError", None) is not False:
+                    raise ValueError("Email health tool failed")
+                data = result.structuredContent
+                if not isinstance(data, dict):
+                    raise ValueError("Invalid email health result")
+                ready, message = data.get("ready"), data.get("message")
+                if ready is True and message == _READY_MESSAGE:
+                    return EmailHealth(True, _READY_MESSAGE)
+                if ready is False and isinstance(message, str) and message in _BLOCKED_MESSAGES:
+                    return EmailHealth(False, message)
+                raise ValueError("Invalid email health result")
+        except Exception:
+            return EmailHealth(False, ARMORY_UNREACHABLE)
+
     async def send_invite(self, to: str, code: str, expires_at: datetime) -> None:
         await self._send(
             to,
             "Your Ember invite code",
-            render_template("invite", code=code, expires_at=f"{expires_at:%Y-%m-%d %H:%M}"),
+            render_template("invite", code=code, email=to, expires_at=f"{expires_at:%Y-%m-%d %H:%M}"),
         )
 
     async def send_email_verification(self, to: str, code: str, expires_at: datetime) -> None:
@@ -88,6 +131,4 @@ class McpEmailSender:
             except Exception:
                 # Upstream exceptions and tool content may contain verification codes.
                 # CancelledError propagates unchanged; no automatic retries.
-                raise EmailDeliveryError(
-                    "Email could not be sent. Check MCP Server connectivity, its Email capability and SMTP configuration; check delivery status before retrying."
-                ) from None
+                raise EmailDeliveryError(EMAIL_DELIVERY_FAILURE) from None

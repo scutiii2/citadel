@@ -102,25 +102,15 @@ describe("AccountView", () => {
     expect(wrapper.find(".banner").exists()).toBe(false);
   });
 
-  it("shows paused permissions and an unverified status when verification is required", async () => {
+  it("explains that email verification is required to use Ember", async () => {
     const wrapper = await mountView([]);
     useAuthStore().account!.email_verified = false;
     await flushPromises();
 
     expect(wrapper.get(".profile-status").text()).toContain("Verification needed");
-    expect(wrapper.get(".banner").text()).toContain("Permissions are paused");
+    expect(wrapper.get(".banner").text()).toContain("Verify your email address to use Ember.");
     expect(wrapper.get(".permissions").text()).toContain("inactive until your email is verified");
     expect(wrapper.find(".profile .chip.ok").exists()).toBe(false);
-  });
-
-  it("keeps optional verification distinct from paused access", async () => {
-    const wrapper = await mountView([]);
-    Object.assign(useAuthStore().account!, { email_verified: false, email_verification_required: false });
-    await flushPromises();
-
-    expect(wrapper.get(".profile-status").text()).toContain("Verification optional");
-    expect(wrapper.get(".banner").text()).toContain("Verifying it is optional");
-    expect(wrapper.get(".permissions").text()).not.toContain("inactive");
   });
 
   it("opens one security form at a time, and closes it again", async () => {

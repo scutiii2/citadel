@@ -18,19 +18,15 @@ async function submit(): Promise<void> {
   error.value = "";
   busy.value = true;
   try {
-    const result = await auth.register({
+    await auth.register({
       username: form.username.trim(),
       email: form.email.trim(),
       password: form.password,
       invite_code: form.invite_code.trim(),
     });
     form.password = "";
-    if (result.account.email_verification_required === false) {
-      await router.replace({ name: "chat" });
-      return;
-    }
-    // The verify page offers "resend" when the first email didn't go out.
-    await router.replace({ name: "verify-email", query: result.verification_email_sent ? {} : { unsent: "1" } });
+    form.invite_code = "";
+    await router.replace({ name: "chat" });
   } catch (err) {
     error.value = errorMessage(err);
   } finally {
@@ -40,7 +36,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <AuthCard title="Create an account" subtitle="Registration needs an invite code from an admin.">
+  <AuthCard title="Create an account" subtitle="Registration needs an invite code sent to your email.">
     <form @submit.prevent="submit">
       <label>
         Invite code
@@ -60,8 +56,9 @@ async function submit(): Promise<void> {
       </label>
       <label>
         Email
-        <input v-model="form.email" type="email" autocomplete="email" required />
+        <input v-model="form.email" type="email" autocomplete="email" aria-describedby="invite-email-hint" required />
       </label>
+      <p id="invite-email-hint" class="notice">Use the email address the invite was sent to.</p>
       <PasswordInput label="Password" v-model="form.password" autocomplete="new-password" minlength="8" required />
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button class="primary" :disabled="busy" :aria-busy="busy">{{ busy ? "Creating ..." : "Create account" }}</button>
