@@ -44,7 +44,7 @@ export async function installFakeApi(page: Page, state: FakeState): Promise<void
         "/api/agents": AGENTS,
         "/api/account-agents": { disabled: [] },
         "/api/tickets/unread-count": { count: 1 },
-        "/api/tickets": [],
+        "/api/tickets": { tickets: [] },
         "/api/account/devices": [],
         "/api/account/tuning": { limits: { max_output_tokens: null, max_tool_rounds: null }, ceiling: null },
         "/api/chats": [],

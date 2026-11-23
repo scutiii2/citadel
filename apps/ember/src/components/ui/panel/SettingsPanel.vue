@@ -49,4 +49,5 @@ defineExpose({ keepFocus, focusSearch: () => field.value?.focus(), matches });
 <style scoped>
 .settings-body { display: grid; gap: 0; }
 .settings-tools { flex: 1; }
+@media (max-width: 767px) { .settings-tools { flex: 1 1 100%; } }
 </style>

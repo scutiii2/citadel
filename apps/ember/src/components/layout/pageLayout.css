@@ -38,6 +38,7 @@
 .pane-scroll::-webkit-scrollbar-track { background: var(--surface); }
 .pane-scroll::-webkit-scrollbar-thumb { background: var(--muted); border: 2px solid var(--surface); border-radius: var(--radius-full); }
 @media (max-width: 767px) {
-  .page-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  .page-head { flex-wrap: wrap; align-items: center; gap: 12px; }
+  .page-head-copy { flex: 1 1 auto; }
   .page-actions { flex-shrink: 1; }
 }

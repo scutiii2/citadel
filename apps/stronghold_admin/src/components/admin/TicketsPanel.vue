@@ -521,7 +521,8 @@ function setPinned(group: TicketGroup, event: Event): void {
   margin: 16px 0;
 }
 @media (max-width: 767px) {
-  .field { flex: 1; }
+  .field { flex: 1 1 120px; }
+  .tickets-card :deep(.search) { flex: 1 1 100%; }
   .ticket-summary { gap: 12px; margin-bottom: 16px; font-size: 0.75em; }
   .summary-groups { display: none; }
   button.refresh { font-size: 0.75em; }
