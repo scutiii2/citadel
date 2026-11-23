@@ -43,6 +43,8 @@ gap: 14px;
 }
 .admin-panel input[type="text"],
 .admin-panel input[type="email"],
+.admin-panel input[type="number"],
+.admin-panel input[type="password"],
 .admin-panel select {
   padding: 6px 10px;
   border: 1px solid var(--border);
@@ -50,6 +52,14 @@ gap: 14px;
   color: var(--text);
   background: var(--bg);
   font: inherit;
+}
+.admin-panel input[type="number"] {
+  appearance: textfield;
+}
+.admin-panel input[type="number"]::-webkit-inner-spin-button,
+.admin-panel input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
 }
 .admin-panel .row-form {
   display: flex;

@@ -4,6 +4,7 @@ import { useAuthStore } from "../../../stores/auth";
 import { commandsClient, type ParamOption } from "../../../api/tools/CommandsClient";
 import type { JsonSchema } from "../../../api/types";
 import { errorMessage } from "../../../utils/errors";
+import ToggleSwitch from "../../ui/forms/ToggleSwitch.vue";
 import { buildArgs, fieldsFromSchema, initialValues, type FieldValues, type ToolField } from "../../../utils/tools/toolSchema";
 
 /** A form for one tool's parameters, from its JSON Schema (Tools page and
@@ -211,10 +212,8 @@ function inputType(field: ToolField): string {
     <p v-if="fields.length === 0" class="muted">This tool takes no parameters.</p>
 
     <div v-for="f in fields" :key="f.name" :class="['field', { invalid: errors[f.name] }]">
-      <label v-if="f.widget === 'checkbox'" class="check">
-        <input v-model="values[f.name]" type="checkbox" :aria-invalid="!!errors[f.name]" :aria-describedby="describedBy(f)" />
-        <span>{{ f.label }}</span>
-      </label>
+      <ToggleSwitch v-if="f.widget === 'checkbox'" class="check" :checked="!!values[f.name]" :aria-invalid="!!errors[f.name]" :aria-describedby="describedBy(f)"
+        @change="values[f.name] = ($event.target as HTMLInputElement).checked">{{ f.label }}</ToggleSwitch>
       <template v-else>
         <label :for="fieldId(f.name)">
           {{ f.label }}<span v-if="f.required" class="req" title="Required">*</span>
@@ -438,27 +437,5 @@ textarea:focus {
 }
 .live .field:has(> .check) {
   flex: 0 0 auto;
-}
-.live .check {
-  position: relative;
-  padding: 5px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  font-size: 0.9em;
-}
-.live .check input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.live .check:has(input:checked) {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-contrast);
-}
-.live .check:has(input:focus-visible) {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 </style>
