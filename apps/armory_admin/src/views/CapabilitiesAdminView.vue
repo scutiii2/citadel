@@ -58,6 +58,15 @@ const STATE_LABELS: Record<State, string> = {
   missing: "Folder missing",
 };
 
+/** What each state means and what to do about it, shown in the helper popover beside the state. */
+const STATE_HELP: Record<State, string> = {
+  online: "The capability is loaded and its tools can be used. Nothing to do. Use Restart to load its code from disk again.",
+  offline: "The capability is switched off, so its tools are not offered. Turn Online on to start it.",
+  new: "Armory found this capability but has never loaded it. Turn Online on to load it and see its tools.",
+  error: "Its code failed to load, so it stays offline. Read the error under its name, fix the code, then turn Online on or use Restart.",
+  missing: "The capability's folder is gone from disk. Restore the folder, or remove the capability from the configuration.",
+};
+
 const rows = computed(() => {
   const search = query.value.trim().toLowerCase();
   return capabilities.value
@@ -159,7 +168,8 @@ onMounted(load);
                 <pre v-if="c.load_error" class="load-error" data-test="load-error">{{ c.load_error }}</pre>
                 <p v-if="rowErrors[c.name]" class="error" role="alert" data-test="row-error">{{ rowErrors[c.name] }}</p>
               </th>
-              <td><span class="state" :class="state"><span aria-hidden="true">{{ state === "online" ? "●" : "○" }}</span> {{ STATE_LABELS[state] }}</span></td>
+              <td><div class="state-cell"><span class="state" :class="state"><span aria-hidden="true">{{ state === "online" ? "●" : "○" }}</span> {{ STATE_LABELS[state] }}</span>
+                <PanelHelp :title="STATE_LABELS[state]"><p>{{ STATE_HELP[state] }}</p></PanelHelp></div></td>
               <td>{{ c.tools.length }}<template v-if="!c.loaded"> · not loaded yet</template></td>
               <td>
                 <div class="controls">
@@ -187,6 +197,7 @@ onMounted(load);
 .controls .restart { border: 1px solid var(--border); }
 .restart:disabled svg { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.state-cell { display: flex; align-items: center; gap: 4px; }
 .state { padding: 1px 8px; border-radius: var(--radius-sm); font-size: 0.8em; background: var(--surface); white-space: nowrap; }
 .state.online { color: var(--success); }
 .state.error, .state.missing { color: var(--danger); }
