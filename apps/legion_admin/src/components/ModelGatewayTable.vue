@@ -211,6 +211,11 @@ async function testDraft() {
     draftTest.value = { ok: false, code: "SETUP", message: `${missing[1]} is required.` };
     return;
   }
+  if (needsModel.value && !model.value.trim()) {
+    tab.value = "models";
+    draftTest.value = { ok: false, code: "SETUP", message: "Enter a default model first." };
+    return;
+  }
   testing.value = true;
   try {
     const gid = /^[a-z0-9][a-z0-9_-]{0,47}$/.test(id.value) ? id.value : "draft";
@@ -239,6 +244,11 @@ function submit() {
   if (missing) {
     tab.value = "connection";
     error.value = `${missing[1]} is required.`;
+    return;
+  }
+  if (needsModel.value && !model.value.trim()) {
+    tab.value = "models";
+    error.value = "Enter a default model.";
     return;
   }
   error.value = "";

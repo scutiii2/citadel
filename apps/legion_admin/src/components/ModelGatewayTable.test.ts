@@ -91,6 +91,25 @@ it("tests the form as filled in before it is saved", async () => {
   wrapper.unmount();
 });
 
+it("opens the Models tab when the default model is missing", async () => {
+  vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue({ ...list, presets: { free: { provider: "openai", auth: "key", api: "chat", label: "Free", base_url: "http://host.docker.internal:29652/v1", model: "" } } } as never);
+  const test = vi.spyOn(agentsAdminClient, "testModelGateway");
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
+  await flushPromises();
+  await wrapper.get('[data-test="add-conversation"]').trigger("click");
+  await wrapper.get('[data-test="preset"]').setValue("free");
+  await wrapper.get('[data-test="preset"]').trigger("change");
+  await wrapper.get('[data-test="test-draft"]').trigger("click");
+  expect(wrapper.get('[data-test="tab-models"]').attributes("aria-selected")).toBe("true");
+  expect(wrapper.get('[data-test="draft-result"]').text()).toContain("default model");
+  await wrapper.get('[data-test="tab-connection"]').trigger("click");
+  await wrapper.get("form").trigger("submit");
+  expect(wrapper.get('[data-test="tab-models"]').attributes("aria-selected")).toBe("true");
+  expect(wrapper.get('[data-test="error"]').text()).toContain("default model");
+  expect(test).not.toHaveBeenCalled();
+  wrapper.unmount();
+});
+
 it("will not save a new chat gateway before a preset is chosen", async () => {
   vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue(list as never);
   const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
