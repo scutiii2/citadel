@@ -48,3 +48,11 @@ def test_chat_presets_carry_their_template_tiers_and_descriptions(client):
     assert presets["claude"]["models"]["light"] == "claude-haiku-5-5"
     assert presets["claude"]["descriptions"]["standard"] == "most tasks"
     assert "models" not in presets["minicpm"]
+
+
+def test_a_body_tests_the_unsaved_form_and_saves_nothing(client):
+    bad = client.post("/agents/model-gateways/decision/new/test", json={"kind": "ollama"}).json()
+    assert bad["ok"] is False and bad["code"] == "422" and "address" in bad["message"].lower()
+    refused = client.post("/agents/model-gateways/decision/new/test", json={"kind": "ollama", "url": "http://127.0.0.1:9", "model": "m"}).json()
+    assert refused["ok"] is False and refused["code"]
+    assert client.get("/agents/model-gateways/decision").json()["gateways"] == []

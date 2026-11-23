@@ -88,11 +88,21 @@ class GatewayStore:
         if not isinstance(provider, str) or provider not in PROVIDERS:
             raise ValueError("The provider must be anthropic, openai or scuti.")
         with self._lock:
-            gateways = self._read()
-            old = gateways.get(gid, {}) if gateways.get(gid, {}).get("provider") == provider else {}
-            entry = self._clean(provider, data, old)
+            entry = self._entry(gid, provider, data)
             settings_store.put(self._path, self._table, gid, entry)
         return self._public(gid, entry)
+
+    def draft(self, gid: Any, data: Any) -> dict[str, Any]:
+        """The entry `put` would save, checked the same way but not saved, with secrets resolved: a test before saving."""
+        if not isinstance(data, dict) or not isinstance(provider := data.get("provider"), str) or provider not in PROVIDERS:
+            raise ValueError("The provider must be anthropic, openai or scuti.")
+        with self._lock:
+            return resolve(self._entry(gid, provider, data))
+
+    def _entry(self, gid: str, provider: str, data: dict[str, Any]) -> dict[str, Any]:
+        gateways = self._read()
+        old = gateways.get(gid, {}) if gateways.get(gid, {}).get("provider") == provider else {}
+        return self._clean(provider, data, old)
 
     @staticmethod
     def _clean(provider: str, data: dict[str, Any], old: dict[str, Any]) -> dict[str, Any]:

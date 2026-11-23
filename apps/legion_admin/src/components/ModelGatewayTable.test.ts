@@ -74,6 +74,23 @@ it("splits a chat gateway into Connection and Models tabs and returns to Connect
   wrapper.unmount();
 });
 
+it("tests the form as filled in before it is saved", async () => {
+  vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue(list as never);
+  const test = vi.spyOn(agentsAdminClient, "testModelGateway").mockResolvedValue({ ok: false, code: "401", message: "The key was refused." } as never);
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
+  await flushPromises();
+  await wrapper.get('[data-test="add-conversation"]').trigger("click");
+  await wrapper.get('[data-test="preset"]').setValue("ollama");
+  await wrapper.get('[data-test="preset"]').trigger("change");
+  await wrapper.get('[data-test="api_key"]').setValue("typed-key");
+  await wrapper.get('[data-test="test-draft"]').trigger("click");
+  await flushPromises();
+  expect(test).toHaveBeenCalledWith("conversation", "ollama", expect.objectContaining({ provider: "openai", api_key: "typed-key" }));
+  expect(wrapper.get('[data-test="draft-code"]').text()).toBe("401");
+  expect(wrapper.get('[data-test="draft-result"]').text()).toContain("The key was refused.");
+  wrapper.unmount();
+});
+
 it("will not save a new chat gateway before a preset is chosen", async () => {
   vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue(list as never);
   const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });

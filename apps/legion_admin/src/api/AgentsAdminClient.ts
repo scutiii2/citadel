@@ -171,8 +171,9 @@ export const agentsAdminClient = {
     apiRequest<ModelGatewayRow>("PUT", `/api/admin/model-gateways/${kind}/${encodeURIComponent(id)}`, entry),
   removeModelGateway: (kind: ModelGatewayKind, id: string) =>
     apiRequest<void>("DELETE", `/api/admin/model-gateways/${kind}/${encodeURIComponent(id)}`),
-  testModelGateway: (kind: ModelGatewayKind, id: string) =>
-    apiRequest<ConnectionTestResult>("POST", `/api/admin/model-gateways/${kind}/${encodeURIComponent(id)}/test`),
+  /** Without `entry`, tests the saved gateway; with it, the form as filled in, before it is saved. */
+  testModelGateway: (kind: ModelGatewayKind, id: string, entry?: Record<string, unknown>) =>
+    apiRequest<ConnectionTestResult>("POST", `/api/admin/model-gateways/${kind}/${encodeURIComponent(id)}/test`, entry),
   /** Does each saved address of this MCP server answer? Reads only. */
   testServer: (id: string) => apiRequest<ConnectionTestResult>("POST", `/api/admin/servers/${encodeURIComponent(id)}/test`),
   servers: async () => (await apiRequest<{ servers: Record<string, McpServer> }>("GET", "/api/admin/servers")).servers,
