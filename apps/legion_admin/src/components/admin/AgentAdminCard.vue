@@ -18,16 +18,46 @@ const gatewayOrder = computed(() => {
   return [primary, ...(llm.fallback_gateways ?? []).map((choice) =>
     typeof choice === "string" ? choice : choice.gateway)].filter(Boolean).join(" → ");
 });
-const rows = computed(() =>
-  [
-    { label: "Provider", value: props.agent.llm?.provider },
-    { label: props.agent.llm?.provider === "decision" ? "Strategy" : props.agent.llm?.fallback_gateways?.length ? "Gateway order" : "Gateway",
-      value: props.agent.llm?.provider === "decision" ? props.agent.decision?.strategy ?? props.agent.llm.strategy ?? "both" : gatewayOrder.value },
-    { label: "Model", value: props.agent.llm?.model },
-    { label: "Port", value: props.agent.port === undefined ? "" : String(props.agent.port) },
-    { label: "URL", value: props.agent.url },
-  ].filter((row): row is { label: string; value: string } => !!row.value),
-);
+type Row = { label: string; value: string };
+const present = (rows: { label: string; value: unknown }[]): Row[] =>
+  rows.map((row) => ({ label: row.label, value: Array.isArray(row.value) ? row.value.join(", ") : row.value === undefined || row.value === null ? "" : String(row.value) }))
+    .filter((row) => row.value !== "");
+const rows = computed(() => present([
+  { label: "Provider", value: props.agent.llm?.provider },
+  { label: props.agent.llm?.provider === "decision" ? "Strategy" : props.agent.llm?.fallback_gateways?.length ? "Gateway order" : "Gateway",
+    value: props.agent.llm?.provider === "decision" ? props.agent.decision?.strategy ?? props.agent.llm.strategy ?? "both" : gatewayOrder.value },
+  { label: "Model", value: props.agent.llm?.model },
+  { label: "Effort", value: props.agent.llm?.reasoning_effort },
+  { label: "Tier range", value: props.agent.llm?.min_tier || props.agent.llm?.max_tier
+    ? `${props.agent.llm?.min_tier ?? "any"} to ${props.agent.llm?.max_tier ?? "any"}` : "" },
+  { label: "Temperature", value: props.agent.llm?.temperature },
+  { label: "Max tokens", value: props.agent.llm?.max_tokens },
+]));
+const general = computed(() => present([
+  { label: "Role", value: props.agent.role },
+  { label: "Kind", value: props.agent.kind },
+  { label: "Enabled", value: props.agent.enabled === false ? "No" : "Yes" },
+  { label: "Port", value: props.agent.port },
+  { label: "URL", value: props.agent.url },
+  { label: "Source", value: props.agent.overridden ? "Edited on this machine" : "Tracked default file" },
+]));
+const limits = computed(() => present([
+  { label: "Tool rounds", value: props.agent.llm?.max_tool_rounds },
+  { label: "Turn tokens", value: props.agent.llm?.max_turn_tokens },
+  { label: "Turn seconds", value: props.agent.llm?.max_turn_seconds },
+  { label: "Highest delegated effort", value: props.agent.llm?.max_effort },
+  ...Object.entries((props.agent.limits as Record<string, unknown> | undefined) ?? {}).map(([key, value]) => ({ label: key.replace(/_/g, " "), value })),
+]));
+const access = computed(() => present([
+  { label: "Delegates to", value: props.agent.workers },
+  { label: "Tools allowed", value: props.agent.tools?.allow },
+  { label: "Tools denied", value: props.agent.tools?.deny },
+  { label: "Plan tool", value: props.agent.plan_tool === false ? "Off" : "" },
+]));
+const sections = computed(() => [
+  { title: "General", rows: general.value }, { title: "Model", rows: rows.value },
+  { title: "Run limits", rows: limits.value }, { title: "Delegation and tools", rows: access.value },
+].filter((section) => section.rows.length));
 </script>
 
 <template>
@@ -53,20 +83,25 @@ const rows = computed(() =>
         <template v-if="decision?.fallback_available === false">Jev fallback unavailable: check the deployment credentials.</template>
         <template v-if="decision?.local_status === 'unavailable'">Local checkpoints unavailable: prepare the cached models.</template>
       </p>
-      <div v-if="rows.length || tiers?.length" class="llm">
-        <dl v-if="rows.length">
-          <template v-for="row in rows" :key="row.label">
+      <section v-for="section in sections" :key="section.title" class="llm" :data-test="`section-${section.title}`">
+        <h4>{{ section.title }}</h4>
+        <dl>
+          <template v-for="row in section.rows" :key="row.label">
             <dt>{{ row.label }}</dt>
             <dd>{{ row.value }}</dd>
           </template>
         </dl>
-        <ul v-if="tiers?.length" class="tiers" aria-label="Model tiers">
+        <ul v-if="section.title === 'Model' && tiers?.length" class="tiers" aria-label="Model tiers">
           <li v-for="t in tiers" :key="t.tier">
             <span class="tier" :title="t.use_for">{{ t.tier }}</span>
             <span class="tier-model" :title="t.use_for">{{ t.id }}</span>
           </li>
         </ul>
-      </div>
+      </section>
+      <section v-if="agent.persona" class="llm">
+        <h4>Persona</h4>
+        <p class="persona">{{ agent.persona }}</p>
+      </section>
     </template>
     <div class="buttons">
       <button
@@ -112,6 +147,8 @@ h3 { margin: 0; font-size: 1.2em; font-weight: 600; color: var(--text); }
   font-size: 0.8em;
 }
 .llm { display: flex; flex-direction: column; gap: 6px; }
+h4 { margin: 0; font-size: 0.85em; font-weight: 600; color: var(--text); }
+.persona { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 dl, .tiers { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; margin: 0; }
 .tiers { padding: 0; list-style: none; }
 .tiers li { display: contents; }
