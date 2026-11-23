@@ -42,6 +42,7 @@ PRESETS.update({
     "provider": "anthropic",
     "auth": "key",
     "label": "OmniRoute",
+    "base_url": "http://host.docker.internal:29651",
     "model": "combo/standard",
     "dashboard_port": 29651
   },
