@@ -11,200 +11,149 @@ const PERMISSIONS: PermissionInfo[] = [
   { name: "roles.manage", description: null },
 ];
 
-const MEMBER: Role = {
-  id: 2,
-  name: "Member",
-  description: "Default role",
-  is_protected: false,
-  permissions: ["chat.use", "tools.view"],
-  account_count: 2,
-};
+const MEMBER: Role = { id: 2, name: "Member", description: "Default role", is_protected: false, permissions: ["chat.use", "tools.view"], account_count: 2 };
+const ADMIN: Role = { id: 1, name: "Administrator", description: null, is_protected: true, permissions: ["chat.use", "tools.view", "roles.manage"], account_count: 1 };
+const NO_AFFECTED = { loading: false, error: "", accounts: null };
 
-const ADMIN: Role = {
-  id: 1,
-  name: "Administrator",
-  description: null,
-  is_protected: true,
-  permissions: ["chat.use", "tools.view", "roles.manage"],
-  account_count: 1,
-};
-
-function editor(role: Role = MEMBER, props: { busy?: boolean; error?: string; saved?: boolean } = {}) {
-  return mount(RoleEditor, { props: { role, permissions: PERMISSIONS, busy: false, error: "", ...props } });
+type Props = { busy?: boolean; error?: string; saved?: boolean; editing?: boolean; affected?: typeof NO_AFFECTED | { loading: boolean; error: string; accounts: never[] } };
+function editor(role: Role = MEMBER, props: Props = {}) {
+  return mount(RoleEditor, { props: { role, permissions: PERMISSIONS, busy: false, error: "", editing: false, affected: NO_AFFECTED, ...props } });
 }
 
 const switchFor = (wrapper: ReturnType<typeof editor>, name: string) => wrapper.get(`input[aria-label="${name}"]`);
-const click = (wrapper: ReturnType<typeof editor>, label: string) =>
-  wrapper.findAll("button").find((b) => b.text() === label)!.trigger("click");
+const isOn = (wrapper: ReturnType<typeof editor>, name: string) => (switchFor(wrapper, name).element as HTMLInputElement).checked;
+type Exposed = { dirty: boolean; valid: boolean; changes: unknown; revert: () => void };
+const exposed = (wrapper: ReturnType<typeof editor>) => wrapper.vm as unknown as Exposed;
+
+beforeEach(() => {
+  setActivePinia(createPinia());
+  useAuthStore().account = { id: 1, username: "admin", email: "a@example.com", email_verified: true, roles: [], permissions: ["roles.manage", "chat.use", "tools.view", "accounts.view"] };
+});
 
 describe("RoleEditor", () => {
-  it("says changes stay in a draft until saved", () => {
-    expect(editor().text()).toContain("Changes are a draft until you save.");
-  });
-
-  it("shows a Saved chip once a change went through, but not beside an error", () => {
-    expect(editor().find(".chip.saved").exists()).toBe(false);
-    expect(editor(MEMBER, { saved: true }).get(".chip.saved").text()).toBe("Saved");
-    expect(editor(MEMBER, { saved: true, error: "boom" }).find(".chip.saved").exists()).toBe(false);
-  });
-
   it("shows the role, its description and its account count", () => {
     const text = editor().text();
-
     expect(text).toContain("Member");
     expect(text).toContain("Default role");
     expect(text).toContain("2 accounts");
     expect(editor({ ...MEMBER, account_count: 1 }).text()).toContain("1 account");
   });
 
-  it("shows a switch per permission, on for the ones the role holds", () => {
+  it("shows a switch per permission, on for the ones the role holds, locked until editing", () => {
     const wrapper = editor();
-
     expect(wrapper.findAll('input[role="switch"]')).toHaveLength(3);
-    expect((switchFor(wrapper, "chat.use").element as HTMLInputElement).checked).toBe(true);
-    expect((switchFor(wrapper, "roles.manage").element as HTMLInputElement).checked).toBe(false);
+    expect(isOn(wrapper, "chat.use")).toBe(true);
+    expect(isOn(wrapper, "roles.manage")).toBe(false);
     expect(wrapper.text()).toContain("Run mcp_server tools");
+    expect(switchFor(wrapper, "chat.use").attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).not.toContain("Changes are a draft");
   });
 
-  it("asks to grant a permission the role lacks, and to revoke one it holds", async () => {
-    const wrapper = editor();
-
-    await switchFor(wrapper, "roles.manage").setValue(!(switchFor(wrapper, "roles.manage").element as HTMLInputElement).checked);
-    await switchFor(wrapper, "chat.use").setValue(!(switchFor(wrapper, "chat.use").element as HTMLInputElement).checked);
-
-    expect(wrapper.emitted("save")).toBeUndefined();
-    await click(wrapper, "Save");
-    expect(wrapper.emitted("save")).toEqual([[{ permissions: ["roles.manage", "tools.view"] }]]);
+  it("stages permission changes in a draft the parent reads", async () => {
+    const wrapper = editor(MEMBER, { editing: true });
+    expect(wrapper.text()).toContain("Changes are a draft until you save.");
+    await switchFor(wrapper, "roles.manage").setValue(true);
+    await switchFor(wrapper, "chat.use").setValue(false);
+    expect(exposed(wrapper).dirty).toBe(true);
+    expect(exposed(wrapper).changes).toEqual({ permissions: ["roles.manage", "tools.view"] });
+    expect(wrapper.emitted("dirty")).toEqual([[true]]);
   });
 
-  it("saves only the fields that changed", async () => {
-    const wrapper = editor();
-    await click(wrapper, "Edit details");
-
-    await wrapper.get('input[aria-label="Description"]').setValue("New text");
-    await wrapper.get("form").trigger("submit");
-
-    expect(wrapper.emitted("save")).toEqual([[{ description: "New text" }]]);
-    expect(wrapper.find("form").exists()).toBe(true); // retained until the server confirms
+  it("changes only the fields that differ and can clear the description", async () => {
+    const wrapper = editor(MEMBER, { editing: true });
+    const inputs = wrapper.findAll("#role-editor input");
+    await inputs[1]!.setValue("New text");
+    expect(exposed(wrapper).changes).toEqual({ description: "New text" });
+    await inputs[1]!.setValue("");
+    expect(exposed(wrapper).changes).toEqual({ description: "" });
+    await inputs[1]!.setValue("Default role");
+    expect(exposed(wrapper).dirty).toBe(false);
   });
 
-  it("closes the edit form without saving when nothing changed", async () => {
-    const wrapper = editor();
-    await click(wrapper, "Edit details");
-
-    await wrapper.get("form").trigger("submit");
-
-    expect(wrapper.emitted("save")).toBeUndefined();
+  it("is invalid without a name", async () => {
+    const wrapper = editor(MEMBER, { editing: true });
+    await wrapper.get("#role-editor input").setValue("   ");
+    expect(exposed(wrapper).valid).toBe(false);
   });
 
-  it("can clear the description", async () => {
-    const wrapper = editor();
-    await click(wrapper, "Edit details");
-
-    await wrapper.get('input[aria-label="Description"]').setValue("");
-    await wrapper.get("form").trigger("submit");
-
-    expect(wrapper.emitted("save")).toEqual([[{ description: "" }]]);
-  });
-
-  it("asks to delete the role", async () => {
-    const wrapper = editor();
-
-    await click(wrapper, "Delete role");
-
-    expect(wrapper.emitted("remove")).toHaveLength(1);
-  });
-
-  it("locks the Administrator role: no deleting, no renaming, no permission changes", async () => {
-    const wrapper = editor(ADMIN);
-
+  it("locks the Administrator role: no deleting, no renaming, no permission changes", () => {
+    const wrapper = editor(ADMIN, { editing: true });
     expect(wrapper.text()).toContain("always holds every permission");
-    expect(wrapper.findAll("button").map((b) => b.text())).toEqual(["Edit description"]);
-    for (const input of wrapper.findAll('input[role="switch"]')) {
-      expect(input.attributes("disabled")).toBeDefined();
-    }
-
-    await click(wrapper, "Edit description");
-    expect(wrapper.get('input[aria-label="Role name"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).not.toContain("Delete role");
+    for (const input of wrapper.findAll('input[role="switch"]')) expect(input.attributes("disabled")).toBeDefined();
+    expect(wrapper.get("#role-editor input").attributes("disabled")).toBeDefined();
   });
 
   it("never sends a name for the protected role", async () => {
-    const wrapper = editor(ADMIN);
-    await click(wrapper, "Edit description");
+    const wrapper = editor(ADMIN, { editing: true });
+    await wrapper.findAll("#role-editor input")[1]!.setValue("Everything");
+    expect(exposed(wrapper).changes).toEqual({ description: "Everything" });
+  });
 
-    await wrapper.get('input[aria-label="Description"]').setValue("Everything");
-    await wrapper.get("form").trigger("submit");
-
-    expect(wrapper.emitted("save")).toEqual([[{ description: "Everything" }]]);
+  it("asks to delete the role, and offers it only outside editing", async () => {
+    const wrapper = editor();
+    await wrapper.findAll("button").find((b) => b.text() === "Delete role")!.trigger("click");
+    expect(wrapper.emitted("remove")).toHaveLength(1);
+    expect(editor(MEMBER, { editing: true }).text()).not.toContain("Delete role");
   });
 
   it("disables the controls while a call runs", () => {
-    const wrapper = editor(MEMBER, { busy: true });
-
-    for (const input of wrapper.findAll('input[role="switch"]')) {
-      expect(input.attributes("disabled")).toBeDefined();
-    }
+    const wrapper = editor(MEMBER, { busy: true, editing: true });
+    for (const input of wrapper.findAll('input[role="switch"]')) expect(input.attributes("disabled")).toBeDefined();
     expect(wrapper.findAll("button").every((b) => b.attributes("disabled") !== undefined)).toBe(true);
   });
 
-  it("shows the error it is given", () => {
-    expect(editor(MEMBER, { error: "That would remove your own admin access" }).get(".error").text()).toBe(
-      "That would remove your own admin access",
-    );
+  it("shows the error and the Saved chip only without an error", () => {
+    expect(editor(MEMBER, { error: "That would remove your own admin access" }).get(".error").text()).toBe("That would remove your own admin access");
+    expect(editor(MEMBER, { saved: true }).get(".chip.saved").text()).toBe("Saved");
+    expect(editor(MEMBER, { saved: true, error: "boom" }).find(".chip.saved").exists()).toBe(false);
   });
-});
 
+  it("shows roles read-only without roles.manage", () => {
+    useAuthStore().account!.permissions = ["roles.view"];
+    const wrapper = editor(MEMBER, { editing: true });
+    expect(wrapper.findAll("input[type=checkbox]").every((input) => (input.element as HTMLInputElement).disabled)).toBe(true);
+    expect(wrapper.find(".danger-zone").exists()).toBe(false);
+  });
 
-beforeEach(() => {
-  setActivePinia(createPinia());
-  useAuthStore().account = { id: 1, username: "admin", email: "a@example.com", email_verified: true, roles: [], permissions: ["roles.manage", "chat.use", "tools.view"] };
-});
+  it("groups permissions and searches by label, key, or description without losing the draft", async () => {
+    const wrapper = editor(MEMBER, { editing: true });
+    expect(wrapper.get('section[aria-label="Chat & files"]').text()).toContain("Use chat");
+    expect(wrapper.get('section[aria-label="Accounts & access"]').text()).toContain("0 of 1 enabled");
+    await switchFor(wrapper, "chat.use").setValue(false);
+    await wrapper.get('input[aria-label="Find a permission"]').setValue("browse");
+    expect(wrapper.findAll('input[role="switch"]')).toHaveLength(1);
+    await wrapper.get('input[aria-label="Find a permission"]').setValue("mcp_server");
+    expect(switchFor(wrapper, "tools.view").attributes("aria-label")).toBe("tools.view");
+    await wrapper.get('input[aria-label="Find a permission"]').setValue("no matches");
+    expect(wrapper.text()).toContain("No permissions match your search.");
+    await wrapper.get('input[aria-label="Find a permission"]').setValue("");
+    expect(isOn(wrapper, "chat.use")).toBe(false);
+    expect(exposed(wrapper).changes).toEqual({ permissions: ["tools.view"] });
+  });
 
-it("shows roles read-only without roles.manage", () => {
-  useAuthStore().account!.permissions = ["roles.view"];
-  const wrapper = editor();
-  expect(wrapper.findAll("input[type=checkbox]").every((input) => (input.element as HTMLInputElement).disabled)).toBe(true);
-  expect(wrapper.find(".danger-zone").exists()).toBe(false);
-});
+  it("resets the draft when the server supplies the saved role", async () => {
+    const wrapper = editor(MEMBER, { editing: true });
+    await switchFor(wrapper, "roles.manage").setValue(true);
+    await wrapper.setProps({ role: { ...MEMBER, permissions: [...MEMBER.permissions, "roles.manage"] } });
+    expect(isOn(wrapper, "roles.manage")).toBe(true);
+    expect(exposed(wrapper).dirty).toBe(false);
+  });
 
-it("groups permissions and searches by label, key, or description", async () => {
-  const wrapper = editor();
-  expect(wrapper.get('section[aria-label="Chat & files"]').text()).toContain('Use chat');
-  expect(wrapper.get('section[aria-label="Accounts & access"]').text()).toContain('0 of 1 enabled');
-  await wrapper.get('input[aria-label="Find a permission"]').setValue('browse');
-  expect(wrapper.findAll('input[role="switch"]')).toHaveLength(1);
-  expect(switchFor(wrapper, 'tools.view').attributes('aria-label')).toBe('tools.view');
-  await wrapper.get('input[aria-label="Find a permission"]').setValue('chat.use');
-  expect(switchFor(wrapper, 'chat.use').attributes('aria-label')).toBe('chat.use');
-  await wrapper.get('input[aria-label="Find a permission"]').setValue('mcp_server');
-  expect(switchFor(wrapper, 'tools.view').attributes('aria-label')).toBe('tools.view');
-  await wrapper.get('input[aria-label="Find a permission"]').setValue('no matches');
-  expect(wrapper.text()).toContain('No permissions match your search.');
-});
+  it("shows permissions added by the server even when their group is not yet known", async () => {
+    const wrapper = editor();
+    await wrapper.setProps({ permissions: [...PERMISSIONS, { name: "new.permission", description: "Future feature" }] });
+    expect(wrapper.get('section[aria-label="Other permissions"]').text()).toContain("new.permission");
+    expect(switchFor(wrapper, "new.permission").attributes("disabled")).toBeDefined();
+  });
 
-it("shows a local permission draft and resets it when the server supplies the saved role", async () => {
-  const wrapper = editor();
-  await switchFor(wrapper, 'roles.manage').setValue(!(switchFor(wrapper, 'roles.manage').element as HTMLInputElement).checked);
-  expect((switchFor(wrapper, 'roles.manage').element as HTMLInputElement).checked).toBe(true);
-  expect(wrapper.find('.save-bar').exists()).toBe(true);
-  await wrapper.setProps({ role: { ...MEMBER, permissions: [...MEMBER.permissions, 'roles.manage'] } });
-  expect((switchFor(wrapper, 'roles.manage').element as HTMLInputElement).checked).toBe(true);
-});
-
-it("shows permissions added by the server even when their group is not yet known", async () => {
-  const wrapper = editor();
-  await wrapper.setProps({ permissions: [...PERMISSIONS, { name: 'new.permission', description: 'Future feature' }] });
-  expect(wrapper.get('section[aria-label="Other permissions"]').text()).toContain('new.permission');
-  expect(switchFor(wrapper, 'new.permission').attributes('disabled')).toBeDefined();
-});
-
-it("reverts role details and permissions together", async () => {
-  const wrapper = editor();
-  await click(wrapper, "Edit details");
-  await wrapper.get('input[aria-label="Description"]').setValue("Changed");
-  await switchFor(wrapper, "chat.use").setValue(!(switchFor(wrapper, "chat.use").element as HTMLInputElement).checked);
-  await click(wrapper, "Revert");
-  expect(wrapper.find(".save-bar").exists()).toBe(false);
-  expect((switchFor(wrapper, "chat.use").element as HTMLInputElement).checked).toBe(true);
-  expect(wrapper.emitted("save")).toBeUndefined();
+  it("reverts details and permissions together", async () => {
+    const wrapper = editor(MEMBER, { editing: true });
+    await wrapper.findAll("#role-editor input")[1]!.setValue("Changed");
+    await switchFor(wrapper, "chat.use").setValue(false);
+    exposed(wrapper).revert();
+    await wrapper.vm.$nextTick();
+    expect(exposed(wrapper).dirty).toBe(false);
+    expect(isOn(wrapper, "chat.use")).toBe(true);
+  });
 });

@@ -83,12 +83,16 @@ it("shows the refusal and keeps the draft", async () => {
   expect((rounds.element as HTMLInputElement).value).toBe("40");
 });
 
-it("reserves space and only shows Save when dirty", async () => {
+it("reserves two slots and shows the named Cancel × before Save only when dirty", async () => {
   const wrapper = await show(view());
-  const slot = wrapper.get(".tuning-actions").element;
+  const slots = wrapper.findAll(".draft-actions .action-slot");
+  expect(slots).toHaveLength(2);
   expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
+  expect(wrapper.find('[data-test="cancel"]').exists()).toBe(false);
   await wrapper.get('[data-path="token_limits.default.max_tool_rounds"]').setValue("4");
-  expect(wrapper.get('[data-test="save"]').element.parentElement).toBe(slot);
+  expect(wrapper.get('[data-test="cancel"]').attributes("aria-label")).toBe("Cancel tuning changes");
+  expect(wrapper.get('[data-test="cancel"]').element.parentElement).toBe(slots[0]!.element);
+  expect(wrapper.get('[data-test="save"]').element.parentElement).toBe(slots[1]!.element);
 });
 
 

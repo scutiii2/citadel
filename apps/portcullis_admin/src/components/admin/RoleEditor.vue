@@ -1,37 +1,32 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
-import type { PermissionInfo, Role, RoleChanges } from "../../api/AdminClient";
+import type { AdminAccount, PermissionInfo, Role, RoleChanges } from "../../api/AdminClient";
 import { useAuthStore } from "../../stores/auth";
 import ToggleSwitch from "../ToggleSwitch.vue";
 import "./admin.css";
 
-/** One role: its name and description, a switch per permission, and delete.
- * It only shows state and reports what the admin chose (the parent runs the
- * call and asks for confirmation); `busy` disables the controls while a call
- * is in flight. */
+/** One role in the record drawer: name and description, the grouped permission switches, the
+ * accounts that hold it, and delete. The draft (`RoleChanges`) lives here, so searching permissions
+ * never loses an edit; the parent owns `editing`, runs the calls and asks for confirmation. */
 const props = defineProps<{
   role: Role;
   permissions: PermissionInfo[];
   busy: boolean;
   error: string;
+  editing: boolean;
   /** The last change went through. */
   saved?: boolean;
+  affected: { loading: boolean; error: string; accounts: AdminAccount[] | null };
 }>();
-
-const emit = defineEmits<{
-  save: [changes: RoleChanges];
-  showAccounts: [];
-  dirty: [value: boolean];
-  remove: [];
-}>();
+const emit = defineEmits<{ showAccounts: []; dirty: [value: boolean]; remove: [] }>();
 
 const auth = useAuthStore();
 const canManage = computed(() => auth.hasPermission("roles.manage") && props.role.permissions.every(auth.hasPermission));
-const editing = ref(false);
 const form = reactive({ name: "", description: "" });
 const search = ref("");
 const draftPermissions = ref<string[]>([]);
 const canViewAccounts = computed(() => ["accounts.view", "accounts.manage", "accounts.delete", "roles.assign"].some(auth.hasPermission));
+
 const changes = computed<RoleChanges>(() => {
   const result: RoleChanges = {};
   if (!props.role.is_protected && form.name.trim() !== props.role.name) result.name = form.name.trim();
@@ -40,17 +35,20 @@ const changes = computed<RoleChanges>(() => {
   return result;
 });
 const dirty = computed(() => Object.keys(changes.value).length > 0);
+const valid = computed(() => form.name.trim() !== "");
+
 function revert(): void {
   form.name = props.role.name;
   form.description = props.role.description ?? "";
   draftPermissions.value = [...props.role.permissions];
-  editing.value = false;
 }
 watch(() => props.role, revert, { immediate: true });
+watch(() => props.role.id, () => { search.value = ""; });
 watch(dirty, (value) => emit("dirty", value));
-defineExpose({ dirty, revert });
+defineExpose({ dirty, valid, changes, revert });
+
 function toggle(name: string): void {
-  if (props.busy || props.role.is_protected || !canManage.value || !auth.hasPermission(name)) return;
+  if (!props.editing || props.busy || props.role.is_protected || !canManage.value || !auth.hasPermission(name)) return;
   draftPermissions.value = draftPermissions.value.includes(name)
     ? draftPermissions.value.filter((p) => p !== name) : [...draftPermissions.value, name];
 }
@@ -80,162 +78,97 @@ const groups = computed(() => {
       label: group.label,
       total: all.length,
       enabled: all.filter((p) => draftPermissions.value.includes(p.name)).length,
-      permissions: all.filter((p) => `${labels[p.name] ?? ''} ${p.name} ${p.description ?? ''}`.toLowerCase().includes(query)),
+      permissions: all.filter((p) => `${labels[p.name] ?? ""} ${p.name} ${p.description ?? ""}`.toLowerCase().includes(query)),
     };
   }).filter((g) => g.permissions.length);
 });
-
-// A different role starts with the edit form closed.
-watch(
-  () => props.role.id,
-  () => { editing.value = false; search.value = ""; },
-);
-
-function startEdit(): void { editing.value = true; }
-function save(): void {
-  if (!dirty.value || props.busy || !canManage.value || !form.name.trim()) return;
-  emit("save", changes.value);
-}
 </script>
 
 <template>
-  <section :class="['editor admin-panel', { dirty }]" :aria-label="`Role ${role.name}`">
-    <form v-if="editing" class="row-form" @submit.prevent="save">
-      <input v-model="form.name" type="text" aria-label="Role name" maxlength="80" required :disabled="busy || role.is_protected" />
-      <input v-model="form.description" type="text" aria-label="Description" maxlength="255" :disabled="busy" />
-
+  <div class="role-body admin-panel" :aria-label="`Role ${role.name}`">
+    <form v-if="editing" id="role-editor" class="row-form" @submit.prevent>
+      <label>Name<input v-model="form.name" type="text" maxlength="80" required :disabled="busy || role.is_protected" /></label>
+      <label>Description<input v-model="form.description" type="text" maxlength="255" :disabled="busy" /></label>
     </form>
     <header v-else>
       <b class="name">{{ role.name }}</b>
       <span v-if="role.is_protected" class="badge">protected</span>
       <span class="muted count">{{ role.account_count }} {{ role.account_count === 1 ? "account" : "accounts" }}</span>
-      <button v-if="canManage" type="button" class="small" :disabled="busy" @click="startEdit">{{ role.is_protected ? "Edit description" : "Edit details" }}</button>
     </header>
-    <button v-if="canViewAccounts" type="button" class="small affected" :disabled="busy" @click="emit('showAccounts')">View affected accounts</button>
     <p v-if="!editing && role.description" class="muted description">{{ role.description }}</p>
-
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="role.is_protected" class="muted note">This role always holds every permission and can't be renamed or deleted.</p>
     <p v-else-if="!canManage" class="muted note">Read-only. Editing requires role management access and every permission held by this role.</p>
-
-    <p v-if="!role.is_protected" class="impact">Changes apply to {{ role.account_count }} {{ role.account_count === 1 ? 'account' : 'accounts' }}.</p>
+    <p v-if="!role.is_protected && editing" class="impact">Changes apply to {{ role.account_count }} {{ role.account_count === 1 ? "account" : "accounts" }} when you save.</p>
     <p class="apply muted" role="status">
-      <span>Changes are a draft until you save.</span>
+      <span v-if="editing">Changes are a draft until you save.</span>
       <span v-if="busy">Saving…</span>
-      <span v-if="saved && !error && !dirty" class="chip saved" role="status">Saved</span>
+      <span v-if="saved && !error && !dirty" class="chip saved">Saved</span>
     </p>
 
-    <p class="muted description">Save applies all changes together to the accounts holding this role.</p>
     <label class="permission-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="search" type="search" placeholder="Find a permission" aria-label="Find a permission" /></label>
     <section v-for="group in groups" :key="group.label" class="permission-group" :aria-label="group.label">
       <div class="group-head"><h4>{{ group.label }}</h4><span>{{ group.enabled }} of {{ group.total }} enabled</span></div>
       <ul class="permissions" :aria-busy="busy">
-      <li v-for="p in group.permissions" :key="p.name">
-        <ToggleSwitch
-          small
-          :checked="draftPermissions.includes(p.name)"
-          :disabled="role.is_protected || busy || !canManage || !auth.hasPermission(p.name)"
-          :aria-label="p.name"
-          @change="toggle(p.name)"
-        />
-        <div>
-          <strong class="permission-label">{{ labels[p.name] ?? p.name }}</strong>
-          <code>{{ p.name }}</code>
-          <div v-if="p.description" class="muted description">{{ p.description }}</div>
-        </div>
-      </li>
+        <li v-for="p in group.permissions" :key="p.name">
+          <ToggleSwitch small :checked="draftPermissions.includes(p.name)" :disabled="!editing || role.is_protected || busy || !canManage || !auth.hasPermission(p.name)" :aria-label="p.name" @change="toggle(p.name)" />
+          <div>
+            <strong class="permission-label">{{ labels[p.name] ?? p.name }}</strong>
+            <code>{{ p.name }}</code>
+            <div v-if="p.description" class="muted description">{{ p.description }}</div>
+          </div>
+        </li>
       </ul>
     </section>
     <p v-if="!groups.length" class="muted">No permissions match your search.</p>
 
-    <div v-if="dirty" class="save-bar" role="group" aria-label="Unsaved role changes" :aria-busy="busy">
-      <div class="save-bar-content"><span>Unsaved changes · {{ role.account_count }} {{ role.account_count === 1 ? 'account' : 'accounts' }} affected</span>
-        <button type="button" class="small" :disabled="busy" @click="revert">Revert</button>
-        <button type="button" class="primary" :disabled="busy || !form.name.trim() || !canManage" @click="save">{{ busy ? 'Saving…' : 'Save' }}</button>
-      </div>
-    </div>
-    <section v-if="!role.is_protected && canManage" class="danger-zone">
+    <section v-if="canViewAccounts" class="affected-section">
+      <h4>Affected accounts</h4>
+      <button v-if="!affected.accounts && !affected.loading" type="button" class="small" :disabled="busy" @click="emit('showAccounts')">View affected accounts</button>
+      <p v-if="affected.loading" role="status" class="muted">Loading accounts…</p>
+      <template v-else-if="affected.error"><p class="error" role="alert">{{ affected.error }}</p><button type="button" class="small" @click="emit('showAccounts')">Retry</button></template>
+      <template v-else-if="affected.accounts">
+        <p class="muted">{{ affected.accounts.length }} {{ affected.accounts.length === 1 ? "account holds" : "accounts hold" }} this role.</p>
+        <ul class="affected-accounts"><li v-for="account in affected.accounts" :key="account.id"><strong>{{ account.username }}</strong><span>{{ account.email }}</span><small>{{ account.is_active ? "Active" : "Disabled" }} · {{ account.email_verified ? "Verified" : "Unverified" }}</small></li></ul>
+      </template>
+    </section>
+
+    <section v-if="!role.is_protected && canManage && !editing" class="danger-zone">
       <h4>Danger zone</h4>
       <p class="muted description">Accounts holding this role lose its permissions. This can't be undone.</p>
       <button type="button" class="small danger" :disabled="busy" @click="emit('remove')">Delete role</button>
     </section>
-  </section>
+  </div>
 </template>
 
 <style scoped>
-.editor.dirty { margin-bottom: 0; }
-.affected { margin-top: 10px; }
-.save-bar { position: fixed; left: 52px; right: 0; bottom: 0; z-index: 20; padding: 14px 24px; border-top: 1px solid var(--border); background: var(--surface); }
-.save-bar-content { display: flex; align-items: center; gap: 10px; max-width: 996px; margin: auto; }
-.save-bar-content span { flex: 1; font-size: 0.85em; }
-@media (max-width: 767px) { .save-bar { left: 0; bottom: var(--rail-height); padding: 12px 16px; } }
-.editor {
-  min-width: 0;
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg);
-}
-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 10px;
-}
-.name {
-  font-size: 1.05em;
-  overflow-wrap: anywhere;
-}
-.count {
-  margin-left: auto;
-  font-size: 0.85em;
-}
-.description {
-  margin: 2px 0 0;
-  font-size: 0.85em;
-}
-.note {
-  margin: 8px 0 0;
-  font-size: 0.85em;
-}
-.apply {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 12px 0 0;
-  font-size: 0.85em;
-}
-.chip.saved {
-  color: var(--success);
-  border-color: var(--success);
-}
-.permissions {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.permissions li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-top: 1px solid var(--border);
-}
+.role-body { min-width: 0; padding-top: 4px; }
+.row-form { display: grid; gap: 10px; }
+.row-form label { display: grid; gap: 4px; font-size: 0.85em; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.name { font-size: 1.05em; overflow-wrap: anywhere; }
+.count { margin-left: auto; font-size: 0.85em; }
+.description { margin: 2px 0 0; font-size: 0.85em; }
+.note { margin: 8px 0 0; font-size: 0.85em; }
+.apply { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 0.85em; }
+.chip.saved { color: var(--success); border-color: var(--success); }
+.impact { margin: 16px 0 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 0.9em; }
+.permissions { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.permissions li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--border); }
 .permissions li > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .permissions li > .toggle { order: 1; flex-shrink: 0; }
 .permission-label { display: block; font-size: 0.9em; font-weight: 500; }
-.impact { margin: 16px 0 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 0.9em; }
 .permission-search { display: flex; align-items: center; gap: 10px; margin: 16px 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.permission-search:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
 .permission-search svg { width: 17px; height: 17px; color: var(--muted); flex-shrink: 0; }
-.permission-search input { width: 100%; min-width: 0; border: none; background: transparent; font: inherit; font-size: 0.85em; }
+.permission-search input { width: 100%; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-size: 0.85em; }
 .permission-group { margin-top: 10px; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 .group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: var(--surface); }
 .group-head h4 { margin: 0; font-size: 0.85em; }
 .group-head span { color: var(--muted); font-size: 0.75em; white-space: nowrap; }
-.permissions code {
-  font-family: var(--mono);
-  font-size: 0.9em;
-}
+.permissions code { font-family: var(--mono); font-size: 0.9em; }
+.affected-section { margin-top: 18px; }
+.affected-accounts { list-style: none; padding: 0; margin: 0; }
+.affected-accounts li { display: flex; flex-direction: column; padding: 12px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.affected-accounts span, .affected-accounts small { color: var(--muted); }
 </style>

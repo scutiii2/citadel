@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { settingsClient } from "../../api/SettingsClient";
+import { useDraftPanel } from "../../composables/useDraftPanel";
 import { EMBER_WEB_PAGES } from "../../utils/emberWebPages";
 import { errorMessage } from "../../utils/errors";
 import ToggleSwitch from "../ToggleSwitch.vue";
+import AdminSearch from "./AdminSearch.vue";
+import ConfirmModal from "./ConfirmModal.vue";
+import DraftActions from "./DraftActions.vue";
 import "./admin.css";
 
-/** Which ember_web pages every account's sidebar shows. Hiding is nav only: a hidden page
- * still opens by its address. Like the other setting that reaches every account, a flip is a
- * draft until Save. */
+/** Which ember_web pages every account's sidebar shows. Hiding is nav only: a hidden page still opens
+ * by its address. A flip is a draft until Save; search only filters the rows, the draft stays mounted. */
 const known = new Set<string>(EMBER_WEB_PAGES.map((page) => page.id));
-
 const stored = ref<string[] | null>(null);
 // The pages the draft hides, among the ones listed here.
 const draft = ref<Set<string>>(new Set());
@@ -18,6 +20,8 @@ const loadError = ref("");
 const saveError = ref("");
 const saving = ref(false);
 const saved = ref(false);
+const search = ref("");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
 
 /** Ids ember_web may know but this page does not list: kept as they are on every save. */
 const unknownHidden = computed(() => (stored.value ?? []).filter((id) => !known.has(id)));
@@ -26,6 +30,9 @@ const dirty = computed(
   () => stored.value !== null && (draft.value.size !== storedKnown.value.size || [...draft.value].some((id) => !storedKnown.value.has(id))),
 );
 const anyHidden = computed(() => draft.value.size > 0 || unknownHidden.value.length > 0);
+const shownPage = (label: string) => !search.value.trim() || label.toLowerCase().includes(search.value.trim().toLowerCase());
+const matchCount = computed(() => EMBER_WEB_PAGES.filter((page) => shownPage(page.label)).length);
+const { discardOpen, keepFocus, answerDiscard } = useDraftPanel(dirty, searchField);
 
 function useStored(list: string[]): void {
   stored.value = list;
@@ -66,38 +73,42 @@ async function save(): Promise<void> {
   const list = [...unknownHidden.value, ...EMBER_WEB_PAGES.map((page) => page.id).filter((id) => draft.value.has(id))];
   saveError.value = "";
   saving.value = true;
-  try {
-    useStored((await settingsClient.setPages(list)).hidden);
-    saved.value = true;
-  } catch (err) {
-    // The draft stays, so Save can be retried or Cancel drops it.
-    saveError.value = errorMessage(err);
-  } finally {
-    saving.value = false;
-  }
+  await keepFocus(async () => {
+    try {
+      useStored((await settingsClient.setPages(list)).hidden);
+      saved.value = true;
+    } catch (err) {
+      // The draft stays, so Save can be retried or Cancel drops it.
+      saveError.value = errorMessage(err);
+    } finally {
+      saving.value = false;
+    }
+  });
 }
 
 onMounted(load);
 </script>
 
 <template>
-  <div class="admin-panel">
-    <p v-if="loadError" class="error">error: {{ loadError }}</p>
-    <section class="card">
-      <div class="head">
-        <span v-if="stored && stored.length > 0" class="dot" title="Changed from the default" aria-hidden="true" />
-        <h3>Sidebar pages</h3>
-        <button v-if="anyHidden" type="button" class="small" :disabled="saving" @click="resetToDefault">Back to default</button>
-        <span v-if="saved && !dirty" class="chip saved">Saved</span>
+  <section class="admin-panel-card sidebar-panel admin-panel" aria-labelledby="sidebar-pages-title">
+    <header class="admin-panel-head">
+      <h2 id="sidebar-pages-title"><span v-if="stored && stored.length > 0" class="dot" title="Changed from the default" aria-hidden="true" /> Sidebar pages</h2>
+      <div class="admin-panel-tools tools">
+        <DraftActions :dirty="dirty" :saving="saving" label="sidebar page changes" @cancel="discardOpen = true" @save="save" />
+        <AdminSearch ref="searchField" v-model="search" label="Search sidebar pages" />
+      </div>
+    </header>
+    <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }}</p>
+    <p v-if="stored && !matchCount" class="admin-panel-text muted">No pages match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
+    <div class="body">
+      <div class="meta">
         <span class="chip scope">Applies to all accounts</span>
+        <button v-if="anyHidden" type="button" class="small" :disabled="saving" @click="resetToDefault">Back to default</button>
+        <span v-if="saved && !dirty" class="chip saved" role="status">Saved</span>
       </div>
       <ul v-if="stored" class="pages">
-        <li v-for="page in EMBER_WEB_PAGES" :key="page.id" class="page-row">
-          <ToggleSwitch
-            :checked="!draft.has(page.id)"
-            :disabled="saving"
-            @change="setShown(page.id, ($event.target as HTMLInputElement).checked)"
-          >
+        <li v-for="page in EMBER_WEB_PAGES" v-show="shownPage(page.label)" :key="page.id" class="page-row">
+          <ToggleSwitch :checked="!draft.has(page.id)" :disabled="saving" @change="setShown(page.id, ($event.target as HTMLInputElement).checked)">
             <span class="page-name">{{ page.label }}</span>
           </ToggleSwitch>
         </li>
@@ -107,72 +118,22 @@ onMounted(load);
         and Overview. The page does not go away: it still opens from its address, and each account's permissions
         are unchanged. Chat and Settings always stay.
       </p>
-      <div v-if="dirty" class="save-bar" role="group" aria-label="Unsaved change">
-        <span class="dot" aria-hidden="true" />
-        <span class="msg">You have an unsaved change. It applies to every account.</span>
-        <button type="button" class="small" :disabled="saving" @click="cancel">Cancel</button>
-        <button type="button" class="primary" :disabled="saving" @click="save">Save</button>
-      </div>
-      <p v-if="saveError" class="error">{{ saveError }}</p>
-    </section>
-  </div>
+      <p v-if="dirty" class="unsaved" role="status">You have an unsaved change. It applies to every account.</p>
+      <p v-if="saveError" class="error" role="alert">{{ saveError }}</p>
+    </div>
+    <ConfirmModal :open="discardOpen" title="Discard unsaved changes?" message="Your sidebar page changes have not been saved." confirm-label="Discard changes" @confirm="answerDiscard(true, cancel)" @close="answerDiscard(false, cancel)" />
+  </section>
 </template>
 
 <style scoped>
-.card {
-  padding: 20px;
-  background: var(--bg);
-}
-.card > .muted {
-  max-width: 620px;
-  font-size: 0.9em;
-}
-.card h3 {
-  margin: 0;
-}
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 18px;
-}
-.chip.scope {
-  margin-left: auto;
-}
-.chip.saved {
-  color: var(--success);
-  border-color: var(--success);
-}
-.pages {
-  display: grid;
-  gap: 10px;
-  margin: 0 0 14px;
-  padding: 0;
-  list-style: none;
-}
-.save-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg);
-}
-.save-bar .msg {
-  flex: 1 1 200px;
-  font-size: 0.9em;
-}
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-}
-.card p {
-  margin-bottom: 0;
-}
+.sidebar-panel { margin-bottom: 14px; }
+.body { display: grid; gap: 10px; padding: 14px; }
+.body p { margin: 0; }
+.body > .muted { max-width: 620px; font-size: 0.9em; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chip.saved { color: var(--success); border-color: var(--success); }
+.pages { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.unsaved { font-size: 0.9em; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--accent); }
+.tools { flex-wrap: nowrap; }
 </style>

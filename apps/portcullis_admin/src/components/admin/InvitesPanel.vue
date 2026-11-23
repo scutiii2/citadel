@@ -2,19 +2,28 @@
 import { computed, onMounted, ref } from "vue";
 import { adminClient, type Invite } from "../../api/AdminClient";
 import { errorMessage, formatUtc } from "../../utils/errors";
-import BaseModal from "../BaseModal.vue";
+import AdminSearch from "./AdminSearch.vue";
 import ConfirmModal from "./ConfirmModal.vue";
+import RecordDrawer from "./RecordDrawer.vue";
 import "./admin.css";
 
-/** The overview counts (OverviewView) change whenever an invite does. */
+/** Open invites: a searchable roster whose rows open an invite's details (with Revoke), and a create
+ * drawer for the email invite. The overview counts (OverviewView) change whenever an invite does. */
 const emit = defineEmits<{ changed: [] }>();
+
 type EmailStatus = { kind: "checking" | "ready" } | { kind: "blocked"; reason: string };
 const statusUnavailable = "Armory could not be reached. Check that Armory is running and Portcullis can call it.";
+
 const createOpen = ref(false);
 const emailStatus = ref<EmailStatus>({ kind: "checking" });
 let emailCheck = 0;
+
 const invites = ref<Invite[]>([]);
+const loading = ref(true);
 const listError = ref("");
+const search = ref("");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
+const selectedId = ref<number | null>(null);
 const inviteeEmail = ref("");
 const emailInput = ref<HTMLInputElement | null>(null);
 const creating = ref(false);
@@ -22,7 +31,13 @@ const createError = ref("");
 const sentTo = ref("");
 const pendingRevoke = ref<Invite | null>(null);
 const revoking = ref(false);
+const revokeError = ref("");
 
+const selected = computed(() => invites.value.find((i) => i.id === selectedId.value) ?? null);
+const visible = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  return invites.value.filter((i) => [i.invitee_email ?? "", i.delivery_method].some((text) => text.toLowerCase().includes(query)));
+});
 const canSend = computed(() => (
   emailStatus.value.kind === "ready" && !creating.value
   && inviteeEmail.value.trim() !== "" && emailInput.value?.validity.valid === true
@@ -45,18 +60,22 @@ async function checkEmailStatus(): Promise<void> {
 function openCreate(): void {
   inviteeEmail.value = "";
   sentTo.value = "";
+  createError.value = "";
+  selectedId.value = null;
   createOpen.value = true;
   void checkEmailStatus();
 }
-
 defineExpose({ openCreate });
 
 async function loadInvites(): Promise<void> {
   listError.value = "";
+  loading.value = true;
   try {
     invites.value = await adminClient.listInvites();
   } catch (err) {
     listError.value = errorMessage(err);
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -81,21 +100,21 @@ async function createInvite(): Promise<void> {
 
 const revokeMessage = computed(() => {
   const invite = pendingRevoke.value;
-  if (!invite) return "";
-  return `Revoke ${invite.invitee_email ?? "this invite"}? Its code stops working.`;
+  return invite ? `Revoke ${invite.invitee_email ?? "this invite"}? Its code stops working.` : "";
 });
 
 async function confirmRevoke(): Promise<void> {
   const invite = pendingRevoke.value;
   if (!invite) return;
-  listError.value = "";
+  revokeError.value = "";
   revoking.value = true;
   try {
     await adminClient.revokeInvite(invite.id);
     invites.value = invites.value.filter((i) => i.id !== invite.id);
+    if (selectedId.value === invite.id) selectedId.value = null;
     emit("changed");
   } catch (err) {
-    listError.value = errorMessage(err);
+    revokeError.value = errorMessage(err);
   } finally {
     revoking.value = false;
     pendingRevoke.value = null;
@@ -106,47 +125,69 @@ onMounted(loadInvites);
 </script>
 
 <template>
-  <div class="admin-panel">
-    <BaseModal class="card invite-create admin-panel" :open="createOpen" title="Invite member" side @close="!creating && (createOpen = false)">
+  <div class="invites-panel admin-panel">
+    <section class="admin-panel-card" aria-labelledby="invite-roster">
+      <header class="admin-panel-head">
+        <h2 id="invite-roster">Open invites</h2>
+        <div class="admin-panel-tools">
+          <button type="button" class="primary" data-test="invite-member" @click="openCreate">Invite member</button>
+          <AdminSearch ref="searchField" v-model="search" label="Search invites" />
+        </div>
+      </header>
+      <p v-if="listError" class="admin-panel-text error" role="alert">{{ listError }} <button type="button" class="chip" @click="loadInvites">Retry</button></p>
+      <p v-else-if="loading" class="admin-panel-text muted" role="status">Loading invites…</p>
+      <p v-else-if="!invites.length" class="admin-panel-text muted">No open invites.</p>
+      <p v-else-if="!visible.length" class="admin-panel-text muted">No invites match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
+      <div v-else class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="invite-roster">
+        <table class="admin-records">
+          <thead><tr><th scope="col">Invitee</th><th scope="col">Created</th><th scope="col">Expires</th></tr></thead>
+          <tbody>
+            <tr v-for="i in visible" :key="i.id" :data-id="i.id" data-test="invite" :class="{ selected: i.id === selectedId }">
+              <th scope="row"><button type="button" class="admin-row-button" aria-haspopup="dialog" @click="selectedId = i.id; revokeError = ''">{{ i.invitee_email ?? "-" }}</button></th>
+              <td>{{ formatUtc(i.created_at) }}</td>
+              <td>{{ formatUtc(i.expires_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-if="!loading && !listError && invites.length" class="admin-panel-text muted count" role="status">{{ visible.length }} of {{ invites.length }} invites</p>
+    </section>
+
+    <RecordDrawer :open="selected !== null" :title="selected ? `Invite ${selected.invitee_email ?? ''}`.trim() : 'Invite details'" :fallback-focus="() => searchField?.focus()" @close="selectedId = null">
+      <div v-if="selected" class="admin-details">
+        <dl>
+          <dt>Invitee</dt><dd>{{ selected.invitee_email ?? "-" }}</dd>
+          <dt>Delivery</dt><dd>{{ selected.delivery_method === "email" ? "Email" : "Manual" }}</dd>
+          <dt>Created</dt><dd>{{ formatUtc(selected.created_at) }}</dd>
+          <dt>Expires</dt><dd>{{ formatUtc(selected.expires_at) }}</dd>
+        </dl>
+        <p v-if="revokeError" class="error" role="alert">{{ revokeError }}</p>
+        <section class="danger-zone">
+          <h4>Danger zone</h4>
+          <p class="muted">Revoking stops the invite's code from working. This can't be undone.</p>
+          <button type="button" class="danger" data-test="revoke" @click="pendingRevoke = selected">Revoke invite</button>
+        </section>
+      </div>
+    </RecordDrawer>
+
+    <RecordDrawer :open="createOpen" title="Invite member" :editing="inviteeEmail.trim() !== ''" :busy="creating" :fallback-focus="() => searchField?.focus()" @close="createOpen = false" @discard="inviteeEmail = ''">
       <p class="muted">We email a one-time code. It works for 7 days. The person must register with this email address.</p>
-      <form class="row-form" @submit.prevent="createInvite">
+      <form id="invite-create" class="admin-editor" @submit.prevent="createInvite">
         <label for="invite-member-email">Email of the new member</label>
         <input id="invite-member-email" ref="emailInput" v-model="inviteeEmail" type="email" required :disabled="creating" />
         <p v-if="emailStatus.kind === 'checking'" class="muted" role="status">Checking email availability…</p>
         <template v-else-if="emailStatus.kind === 'blocked'">
           <p class="error" role="alert">{{ emailStatus.reason }}</p>
-          <button type="button" class="small" @click="checkEmailStatus">Check again</button>
+          <button type="button" class="chip" @click="checkEmailStatus">Check again</button>
         </template>
         <p v-if="createError" class="error" role="alert">{{ createError }}</p>
-        <button type="submit" class="primary" :disabled="!canSend" :aria-busy="creating">
-          {{ creating ? "Sending ..." : "Send invite" }}
-        </button>
       </form>
-      <div v-if="sentTo" class="created" role="status">
-        <p>Invitation sent to {{ sentTo }}.</p>
-      </div>
-    </BaseModal>
-
-    <h3>Open invites</h3>
-    <p v-if="listError" class="error">error: {{ listError }}</p>
-    <p v-if="invites.length === 0 && !listError" class="muted">No open invites.</p>
-    <div v-if="invites.length" class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Invitee</th><th>Created</th><th>Expires</th><th></th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="i in invites" :key="i.id">
-            <td class="invitee">{{ i.invitee_email ?? "-" }}</td>
-            <td>{{ formatUtc(i.created_at) }}</td>
-            <td>{{ formatUtc(i.expires_at) }}</td>
-            <td>
-              <button type="button" class="small danger" @click="pendingRevoke = i">Revoke</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <p v-if="sentTo" class="created" role="status">Invitation sent to {{ sentTo }}.</p>
+      <template #footer>
+        <button type="button" class="chip" :disabled="creating" @click="createOpen = false">Close</button>
+        <button type="submit" form="invite-create" class="primary" :disabled="!canSend" :aria-busy="creating">{{ creating ? "Sending ..." : "Send invite" }}</button>
+      </template>
+    </RecordDrawer>
 
     <ConfirmModal
       :open="pendingRevoke !== null"
@@ -162,60 +203,11 @@ onMounted(loadInvites);
 </template>
 
 <style scoped>
-.invite-create.side-modal.card { margin: 0; padding: 24px; background: var(--bg); }
-.invite-create.side-modal .row-form { flex-direction: column; align-items: stretch; }
-.invite-create.side-modal .row-form input { flex: none; width: 100%; }
-.invite-create.side-modal .row-form .primary { align-self: flex-start; }
-.invite-create > p {
-  margin: 0;
-  font-size: 0.9em;
-}
-.invite-create .row-form {
-  margin-top: 18px;
-  gap: 14px;
-}
-.invite-create .row-form p {
-  margin: 0;
-}
-.invite-create .row-form button {
-  align-self: flex-start;
-}
-.table-wrap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-.created {
-  margin-top: 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-}
-.created p {
-  margin: 0.3em 0;
-}
-.table-wrap {
-  overflow-x: auto;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9em;
-}
-th,
-td {
-  padding: 14px 16px;
-  border-top: 1px solid var(--border);
-  text-align: left;
-}
-th {
-  border-top: none;
-  font-size: 0.85em;
-  font-weight: 500;
-  color: var(--muted);
-  background: var(--surface);
-}
-.invitee {
-  overflow-wrap: anywhere;
-}
+.invites-panel { min-width: 0; }
+.admin-records tbody tr.selected { background: var(--surface); }
+.admin-editor { max-width: none; }
+.created { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius-lg); background: var(--surface); }
+.count { border-top: 1px solid var(--border); font-size: 0.8rem; }
+.danger-zone { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.danger-zone h4 { margin: 0 0 8px; font-size: 0.85em; }
 </style>

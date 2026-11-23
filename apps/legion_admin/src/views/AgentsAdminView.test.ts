@@ -537,7 +537,7 @@ describe("AgentsAdminView", () => {
     vi.spyOn(agentsAdminClient, "prompts").mockResolvedValue({ values: {}, defaults: {}, overridden: [] });
     const wrapper = await mounted();
     await wrapper.find("[data-test=shared-prompts]").trigger("click");
-    expect(wrapper.findComponent({ name: "SharedPromptsModal" }).props("open")).toBe(true);
+    expect(wrapper.findComponent({ name: "SharedPromptsDrawer" }).props("open")).toBe(true);
   });
 });
 

@@ -2,8 +2,8 @@
 import { computed, ref, watch } from "vue";
 import { agentsAdminClient, type SharedPrompts } from "../../api/AgentsAdminClient";
 import { errorMessage } from "../../utils/errors";
-import BaseModal from "../BaseModal.vue";
 import ConfirmModal from "./ConfirmModal.vue";
+import RecordDrawer from "./RecordDrawer.vue";
 
 /** The prompt text every agent shares. Each text shows the built-in default
  * it falls back to; a text that differs has a dot and its own reset. Saving
@@ -33,6 +33,7 @@ const draft = ref<Record<string, string>>({});
 const loading = ref(false);
 const saving = ref(false);
 const confirming = ref(false);
+const discarding = ref(false);
 const error = ref("");
 
 const changed = computed(() => (loaded.value ? FIELDS.filter((f) => draft.value[f.key] !== loaded.value!.values[f.key]) : []));
@@ -55,13 +56,19 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) void load();
-    else confirming.value = false;
+    else confirming.value = discarding.value = false;
   },
   { immediate: true },
 );
 
 function reset(key: string): void {
   if (loaded.value) draft.value = { ...draft.value, [key]: loaded.value.defaults[key] ?? "" };
+}
+
+/** Unsaved text asks before the drawer closes. */
+function requestClose(): void {
+  if (changed.value.length) discarding.value = true;
+  else emit("close");
 }
 
 async function save(): Promise<void> {
@@ -85,7 +92,7 @@ async function save(): Promise<void> {
 </script>
 
 <template>
-  <BaseModal :open="open" title="Shared prompts" @close="emit('close')">
+  <RecordDrawer :open="open" title="Shared prompts" :busy="saving" @close="requestClose">
     <div class="shared">
       <p class="intro">Text every agent's system prompt is built from. Saving restarts every agent.</p>
       <p v-if="loading" class="muted">Loading…</p>
@@ -101,25 +108,33 @@ async function save(): Promise<void> {
         </label>
       </template>
       <p v-if="error" class="error" role="alert" data-test="prompts-error">{{ error }}</p>
-      <div class="actions">
-        <button type="button" class="cancel" :disabled="saving" @click="emit('close')">Close</button>
-        <button type="button" class="primary" data-test="save-prompts" :disabled="saving || changed.length === 0" @click="confirming = true">Save</button>
-      </div>
     </div>
-    <ConfirmModal
-      :open="confirming"
-      title="Restart every agent?"
-      :message="`Saving changes ${changed.map((f) => f.label).join(', ')}. Every agent restarts to apply it, and a chat being answered right now is cut off.`"
-      confirm-label="Save and restart"
-      :busy="saving"
-      @confirm="save"
-      @close="confirming = false"
-    />
-  </BaseModal>
+    <template #footer>
+      <button type="button" class="chip" :disabled="saving" @click="requestClose">Close</button>
+      <button type="button" class="primary" data-test="save-prompts" :disabled="saving || changed.length === 0" @click="confirming = true">Save</button>
+    </template>
+  </RecordDrawer>
+  <ConfirmModal
+    :open="confirming"
+    title="Restart every agent?"
+    :message="`Saving changes ${changed.map((f) => f.label).join(', ')}. Every agent restarts to apply it, and a chat being answered right now is cut off.`"
+    confirm-label="Save and restart"
+    :busy="saving"
+    @confirm="save"
+    @close="confirming = false"
+  />
+  <ConfirmModal
+    :open="discarding"
+    title="Discard changes?"
+    message="Your changes will be lost."
+    confirm-label="Discard changes"
+    @confirm="discarding = false; emit('close')"
+    @close="discarding = false"
+  />
 </template>
 
 <style scoped>
-.shared { display: grid; gap: 12px; }
+.shared { display: grid; gap: 12px; padding-block-start: 4px; }
 .intro, .muted { margin: 0; color: var(--muted); font-size: 0.9em; }
 .field { display: grid; gap: 4px; font-size: 0.9em; }
 .label { display: flex; align-items: center; gap: 8px; color: var(--muted); }
@@ -137,10 +152,6 @@ textarea {
   font: inherit;
   resize: vertical;
 }
-.actions { display: flex; justify-content: flex-end; gap: 8px; }
-.cancel { padding: 6px 16px; border: 1px solid var(--border); border-radius: var(--radius-full); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
-.primary { padding: 6px 16px; border: none; border-radius: var(--radius-full); cursor: pointer; font: inherit; font-weight: 600; color: var(--accent-contrast); background: var(--accent); }
-.primary:disabled, .cancel:disabled { opacity: 0.6; cursor: default; }
 .error { margin: 0; color: var(--danger); }
 :is(button, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>

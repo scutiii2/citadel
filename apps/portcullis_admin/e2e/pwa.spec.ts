@@ -39,12 +39,12 @@ for (const width of [375, 768]) {
     await page.setViewportSize({ width, height: 812 });
     await installFakeApi(page, newState());
     await page.goto("/overview");
-    await expect(page.getByRole("heading", { name: "Workspace overview", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Overview", level: 1 })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.getByRole("button", { name: "root - account menu", exact: true }).click();
-    await expect(page.getByRole("menuitem", { name: "Settings", exact: true })).toBeVisible();
-    await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Profile", exact: true }).click();
+    await expect(page.locator(".header-popover").getByRole("link", { name: "Settings", exact: true })).toBeVisible();
+    await page.locator(".header-popover").getByRole("link", { name: "Settings", exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.getByRole('searchbox', { name: 'Search settings' }).fill('theme');
     if (width < 768) await expect(page.getByRole('searchbox', { name: 'Search settings' })).toHaveCSS('font-size', '16px');

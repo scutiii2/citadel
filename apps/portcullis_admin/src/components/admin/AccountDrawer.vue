@@ -1,31 +1,30 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
-import type { AccountChanges, AdminAccount, Role, RoleRef } from "../../api/AdminClient";
+import { computed } from "vue";
+import type { AdminAccount, Role, RoleRef } from "../../api/AdminClient";
 import { useAuthStore } from "../../stores/auth";
 import { formatUtc } from "../../utils/errors";
 import ToggleSwitch from "../ToggleSwitch.vue";
 import "./admin.css";
 
-/** Everything one account offers: edit details, roles, enable/disable, send
- * verification, delete. It only shows state and reports what the admin chose
- * (the parent runs the call and asks for confirmation); `busy` disables the
- * controls while a call is in flight. */
-const props = withDefaults(defineProps<{
+/** The body of the account drawer: every assigned role (or "No roles"), and while editing the
+ * staged profile fields and role choices, kept by role ID. It only reports what the admin chose:
+ * the panel owns the draft, runs the calls and asks for confirmation. */
+export interface AccountDraft { username: string; email: string; roleIds: number[] }
+
+const props = defineProps<{
   account: AdminAccount;
   roles: Role[];
   isSelf: boolean;
   busy: boolean;
   error: string;
   notice: string;
-  showClose?: boolean;
-}>(), { showClose: true });
+  editing: boolean;
+  draft: AccountDraft;
+}>();
 
 const emit = defineEmits<{
-  close: [];
-  save: [changes: AccountChanges];
+  "update:draft": [draft: AccountDraft];
   setActive: [active: boolean];
-  addRole: [roleId: number];
-  removeRole: [role: RoleRef];
   sendVerification: [];
   remove: [];
 }>();
@@ -33,288 +32,118 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const canManage = computed(() => auth.hasPermission("accounts.manage"));
 const canAssign = computed(() => auth.hasPermission("roles.assign"));
-const editing = ref(false);
-const form = reactive({ username: "", email: "" });
-
-// A different account starts with the edit form closed.
-watch(
-  () => props.account.id,
-  () => (editing.value = false),
-);
-
-const missingRoles = computed(() => {
-  const held = new Set(props.account.roles.map((r) => r.id));
-  return props.roles.filter((r) => !held.has(r.id) && r.permissions.every(auth.hasPermission));
-});
-
 /** Protected accounts can't be changed at all; your own can't be disabled or deleted. */
 const locked = computed(() => props.account.is_protected);
 const canDisable = computed(() => canManage.value && !locked.value && !props.isSelf);
 
-function startEdit(): void {
-  form.username = props.account.username;
-  form.email = props.account.email;
-  editing.value = true;
+/** Every role the editor can show: the known roles plus any the account holds that the list lacks. */
+const choices = computed(() => {
+  const known = new Map<number, RoleRef & { delegable: boolean }>();
+  for (const role of props.roles) known.set(role.id, { id: role.id, name: role.name, delegable: role.permissions.every(auth.hasPermission) });
+  for (const role of props.account.roles) if (!known.has(role.id)) known.set(role.id, { ...role, delegable: false });
+  return [...known.values()].sort((a, b) => a.name.localeCompare(b.name));
+});
+const held = computed(() => new Set(props.account.roles.map((role) => role.id)));
+/** A role can be newly granted only when its permissions are all held by the actor; any held role can be removed. */
+const disabledChoice = (role: { id: number; delegable: boolean }) => props.busy || !canAssign.value || (!held.value.has(role.id) && !role.delegable);
+
+function patch(change: Partial<AccountDraft>): void {
+  emit("update:draft", { ...props.draft, ...change });
 }
 
-function save(): void {
-  const changes: AccountChanges = {};
-  if (form.username.trim() !== props.account.username) changes.username = form.username.trim();
-  if (form.email.trim() !== props.account.email) changes.email = form.email.trim();
-  if (Object.keys(changes).length) emit("save", changes);
-  editing.value = false;
+function toggleRole(id: number, checked: boolean): void {
+  const ids = new Set(props.draft.roleIds);
+  if (checked) ids.add(id);
+  else ids.delete(id);
+  patch({ roleIds: [...ids] });
 }
 
-function onAddRole(event: Event): void {
-  const select = event.target as HTMLSelectElement;
-  const roleId = Number(select.value);
-  select.value = "";
-  if (roleId) emit("addRole", roleId);
-}
 function requestActive(event: Event): void {
   const input = event.target as HTMLInputElement;
   const wanted = input.checked;
   input.checked = props.account.is_active;
-  emit('setActive', wanted);
+  emit("setActive", wanted);
 }
 </script>
 
 <template>
-  <aside class="drawer admin-panel" :aria-label="`Account ${account.username}`">
-    <header>
-      <div class="identity">
-        <span class="avatar" aria-hidden="true">{{ account.username.slice(0, 2).toUpperCase() }}</span>
-        <div class="who">
-          <b class="name">{{ account.username }}</b>
-          <span v-if="isSelf" class="self-label">Your account</span>
-        </div>
+  <div class="account-body admin-panel" :aria-label="`Account ${account.username}`">
+    <div class="identity">
+      <span class="avatar" aria-hidden="true">{{ account.username.slice(0, 2).toUpperCase() }}</span>
+      <div class="who">
+        <b class="name">{{ account.username }}</b>
+        <span v-if="isSelf" class="self-label">Your account</span>
       </div>
-      <button v-if="showClose" type="button" class="x" aria-label="Close" @click="emit('close')">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-      </button>
-    </header>
-    <div class="profile-meta">
-      <p class="account-email">{{ account.email }}</p>
-      <p class="joined"><span>Joined</span><time>{{ formatUtc(account.created_at) }}</time></p>
     </div>
 
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="notice" class="notice">{{ notice }}</p>
-
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="notice" class="notice" role="status">{{ notice }}</p>
     <p v-if="locked" class="muted small-text">This is the protected admin account. It can't be edited, disabled or deleted.</p>
 
-    <form v-if="editing" class="edit" @submit.prevent="save">
-      <input v-model="form.username" type="text" aria-label="Username" required />
-      <input v-model="form.email" type="email" aria-label="Email" required />
-      <div class="row">
-        <button class="primary" :disabled="busy">Save</button>
-        <button type="button" class="small" @click="editing = false">Cancel</button>
-      </div>
+    <form v-if="editing" id="account-editor" class="edit" @submit.prevent>
+      <template v-if="canManage">
+        <label>Username<input :value="draft.username" type="text" required :disabled="busy" @input="patch({ username: ($event.target as HTMLInputElement).value })" /></label>
+        <label>Email<input :value="draft.email" type="email" required :disabled="busy" @input="patch({ email: ($event.target as HTMLInputElement).value })" /></label>
+      </template>
+      <fieldset v-if="canAssign || account.roles.length" class="roles-edit">
+        <legend>Roles</legend>
+        <label v-for="role in choices" :key="role.id" class="role-choice">
+          <input type="checkbox" :checked="draft.roleIds.includes(role.id)" :disabled="disabledChoice(role)" @change="toggleRole(role.id, ($event.target as HTMLInputElement).checked)" />
+          {{ role.name }}
+        </label>
+        <p v-if="!choices.length" class="muted">No roles</p>
+      </fieldset>
     </form>
-
-    <section class="roles-section">
-      <h4>Roles</h4>
-      <div class="chips">
-        <span v-for="r in account.roles" :key="r.id" class="chip" :class="{ fixed: locked }">
-          {{ r.name }}
-          <button
-            v-if="!locked && canAssign"
-            type="button"
-            class="chip-x"
-            :aria-label="`Remove role ${r.name}`"
-            :disabled="busy"
-            @click="emit('removeRole', r)"
-          >
-            ×
-          </button>
-        </span>
-        <span v-if="account.roles.length === 0" class="muted">No roles</span>
+    <template v-else>
+      <div class="profile-meta">
+        <p class="account-email">{{ account.email }}</p>
+        <p class="joined"><span>Joined</span><time>{{ formatUtc(account.created_at) }}</time></p>
       </div>
-      <select v-if="!locked && canAssign && missingRoles.length" class="add-role" aria-label="Role to add" :disabled="busy" @change="onAddRole">
-        <option value="">+ Add role</option>
-        <option v-for="r in missingRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
-      </select>
+      <section class="roles-section">
+        <h4>Roles</h4>
+        <div class="chips">
+          <span v-for="r in account.roles" :key="r.id" class="chip fixed">{{ r.name }}</span>
+          <span v-if="account.roles.length === 0" class="muted">No roles</span>
+        </div>
+      </section>
+    </template>
+
+    <section v-if="canDisable" class="active-section">
+      <ToggleSwitch small :checked="account.is_active" :disabled="busy || editing" @change="requestActive($event)">Active</ToggleSwitch>
     </section>
 
-    <section v-if="canDisable">
-      <ToggleSwitch
-        small
-        :checked="account.is_active"
-        :disabled="busy"
-        @change="requestActive($event)"
-      >
-        Active
-      </ToggleSwitch>
-    </section>
-
-    <div v-if="!locked" class="buttons">
-      <button v-if="!editing && canManage" type="button" class="small" :disabled="busy" @click="startEdit">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16 3a2.1 2.1 0 0 1 3 3L7 18l-4 1 1-4z" /></svg>
-        Edit details
-      </button>
-      <button v-if="!account.email_verified && canManage" type="button" class="small" :disabled="busy" @click="emit('sendVerification')">
-        Send verification
-      </button>
+    <div v-if="!locked && !account.email_verified && canManage" class="buttons">
+      <button type="button" class="small" :disabled="busy || editing" @click="emit('sendVerification')">Send verification</button>
     </div>
 
     <section v-if="!locked && !isSelf && auth.hasPermission('accounts.delete')" class="danger-zone">
       <h4>Danger zone</h4>
       <p class="muted small-text">Removes the account for good. This can't be undone.</p>
-      <button type="button" class="small danger" :disabled="busy" @click="emit('remove')">Delete account</button>
+      <button type="button" class="small danger" :disabled="busy || editing" @click="emit('remove')">Delete account</button>
     </section>
-  </aside>
+  </div>
 </template>
 
 <style scoped>
-.drawer {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0;
-  background: var(--bg);
-}
-.identity {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-.avatar {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-full);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  font-size: 0.85em;
-  font-weight: 600;
-}
-.drawer > section:not(.danger-zone) {
-  padding-top: 18px;
-  margin-top: 18px;
-  border-top: 1px solid var(--border);
-}
-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-.who {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.name {
-  font-size: 1.05em;
-  font-weight: 600;
-}
-.self-label {
-  color: var(--muted);
-  font-size: 0.75em;
-  margin-top: 2px;
-}
-.profile-meta {
-  margin-top: 14px;
-}
-.account-email {
-  margin: 0;
-  font-size: 0.85em;
-  overflow-wrap: anywhere;
-}
-.joined {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 10px 0 0;
-  color: var(--muted);
-  font-size: 0.75em;
-}
-.joined > span {
-  font-size: 0.9em;
-}
-.drawer > .error, .drawer > .notice, .drawer > .small-text {
-  margin: 14px 0 0;
-}
-.name,
-.who span {
-  overflow-wrap: anywhere;
-}
-.small-text {
-  margin: 0;
-  font-size: 0.85em;
-}
-h4 {
-  margin: 0 0 12px;
-  font-size: 0.85em;
-  font-weight: 600;
-}
-.x {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  padding: 4px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: none;
-  cursor: pointer;
-  color: var(--muted);
-}
-.x svg { width: 16px; height: 16px; }
-.x:hover { color: var(--text); background: var(--bg); }
-.edit {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 18px;
-}
-.row {
-  display: flex;
-  gap: 8px;
-}
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 20px;
-}
-.drawer .buttons > button.small {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 36px;
-  padding: 7px 12px;
-  border-radius: var(--radius-md);
-  background: var(--bg);
-}
-.buttons svg { width: 15px; height: 15px; }
-.drawer .chips {
-  margin-top: 0;
-  gap: 8px;
-}
-.drawer .chip {
-  gap: 8px;
-  padding: 5px 6px 5px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg);
-  overflow-wrap: anywhere;
-  max-width: 100%;
-}
-.drawer .chip.fixed { padding-right: 10px; }
-.drawer select.add-role {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  margin-top: 12px;
-  padding: 8px 10px;
-  font-size: 0.85em;
-  cursor: pointer;
-}
+.account-body { display: flex; flex-direction: column; gap: 0; }
+.identity { display: flex; align-items: center; gap: 12px; min-width: 0; padding-top: 4px; }
+.avatar { width: 44px; height: 44px; flex-shrink: 0; display: grid; place-items: center; border-radius: var(--radius-full); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); font-size: 0.85em; font-weight: 600; }
+.who { display: flex; flex-direction: column; min-width: 0; }
+.name { font-size: 1.05em; font-weight: 600; overflow-wrap: anywhere; }
+.self-label { color: var(--muted); font-size: 0.75em; margin-top: 2px; }
+.profile-meta { margin-top: 14px; }
+.account-email { margin: 0; font-size: 0.85em; overflow-wrap: anywhere; }
+.joined { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 0; color: var(--muted); font-size: 0.75em; }
+.account-body > .error, .account-body > .notice, .account-body > .small-text { margin: 14px 0 0; }
+.small-text { font-size: 0.85em; }
+h4 { margin: 0 0 12px; font-size: 0.85em; font-weight: 600; }
+.account-body > section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.edit { display: grid; gap: 12px; margin-top: 18px; }
+.edit > label { display: grid; gap: 4px; font-size: 0.85em; }
+.edit input[type="text"], .edit input[type="email"] { min-height: 40px; }
+.roles-edit { display: grid; gap: 6px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.roles-edit legend { padding: 0 6px; font-size: 0.85em; font-weight: 600; }
+.role-choice { display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 0.9em; overflow-wrap: anywhere; }
+.buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
 </style>

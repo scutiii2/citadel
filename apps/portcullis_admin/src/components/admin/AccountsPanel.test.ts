@@ -1,5 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
+import { createMemoryHistory, createRouter } from "vue-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { adminClient, type AdminAccount, type Role } from "../../api/AdminClient";
 import { ApiError } from "../../api/http";
@@ -29,33 +30,26 @@ beforeAll(() => {
   HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
     this.removeAttribute("open");
   };
+  HTMLFormElement.prototype.reportValidity ??= function () { return true; };
 });
 
-const ROLES: Role[] = [
-  { id: 1, name: "Administrator", description: null, is_protected: true, permissions: [], account_count: 1 },
-  { id: 2, name: "Member", description: null, is_protected: false, permissions: [], account_count: 2 },
-];
+const role = (id: number, name: string, protectedRole = false): Role => ({ id, name, description: null, is_protected: protectedRole, permissions: [], account_count: 1 });
+const ROLES: Role[] = [role(1, "Administrator", true), role(2, "Member"), role(3, "Support"), role(4, "Auditor")];
 
 function account(id: number, username: string, extra: Partial<AdminAccount> = {}): AdminAccount {
   return {
-    id,
-    username,
-    email: `${username}@mail.com`,
-    email_verified: true,
-    is_active: true,
-    is_protected: false,
-    created_at: "2026-09-12T10:00:00",
-    roles: [{ id: 2, name: "Member" }],
-    ...extra,
+    id, username, email: `${username}@mail.com`, email_verified: true, is_active: true, is_protected: false,
+    created_at: "2026-09-12T10:00:00", roles: [{ id: 2, name: "Member" }], ...extra,
   };
 }
 
 const ADMIN = account(1, "admin", { is_protected: true, roles: [{ id: 1, name: "Administrator" }] });
 const MARIA = account(2, "maria", { email_verified: false });
-const LI = account(3, "li", { is_active: false });
+const LI = account(3, "li", { is_active: false, roles: [] });
+const DUO = account(4, "duo", { roles: [{ id: 2, name: "Member" }, { id: 3, name: "Support" }] });
 
-async function panel() {
-  const wrapper = mount(AccountsPanel);
+async function panel(filters?: { q: string; status: "all" | "unverified" | "disabled" }) {
+  const wrapper = mount(AccountsPanel, { props: { filters }, attachTo: document.body, global: { plugins: [createRouter({ history: createMemoryHistory(), routes: [{ path: "/:p(.*)*", component: { template: "<div />" } }] })] } });
   await flushPromises();
   return wrapper;
 }
@@ -63,240 +57,291 @@ async function panel() {
 type Panel = Awaited<ReturnType<typeof panel>>;
 
 const rowFor = (wrapper: Panel, name: string) => wrapper.findAll("tbody tr").find((r) => r.text().includes(name))!;
-const drawer = (wrapper: Panel) => wrapper.find("aside.drawer");
-const confirmDialog = (wrapper: Panel) => wrapper.getComponent(ConfirmModal);
-const clickIn = (root: { findAll: Panel["findAll"] }, label: string) =>
-  root.findAll("button").find((b) => b.text() === label)!.trigger("click");
+const drawer = (wrapper: Panel) => wrapper.find(".account-body");
+const ask = (wrapper: Panel, title: string) => wrapper.findAllComponents(ConfirmModal).find((c) => c.props("title") === title)!;
+const open = async (wrapper: Panel, name: string) => { await rowFor(wrapper, name).get(".admin-row-button").trigger("click"); await flushPromises(); };
+const clickIn = (root: { findAll: Panel["findAll"] }, label: string) => root.findAll("button").find((b) => b.text() === label)!.trigger("click");
+
+async function edit(wrapper: Panel) {
+  await wrapper.get('[data-test="edit"]').trigger("click");
+  await flushPromises();
+}
+async function save(wrapper: Panel) {
+  await wrapper.get('[data-test="save-account"]').trigger("click");
+  await ask(wrapper, "Save changes?").vm.$emit("confirm");
+  await flushPromises();
+}
+const checkbox = (wrapper: Panel, name: string) => wrapper.findAll(".role-choice").find((l) => l.text() === name)!.get("input");
 
 beforeEach(() => {
   vi.clearAllMocks();
   setActivePinia(createPinia());
-  useAuthStore().account = { id: 1, username: "admin", email: "admin@mail.com", email_verified: true, roles: [], permissions: ["accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "chat.use", "tools.view"] };
-  client.listAccounts.mockResolvedValue([ADMIN, MARIA, LI]);
+  useAuthStore().account = { id: 1, username: "admin", email: "admin@mail.com", email_verified: true, roles: [], permissions: ["accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "chat.use", "tools.view"] };
+  client.listAccounts.mockResolvedValue([ADMIN, MARIA, LI, DUO]);
   client.listRoles.mockResolvedValue(ROLES);
 });
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); document.body.innerHTML = ""; });
 
-describe("AccountsPanel", () => {
+describe("AccountsPanel roster", () => {
   it("lists accounts with their roles and status", async () => {
     const wrapper = await panel();
-
-    expect(wrapper.findAll("tbody tr")).toHaveLength(3);
-    expect(rowFor(wrapper, "admin").text()).toContain("you");
+    expect(wrapper.findAll("tbody tr")).toHaveLength(4);
     expect(rowFor(wrapper, "admin").text()).toContain("protected");
+    expect(rowFor(wrapper, "admin").text()).toContain("you");
     expect(rowFor(wrapper, "maria").text()).toContain("unverified");
     expect(rowFor(wrapper, "li").text()).toContain("disabled");
-    expect(rowFor(wrapper, "maria").text()).toContain("Member");
-    expect(client.listAccounts).toHaveBeenCalledWith({ q: "", status: "all" });
+    expect(rowFor(wrapper, "li").text()).toContain("No roles");
+    expect(rowFor(wrapper, "duo").text()).toContain("Support");
+    wrapper.unmount();
   });
 
-  it("shows an empty message when nothing matches", async () => {
-    client.listAccounts.mockResolvedValue([]);
-
-    expect((await panel()).text()).toContain("No accounts match.");
-  });
-
-  it("shows an error when the list cannot be read", async () => {
-    client.listAccounts.mockRejectedValue(new ApiError(500, "boom"));
-
-    expect((await panel()).text()).toContain("boom");
-  });
-
-  it("searches after the typing pauses", async () => {
-    vi.useFakeTimers();
+  it("searches username, email and any assigned role locally", async () => {
     const wrapper = await panel();
-    client.listAccounts.mockClear();
-
-    await wrapper.get('input[aria-label="Search accounts"]').setValue("mar");
-    await vi.advanceTimersByTimeAsync(100);
-    expect(client.listAccounts).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(200);
+    await wrapper.get('input[type="search"]').setValue("support");
+    expect(wrapper.findAll("tbody tr").map((r) => r.text())).toEqual([expect.stringContaining("duo")]);
+    await wrapper.get('input[type="search"]').setValue("MARIA@mail");
+    expect(wrapper.findAll("tbody tr")).toHaveLength(1);
+    await wrapper.get('input[type="search"]').setValue("zzz");
+    expect(wrapper.text()).toContain("No accounts match your search.");
     expect(client.listAccounts).toHaveBeenCalledTimes(1);
-    expect(client.listAccounts).toHaveBeenCalledWith({ q: "mar", status: "all" });
+    wrapper.unmount();
   });
 
-  it("filters by status", async () => {
+  it("filters by status through the existing roster request", async () => {
     const wrapper = await panel();
-
-    await clickIn(wrapper, "Unverified");
+    client.listAccounts.mockResolvedValue([LI]);
+    await wrapper.findAll(".filters button").find((b) => b.text().startsWith("Disabled"))!.trigger("click");
     await flushPromises();
-
-    expect(client.listAccounts).toHaveBeenLastCalledWith({ q: "", status: "unverified" });
+    expect(client.listAccounts).toHaveBeenLastCalledWith({ status: "disabled" });
+    expect(wrapper.emitted("filter")!.at(-1)).toEqual([{ q: "", status: "disabled" }]);
+    expect(wrapper.findAll("tbody tr")).toHaveLength(1);
+    wrapper.unmount();
   });
 
   it("loads bookmark filters and follows updates from browser navigation", async () => {
-    const wrapper = mount(AccountsPanel, { props: { filters: { q: 'mar', status: 'unverified' } } });
+    const wrapper = await panel({ q: "mar", status: "unverified" });
+    expect(client.listAccounts).toHaveBeenCalledWith({ status: "unverified" });
+    expect((wrapper.get('input[type="search"]').element as HTMLInputElement).value).toBe("mar");
+    await wrapper.setProps({ filters: { q: "", status: "all" } });
     await flushPromises();
-    expect(client.listAccounts).toHaveBeenLastCalledWith({ q: 'mar', status: 'unverified' });
-    await wrapper.setProps({ filters: { q: '', status: 'disabled' } });
-    await flushPromises();
-    expect(client.listAccounts).toHaveBeenLastCalledWith({ q: '', status: 'disabled' });
-    expect(wrapper.emitted('filter')?.at(-1)).toEqual([{ q: '', status: 'disabled' }]);
+    expect(client.listAccounts).toHaveBeenLastCalledWith({ status: "all" });
+    wrapper.unmount();
   });
 
-  it("ignores a slow answer to an older search", async () => {
-    vi.useFakeTimers();
+  it("ignores a slow answer to an older status", async () => {
+    let releaseOld: (rows: AdminAccount[]) => void = () => {};
     const wrapper = await panel();
-    let releaseOld!: (rows: AdminAccount[]) => void;
-    client.listAccounts.mockReturnValueOnce(new Promise((resolve) => (releaseOld = resolve)));
-    client.listAccounts.mockResolvedValueOnce([MARIA]);
-
-    await clickIn(wrapper, "Unverified");
-    await clickIn(wrapper, "Disabled");
+    client.listAccounts.mockReturnValueOnce(new Promise((resolve) => { releaseOld = resolve; }));
+    client.listAccounts.mockResolvedValueOnce([LI]);
+    const buttons = wrapper.findAll(".filters button");
+    await buttons.find((b) => b.text().startsWith("Unverified"))!.trigger("click");
+    await buttons.find((b) => b.text().startsWith("Disabled"))!.trigger("click");
     await flushPromises();
-    releaseOld([ADMIN]);
+    releaseOld([MARIA]);
     await flushPromises();
-
-    expect(wrapper.findAll("tbody tr").map((r) => r.text())).toEqual([expect.stringContaining("maria")]);
+    expect(wrapper.findAll("tbody tr").map((r) => r.text())).toEqual([expect.stringContaining("li")]);
+    wrapper.unmount();
   });
 
-  it("opens the drawer for the clicked account and closes it again", async () => {
+  it("shows the error with a retry when the roster cannot be read", async () => {
+    client.listAccounts.mockRejectedValue(new ApiError(500, "boom"));
+    const wrapper = await panel();
+    expect(wrapper.get("[role=alert]").text()).toContain("boom");
+    client.listAccounts.mockResolvedValue([ADMIN]);
+    await wrapper.get("[role=alert] button").trigger("click");
+    await flushPromises();
+    expect(wrapper.findAll("tbody tr")).toHaveLength(1);
+    wrapper.unmount();
+  });
+});
+
+describe("AccountsPanel drawer", () => {
+  it("opens the drawer for the row and closes it again", async () => {
     const wrapper = await panel();
     expect(drawer(wrapper).exists()).toBe(false);
-
-    await rowFor(wrapper, "maria").trigger("click");
-    expect(drawer(wrapper).attributes("aria-label")).toBe("Account maria");
-
+    await open(wrapper, "maria");
+    expect(wrapper.get('dialog[aria-label="Account maria"]').attributes("open")).toBeDefined();
+    expect(drawer(wrapper).text()).toContain("maria@mail.com");
     await wrapper.get('dialog[aria-label="Account maria"] button[aria-label="Close"]').trigger("click");
     expect(drawer(wrapper).exists()).toBe(false);
+    wrapper.unmount();
   });
 
-  it("gives the drawer the roles that can still be added", async () => {
+  it("shows every assigned role, and No roles for an empty set", async () => {
     const wrapper = await panel();
-
-    await rowFor(wrapper, "maria").trigger("click");
-
-    expect(drawer(wrapper).findAll("select option").map((o) => o.text())).toEqual(["+ Add role", "Administrator"]);
+    await open(wrapper, "duo");
+    expect(drawer(wrapper).findAll(".roles-section .chip").map((c) => c.text())).toEqual(["Member", "Support"]);
+    await wrapper.get('dialog[aria-label="Account duo"] button[aria-label="Close"]').trigger("click");
+    await open(wrapper, "li");
+    expect(drawer(wrapper).find(".roles-section").text()).toContain("No roles");
+    wrapper.unmount();
   });
 
-  it("assigns a role chosen in the drawer", async () => {
-    client.assignRole.mockResolvedValue({ ...MARIA, roles: [...MARIA.roles, { id: 1, name: "Administrator" }] });
+  it("keeps the protected account read-only", async () => {
     const wrapper = await panel();
-    await rowFor(wrapper, "maria").trigger("click");
+    await open(wrapper, "admin");
+    expect(wrapper.find('[data-test="edit"]').exists()).toBe(false);
+    expect(drawer(wrapper).text()).toContain("protected admin account");
+    expect(drawer(wrapper).find('input[role="switch"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
 
-    await drawer(wrapper).get("select").setValue("1");
+  it("drops pending edits on discard without any write", async () => {
+    const wrapper = await panel();
+    await open(wrapper, "maria");
+    await edit(wrapper);
+    await wrapper.get('input[type="email"]').setValue("other@mail.com");
+    await checkbox(wrapper, "Auditor").setValue(true);
+    await wrapper.get('[data-test="cancel-edit"]').trigger("click");
+    await ask(wrapper, "Discard changes?").vm.$emit("confirm");
     await flushPromises();
+    expect(client.updateAccount).not.toHaveBeenCalled();
+    expect(client.assignRole).not.toHaveBeenCalled();
+    expect(drawer(wrapper).text()).toContain("maria@mail.com");
+    expect(wrapper.find("#account-editor").exists()).toBe(false);
+    wrapper.unmount();
+  });
 
-    expect(client.assignRole).toHaveBeenCalledWith(2, 1);
-    expect(rowFor(wrapper, "maria").text()).toContain("Administrator");
+  it("saves profile first, then additions, then removals, by role ID", async () => {
+    const calls: string[] = [];
+    client.updateAccount.mockImplementation(async (_id, changes) => { calls.push(`patch ${JSON.stringify(changes)}`); return { ...MARIA, email: "new@mail.com" }; });
+    client.assignRole.mockImplementation(async (_id, roleId) => { calls.push(`add ${roleId}`); return { ...MARIA, email: "new@mail.com", roles: [{ id: 2, name: "Member" }, { id: roleId, name: "Auditor" }] }; });
+    client.removeRole.mockImplementation(async (_id, roleId) => { calls.push(`remove ${roleId}`); return { ...MARIA, email: "new@mail.com", roles: [{ id: 4, name: "Auditor" }] }; });
+    const wrapper = await panel();
+    await open(wrapper, "maria");
+    await edit(wrapper);
+    await wrapper.get('input[type="email"]').setValue("new@mail.com");
+    await checkbox(wrapper, "Auditor").setValue(true);
+    await checkbox(wrapper, "Member").setValue(false);
+    await save(wrapper);
+    expect(calls).toEqual(['patch {"email":"new@mail.com"}', "add 4", "remove 2"]);
+    expect(rowFor(wrapper, "maria").text()).toContain("Auditor");
+    expect(rowFor(wrapper, "maria").text()).not.toContain("Member");
+    expect(wrapper.find("#account-editor").exists()).toBe(false);
     expect(wrapper.emitted("changed")).toHaveLength(1);
+    wrapper.unmount();
   });
 
-  it("asks before removing a role, and removes it once confirmed", async () => {
-    client.removeRole.mockResolvedValue({ ...MARIA, roles: [] });
+  it("retries only the outstanding part after one of two role calls succeeds", async () => {
+    // Support was granted elsewhere after editing began: it was never staged, so it must survive.
+    const edited = { ...DUO, email: "new@mail.com" };
+    client.updateAccount.mockResolvedValue(edited);
+    client.assignRole.mockResolvedValueOnce({ ...edited, roles: [...edited.roles, { id: 4, name: "Auditor" }] });
+    client.removeRole.mockRejectedValueOnce(new ApiError(503, "unavailable"));
     const wrapper = await panel();
-    await rowFor(wrapper, "maria").trigger("click");
+    await open(wrapper, "duo");
+    await edit(wrapper);
+    await wrapper.get('input[type="email"]').setValue("new@mail.com");
+    await checkbox(wrapper, "Auditor").setValue(true);
+    await checkbox(wrapper, "Member").setValue(false);
+    await save(wrapper);
+    expect(client.updateAccount).toHaveBeenCalledTimes(1);
+    expect(client.assignRole).toHaveBeenCalledTimes(1);
+    expect(client.removeRole).toHaveBeenCalledTimes(1);
+    expect(drawer(wrapper).get(".error").text()).toContain("removing Member");
+    expect(drawer(wrapper).get(".error").text()).toContain("unavailable");
+    // The confirmed parts show in the roster and the draft is kept for the retry.
+    expect(rowFor(wrapper, "duo").text()).toContain("Auditor");
+    expect(checkbox(wrapper, "Member").element.checked).toBe(false);
+    expect(wrapper.find("#account-editor").exists()).toBe(true);
 
-    await drawer(wrapper).get(".chip-x").trigger("click");
-    expect(confirmDialog(wrapper).props("open")).toBe(true);
-    expect(confirmDialog(wrapper).props("message")).toBe("Remove role 'Member' from 'maria'?");
-    expect(client.removeRole).not.toHaveBeenCalled();
+    const fresh = { ...edited, roles: [{ id: 2, name: "Member" }, { id: 3, name: "Support" }, { id: 4, name: "Auditor" }, { id: 1, name: "Administrator" }] };
+    client.listAccounts.mockResolvedValueOnce([ADMIN, MARIA, LI, fresh]);
+    client.removeRole.mockResolvedValueOnce({ ...fresh, roles: fresh.roles.filter((r) => r.id !== 2) });
+    await save(wrapper);
+    expect(client.updateAccount).toHaveBeenCalledTimes(1);
+    expect(client.assignRole).toHaveBeenCalledTimes(1);
+    expect(client.removeRole).toHaveBeenCalledTimes(2);
+    expect(client.removeRole).toHaveBeenLastCalledWith(4, 2);
+    expect(rowFor(wrapper, "duo").text()).toContain("Administrator");
+    expect(rowFor(wrapper, "duo").text()).toContain("Support");
+    expect(wrapper.find("#account-editor").exists()).toBe(false);
+    wrapper.unmount();
+  });
 
-    await confirmDialog(wrapper).get(".confirm").trigger("click");
-    await flushPromises();
-
-    expect(client.removeRole).toHaveBeenCalledWith(2, 2);
-    expect(confirmDialog(wrapper).props("open")).toBe(false);
-    expect(rowFor(wrapper, "maria").text()).toContain("No roles");
+  it("refreshes the signed-in account after a self change, even on a partial save", async () => {
+    const auth = useAuthStore();
+    auth.account = { ...auth.account!, id: 2 };
+    const refresh = vi.spyOn(auth, "refresh").mockResolvedValue(undefined as never);
+    client.assignRole.mockResolvedValueOnce({ ...MARIA, roles: [...MARIA.roles, { id: 3, name: "Support" }] });
+    client.removeRole.mockRejectedValueOnce(new ApiError(500, "no"));
+    const wrapper = await panel();
+    await open(wrapper, "maria");
+    await edit(wrapper);
+    await checkbox(wrapper, "Support").setValue(true);
+    await checkbox(wrapper, "Member").setValue(false);
+    await save(wrapper);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
   });
 
   it("asks before disabling and does nothing when the question is cancelled", async () => {
     const wrapper = await panel();
-    await rowFor(wrapper, "maria").trigger("click");
-
-    await drawer(wrapper).get('input[role="switch"]').setValue(!(drawer(wrapper).get('input[role="switch"]').element as HTMLInputElement).checked);
-    expect(confirmDialog(wrapper).props("message")).toContain("Disable 'maria'?");
-
-    await confirmDialog(wrapper).get(".cancel").trigger("click");
-
-    expect(confirmDialog(wrapper).props("open")).toBe(false);
+    await open(wrapper, "maria");
+    const toggle = drawer(wrapper).get('input[role="switch"]');
+    await toggle.setValue(!(toggle.element as HTMLInputElement).checked);
+    expect(ask(wrapper, "Disable account").props("message")).toContain("Disable 'maria'?");
+    await ask(wrapper, "Disable account").vm.$emit("close");
+    expect(wrapper.findAllComponents(ConfirmModal).some((c) => c.props("open"))).toBe(false);
     expect(client.updateAccount).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 
-  it("disables an account once confirmed", async () => {
-    client.updateAccount.mockResolvedValue({ ...MARIA, is_active: false });
+  it("disables an account once confirmed and enables one without asking", async () => {
+    client.updateAccount.mockResolvedValueOnce({ ...MARIA, is_active: false });
     const wrapper = await panel();
-    await rowFor(wrapper, "maria").trigger("click");
-
-    await drawer(wrapper).get('input[role="switch"]').setValue(!(drawer(wrapper).get('input[role="switch"]').element as HTMLInputElement).checked);
-    await confirmDialog(wrapper).get(".confirm").trigger("click");
+    await open(wrapper, "maria");
+    const toggle = drawer(wrapper).get('input[role="switch"]');
+    await toggle.setValue(false);
+    await ask(wrapper, "Disable account").vm.$emit("confirm");
     await flushPromises();
-
     expect(client.updateAccount).toHaveBeenCalledWith(2, { is_active: false });
     expect(rowFor(wrapper, "maria").text()).toContain("disabled");
-  });
 
-  it("enables a disabled account without asking", async () => {
-    client.updateAccount.mockResolvedValue({ ...LI, is_active: true });
-    const wrapper = await panel();
-    await rowFor(wrapper, "li").trigger("click");
-
-    await drawer(wrapper).get('input[role="switch"]').setValue(!(drawer(wrapper).get('input[role="switch"]').element as HTMLInputElement).checked);
+    client.updateAccount.mockResolvedValueOnce({ ...MARIA, is_active: true });
+    await drawer(wrapper).get('input[role="switch"]').setValue(true);
     await flushPromises();
-
-    expect(confirmDialog(wrapper).props("open")).toBe(false);
-    expect(client.updateAccount).toHaveBeenCalledWith(3, { is_active: true });
+    expect(client.updateAccount).toHaveBeenLastCalledWith(2, { is_active: true });
+    wrapper.unmount();
   });
 
   it("deletes an account once confirmed, then closes the drawer", async () => {
     client.deleteAccount.mockResolvedValue(undefined);
     const wrapper = await panel();
-    await rowFor(wrapper, "maria").trigger("click");
-
+    await open(wrapper, "maria");
     await clickIn(drawer(wrapper), "Delete account");
-    expect(confirmDialog(wrapper).props("message")).toContain("Delete 'maria' permanently?");
-    await confirmDialog(wrapper).get(".confirm").trigger("click");
-    expect(client.deleteAccount).not.toHaveBeenCalled();
-    await confirmDialog(wrapper).get(".require input").setValue("maria");
-    await confirmDialog(wrapper).get(".confirm").trigger("click");
+    expect(ask(wrapper, "Delete account").props("requireText")).toBe("maria");
+    await ask(wrapper, "Delete account").vm.$emit("confirm");
     await flushPromises();
-
     expect(client.deleteAccount).toHaveBeenCalledWith(2);
-    expect(wrapper.findAll("tbody tr")).toHaveLength(2);
+    expect(wrapper.findAll("tbody tr")).toHaveLength(3);
     expect(drawer(wrapper).exists()).toBe(false);
-    expect(wrapper.emitted("changed")).toHaveLength(1);
-  });
-
-  it("saves edited details", async () => {
-    client.updateAccount.mockResolvedValue({ ...MARIA, email: "new@mail.com" });
-    const wrapper = await panel();
-    await rowFor(wrapper, "maria").trigger("click");
-
-    await clickIn(drawer(wrapper), "Edit details");
-    await drawer(wrapper).get('input[aria-label="Email"]').setValue("new@mail.com");
-    await drawer(wrapper).get("form").trigger("submit");
-    await flushPromises();
-
-    expect(client.updateAccount).toHaveBeenCalledWith(2, { email: "new@mail.com" });
-    expect(rowFor(wrapper, "maria").text()).toContain("new@mail.com");
+    wrapper.unmount();
   });
 
   it("sends a verification email and says so", async () => {
     client.sendVerification.mockResolvedValue({ sent: true });
     const wrapper = await panel();
-    await rowFor(wrapper, "maria").trigger("click");
-
+    await open(wrapper, "maria");
     await clickIn(drawer(wrapper), "Send verification");
     await flushPromises();
-
     expect(client.sendVerification).toHaveBeenCalledWith(2);
     expect(drawer(wrapper).text()).toContain("Verification email sent to maria@mail.com.");
+    wrapper.unmount();
   });
 
-  it("shows a failed action in the drawer and leaves the row alone", async () => {
+  it("keeps the failed profile edit retryable in the open drawer", async () => {
     client.updateAccount.mockRejectedValue(new ApiError(409, "Email 'x@y.z' is already in use"));
     const wrapper = await panel();
-    await rowFor(wrapper, "maria").trigger("click");
-
-    await clickIn(drawer(wrapper), "Edit details");
-    await drawer(wrapper).get('input[aria-label="Email"]').setValue("x@y.z");
-    await drawer(wrapper).get("form").trigger("submit");
-    await flushPromises();
-
+    await open(wrapper, "maria");
+    await edit(wrapper);
+    await wrapper.get('input[type="email"]').setValue("x@y.z");
+    await save(wrapper);
     expect(drawer(wrapper).get(".error").text()).toContain("already in use");
+    expect((wrapper.get('input[type="email"]').element as HTMLInputElement).value).toBe("x@y.z");
     expect(rowFor(wrapper, "maria").text()).toContain("maria@mail.com");
     expect(wrapper.emitted("changed")).toBeUndefined();
+    wrapper.unmount();
   });
 });

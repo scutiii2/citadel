@@ -39,7 +39,11 @@ async function panel() {
 
 type Panel = Awaited<ReturnType<typeof panel>>;
 
-const confirmDialog = (wrapper: Panel) => wrapper.getComponent(ConfirmModal);
+const confirmDialog = (wrapper: Panel) => wrapper.findAllComponents(ConfirmModal).find((c) => c.props("title") === "Revoke invite")!;
+async function openInvite(wrapper: Panel) {
+  await wrapper.get("tbody .admin-row-button").trigger("click");
+  await flushPromises();
+}
 const emailField = (wrapper: Panel) => wrapper.get<HTMLInputElement>('input[type="email"]');
 const submit = (wrapper: Panel) => wrapper.get('button[type="submit"]');
 
@@ -60,7 +64,27 @@ describe("InvitesPanel", () => {
 
     expect(wrapper.findAll("tbody tr")).toHaveLength(1);
     expect(wrapper.get("tbody").text()).toContain("new@mail.com");
-    expect(wrapper.findAll("th").map((header) => header.text())).toEqual(["Invitee", "Created", "Expires", ""]);
+    expect(wrapper.findAll("thead th").map((header) => header.text())).toEqual(["Invitee", "Created", "Expires"]);
+  });
+
+  it("searches the open invites locally", async () => {
+    client.listInvites.mockResolvedValue([INVITE, CREATED]);
+    const wrapper = await panel();
+    await wrapper.get('input[type="search"]').setValue("MEMBER@");
+    expect(wrapper.findAll("tbody tr")).toHaveLength(1);
+    expect(wrapper.get("tbody").text()).toContain("member@example.com");
+    await wrapper.get('input[type="search"]').setValue("nobody");
+    expect(wrapper.text()).toContain("No invites match your search.");
+    expect(client.listInvites).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens an invite's details with its delivery method", async () => {
+    const wrapper = await panel();
+    await openInvite(wrapper);
+    const drawer = wrapper.get('dialog[aria-label="Invite new@mail.com"]');
+    expect(drawer.attributes("open")).toBeDefined();
+    expect(drawer.text()).toContain("Email");
+    expect(drawer.text()).toContain("Revoke invite");
   });
 
   it("says when there are none", async () => {
@@ -98,7 +122,7 @@ describe("InvitesPanel", () => {
     await openDrawer(wrapper);
     await emailField(wrapper).setValue("member@example.com");
 
-    expect(wrapper.get(".invite-create .error").text()).toBe(reason);
+    expect(wrapper.get("#invite-create .error").text()).toBe(reason);
     expect(submit(wrapper).attributes("disabled")).toBeDefined();
     await wrapper.get("form").trigger("submit");
     expect(client.createInvite).not.toHaveBeenCalled();
@@ -137,7 +161,7 @@ describe("InvitesPanel", () => {
     await wrapper.get("form").trigger("submit");
     await flushPromises();
 
-    expect(wrapper.get(".invite-create .error").text()).toBe("Email could not be sent.");
+    expect(wrapper.get("#invite-create .error").text()).toBe("Email could not be sent.");
     expect(emailField(wrapper).element.value).toBe("member@example.com");
     expect(submit(wrapper).attributes("disabled")).toBeUndefined();
     expect(wrapper.emitted("changed")).toBeUndefined();
@@ -146,7 +170,8 @@ describe("InvitesPanel", () => {
   it("asks before revoking, and does nothing when cancelled", async () => {
     const wrapper = await panel();
 
-    await wrapper.get("tbody button.danger").trigger("click");
+    await openInvite(wrapper);
+    await wrapper.get("[data-test=revoke]").trigger("click");
     expect(confirmDialog(wrapper).props("open")).toBe(true);
     expect(confirmDialog(wrapper).props("message")).toBe("Revoke new@mail.com? Its code stops working.");
 
@@ -160,12 +185,14 @@ describe("InvitesPanel", () => {
     client.revokeInvite.mockResolvedValue(undefined);
     const wrapper = await panel();
 
-    await wrapper.get("tbody button.danger").trigger("click");
+    await openInvite(wrapper);
+    await wrapper.get("[data-test=revoke]").trigger("click");
     await confirmDialog(wrapper).get(".confirm").trigger("click");
     await flushPromises();
 
     expect(client.revokeInvite).toHaveBeenCalledWith(5);
     expect(wrapper.find("tbody").exists()).toBe(false);
+    expect(wrapper.find("[data-test=revoke]").exists()).toBe(false);
     expect(confirmDialog(wrapper).props("open")).toBe(false);
     expect(wrapper.emitted("changed")).toHaveLength(1);
   });
@@ -174,7 +201,8 @@ describe("InvitesPanel", () => {
     client.revokeInvite.mockRejectedValue(new ApiError(409, "That invite was already used"));
     const wrapper = await panel();
 
-    await wrapper.get("tbody button.danger").trigger("click");
+    await openInvite(wrapper);
+    await wrapper.get("[data-test=revoke]").trigger("click");
     await confirmDialog(wrapper).get(".confirm").trigger("click");
     await flushPromises();
 

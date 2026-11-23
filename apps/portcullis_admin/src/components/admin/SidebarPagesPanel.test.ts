@@ -1,22 +1,31 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/http";
 import { settingsClient } from "../../api/SettingsClient";
+import ConfirmModal from "./ConfirmModal.vue";
 import SidebarPagesPanel from "./SidebarPagesPanel.vue";
 
 vi.mock("../../api/SettingsClient", () => ({ settingsClient: { get: vi.fn(), set: vi.fn(), pages: vi.fn(), setPages: vi.fn() } }));
 
 const client = vi.mocked(settingsClient);
 
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) { this.removeAttribute("open"); };
+});
+afterEach(() => { document.body.innerHTML = ""; });
+
 async function panel(hidden: string[] = []) {
   client.pages.mockResolvedValue({ hidden });
-  const wrapper = mount(SidebarPagesPanel);
+  const wrapper = mount(SidebarPagesPanel, { attachTo: document.body });
   await flushPromises();
   return wrapper;
 }
 
 type Panel = Awaited<ReturnType<typeof panel>>;
 const rows = (wrapper: Panel) => wrapper.findAll(".page-row");
+const saveIcon = (wrapper: Panel) => wrapper.get('[data-test="save"]');
+const hasSave = (wrapper: Panel) => wrapper.find('[data-test="save"]').exists();
 const labels = (wrapper: Panel) => rows(wrapper).map((r) => r.get(".page-name").text());
 const box = (wrapper: Panel, label: string) =>
   rows(wrapper).find((r) => r.get(".page-name").text() === label)!.get('input[type="checkbox"]');
@@ -50,13 +59,13 @@ describe("SidebarPagesPanel", () => {
 
   it("holds a flip as an unsaved change until Save", async () => {
     const wrapper = await panel();
-    expect(wrapper.find(".save-bar").exists()).toBe(false);
+    expect(hasSave(wrapper)).toBe(false);
 
     await box(wrapper, "Usage").setValue(false);
 
     expect(client.setPages).not.toHaveBeenCalled();
-    expect(wrapper.get(".save-bar").text()).toContain("unsaved change");
-    expect(wrapper.get(".save-bar").text()).toContain("every account");
+    expect(wrapper.get(".unsaved").text()).toContain("unsaved change");
+    expect(wrapper.get(".unsaved").text()).toContain("every account");
   });
 
   it("saves the hidden ids on Save, then shows Saved", async () => {
@@ -64,23 +73,25 @@ describe("SidebarPagesPanel", () => {
     await box(wrapper, "Usage").setValue(false);
     await box(wrapper, "Agents").setValue(false);
 
-    await wrapper.get(".save-bar .primary").trigger("click");
+    await saveIcon(wrapper).trigger("click");
     await flushPromises();
 
     expect(client.setPages).toHaveBeenCalledWith(["/agents", "/usage"]);
-    expect(wrapper.find(".save-bar").exists()).toBe(false);
+    expect(hasSave(wrapper)).toBe(false);
     expect(wrapper.get(".chip.saved").text()).toBe("Saved");
   });
 
-  it("drops the draft on Cancel without saving", async () => {
+  it("confirms before dropping the draft on Cancel, without saving", async () => {
     const wrapper = await panel();
     await box(wrapper, "Usage").setValue(false);
 
-    await wrapper.get(".save-bar button:not(.primary)").trigger("click");
+    await wrapper.get('[data-test="cancel"]').trigger("click");
+    await wrapper.getComponent(ConfirmModal).vm.$emit("confirm");
+    await flushPromises();
 
     expect(client.setPages).not.toHaveBeenCalled();
     expect(checked(wrapper, "Usage")).toBe(true);
-    expect(wrapper.find(".save-bar").exists()).toBe(false);
+    expect(hasSave(wrapper)).toBe(false);
   });
 
   it("flipping back to the stored state clears the unsaved change", async () => {
@@ -89,18 +100,18 @@ describe("SidebarPagesPanel", () => {
     await box(wrapper, "Usage").setValue(false);
     await box(wrapper, "Usage").setValue(true);
 
-    expect(wrapper.find(".save-bar").exists()).toBe(false);
+    expect(hasSave(wrapper)).toBe(false);
   });
 
   it("offers Back to default only while something is hidden, and it makes an unsaved draft", async () => {
     const wrapper = await panel(["/usage"]);
-    const reset = wrapper.findAll(".head button").find((b) => b.text() === "Back to default")!;
+    const reset = wrapper.findAll(".meta button").find((b) => b.text() === "Back to default")!;
 
     await reset.trigger("click");
 
     expect(checked(wrapper, "Usage")).toBe(true);
     expect(client.setPages).not.toHaveBeenCalled();
-    expect(wrapper.find(".save-bar").exists()).toBe(true);
+    expect(hasSave(wrapper)).toBe(true);
     expect((await panel()).findAll(".head button").some((b) => b.text() === "Back to default")).toBe(false);
   });
 
@@ -108,7 +119,7 @@ describe("SidebarPagesPanel", () => {
     const wrapper = await panel(["/future-page"]);
     await box(wrapper, "Usage").setValue(false);
 
-    await wrapper.get(".save-bar .primary").trigger("click");
+    await saveIcon(wrapper).trigger("click");
     await flushPromises();
 
     expect(client.setPages).toHaveBeenCalledWith(["/future-page", "/usage"]);
@@ -119,12 +130,24 @@ describe("SidebarPagesPanel", () => {
     client.setPages.mockRejectedValue(new ApiError(403, "Missing permission: settings.manage"));
     await box(wrapper, "Usage").setValue(false);
 
-    await wrapper.get(".save-bar .primary").trigger("click");
+    await saveIcon(wrapper).trigger("click");
     await flushPromises();
 
     expect(wrapper.text()).toContain("Missing permission: settings.manage");
-    expect(wrapper.find(".save-bar").exists()).toBe(true);
+    expect(hasSave(wrapper)).toBe(true);
     expect(wrapper.find(".chip.saved").exists()).toBe(false);
+  });
+
+  it("searches the rows but keeps hidden edits in the saved payload", async () => {
+    const wrapper = await panel();
+    await box(wrapper, "Usage").setValue(false);
+    await wrapper.get('input[type="search"]').setValue("agent");
+    expect(rows(wrapper).filter((r) => r.attributes("style")?.includes("display: none"))).toHaveLength(3);
+    await saveIcon(wrapper).trigger("click");
+    await flushPromises();
+    expect(client.setPages).toHaveBeenCalledWith(["/usage"]);
+    await wrapper.get('input[type="search"]').setValue("zzz");
+    expect(wrapper.text()).toContain("No pages match your search.");
   });
 
   it("shows a load error", async () => {

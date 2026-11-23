@@ -1,68 +1,91 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
 import {
   adminClient,
-  type AccountChanges,
   type AccountStatus,
   type AdminAccount,
   type Role,
-  type RoleRef,
 } from "../../api/AdminClient";
 import { useAuthStore } from "../../stores/auth";
 import { errorMessage } from "../../utils/errors";
-import SegmentedControl from "../SegmentedControl.vue";
-import BaseModal from "../BaseModal.vue";
-import AccountDrawer from "./AccountDrawer.vue";
+import AccountDrawer, { type AccountDraft } from "./AccountDrawer.vue";
+import AdminSearch from "./AdminSearch.vue";
 import ConfirmModal from "./ConfirmModal.vue";
+import RecordDrawer from "./RecordDrawer.vue";
+import StatusFilters from "./StatusFilters.vue";
 import "./admin.css";
 
-/** The overview counts (OverviewView) change whenever an account does. */
-const props = withDefaults(defineProps<{ showHeading?: boolean; filters?: { q: string; status: AccountStatus } }>(), { showHeading: true });
+/** The account roster: a status filter and a local search over username, email and role names, a
+ * row that opens the account in a drawer, and a staged edit (profile fields plus role choices by ID)
+ * saved sequentially through the existing endpoints. */
+const props = defineProps<{ filters?: { q: string; status: AccountStatus } }>();
 const emit = defineEmits<{ changed: []; filter: [value: { q: string; status: AccountStatus }] }>();
 
 const STATUS_OPTIONS = [
-  { value: "all", label: "All" },
-  { value: "unverified", label: "Unverified" },
-  { value: "disabled", label: "Disabled" },
+  { id: "all", label: "All", tone: "accent" },
+  { id: "unverified", label: "Unverified", tone: "warning" },
+  { id: "disabled", label: "Disabled", tone: "muted" },
 ] as const;
-const SEARCH_DELAY_MS = 250;
 
-/** What the confirmation dialog is asking about. */
-type Pending =
-  | { kind: "disable"; account: AdminAccount }
-  | { kind: "delete"; account: AdminAccount }
-  | { kind: "removeRole"; account: AdminAccount; role: RoleRef };
+type Pending = { kind: "disable"; account: AdminAccount } | { kind: "delete"; account: AdminAccount };
 
 const auth = useAuthStore();
 
 const accounts = ref<AdminAccount[]>([]);
+/** Every account seen, by ID, so the open one survives a filter that no longer lists it. */
+const known = ref<Map<number, AdminAccount>>(new Map());
 const roles = ref<Role[]>([]);
 const search = ref(props.filters?.q ?? "");
 const status = ref<AccountStatus>(props.filters?.status ?? "all");
+const loading = ref(true);
 const loadError = ref("");
 const actionError = ref("");
 const notice = ref("");
 const busy = ref(false);
 const selectedId = ref<number | null>(null);
 const pending = ref<Pending | null>(null);
+const editing = ref(false);
+const draft = ref<AccountDraft>({ username: "", email: "", roleIds: [] });
+/** Role IDs held when editing began: only these may be removed by this edit. */
+const snapshotRoleIds = ref<number[]>([]);
+/** A failed save may have been applied by the server: re-read the account before retrying. */
+let refreshBeforeRetry = false;
+const drawer = ref<InstanceType<typeof RecordDrawer>>();
+const searchField = ref<InstanceType<typeof AdminSearch>>();
 
 const myId = computed(() => auth.account?.id ?? null);
-const selected = computed(() => accounts.value.find((a) => a.id === selectedId.value) ?? null);
+const selected = computed(() => (selectedId.value === null ? null : known.value.get(selectedId.value) ?? null));
+const canEdit = computed(() => !!selected.value && !selected.value.is_protected && (auth.hasPermission("accounts.manage") || auth.hasPermission("roles.assign")));
 
-// Only the newest list request may fill the table: a slow answer to an earlier
-// keystroke would otherwise overwrite it.
+const visible = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  if (!query) return accounts.value;
+  return accounts.value.filter((a) => [a.username, a.email, ...a.roles.map((r) => r.name)].some((value) => value.toLowerCase().includes(query)));
+});
+
+function remember(list: AdminAccount[]): void {
+  const next = new Map(known.value);
+  for (const account of list) next.set(account.id, account);
+  known.value = next;
+}
+
+// Only the newest roster request may fill the table: a slow answer to an earlier status would
+// otherwise overwrite it.
 let loadSeq = 0;
-let searchTimer: ReturnType<typeof setTimeout> | undefined;
-
 async function loadAccounts(): Promise<void> {
   const seq = ++loadSeq;
+  loading.value = true;
   try {
-    const rows = await adminClient.listAccounts({ q: search.value, status: status.value });
+    const rows = await adminClient.listAccounts({ status: status.value });
     if (seq !== loadSeq) return;
     accounts.value = rows;
+    remember(rows);
     loadError.value = "";
   } catch (err) {
     if (seq === loadSeq) loadError.value = errorMessage(err);
+  } finally {
+    if (seq === loadSeq) loading.value = false;
   }
 }
 
@@ -74,35 +97,132 @@ async function loadRoles(): Promise<void> {
   }
 }
 
-watch(search, () => {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(loadAccounts, SEARCH_DELAY_MS);
-});
 watch(status, loadAccounts);
 watch(() => props.filters, (next) => {
   if (next) { search.value = next.q; status.value = next.status; }
 });
 watch([search, status], () => emit("filter", { q: search.value, status: status.value }));
-
 onMounted(() => {
   void loadAccounts();
   void loadRoles();
 });
-onBeforeUnmount(() => clearTimeout(searchTimer));
 
 function replace(updated: AdminAccount): void {
   accounts.value = accounts.value.map((a) => (a.id === updated.id ? updated : a));
+  remember([updated]);
 }
 
 function select(account: AdminAccount): void {
   selectedId.value = account.id;
   actionError.value = "";
   notice.value = "";
+  editing.value = false;
 }
 
-/** Runs one admin call for `account`, showing its error or notice. Refreshes
- * the logged-in account afterwards when it was the one changed, so the nav
- * tabs and username in the top bar follow. */
+function closeDrawer(): void {
+  selectedId.value = null;
+  editing.value = false;
+  actionError.value = "";
+}
+
+function startEdit(): void {
+  const account = selected.value;
+  if (!account) return;
+  draft.value = { username: account.username, email: account.email, roleIds: account.roles.map((r) => r.id) };
+  snapshotRoleIds.value = account.roles.map((r) => r.id);
+  actionError.value = "";
+  notice.value = "";
+  refreshBeforeRetry = false;
+  editing.value = true;
+}
+
+/** Validates the profile fields before the save confirmation opens. */
+function requestSave(): void {
+  const form = document.getElementById("account-editor") as HTMLFormElement | null;
+  if (form && !form.reportValidity()) return;
+  drawer.value?.requestSave();
+}
+
+function discard(): void {
+  editing.value = false;
+  actionError.value = "";
+}
+
+/** Refreshes the signed-in account when it was the one changed, so the nav and header follow. */
+async function refreshSelf(id: number): Promise<void> {
+  if (id === myId.value) await auth.refresh();
+}
+
+/** The saved changes still outstanding: profile fields first, then role additions, then removals. */
+function outstanding(account: AdminAccount) {
+  const changes: { username?: string; email?: string } = {};
+  if (auth.hasPermission("accounts.manage")) {
+    if (draft.value.username.trim() !== account.username) changes.username = draft.value.username.trim();
+    if (draft.value.email.trim() !== account.email) changes.email = draft.value.email.trim();
+  }
+  const held = new Set(account.roles.map((r) => r.id));
+  const wanted = new Set(draft.value.roleIds);
+  const canAssign = auth.hasPermission("roles.assign");
+  const adds = canAssign ? draft.value.roleIds.filter((id) => !held.has(id)) : [];
+  const removes = canAssign ? snapshotRoleIds.value.filter((id) => !wanted.has(id) && held.has(id)) : [];
+  return { changes, adds, removes };
+}
+
+const roleName = (id: number) => roles.value.find((r) => r.id === id)?.name ?? selected.value?.roles.find((r) => r.id === id)?.name ?? `role ${id}`;
+
+async function save(): Promise<void> {
+  const target = selected.value;
+  if (!target || busy.value) return;
+  actionError.value = "";
+  notice.value = "";
+  busy.value = true;
+  let confirmedWrite = false;
+  let step = "";
+  try {
+    let account = target;
+    if (refreshBeforeRetry) {
+      // The earlier failure was ambiguous: re-read through the roster endpoint, then skip what already landed.
+      step = "refreshing the account";
+      const fresh = (await adminClient.listAccounts()).find((a) => a.id === target.id);
+      if (!fresh) throw new Error("The account no longer exists.");
+      replace(fresh);
+      account = fresh;
+      refreshBeforeRetry = false;
+    }
+    const { changes, adds, removes } = outstanding(account);
+    if (Object.keys(changes).length) {
+      step = "saving profile details";
+      account = await adminClient.updateAccount(account.id, changes);
+      replace(account);
+      confirmedWrite = true;
+    }
+    for (const id of adds) {
+      step = `adding ${roleName(id)}`;
+      account = await adminClient.assignRole(account.id, id);
+      replace(account);
+      confirmedWrite = true;
+    }
+    for (const id of removes) {
+      step = `removing ${roleName(id)}`;
+      account = await adminClient.removeRole(account.id, id);
+      replace(account);
+      confirmedWrite = true;
+    }
+    editing.value = false;
+    notice.value = "Changes saved.";
+  } catch (err) {
+    refreshBeforeRetry = true;
+    actionError.value = `Could not finish ${step}: ${errorMessage(err)}`;
+  } finally {
+    busy.value = false;
+    if (confirmedWrite) {
+      try { await refreshSelf(target.id); } catch { /* the next request shows any lost session */ }
+      emit("changed");
+    }
+  }
+}
+
+/** Runs one separate admin call, showing its error or notice. */
 async function act(account: AdminAccount, call: () => Promise<void>, done?: string): Promise<void> {
   actionError.value = "";
   notice.value = "";
@@ -110,17 +230,13 @@ async function act(account: AdminAccount, call: () => Promise<void>, done?: stri
   try {
     await call();
     if (done) notice.value = done;
-    if (account.id === myId.value) await auth.refresh();
+    await refreshSelf(account.id);
     emit("changed");
   } catch (err) {
     actionError.value = errorMessage(err);
   } finally {
     busy.value = false;
   }
-}
-
-function saveDetails(account: AdminAccount, changes: AccountChanges): Promise<void> {
-  return act(account, async () => replace(await adminClient.updateAccount(account.id, changes)));
 }
 
 function setActive(account: AdminAccount, active: boolean): Promise<void> | undefined {
@@ -131,47 +247,16 @@ function setActive(account: AdminAccount, active: boolean): Promise<void> | unde
   return act(account, async () => replace(await adminClient.updateAccount(account.id, { is_active: true })));
 }
 
-function addRole(account: AdminAccount, roleId: number): Promise<void> {
-  return act(account, async () => replace(await adminClient.assignRole(account.id, roleId)));
-}
-
 function sendVerification(account: AdminAccount): Promise<void> {
-  return act(
-    account,
-    async () => {
-      await adminClient.sendVerification(account.id);
-    },
-    `Verification email sent to ${account.email}.`,
-  );
+  return act(account, async () => { await adminClient.sendVerification(account.id); }, `Verification email sent to ${account.email}.`);
 }
 
 const confirmText = computed(() => {
   const p = pending.value;
   if (!p) return { title: "", message: "", label: "", requireText: "" };
   const name = p.account.username;
-  switch (p.kind) {
-    case "disable":
-      return {
-        title: "Disable account",
-        message: `Disable '${name}'? They are logged out and can't log in until enabled.`,
-        label: "Disable",
-        requireText: "",
-      };
-    case "delete":
-      return {
-        title: "Delete account",
-        message: `Delete '${name}' permanently? This can't be undone.`,
-        label: "Delete",
-        requireText: name,
-      };
-    case "removeRole":
-      return {
-        title: "Remove role",
-        message: `Remove role '${p.role.name}' from '${name}'?`,
-        label: "Remove",
-        requireText: "",
-      };
-  }
+  if (p.kind === "disable") return { title: "Disable account", message: `Disable '${name}'? They are logged out and can't log in until enabled.`, label: "Disable", requireText: "" };
+  return { title: "Delete account", message: `Delete '${name}' permanently? This can't be undone.`, label: "Delete", requireText: name };
 });
 
 async function confirm(): Promise<void> {
@@ -181,12 +266,11 @@ async function confirm(): Promise<void> {
   await act(account, async () => {
     if (p.kind === "disable") {
       replace(await adminClient.updateAccount(account.id, { is_active: false }));
-    } else if (p.kind === "removeRole") {
-      replace(await adminClient.removeRole(account.id, p.role.id));
     } else {
       await adminClient.deleteAccount(account.id);
       accounts.value = accounts.value.filter((a) => a.id !== account.id);
-      selectedId.value = null;
+      known.value = new Map([...known.value].filter(([id]) => id !== account.id));
+      closeDrawer();
     }
   });
   // On failure the dialog closes too; the error shows in the drawer.
@@ -195,57 +279,39 @@ async function confirm(): Promise<void> {
 </script>
 
 <template>
-  <div class="admin-panel">
-    <header v-if="showHeading" class="section-head">
-      <div><h3>Accounts</h3><p>Choose an account to manage its details and access.</p></div>
-    </header>
-    <div :class="['layout', { open: selected }]">
-      <div class="accounts-panel">
-        <div class="toolbar">
-          <label class="search-field">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg>
-            <input v-model="search" type="text" placeholder="Search name or email" aria-label="Search accounts" />
-          </label>
-          <SegmentedControl class="status-filter" v-model="status" :options="STATUS_OPTIONS" label="Status" aria-label="Account status" />
+  <div class="accounts-panel admin-panel">
+    <StatusFilters v-model="status" label="Filter by account status" :options="STATUS_OPTIONS" />
+    <section class="admin-panel-card" aria-labelledby="account-roster">
+      <header class="admin-panel-head">
+        <h2 id="account-roster">Account roster</h2>
+        <div class="admin-panel-tools">
+          <RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">Invite member</RouterLink>
+          <AdminSearch ref="searchField" v-model="search" label="Search accounts" />
         </div>
-
-        <p v-if="loadError" class="error">error: {{ loadError }}</p>
-        <template v-if="!selected">
-          <p v-if="actionError" class="error">{{ actionError }}</p>
-          <p v-if="notice" class="notice">{{ notice }}</p>
-        </template>
-
-        <table v-if="accounts.length" class="accounts">
-          <thead>
-            <tr>
-              <th>Account</th>
-              <th>Roles</th>
-              <th>Status</th>
-            </tr>
-          </thead>
+      </header>
+      <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button type="button" class="chip" @click="loadAccounts">Retry</button></p>
+      <p v-else-if="loading && !accounts.length" class="admin-panel-text muted" role="status">Loading accounts…</p>
+      <p v-else-if="!visible.length" class="admin-panel-text muted">{{ accounts.length ? "No accounts match your search." : "No accounts match this filter." }}
+        <button v-if="search" type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button>
+      </p>
+      <div v-else class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="account-roster">
+        <table class="admin-records">
+          <thead><tr><th scope="col">Account</th><th scope="col">Roles</th><th scope="col">Status</th></tr></thead>
           <tbody>
-            <tr v-for="a in accounts" :key="a.id" :class="{ selected: a.id === selectedId }" @click="select(a)">
-              <td>
-                <div class="identity">
-                  <span class="avatar" aria-hidden="true">{{ a.username.slice(0, 2).toUpperCase() }}</span>
+            <tr v-for="a in visible" :key="a.id" :data-id="a.id" data-test="account" :class="{ selected: a.id === selectedId }">
+              <th scope="row">
+                <div class="admin-record-name">
+                  <span class="admin-record-badge" aria-hidden="true">{{ a.username.slice(0, 2).toUpperCase() }}</span>
                   <div>
-                    <button type="button" class="name" :aria-pressed="a.id === selectedId" @click.stop="select(a)">
-                      {{ a.username }}
-                    </button>
+                    <button type="button" class="admin-row-button" aria-haspopup="dialog" @click="select(a)">{{ a.username }}</button>
                     <span v-if="a.id === myId" class="badge">you</span>
                     <span v-if="a.is_protected" class="badge">protected</span>
-                    <div class="muted email">{{ a.email }}</div>
-                    <div class="mobile-roles">
-                      <span v-for="r in a.roles" :key="r.id" class="chip fixed">{{ r.name }}</span>
-                      <span v-if="a.roles.length === 0" class="muted">No roles</span>
-                    </div>
+                    <p>{{ a.email }}</p>
+                    <div class="mobile-roles"><span v-for="r in a.roles" :key="r.id" class="chip fixed">{{ r.name }}</span><span v-if="!a.roles.length" class="muted">No roles</span></div>
                   </div>
                 </div>
-              </td>
-              <td>
-                <span v-for="r in a.roles" :key="r.id" class="chip fixed">{{ r.name }}</span>
-                <span v-if="a.roles.length === 0" class="muted">No roles</span>
-              </td>
+              </th>
+              <td class="role-cell"><span v-for="r in a.roles" :key="r.id" class="chip fixed">{{ r.name }}</span><span v-if="!a.roles.length" class="muted">No roles</span></td>
               <td>
                 <span v-if="!a.is_active" class="account-status disabled"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0" /></svg>disabled</span>
                 <span v-else-if="!a.email_verified" class="account-status unverified"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0" /></svg>unverified</span>
@@ -254,33 +320,21 @@ async function confirm(): Promise<void> {
             </tr>
           </tbody>
         </table>
-        <p v-else-if="!loadError" class="muted empty">No accounts match.</p>
-        <footer v-if="!loadError" class="list-footer">
-          <span>{{ accounts.length }} {{ accounts.length === 1 ? "account" : "accounts" }} shown</span>
-          <span>Select a name to view details ↗</span>
-        </footer>
       </div>
+      <p v-if="!loadError && accounts.length" class="admin-panel-text muted count" role="status">{{ visible.length }} of {{ accounts.length }} {{ accounts.length === 1 ? "account" : "accounts" }}</p>
+    </section>
 
-      <BaseModal :open="selected !== null" :title="selected ? `Account ${selected.username}` : 'Account details'" side @close="selectedId = null">
-      <AccountDrawer
-        v-if="selected"
-        :account="selected"
-        :roles="roles"
-        :is-self="selected.id === myId"
-        :busy="busy"
-        :error="actionError"
-        :notice="notice"
-        :show-close="false"
-        @close="selectedId = null"
-        @save="(changes) => saveDetails(selected!, changes)"
-        @set-active="(active) => setActive(selected!, active)"
-        @add-role="(roleId) => addRole(selected!, roleId)"
-        @remove-role="(role) => (pending = { kind: 'removeRole', account: selected!, role })"
-        @send-verification="sendVerification(selected!)"
-        @remove="pending = { kind: 'delete', account: selected! }"
-      />
-      </BaseModal>
-    </div>
+    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected ? `Account ${selected.username}` : 'Account details'"
+      :editable="canEdit" :editing="editing" :busy="busy" :fallback-focus="() => searchField?.focus()"
+      @edit="startEdit" @close="closeDrawer" @discard="discard" @save="save">
+      <AccountDrawer v-if="selected" v-model:draft="draft" :account="selected" :roles="roles" :is-self="selected.id === myId" :busy="busy"
+        :error="actionError" :notice="notice" :editing="editing"
+        @set-active="(active) => setActive(selected!, active)" @send-verification="sendVerification(selected!)" @remove="pending = { kind: 'delete', account: selected! }" />
+      <template v-if="editing" #footer>
+        <button type="button" class="chip" :disabled="busy" data-test="cancel-edit" @click="drawer?.requestCancel()">Cancel</button>
+        <button type="button" class="primary" :disabled="busy" :aria-busy="busy" data-test="save-account" @click="requestSave">Save changes</button>
+      </template>
+    </RecordDrawer>
 
     <ConfirmModal
       :open="pending !== null"
@@ -297,203 +351,21 @@ async function confirm(): Promise<void> {
 </template>
 
 <style scoped>
-.toolbar {
-  align-items: last baseline;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 14px;
-  border-bottom: 1px solid var(--border);
-}
-.search-field {
-display: flex;
-  align-items: center;
-  gap: 8px;
-flex: 1 1 180px;
-  max-width: 330px;
-  padding: 7px 10px;
-border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-color: var(--muted);
-  background: var(--surface);
-  min-width: 0;
-}
-.search-field svg {
-  width: 17px;
-  height: 17px;
-  flex-shrink: 0;
-}
-.search-field input[type="text"] {
-  border: none;
-  background: transparent;
-  padding: 0;
-  width: 100%;
-  min-width: 0;
-  font-size: 0.85em;
-}
-.accounts-panel {
-  min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-.accounts-panel > .error, .accounts-panel > .notice {
-  padding: 0 14px;
-}
-.identity {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-width: 0;
-}
-.identity > div {
-  min-width: 0;
-}
-.avatar {
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--code-bg);
-  color: var(--muted);
-  font-size: 0.8em;
-  font-weight: 600;
-}
-.mobile-roles {
-  display: none;
-}
-.account-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-  font-size: 0.85em;
-  text-transform: capitalize;
-}
-.account-status svg {
-  width: 14px;
-  height: 14px;
-}
-.account-status.active {
-  color: var(--success);
-}
-.account-status.unverified {
-  color: var(--warning);
-}
-.account-status.disabled {
-  color: var(--muted);
-}
-.list-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.75em;
-}
-.layout {
-  display: grid;
-  gap: 16px;
-  align-items: start;
-}
-.layout.open {
-  grid-template-columns: minmax(0, 1fr);
-}
-.accounts {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-.accounts th:first-child {
-  width: 52%;
-}
-.accounts th:nth-child(2) {
-  width: 25%;
-}
-.accounts th {
-  padding: 11px 16px;
-  text-align: left;
-  font-size: 0.75em;
-  font-weight: 500;
-  color: var(--muted);
-  background: var(--surface);
-}
-.accounts td {
-  padding: 15px 16px;
-  border-top: 1px solid var(--border);
-  vertical-align: middle;
-  font-size: 0.85em;
-}
-.accounts tbody tr {
-  cursor: pointer;
-}
-.accounts tbody tr:hover,
-.accounts tbody tr.selected {
-  background: color-mix(in srgb, var(--accent) 6%, var(--bg));
-}
-.name {
-  margin-right: 6px;
-  padding: 0;
-  border: none;
-  cursor: pointer;
-  font: inherit;
-  font-weight: 600;
-  color: var(--text);
-  background: none;
-  overflow-wrap: anywhere;
-}
-.email {
-  font-size: 0.85em;
-  overflow-wrap: anywhere;
-}
-.chip {
-  margin: 0 4px 4px 0;
-}
-.empty {
-margin: 0;
-  padding: 24px 16px;
-}
+.accounts-panel { min-width: 0; }
+.admin-records tbody tr.selected { background: var(--surface); }
+.mobile-roles { display: none; }
+.admin-record-name p { overflow-wrap: anywhere; }
+.badge { margin-inline-start: 6px; }
+.chip.fixed { margin: 0 4px 4px 0; }
+.account-status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 0.85em; text-transform: capitalize; }
+.account-status svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.account-status.active { color: var(--success); }
+.account-status.unverified { color: var(--warning); }
+.account-status.disabled { color: var(--muted); }
+.count { border-top: 1px solid var(--border); font-size: 0.8rem; }
 @media (max-width: 767px) {
-  .layout.open {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .search-field {
-    flex-basis: 100%;
-    max-width: none;
-  }
-  .status-filter {
-    width: 100%;
-  }
-  .accounts th:nth-child(2), .accounts td:nth-child(2) {
-    display: none;
-  }
-  .accounts th:first-child {
-    width: 65%;
-  }
-  .accounts th:last-child {
-    width: 35%;
-  }
-  .accounts th, .accounts td {
-    padding: 12px 10px;
-  }
-  .avatar {
-    width: 28px;
-    height: 28px;
-  }
-  .identity {
-    gap: 8px;
-  }
-  .mobile-roles {
-    display: flex;
-    flex-wrap: wrap;
-    margin-top: 4px;
-    font-size: 0.85em;
-  }
-  .list-footer span:last-child {
-    display: none;
-  }
+  .role-cell, thead th:nth-child(2) { display: none; }
+  .mobile-roles { display: flex; flex-wrap: wrap; margin-top: 4px; font-size: 0.85em; }
 }
+@media (max-width: 400px) { .admin-record-badge { display: none; } }
 </style>

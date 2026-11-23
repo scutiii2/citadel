@@ -27,7 +27,7 @@ async function view(path = '/overview') {
     { path: 'settings', component: { template: '<div>settings page</div>' } },
   ] }, { path: '/:pathMatch(.*)*', component: { template: '<div />' } }] });
   await router.push(path);
-  const wrapper = mount({ components: { AdminNav }, template: '<div><AdminNav /><RouterView /></div>' }, { global: { plugins: [router] } });
+  const wrapper = mount({ components: { AdminNav }, template: '<div><AdminNav :expanded="false" /><RouterView /></div>' }, { global: { plugins: [router] } });
   mounted.push(wrapper);
   await flushPromises();
   return { wrapper, router };
@@ -44,6 +44,7 @@ it('shows separate destinations and marks the active child page', async () => {
 it('shows counts only on the overview and refreshes when returning', async () => {
   const { wrapper, router } = await view();
   expect(wrapper.findAll('.stats .tile').map(t => t.text())).toEqual(['Accounts24', 'Unverified3', 'Disabled1', 'Open invites5']);
+  expect(wrapper.findAll('.destination .live').map(t => t.text())).toContain('24 accounts · 3 unverified · 1 disabled');
   expect(wrapper.get('.admin-info a').attributes('href')).toBe('/admin/accounts?status=unverified');
   await router.push('/admin/roles');
   expect(wrapper.find('.stats').exists()).toBe(false);
@@ -56,11 +57,17 @@ it('keeps navigation and destination links usable when summary fails', async () 
   const { wrapper } = await view();
   expect(wrapper.get('[role="alert"]').text()).toContain('boom');
   expect(wrapper.findAll('.destination')).toHaveLength(4);
+  expect(wrapper.findAll('.stats .tile .unavailable')).toHaveLength(4);
+});
+it('shows a count the server withheld as unavailable, not zero', async () => {
+  client.summary.mockResolvedValue({ accounts: 24, unverified: null, disabled: 0, open_invites: null, roles: 2 });
+  const { wrapper } = await view();
+  expect(wrapper.findAll('.stats .tile').map(t => t.text())).toEqual(['Accounts24', 'UnverifiedUnavailable', 'Disabled0', 'Open invitesUnavailable']);
 });
 it('offers only overview and roles to a role viewer and hides unrelated counts', async () => {
   useAuthStore().account!.permissions = ['roles.view'];
   const { wrapper } = await view();
-  expect(wrapper.findAll('nav[aria-label="Admin sections"] a').map(a => a.attributes('aria-label'))).toEqual(['Roles & permissions']);
+  expect(wrapper.findAll('nav[aria-label="Admin sections"] a').map(a => a.attributes('aria-label'))).toEqual(['Overview', 'Roles & permissions']);
   expect(wrapper.findAll('.destination')).toHaveLength(1);
   expect(wrapper.find('.stats').exists()).toBe(false);
   expect(wrapper.find('.page-head .primary').exists()).toBe(false);
@@ -75,7 +82,7 @@ it('keeps overview destinations in sync with available sidebar pages', async () 
   useAuthStore().account!.permissions = ['accounts.view', 'roles.view', 'invites.manage', 'settings.manage'];
   const { wrapper } = await view();
   const links = wrapper.findAll('.destination').map(a => a.attributes('href'));
-  expect(links).toEqual(wrapper.findAll('nav[aria-label="Admin sections"] a').map(a => a.attributes('href')));
+  expect(links).toEqual(wrapper.findAll('nav[aria-label="Admin sections"] a').map(a => a.attributes('href')).filter(href => href !== '/overview'));
   expect(links).toContain('/admin/invites');
   expect(links).toContain('/admin/settings');
   expect(wrapper.findAll('.destination p').every(p => p.text().length > 0)).toBe(true);

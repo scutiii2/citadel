@@ -3,6 +3,7 @@ import PageLayout from "../components/PageLayout.vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AdminSearch from "../components/admin/AdminSearch.vue";
+import StatusFilters from "../components/admin/StatusFilters.vue";
 import RecordDrawer from "../components/admin/RecordDrawer.vue";
 import {
   agentsAdminClient,
@@ -16,7 +17,7 @@ import { capabilitiesAdminClient } from "../api/CapabilitiesAdminClient";
 import type { CapabilityInfo } from "../api/CommandsClient";
 import AgentAdminCard from "../components/admin/AgentAdminCard.vue";
 import AgentForm from "../components/admin/AgentForm.vue";
-import SharedPromptsModal from "../components/admin/SharedPromptsModal.vue";
+import SharedPromptsDrawer from "../components/admin/SharedPromptsDrawer.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import { errorMessage } from "../utils/errors";
 
@@ -53,11 +54,11 @@ type Filter = Status | "all";
 const localFilter = ref<Filter>("all");
 const filter = computed(() => route.query.status === "offline" ? "offline" : localFilter.value);
 const filters = [
-  { id: "all", label: "All agents" },
-  { id: "running", label: "Running" },
-  { id: "offline", label: "Offline" },
-  { id: "disabled", label: "Disabled" },
-  { id: "unknown", label: "Unknown" },
+  { id: "all", label: "All agents", tone: "accent" },
+  { id: "running", label: "Running", tone: "success" },
+  { id: "offline", label: "Offline", tone: "warning" },
+  { id: "disabled", label: "Disabled", tone: "muted" },
+  { id: "unknown", label: "Unknown", tone: "muted" },
 ] as const;
 
 function setFilter(next: Filter) {
@@ -81,6 +82,7 @@ const totals = computed(() => {
   for (const row of roster.value) counts[row.status]++;
   return counts;
 });
+const filterOptions = computed(() => filters.map((item) => ({ ...item, count: totals.value[item.id] })));
 const visible = computed(() => {
   const query = search.value.trim().toLowerCase();
   return roster.value.filter(({ agent, status, role }) =>
@@ -253,11 +255,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 
 <template>
   <PageLayout class="agents-admin" title="Agents" wide>
-    <div class="filters" aria-label="Filter agents">
-      <button v-for="item in filters" :key="item.id" type="button" class="chip" :aria-pressed="filter === item.id" @click="setFilter(item.id)">
-        {{ item.label }} <span>{{ totals[item.id] }}</span>
-      </button>
-    </div>
+    <StatusFilters :model-value="filter" label="Filter agents" :options="filterOptions" @update:model-value="setFilter" />
     <p v-if="notice" class="notice" role="status" data-test="notice">{{ notice }}</p>
     <section class="admin-panel-card" aria-labelledby="agent-roster">
       <header class="admin-panel-head">
@@ -305,7 +303,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
         <button type="submit" form="agent-editor" class="primary" :disabled="saving" :aria-busy="saving">{{ creating ? 'Create agent' : 'Save changes' }}</button>
       </template>
     </RecordDrawer>
-    <SharedPromptsModal :open="promptsOpen" @close="promptsOpen = false" @saved="settleSoon('Shared prompts saved. Every agent restarts in a few seconds.')" />
+    <SharedPromptsDrawer :open="promptsOpen" @close="promptsOpen = false" @saved="settleSoon('Shared prompts saved. Every agent restarts in a few seconds.')" />
     <ConfirmModal
       :open="resetting !== null"
       title="Reset agent"
@@ -331,10 +329,6 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 </template>
 
 <style scoped>
-.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-.filters .chip { min-height: 36px; padding: 3px 12px; border: 1px solid var(--border); border-radius: var(--radius-full); color: var(--muted); background: transparent; font: inherit; font-size: 0.84rem; cursor: pointer; }
-.filters span { margin-inline-start: 4px; }
-.filters [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .agent-state { display: inline-flex; gap: 5px; align-items: center; padding: 3px 8px; border-radius: var(--radius-full); color: var(--muted); background: var(--surface); font-size: 0.8rem; }
 .agent-state.running { color: var(--text); background: color-mix(in srgb, var(--success) 12%, var(--bg)); }
 .agent-state.offline { color: var(--text); background: color-mix(in srgb, var(--warning) 14%, var(--bg)); }
@@ -342,6 +336,5 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 .agent-state.offline span { color: var(--warning); }
 .count { border-top: 1px solid var(--border); font-size: 0.8rem; }
 .notice { color: var(--muted); }
-@media (max-width: 767px) { .filters .chip { min-height: 44px; } }
 @media (max-width: 400px) { .admin-record-badge { display: none; } }
 </style>
