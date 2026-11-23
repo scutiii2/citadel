@@ -3,7 +3,7 @@
   "role": "architect",
   "kind": "code",
   "port": 29621,
-  "enabled": false,
+  "enabled": true,
   "entry": false,
   "plan_tool": false,
   "llm": {
