@@ -300,7 +300,15 @@ onMounted(load);
               </select>
             </div>
             <div v-if="chat && type === 'openai'">
-              <label :for="`${kind}-api`">API style</label>
+              <div class="label-row">
+                <label :for="`${kind}-api`">API style</label>
+                <PanelHelp title="API style">
+                  <p>Which OpenAI endpoint the gateway calls.</p>
+                  <p><strong>chat</strong> uses Chat Completions (<code>/v1/chat/completions</code>). Every OpenAI-compatible server supports it: Ollama, Groq, OpenRouter, vLLM, LiteLLM and so on.</p>
+                  <p><strong>responses</strong> uses the newer Responses API (<code>/v1/responses</code>). Only OpenAI itself and Azure OpenAI support it reliably.</p>
+                  <p>Choose responses for GPT and Azure OpenAI, chat for any other server or custom base address. A preset sets the right one.</p>
+                </PanelHelp>
+              </div>
               <select :id="`${kind}-api`" v-model="api" :disabled="saving">
                 <option v-for="name in list?.form?.choices.api ?? []" :key="name" :value="name">{{ name }}</option>
               </select>
@@ -366,6 +374,7 @@ onMounted(load);
 .pair > div { display: grid; gap: 6px; min-width: 0; }
 .tier { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .tier h4 { margin: 0; font-size: 0.9rem; }
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .hint { margin: 0; font-size: 0.85rem; color: var(--muted); }
 .req { color: var(--accent); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

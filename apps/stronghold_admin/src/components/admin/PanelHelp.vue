@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 
-/** The helper icon in a panel header: one click shows a popover saying what the panel is for.
+/** The helper icon in a panel header: one click shows a popover (in the top layer, so it also shows over a drawer) saying what the panel is for.
  * The popover is teleported to <body> because panel cards clip their paint. It closes on Escape
  * (focus returns to the icon), on a press outside, and on scroll or resize. */
 const props = defineProps<{ title: string }>();
@@ -42,7 +42,7 @@ watch(open, async (now) => {
   document[act]("keydown", key, true);
   window[act]("resize", position);
   window[act]("scroll", onScroll, true);
-  if (now) { position(); await nextTick(); position(); }
+  if (now) { position(); await nextTick(); pop.value?.showPopover?.(); position(); }
 });
 
 onBeforeUnmount(() => {
@@ -58,7 +58,7 @@ onBeforeUnmount(() => {
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M9.5 9.2a2.6 2.6 0 1 1 3.7 2.4c-.8.4-1.2 1-1.2 1.9M12 17h.01" /></svg>
   </button>
   <Teleport to="body">
-    <div v-if="open" :id="id" ref="pop" class="panel-help" role="note" :aria-label="`About ${props.title}`" :style="place">
+    <div v-if="open" :id="id" ref="pop" popover="manual" class="panel-help" role="note" :aria-label="`About ${props.title}`" :style="place">
       <h3>{{ props.title }}</h3>
       <div class="panel-help-body"><slot /></div>
     </div>
@@ -66,7 +66,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
-.panel-help { position: fixed; z-index: 60; width: min(300px, calc(100vw - 16px)); max-height: 70dvh; overflow: auto; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); overflow-wrap: anywhere; }
+.panel-help { position: fixed; inset: auto; margin: 0; z-index: 60; width: min(300px, calc(100vw - 16px)); max-height: 70dvh; overflow: auto; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); overflow-wrap: anywhere; }
 .panel-help h3 { margin: 0 0 6px; font-size: 0.9rem; }
 .panel-help-body { display: grid; gap: 8px; color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
 .panel-help-body p { margin: 0; }
