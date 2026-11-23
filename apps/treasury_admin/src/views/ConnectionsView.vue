@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { treasuryAdminClient, type CacheDefaults, type ConnectionRow, type ConnectionSpec, type ConnectionsView } from "../api/TreasuryAdminClient";
 import AdminSearch from "../components/admin/AdminSearch.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import DraftActions from "../components/admin/DraftActions.vue";
 import PanelHelp from "../components/admin/PanelHelp.vue";
 import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import FormTabs from "../components/admin/FormTabs.vue";
 import StatusFilters from "../components/admin/StatusFilters.vue";
 import PageLayout from "../components/PageLayout.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
@@ -32,6 +33,8 @@ const formEl = ref<HTMLFormElement>();
 const selectedName = ref<string | null>(null);
 const creating = ref(false);
 const editing = ref(false);
+const tab = ref("general");
+const tabItems = [{ id: "general", label: "General" }, { id: "options", label: "Options" }];
 const formError = ref("");
 
 const name = ref("");
@@ -222,6 +225,7 @@ function where(row: ConnectionRow): string {
   if (s.type === "postgres") return s.dsn ?? "";
   return [s.project, s.database].filter(Boolean).join(" / ") || "default project";
 }
+watch([editing, creating], () => { tab.value = "general"; });
 </script>
 
 <template>
@@ -283,6 +287,8 @@ function where(row: ConnectionRow): string {
     <RecordDrawer ref="drawer" :open="drawerOpen" :title="creating ? 'Add connection' : selected ? `Connection ${selected.name}` : 'Connection'" :editable="!creating" :editing="editing" :busy="busy"
       :save-label="creating ? 'Add connection' : 'Save connection'" :fallback-focus="() => searchField?.focus()" @edit="editing = true" @discard="discard" @save="save" @close="close">
       <form v-if="editing" ref="formEl" class="admin-editor" data-test="form" @submit.prevent="requestSave">
+        <FormTabs v-model="tab" :items="tabItems" prefix="conn" label="Connection settings" />
+        <section v-show="tab === 'general'" id="conn-panel-general" class="pane" role="tabpanel" aria-labelledby="conn-tab-general">
         <div class="field">
           <label for="c-name">Name</label>
           <input id="c-name" v-model="name" required :disabled="!creating || busy" autocomplete="off" spellcheck="false" data-test="name" />
@@ -317,12 +323,15 @@ function where(row: ConnectionRow): string {
           <div class="field"><label for="c-cred">Credentials file (optional)</label><input id="c-cred" v-model="credentials" :disabled="busy" autocomplete="off" data-test="credentials" /></div>
           <div class="field"><label for="c-db">Database (optional)</label><input id="c-db" v-model="database" :disabled="busy" autocomplete="off" data-test="database" /></div>
         </template>
+        </section>
+        <section v-show="tab === 'options'" id="conn-panel-options" class="pane" role="tabpanel" aria-labelledby="conn-tab-options">
         <ToggleSwitch :checked="rawSql" :disabled="busy" data-test="raw-sql" @change="rawSql = ($event.target as HTMLInputElement).checked">Allow raw SQL on this connection</ToggleSwitch>
         <div class="field">
           <label for="c-cache">Cache for this connection (seconds, optional)</label>
           <input id="c-cache" v-model="cacheTtl" type="number" min="0" :disabled="busy" data-test="cache" />
           <p class="help">Empty uses the cache defaults. 0 turns the cache off for this connection.</p>
         </div>
+        </section>
       </form>
       <div v-else-if="selected" class="admin-details">
         <dl>
@@ -369,6 +378,7 @@ function where(row: ConnectionRow): string {
 </template>
 
 <style scoped>
+.pane { display: grid; gap: 12px; min-width: 0; }
 .error { margin: 0 0 12px; color: var(--danger); }
 .cache { margin-top: 14px; }
 .cache-body { display: grid; gap: 12px; padding: 14px; max-width: 560px; }
