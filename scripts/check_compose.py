@@ -1,4 +1,4 @@
-"""Check gateway isolation and start-order hints without reading deployment env files.
+"""Check provider-key isolation and start-order hints without reading deployment env files.
 
     python scripts/check_compose.py            checks the real compose files (needs Docker)
     python scripts/check_compose.py --self-test  checks check() on hand-made data (no Docker)
@@ -16,14 +16,11 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-GATEWAYS = ("conversation-gateway", "decision-gateway")
-ADMIN_OVERLAY = ["docker-compose.yml", "docker-compose.gateway-admin.yml"]
 
 
 def load(files: list[str]) -> dict:
-    """`docker compose config` as JSON, with throwaway admin passwords in the child environment only."""
-    env = {**os.environ, "COMPOSE_DISABLE_ENV_FILE": "1",
-           "CONVERSATION_GATEWAY_ADMIN_PASSWORD": "x", "DECISION_GATEWAY_ADMIN_PASSWORD": "x"}
+    """`docker compose config` as JSON, without reading any deployment env file."""
+    env = {**os.environ, "COMPOSE_DISABLE_ENV_FILE": "1"}
     env.pop("COMPOSE_ENV_FILES", None)
     args = ["docker", "compose", *[arg for file in files for arg in ("-f", file)],
             "config", "--no-env-resolution", "--format", "json"]
@@ -41,45 +38,27 @@ def _loads_gateways_env(service: dict) -> bool:
     return False
 
 
-def check(default: dict, overlay: dict) -> list[str]:
+def check(default: dict) -> list[str]:
     """One message per broken invariant; an empty list means all hold."""
     out: list[str] = []
     services = default.get("services", {})
-    for name in GATEWAYS:
-        if name not in services:
-            out.append(f"services: {name} is missing")
-    if out:
-        return out
-    for name in GATEWAYS:
-        svc = services.get(name)
-        if svc is None:
-            continue
-        if svc.get("ports"):
-            out.append(f"ports: {name} publishes a port in the default config")
-        if set(svc.get("networks") or {}) != {"llm_net"}:
-            out.append(f"networks: {name} must be on llm_net only")
-        if not _loads_gateways_env(svc):
-            out.append(f"env_file: {name} does not load .env.gateways")
-        if any(v.get("target") == "/citadel.env" or "docker.sock" in str(v.get("source", "")) for v in svc.get("volumes") or []):
-            out.append(f"volumes: {name} mounts /citadel.env or the Docker socket")
-        ports = overlay.get("services", {}).get(name, {}).get("ports") or []
-        if len(ports) != 1 or ports[0].get("host_ip") != "127.0.0.1":
-            out.append(f"ports: {name} must publish exactly one port on 127.0.0.1 in the admin overlay")
     on_llm = {n for n, s in services.items() if "llm_net" in (s.get("networks") or {})}
-    if on_llm != {"legion", *GATEWAYS}:
-        out.append("networks: llm_net must be attached to exactly legion and the two gateways, found " + ", ".join(sorted(on_llm)))
+    if on_llm != {"legion"}:
+        out.append("networks: llm_net must be attached to exactly legion, found " + ", ".join(sorted(on_llm)))
     legion = services.get("legion", {})
     if not {"core", "llm_net"} <= set(legion.get("networks") or {}):
         out.append("networks: legion must be on core and llm_net")
+    if not _loads_gateways_env(legion):
+        out.append("env_file: legion does not load .env.gateways")
     for name, svc in services.items():
-        if name in GATEWAYS:
+        if name == "legion":
             continue
         if _loads_gateways_env(svc):
             out.append(f"env_file: {name} loads .env.gateways")
         if ".env.gateways" in json.dumps([svc.get("volumes"), svc.get("environment")]):
             out.append(f"volumes: {name} mentions .env.gateways in volumes or environment")
-    if set(legion.get("depends_on") or {}) & set(GATEWAYS):
-        out.append("depends_on: legion must not depend on a gateway")
+    if "ports" in legion and legion["ports"]:
+        out.append("ports: legion must not publish a port")
     for name, service in services.items():
         depends = service.get("depends_on")
         if isinstance(depends, dict) and any(
@@ -108,41 +87,34 @@ def check_source(text: str) -> list[str]:
     return problems
 
 
-def _good() -> tuple[dict, dict]:
-    gw = lambda: {"networks": {"llm_net": None}, "env_file": [{"path": ".env.gateways"}], "volumes": []}
-    default = {"services": {"conversation-gateway": gw(), "decision-gateway": gw(),
-                            "legion": {"networks": {"core": None, "llm_net": None}, "depends_on": {"armory": {}}},
-                            "armory": {"networks": {"core": None}, "environment": {"A": "1"}}},
-               "networks": {"core": {}, "llm_net": {"name": "citadel_llm"}}}
-    port = {"ports": [{"host_ip": "127.0.0.1", "target": 29407, "published": "29407"}]}
-    return default, {"services": {n: copy.deepcopy(port) for n in GATEWAYS}}
+def _good() -> dict:
+    return {"services": {"legion": {"networks": {"core": None, "llm_net": None}, "env_file": [{"path": ".env.gateways"}],
+                                    "depends_on": {"armory": {}}},
+                         "armory": {"networks": {"core": None}, "environment": {"A": "1"}}},
+            "networks": {"core": {}, "llm_net": {"name": "citadel_llm"}}}
 
 
 def self_test() -> None:
-    default, overlay = _good()
-    assert check(default, overlay) == []
+    default = _good()
+    assert check(default) == []
     assert check_source("services: {armory: {ports: !override [], depends_on: [treasury]}}") == []
     assert check_source("services: {armory: {depends_on: {legion: {condition: service_healthy}}}}")
 
-    def broken(mutate, word, over=False):
-        d, o = copy.deepcopy(default), copy.deepcopy(overlay)
-        mutate(o if over else d)
-        found = check(d, o)
+    def broken(mutate, word):
+        d = copy.deepcopy(default)
+        mutate(d)
+        found = check(d)
         assert len(found) == 1 and word in found[0], (word, found)
 
-    broken(lambda d: d["services"].pop("decision-gateway"), "missing")
-    broken(lambda d: d["services"]["conversation-gateway"].update(ports=["29407:29407"]), "ports")
-    broken(lambda d: d["services"]["decision-gateway"]["networks"].update(core=None), "networks")
     broken(lambda d: d["services"]["armory"]["networks"].update(llm_net=None), "llm_net must be attached")
     broken(lambda d: d["services"]["legion"]["networks"].pop("core"), "legion must be on")
+    broken(lambda d: d["services"]["legion"].pop("env_file"), "does not load")
+    broken(lambda d: d["services"]["legion"].update(ports=["1:1"]), "ports")
     broken(lambda d: d["services"]["armory"].update(env_file=[{"path": ".env.gateways"}]), "env_file")
-    broken(lambda d: d["services"]["conversation-gateway"]["volumes"].append({"target": "/citadel.env"}), "volumes")
     broken(lambda d: d["services"]["armory"].update(volumes=[{"source": "/x/.env.gateways"}]), "volumes")
-    broken(lambda d: d["services"]["legion"]["depends_on"].update({"decision-gateway": {}}), "depends_on")
     broken(lambda d: d["services"]["armory"].update(depends_on={"legion": {"condition": "service_healthy"}}),
            "start-order hint")
     broken(lambda d: d["networks"]["llm_net"].update(internal=True), "internal")
-    broken(lambda o: o["services"]["decision-gateway"]["ports"][0].update(host_ip="0.0.0.0"), "admin overlay", over=True)
     print("self-test passed")
 
 
@@ -151,7 +123,7 @@ if __name__ == "__main__":
         self_test()
         sys.exit(0)
     try:
-        problems = check(load(["docker-compose.yml"]), load(ADMIN_OVERLAY))
+        problems = check(load(["docker-compose.yml"]))
         for filename in sorted(ROOT.glob("docker-compose*.yml")):
             problems.extend(check_source(filename.read_text(encoding="utf-8")))
     except FileNotFoundError:

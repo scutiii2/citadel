@@ -94,17 +94,30 @@ export interface SharedPrompts {
   overridden: string[];
 }
 
-/** Where Legion reaches ConversationGateway or DecisionGateway. The token is write-only: only its presence comes back. */
-export interface GatewaySettingsView {
-  url: string;
-  has_token: boolean;
-  description?: string;
+export type ModelGatewayKind = "conversation" | "decision";
+/** One input of a gateway's form: [field, label, secret, required]. */
+export type ModelGatewayField = [string, string, boolean, boolean];
+
+/** A saved gateway as the page sees it: its settings without secrets (`has_<secret>` says whether one is saved). */
+export interface ModelGatewayRow {
+  id: string;
+  provider?: string;
+  kind?: string;
+  auth?: string;
+  label?: string;
+  model?: string;
+  timeout_s?: number;
+  reachable?: boolean;
+  [field: string]: unknown;
 }
 
-export interface GatewaySettingsPatch {
-  url?: string;
-  description?: string;
-  token?: string;
+export interface ModelGatewayList {
+  gateways: ModelGatewayRow[];
+  presets: Record<string, Record<string, unknown>>;
+  /** Chat gateway: provider -> auth variant -> fields. */
+  form?: { providers: Record<string, Record<string, ModelGatewayField[]>>; choices: { api: string[] } };
+  /** Decision gateway: kind -> fields. */
+  kinds?: Record<string, ModelGatewayField[]>;
 }
 
 /** One MCP server Legion connects to. A header value is write-only: reads carry `has_value` instead. */
@@ -150,15 +163,14 @@ export const agentsAdminClient = {
   /** Drops this machine's edits so the tracked default file applies again. */
   reset: (id: string) => apiRequest<AgentFile>("POST", `/api/admin/agents/${encodeURIComponent(id)}/reset`),
   remove: (id: string) => apiRequest<void>("DELETE", `/api/admin/agents/${encodeURIComponent(id)}`),
-  gatewaySettings: () => apiRequest<GatewaySettingsView>("GET", "/api/admin/gateway-settings"),
-  /** Only the fields given are changed; an empty token removes the saved one. */
-  setGatewaySettings: (changes: GatewaySettingsPatch) =>
-    apiRequest<GatewaySettingsView>("PUT", "/api/admin/gateway-settings", changes),
-  decisionGatewaySettings: () => apiRequest<GatewaySettingsView>("GET", "/api/admin/decision-gateway-settings"),
-  setDecisionGatewaySettings: (changes: GatewaySettingsPatch) =>
-    apiRequest<GatewaySettingsView>("PUT", "/api/admin/decision-gateway-settings", changes),
-  testGateway: () => apiRequest<ConnectionTestResult>("POST", "/api/admin/gateway-settings/test"),
-  testDecisionGateway: () => apiRequest<ConnectionTestResult>("POST", "/api/admin/decision-gateway-settings/test"),
+  modelGateways: (kind: ModelGatewayKind) => apiRequest<ModelGatewayList>("GET", `/api/admin/model-gateways/${kind}`),
+  /** Secrets are write-only: leave a secret out to keep the saved one. */
+  saveModelGateway: (kind: ModelGatewayKind, id: string, entry: Record<string, unknown>) =>
+    apiRequest<ModelGatewayRow>("PUT", `/api/admin/model-gateways/${kind}/${encodeURIComponent(id)}`, entry),
+  removeModelGateway: (kind: ModelGatewayKind, id: string) =>
+    apiRequest<void>("DELETE", `/api/admin/model-gateways/${kind}/${encodeURIComponent(id)}`),
+  testModelGateway: (kind: ModelGatewayKind, id: string) =>
+    apiRequest<ConnectionTestResult>("POST", `/api/admin/model-gateways/${kind}/${encodeURIComponent(id)}/test`),
   /** Does each saved address of this MCP server answer? Reads only. */
   testServer: (id: string) => apiRequest<ConnectionTestResult>("POST", `/api/admin/servers/${encodeURIComponent(id)}/test`),
   servers: async () => (await apiRequest<{ servers: Record<string, McpServer> }>("GET", "/api/admin/servers")).servers,

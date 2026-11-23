@@ -16,8 +16,6 @@ KNOWN = {
     "stronghold": "http://stronghold:29650",
     "legion": "http://legion:29603",
     "armory": "http://armory:29600",
-    "conversation-gateway": "http://conversation-gateway:29407",
-    "decision-gateway": "http://decision-gateway:29406",
 }
 _LOG = logging.getLogger(__name__)
 _TIMEOUT = 2.0

@@ -1,4 +1,4 @@
-"""Legion's HTTP client for ConversationGateway (AI/ModelProviders/ConversationGateway).
+"""Legion's client for its built-in ConversationGateway (src/gateway/conversation).
 
 The gateway holds provider keys and speaks to Anthropic, OpenAI and the CNV
 model services. Legion sends one chat request per model round and runs the
@@ -9,23 +9,16 @@ turns into a cooldown and a switch.
 
 from __future__ import annotations
 
-import json
 import time
 from typing import Any, AsyncIterator
 
-import httpx
+from src import gateway
+from src.gateway.conversation.contract import Limits, parse_request
+from src.gateway.conversation.errors import GatewayError
+from src.gateway.conversation.settings import Settings
 
-from src.runtime import gateway_settings, internal_auth
-from src.runtime.gateway_settings import GatewaySettings
-
-# No read timeout: a round streams for as long as the model writes. The turn
-# guard and Stop end a slow turn; connect, write and pool still fail fast.
-_STREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
-_SYNC_TIMEOUT = httpx.Timeout(300.0, connect=10.0)
-_IDS_TIMEOUT = httpx.Timeout(5.0)
 _IDS_TTL_SECONDS = 60.0
-# Tests replace this to answer saved_gateway_ids() without a network.
-_SYNC_TRANSPORT: httpx.BaseTransport | None = None
+_LIMITS = Limits.from_settings(Settings())
 
 _ids: frozenset[str] | None = None
 _ids_until = 0.0
@@ -44,125 +37,50 @@ class GatewayCallError(Exception):
         self.retry_after = retry_after
 
 
-def _headers(settings: GatewaySettings) -> dict[str, str]:
-    headers = {"X-Requester-Username": internal_auth.current_requester().username or "legion"}
-    if settings.token:
-        headers["X-Internal-Token"] = settings.token
-    return headers
-
-
-def _unavailable(message: str) -> GatewayCallError:
-    return GatewayCallError(502, "gateway_unavailable", message, kind="unavailable")
-
-
-def _seconds(value: str | None) -> float | None:
-    try:
-        return float(value) if value else None
-    except ValueError:
-        return None
-
-
-def _error(status: int, payload: Any, retry_after: str | None = None) -> GatewayCallError:
-    """The gateway's `{error: {code, message, kind?}}` as an exception."""
-    detail = payload.get("error") if isinstance(payload, dict) else None
-    if not isinstance(detail, dict):
-        detail = {}
-    return GatewayCallError(
-        status,
-        str(detail.get("code") or "gateway_error"),
-        str(detail.get("message") or f"ConversationGateway answered {status}"),
-        kind=detail.get("kind") if isinstance(detail.get("kind"), str) else None,
-        retry_after=_seconds(retry_after),
-    )
-
-
-def _json(text: str) -> Any:
-    try:
-        return json.loads(text)
-    except ValueError:
-        return None
+def _call_error(error: GatewayError) -> GatewayCallError:
+    return GatewayCallError(error.status, error.code, error.message, kind=error.kind,
+                            retry_after=float(error.retry_after) if error.retry_after else None)
 
 
 class ConversationGatewayClient:
     """One chat round per call. Holds no state between calls."""
 
-    def __init__(self, transport: httpx.AsyncBaseTransport | None = None,
-                 sync_transport: httpx.BaseTransport | None = None) -> None:
-        self._transport = transport
-        self._sync_transport = sync_transport
-
     async def stream(self, body: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
-        """The round's NDJSON events in order; the last one is `done`."""
+        """The round's events in order; the last one is `done`."""
         finished = False
-        settings = await gateway_settings.current()
         try:
-            # shortcut: one HTTP client per round, safe across Legion's event loops;
-            # pool per loop if connection setup shows up in round latency.
-            async with httpx.AsyncClient(transport=self._transport, timeout=_STREAM_TIMEOUT) as client:
-                async with client.stream(
-                    "POST", f"{settings.url}/api/chat", json={**body, "stream": True}, headers=_headers(settings),
-                ) as response:
-                    if response.status_code != 200:
-                        await response.aread()
-                        raise _error(response.status_code, _json(response.text), response.headers.get("retry-after"))
-                    async for line in response.aiter_lines():
-                        if not line.strip():
-                            continue
-                        event = _json(line)
-                        if not isinstance(event, dict):
-                            raise _unavailable("ConversationGateway sent an unreadable stream line.")
-                        if event.get("type") == "error":
-                            raise _error(int(event.get("status") or 502), event)
-                        finished = event.get("type") == "done"
-                        yield event
-        except httpx.HTTPError as error:
-            raise _unavailable(f"ConversationGateway is unreachable: {type(error).__name__}") from error
+            request = parse_request({**body, "stream": True}, _LIMITS)
+            async for event in gateway.stream(gateway.chat_service().stream(request)):
+                finished = event.get("type") == "done"
+                yield event
+        except GatewayError as error:
+            raise _call_error(error) from error
         if not finished:
-            raise _unavailable("ConversationGateway ended the stream early.")
+            raise GatewayCallError(502, "gateway_unavailable", "ConversationGateway ended the stream early.",
+                                   kind="unavailable")
 
     def chat_sync(self, body: dict[str, Any]) -> dict[str, Any]:
         """One non-streamed reply, for the sync `interpret` path."""
-        settings = gateway_settings.current_sync()
         try:
-            with httpx.Client(transport=self._sync_transport, timeout=_SYNC_TIMEOUT) as client:
-                response = client.post(f"{settings.url}/api/chat", json={**body, "stream": False},
-                                       headers=_headers(settings))
-        except httpx.HTTPError as error:
-            raise _unavailable(f"ConversationGateway is unreachable: {type(error).__name__}") from error
-        payload = _json(response.text)
-        if response.status_code != 200:
-            raise _error(response.status_code, payload, response.headers.get("retry-after"))
-        if not isinstance(payload, dict):
-            raise _unavailable("ConversationGateway sent an unreadable reply.")
-        return payload
+            request = parse_request({**body, "stream": False}, _LIMITS)
+            return gateway.call_sync(gateway.chat_service().chat(request), 300)
+        except GatewayError as error:
+            raise _call_error(error) from error
 
 
-def saved_gateway_ids() -> frozenset[str] | None:
-    """Ids of the gateways saved in ConversationGateway, cached for a minute.
-    None (and not cached) when the service cannot be asked: the caller then
-    assumes a gateway exists and lets the call itself report the outage, so
-    Legion can start before the gateway does."""
+def saved_gateway_ids() -> frozenset[str]:
+    """Ids of the gateways saved on the Model gateways page, cached for a minute."""
     global _ids, _ids_until
     if _ids is not None and time.monotonic() < _ids_until:
         return _ids
-    settings = gateway_settings.current_sync()
-    try:
-        with httpx.Client(transport=_SYNC_TRANSPORT, timeout=_IDS_TIMEOUT) as client:
-            response = client.get(f"{settings.url}/api/gateways", headers=_headers(settings))
-        entries = response.json().get("gateways") if response.status_code == 200 else None
-    except (httpx.HTTPError, ValueError, AttributeError):
-        entries = None
-    if not isinstance(entries, list):
-        return None
-    _ids = frozenset(str(entry["id"]) for entry in entries if isinstance(entry, dict) and entry.get("id"))
+    _ids = frozenset(gateway.chat_store().all())
     _ids_until = time.monotonic() + _IDS_TTL_SECONDS
     return _ids
 
 
-def is_saved(gateway: str) -> bool:
-    """Whether ConversationGateway has `gateway` saved; True when it cannot be asked."""
-    ids = saved_gateway_ids()
-    return ids is None or gateway in ids
+def is_saved(gateway_id: str) -> bool:
+    """Whether a gateway named `gateway_id` is saved."""
+    return gateway_id in saved_gateway_ids()
 
 
 def reset_cache() -> None:

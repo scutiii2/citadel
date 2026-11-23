@@ -25,18 +25,4 @@ async def check_routes(tmp_path):
     assert response.status_code == 200
     report = response.json()
     assert report["service"] == "legion" and report["status"] == "up"
-    assert {item["name"] for item in report["dependencies"]} == {"treasury", "armory", "stronghold", "conversation-gateway", "decision-gateway"}
-
-
-def test_gateway_probe_keeps_a_saved_address_when_treasury_is_slow(monkeypatch):
-    from src.ready import _gateway_address
-    from src.runtime import gateway_settings
-
-    async def stalls():
-        await asyncio.sleep(4)
-        return gateway_settings.GatewaySettings("http://stale:9000", "")
-
-    monkeypatch.setattr(gateway_settings, "current", lambda which: stalls())
-    monkeypatch.setitem(gateway_settings._cache, gateway_settings.KEY,
-                        (gateway_settings.GatewaySettings("http://saved:9000", ""), 0))
-    assert asyncio.run(_gateway_address(gateway_settings.KEY)) == "http://saved:9000"
+    assert {item["name"] for item in report["dependencies"]} == {"treasury", "armory", "stronghold"}

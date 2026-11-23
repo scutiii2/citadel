@@ -1,7 +1,7 @@
 """One catalog shared by Legion startup and MCP connections."""
 
 from src.citadel_auth import ServiceCatalog, data_dir
-from src.runtime import config_files, gateway_settings, internal_auth
+from src.runtime import config_files, treasury_bootstrap, internal_auth
 
-catalog = ServiceCatalog(internal_auth.keyring, gateway_settings.treasury_address(),
+catalog = ServiceCatalog(internal_auth.keyring, treasury_bootstrap.treasury_address(),
                          cache_path=data_dir(config_files.CONFIGS_DIR.parent) / "catalog_cache.json")

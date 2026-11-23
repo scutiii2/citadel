@@ -60,14 +60,3 @@ def test_a_manual_registration_during_a_probe_wins(tmp_path):
     assert "armory" in result["found"]
     assert "armory" not in result["registered"]
     assert service_catalog.effective(db)["armory"] == "http://manual:9000"
-
-
-def test_a_reachable_gateway_uses_the_outside_catalog(tmp_path):
-    from src import outside_catalog
-
-    db = tmp_path / "catalog.db"
-    result = asyncio.run(run_discovery(db, {"conversation-gateway"}))
-    assert result["registered"] == ["conversation-gateway"]
-    groups = outside_catalog.view(db)["groups"]
-    assert len(groups) == 1
-    assert groups[0]["origins"][0]["origin"] == discovery.KNOWN["conversation-gateway"]

@@ -81,11 +81,7 @@ def _resolve() -> tuple[str, Any]:
     # Import only the selected provider: a local Laya agent must not depend on
     # a cloud gateway, persona configuration or cloud SDK initialization.
     module = importlib.import_module(module_name)
-    if not module.has_api_key():
-        raise AgentConfigError(
-            f"AI_AGENT_PROVIDER is {provider_id!r} but its API key is not configured in {_SECRETS_PATH}"
-            " (an anthropic or openai gateway must be saved in ConversationGateway under the same id)"
-        )
+    # No saved gateway is no startup error: Legion starts first and gateways are added on the Model gateways page.
     spec = agent_spec.current()
     for index, choice in enumerate(spec.llm.fallback_gateways):
         where = f"{spec.source or spec.id}: llm.fallback_gateways[{index}].gateway"

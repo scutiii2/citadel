@@ -1,7 +1,6 @@
-"""Reachability checks for the Connections page: one gateway or one MCP server, changing nothing.
+"""Reachability check for the Connections page: one MCP server, changing nothing.
 
-Each check asks the address for its health route (gateways) or any answer (MCP servers) and
-reports `{ok, message, origins?}`. A token is only sent to the address it belongs to, and
+The check asks each address for any answer and reports `{ok, message, origins?}`. A token is only sent to the address it belongs to, and
 never appears in a result.
 """
 
@@ -12,7 +11,6 @@ from typing import Any
 import httpx
 
 from src.runtime import outside_origins
-from src.runtime.gateway_settings import GatewaySettings
 
 _TIMEOUT = httpx.Timeout(5.0, connect=3.0)
 # Tests replace this to answer without a network.
@@ -28,25 +26,6 @@ async def _get(address: str, headers: dict[str, str]) -> httpx.Response | str:
         return "No answer within 5 seconds."
     except httpx.HTTPError:
         return "Could not connect to this address."
-
-
-async def probe_gateway(settings: GatewaySettings) -> dict[str, Any]:
-    """Health route of a ConversationGateway or DecisionGateway; `ready` is true once a gateway is saved there."""
-    headers = {"X-Internal-Token": settings.token} if settings.token else {}
-    answer = await _get(settings.url + "/health", headers)
-    if isinstance(answer, str):
-        return {"ok": False, "message": answer}
-    if answer.status_code in (401, 403):
-        return {"ok": False, "message": "The token was refused."}
-    if answer.status_code != 200:
-        return {"ok": False, "message": f"The gateway answered {answer.status_code}."}
-    try:
-        ready = answer.json().get("ready") is True
-    except (ValueError, AttributeError):
-        return {"ok": False, "message": "This address is not a gateway."}
-    if not ready:
-        return {"ok": False, "message": "The gateway answers, but no gateway is saved in it yet."}
-    return {"ok": True, "message": "The gateway answers and is ready."}
 
 
 async def probe_server(entry: dict[str, Any]) -> dict[str, Any]:

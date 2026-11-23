@@ -86,17 +86,16 @@ def test_laya_resolves_without_cloud_keys_or_cloud_provider_imports(monkeypatch)
     assert imports == ["src.providers.decision.provider"]
 
 
-def test_provider_without_api_key_fails_loudly(monkeypatch):
+def test_provider_without_a_saved_gateway_still_starts(monkeypatch):
     _clear_env(monkeypatch)
     monkeypatch.setenv("AI_AGENT_PROVIDER", "anthropic")
 
     from src.agents import agent_config
     from src.providers import gateway_client
 
-    # An anthropic gateway's key lives in ConversationGateway: "no key" means "not saved there".
+    # Gateways are added on the Model gateways page after Legion is up, so none saved is not a startup error.
     monkeypatch.setattr(gateway_client, "is_saved", lambda gateway: False)
-    with pytest.raises(agent_config.AgentConfigError, match="its API key is not configured"):
-        agent_config._resolve()
+    agent_config._resolve()
 
 
 def test_valid_anthropic_config_resolves(monkeypatch):

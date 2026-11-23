@@ -5,16 +5,16 @@ from pathlib import Path
 import httpx
 import pytest
 
-from src.runtime import config_files, gateway_settings
+from src.runtime import config_files, treasury_bootstrap
 
 
 def test_bootstrap_reads_config_and_environment(tmp_path, monkeypatch):
     monkeypatch.setattr(config_files, "CONFIGS_DIR", tmp_path)
     (tmp_path / "config_app.json").write_text('{"treasury_url": "http://file:29602"}')
     monkeypatch.delenv("TREASURY_URL", raising=False)
-    assert gateway_settings.treasury_address() == "http://file:29602"
+    assert treasury_bootstrap.treasury_address() == "http://file:29602"
     monkeypatch.setenv("TREASURY_URL", "http://env:29602/")
-    assert gateway_settings.treasury_address() == "http://env:29602"
+    assert treasury_bootstrap.treasury_address() == "http://env:29602"
 
 
 @pytest.mark.parametrize("entry", [True, False])

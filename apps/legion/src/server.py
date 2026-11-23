@@ -19,12 +19,13 @@ import sys
 from uuid import uuid4
 from pathlib import Path
 from src import ready
+from src.gateway import routes as model_gateway_routes
 from src.providers import gateway_client
 from contextlib import asynccontextmanager, suppress
 from src.citadel_auth import settings_store, advertised_url
 from src.citadel_auth.treasury import register_instance
 from src.runtime.service_catalog import catalog
-from src.runtime import config_files, connection_probe, gateway_settings, outside_origins, tuning_overrides
+from src.runtime import config_files, connection_probe, outside_origins, treasury_bootstrap, tuning_overrides
 from src.tools.mcp_client import config as mcp_config
 from typing import Any
 from urllib.parse import urlsplit
@@ -455,59 +456,7 @@ def _tuning_overlay() -> Path:
     return tuning_overrides.PATH
 
 
-@mcp.custom_route("/agents/gateway-settings", methods=["GET"])
-async def gateway_settings_get(_request: Request) -> JSONResponse:
-    """ConversationGateway address, description, and token presence. The token itself is never returned."""
-    return JSONResponse(gateway_settings.view(await gateway_settings.current()))
-
-
-@mcp.custom_route("/agents/gateway-settings", methods=["PUT"])
-async def gateway_settings_put(request: Request) -> JSONResponse:
-    """Body: {"url"?, "description"?, "token"?}; omitted values stay saved. Empty description or token clears it.
-    Saved in Treasury; other agent processes pick the edit up within half a minute."""
-    changes = await _json_object(request)
-    if changes is None:
-        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
-    try:
-        saved = await gateway_settings.save(changes)
-    except gateway_settings.GatewaySettingsError as error:
-        return JSONResponse({"error": str(error)}, status_code=400)
-    gateway_client.reset_cache()
-    return JSONResponse(gateway_settings.view(saved))
-
-
-@mcp.custom_route("/agents/decision-gateway-settings", methods=["GET"])
-async def decision_gateway_settings_get(_request: Request) -> JSONResponse:
-    """Where DecisionGateway is and whether a token is set. The token itself is never returned."""
-    return JSONResponse(gateway_settings.view(await gateway_settings.current(gateway_settings.DECISION_KEY)))
-
-
-@mcp.custom_route("/agents/decision-gateway-settings", methods=["PUT"])
-async def decision_gateway_settings_put(request: Request) -> JSONResponse:
-    """Same body and rules as /agents/gateway-settings, for DecisionGateway."""
-    from src.providers.decision import gateway_client as decision_gateway
-
-    changes = await _json_object(request)
-    if changes is None:
-        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
-    try:
-        saved = await gateway_settings.save(changes, gateway_settings.DECISION_KEY)
-    except gateway_settings.GatewaySettingsError as error:
-        return JSONResponse({"error": str(error)}, status_code=400)
-    decision_gateway.reset_cache()
-    return JSONResponse(gateway_settings.view(saved))
-
-
-@mcp.custom_route("/agents/gateway-settings/test", methods=["POST"])
-async def gateway_settings_test(_request: Request) -> JSONResponse:
-    """Is ConversationGateway reachable with the saved address and token? Changes nothing."""
-    return JSONResponse(await connection_probe.probe_gateway(await gateway_settings.current()))
-
-
-@mcp.custom_route("/agents/decision-gateway-settings/test", methods=["POST"])
-async def decision_gateway_settings_test(_request: Request) -> JSONResponse:
-    """Same check for DecisionGateway."""
-    return JSONResponse(await connection_probe.probe_gateway(await gateway_settings.current(gateway_settings.DECISION_KEY)))
+model_gateway_routes.register(mcp)
 
 
 @mcp.custom_route("/agents/servers/{server_id}/test", methods=["POST"])
@@ -732,7 +681,7 @@ if SPEC.internal_role == "router":
 async def _register_with_treasury():
     """Register in the serving loop and release both background tasks on shutdown."""
     registration = asyncio.create_task(register_instance(
-        internal_auth.keyring, gateway_settings.treasury_address(), gateway_settings.INSTANCE, [gateway_settings.CONNECTION]))
+        internal_auth.keyring, treasury_bootstrap.treasury_address(), treasury_bootstrap.INSTANCE, [treasury_bootstrap.CONNECTION]))
     parts = urlsplit(_AGENT_URL)
     origin = f"{parts.scheme}://{parts.netloc}"
     catalog.start("legion" if SPEC.entry else None,

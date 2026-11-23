@@ -35,9 +35,9 @@ def test_fallback_readiness_respects_selected_strategy(monkeypatch, strategy, fa
     assert summary["fallback_available"] is fallback_available
 
 
-@pytest.mark.parametrize("listed", [{"laya": False}, {"jev": True}, None])
+@pytest.mark.parametrize("listed", [{"laya": False}, {"jev": True}, {}])
 def test_an_unreachable_or_missing_laya_service_publishes_degraded_state(monkeypatch, listed):
-    """Down, not saved, or DecisionGateway itself not answering: never reported as loaded."""
+    """Down, not saved, or the gateway listing empty: never reported as loaded."""
     spec = replace(agent_spec.current(), role="router", decision=RouterPolicy())
     monkeypatch.setattr(agent_spec, "current", lambda: spec)
     _listing(monkeypatch, listed)

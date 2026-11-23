@@ -20,16 +20,13 @@ The internal Router chooses specialists and model tiers through that arrangement
 ## Setup
 
 1. Copy `.env.example` to `.env`.
-   - **Anthropic-protocol agents** (`llm.provider: "anthropic"`) call their models through
-     ConversationGateway (`AI/ModelProviders/ConversationGateway`, port 29407, reached inside Docker as `http://conversation-gateway:29407`). Their keys are saved
-     there, not here: on its `/admin/gateways.html` page save a gateway with the same id as the file in
-     `gateways/anthropic/` (`claude`, `openrouter`, ...) and create an access token for Legion. Then
-     set the gateway's address and that token on the Legion admin app's **Connections** page. Legion
-     keeps them in Treasury (instance `legion`, collection `legion_settings`), so Legion must know where Treasury is:
-     `treasury_url` in `configs/config_app.json` (`TREASURY_URL` overrides it). Every agent process picks an
-     gateway edit up within half a minute. The token is write-only. No environment variable names a gateway: until a
-     value is saved the default address is used, and no token.
-   - **OpenAI-protocol agents** use the same service and the same token. Save a gateway with the
+   - **Anthropic-protocol agents** (`llm.provider: "anthropic"`) call their models through the chat gateway built into
+     Legion (`src/gateway/conversation`). Their keys are not in `.env`: on the Legion admin
+     app's **Connections** page, **Model gateways**, save a gateway with the same id as the
+     file in `gateways/anthropic/` (`claude`, `openrouter`, ...) and paste its key there (write-only). Entries live in Legion's
+     settings database (`.data/settings.db`, table `conversation_gateways`); an edit reaches every agent within a minute. Legion must still
+     know where Treasury is for its other settings: `treasury_url` in `configs/config_app.json` (`TREASURY_URL` overrides it).
+   - **OpenAI-protocol agents** use the same chat gateway. Save a gateway with the
      same id as the file in `gateways/openai/` (`gpt`, `groq`, `azure`, ...).
 
 2. Make sure `mcp_server` is running (`py -m src.run` in `apps/armory/`) -
@@ -61,11 +58,9 @@ Failover reads the gateway's error `kind` (`rate_limit`, `quota`, `auth`, `unava
 ### Laya service
 
 Laya is gateway `laya` of provider `decision`; Jev is gateway `jev`. Legion loads no model and holds
-no address or key for either: both are entries saved in DecisionGateway
-(`AI/ModelProviders/DecisionGateway`, port 29406, reached inside Docker as `http://decision-gateway:29406`) under those two ids. Set that service's address and
-Legion's token on the Legion admin app's **Connections** page (kept in Treasury, like
-ConversationGateway's). Laya's strategy and window, and Jev's model and key, are set on the
-gateway entry there.
+no address or key for either: both are entries of the decision gateway built into Legion
+(`src/gateway/decision`), saved on the Legion admin app's **Connections** page, **Model gateways**, under those two ids
+(`.data/settings.db`, table `decision_gateways`). Laya's address, strategy and window, and Jev's model and key, are set on the entry there.
 
 An unreachable service warns, allowing `both` to fall through to Jev per request.
 Agent strategies are `laya-only`, `jev-only` and `both`; see

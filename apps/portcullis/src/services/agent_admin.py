@@ -113,22 +113,6 @@ class AgentAdmin:
         providers = body.get("providers") if isinstance(body, dict) else None
         return providers if isinstance(providers, dict) else {}
 
-    async def gateway_settings(self, account: Account) -> dict[str, Any]:
-        """Where legion reaches ConversationGateway: {url, description, has_token}. The token is never returned."""
-        return await self._request("GET", "/agents/gateway-settings", account)
-
-    async def set_gateway_settings(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
-        """Save {"url"?, "description"?, "token"?} (legion keeps them in the database service); returns the new view."""
-        return await self._request("PUT", "/agents/gateway-settings", account, json=changes)
-
-    async def decision_gateway_settings(self, account: Account) -> dict[str, Any]:
-        """Where legion reaches DecisionGateway: {url, description, has_token}. The token is never returned."""
-        return await self._request("GET", "/agents/decision-gateway-settings", account)
-
-    async def set_decision_gateway_settings(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
-        """Save {"url"?, "description"?, "token"?} for DecisionGateway; returns the new view."""
-        return await self._request("PUT", "/agents/decision-gateway-settings", account, json=changes)
-
     async def servers(self, account: Account) -> dict[str, Any]:
         """The MCP servers legion connects to, `{id: entry}`. A header value is never returned."""
         body = await self._request("GET", "/agents/servers", account)
@@ -153,10 +137,22 @@ class AgentAdmin:
         """Legion's answer about an address: whether Treasury's outside catalog knows it, and its group."""
         return await self._request("POST", "/agents/servers/lookup", account, json={"address": address})
 
-    async def test_gateway(self, account: Account, decision: bool) -> dict[str, Any]:
-        """Does the saved ConversationGateway (or DecisionGateway) answer? {ok, message}; changes nothing."""
-        path = "/agents/decision-gateway-settings/test" if decision else "/agents/gateway-settings/test"
-        return await self._request("POST", path, account, timeout=15.0)
+    async def model_gateways(self, account: Account, kind: str) -> dict[str, Any]:
+        """The saved entries of the built-in gateway (`conversation` or `decision`) with the form and presets."""
+        return await self._request("GET", f"/agents/model-gateways/{kind}", account, timeout=30.0)
+
+    async def save_model_gateway(self, account: Account, kind: str, gateway_id: str, entry: dict[str, Any]) -> dict[str, Any]:
+        return await self._request("PUT", f"/agents/model-gateways/{kind}/{quote(gateway_id, safe='')}", account, json=entry)
+
+    async def delete_model_gateway(self, account: Account, kind: str, gateway_id: str) -> dict[str, Any]:
+        return await self._request("DELETE", f"/agents/model-gateways/{kind}/{quote(gateway_id, safe='')}", account)
+
+    async def test_model_gateway(self, account: Account, kind: str, gateway_id: str) -> dict[str, Any]:
+        """Does this saved entry answer? {ok, message}; changes nothing."""
+        return await self._request("POST", f"/agents/model-gateways/{kind}/{quote(gateway_id, safe='')}/test", account, timeout=30.0)
+
+    async def model_gateway_models(self, account: Account, gateway_id: str) -> dict[str, Any]:
+        return await self._request("GET", f"/agents/model-gateways/conversation/{quote(gateway_id, safe='')}/models", account, timeout=30.0)
 
     async def test_server(self, account: Account, server_id: str) -> dict[str, Any]:
         """Does each address of this MCP server answer? {ok, message, origins}; changes nothing."""

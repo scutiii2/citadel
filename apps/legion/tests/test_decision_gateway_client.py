@@ -1,16 +1,14 @@
-"""Legion's calls to DecisionGateway, and the two saved gateways it asks."""
+"""Legion's calls to the built-in DecisionGateway, and the two saved gateways it asks."""
 
 from __future__ import annotations
 
-import json
-
-import httpx
 import pytest
 
+from src import gateway
+from src.gateway.decision.errors import GatewayError
 from src.providers.decision import gateway_client as client
 from src.providers.decision.contract import DecisionError, DecisionRequest
 from src.providers.decision.gateways import saved
-from src.runtime import gateway_settings
 
 # conftest replaces the listing for every test; these tests check the real one.
 _saved_gateways = client.saved_gateways
@@ -20,59 +18,51 @@ ANSWER = {"q": {"type": "choice", "choice": "a", "answer_confidence": 0.95, "unc
 
 
 class FakeService:
-    def __init__(self, reply=None, status=200, listed=None, down=False):
-        self.reply = reply if reply is not None else {"gateway": "laya", "model": "m", "answers": ANSWER, "tokens": 5}
-        self.status, self.listed, self.down, self.requests = status, listed, down, []
+    def __init__(self):
+        self.reply = {"gateway": "laya", "model": "m", "answers": ANSWER, "tokens": 5}
+        self.error: GatewayError | None = None
+        self.listed: list[dict] = []
+        self.requests, self.listings = [], 0
 
-    def __call__(self, request: httpx.Request) -> httpx.Response:
+    async def decide(self, request):
         self.requests.append(request)
-        if self.down:
-            raise httpx.ConnectError("refused", request=request)
-        if request.url.path == "/api/gateways":
-            return httpx.Response(200, json={"gateways": self.listed or []})
-        return httpx.Response(self.status, json=self.reply)
+        if self.error:
+            raise self.error
+        return self.reply
 
-    def body(self, index=0):
-        return json.loads(self.requests[index].content)
+    async def gateways(self):
+        self.listings += 1
+        if self.error:
+            raise self.error
+        return self.listed
 
 
 @pytest.fixture
 def service(monkeypatch):
     fake = FakeService()
-    monkeypatch.setattr(client, "_TRANSPORT", httpx.MockTransport(fake))
+    monkeypatch.setattr(gateway, "decision_service", lambda: fake)
     monkeypatch.setattr(client, "saved_gateways", _saved_gateways)
-    monkeypatch.setattr(client, "_settings",
-                        lambda: gateway_settings.GatewaySettings("http://decisiongateway.test:29406", "dg_token"))
     client.reset_cache()
     yield fake
     client.reset_cache()
 
 
-def test_decide_sends_the_saved_gateway_id_token_and_minimum(service):
+def test_decide_sends_the_saved_gateway_id_and_minimum(service):
     result = saved.laya().ask(DecisionRequest("hi", QUESTION, min_confidence=0.8), timeout=2)
     sent = service.requests[0]
-    assert str(sent.url) == "http://decisiongateway.test:29406/api/decide"
-    assert sent.headers["x-internal-token"] == "dg_token"
-    assert service.body() == {"gateway": "laya", "text": "hi", "questions": QUESTION, "trace": True,
-                              "min_confidence": 0.8}
+    assert (sent.gateway, sent.text, sent.min_confidence, sent.trace) == ("laya", "hi", 0.8, True)
     assert (result.answers, result.tokens, result.model) == (ANSWER, 5, "m")
 
 
 def test_no_minimum_leaves_the_threshold_to_the_gateway(service):
     saved.jev().ask(DecisionRequest("hi", QUESTION))
-    assert "min_confidence" not in service.body() and service.body()["gateway"] == "jev"
+    assert service.requests[0].gateway == "jev" and service.requests[0].min_confidence is None
 
 
 def test_a_refusal_carries_the_gateway_message_only(service):
-    service.status, service.reply = 502, {"error": "upstream_unreachable", "message": "The gateway is unreachable."}
+    service.error = GatewayError(502, "upstream_unreachable", "The gateway is unreachable.")
     with pytest.raises(DecisionError, match="The gateway is unreachable."):
         saved.jev().ask(DecisionRequest("hi", QUESTION))
-
-
-def test_an_unreachable_service_is_a_decision_error(service):
-    service.down = True
-    with pytest.raises(DecisionError, match="could not be reached"):
-        saved.laya().ask(DecisionRequest("hi", QUESTION))
 
 
 def test_an_unexpected_reply_is_a_decision_error(service):
@@ -99,37 +89,11 @@ def test_availability_follows_the_listing_and_is_cached(service):
     assert client.is_usable("spare") is True      # saved, not probed
     assert client.is_usable("missing") is False   # not saved
     assert client.is_reachable("laya") is True and client.is_reachable("spare") is False
-    assert len(service.requests) == 1
+    assert service.listings == 1
 
 
-def test_an_unreachable_service_counts_as_usable_but_never_as_reachable(service):
-    """The ask itself then reports the outage, so `both` can still fall through."""
-    service.down = True
-    assert saved.laya().available() is True
+def test_a_failing_listing_means_nothing_is_usable_and_is_not_cached(service):
+    service.error = GatewayError(500, "failed", "x")
+    assert saved.laya().available() is False
     assert client.is_reachable("laya") is False
-    assert len(service.requests) == 2  # an outage is not cached
-
-
-def test_routes_read_and_save_the_decision_gateway_settings(monkeypatch):
-    from starlette.testclient import TestClient
-
-    from src import server
-
-    stored: dict = {}
-
-    async def read(which=None):
-        return dict(stored)
-
-    async def save(changes, which):
-        assert which == gateway_settings.DECISION_KEY
-        stored.update(changes)
-        return gateway_settings.GatewaySettings(stored.get("url", ""), stored.get("token", ""))
-
-    monkeypatch.setattr(gateway_settings, "_read", read)
-    monkeypatch.setattr(gateway_settings, "save", save)
-    gateway_settings.reset_cache()
-    http = TestClient(server.mcp.streamable_http_app())
-    assert http.get("/agents/decision-gateway-settings").json() == {"url": "http://127.0.0.1:29406", "has_token": False}
-    response = http.put("/agents/decision-gateway-settings", json={"url": "http://dg.test:29406", "token": "dg_new"})
-    assert response.json() == {"url": "http://dg.test:29406", "has_token": True}
-    gateway_settings.reset_cache()
+    assert service.listings == 2

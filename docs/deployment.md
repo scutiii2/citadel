@@ -11,18 +11,16 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `treasury_admin` | admin web app: Treasury instances, connections and service addresses | 26505 |
 | `portcullis` | backend for both web apps | internal |
 | `armory` | MCP server (capabilities, including Server Manager) | internal 29600 |
-| `legion` | AI agent | internal |
+| `legion` | AI agent, with the chat and decision model gateways built in | internal |
 | `treasury` | database gateway | internal 29602 |
 | `stronghold` | product logic, called only by portcullis | internal 29650 |
-| `conversation-gateway` | chat-model gateway for Legion | internal 29407, `llm_net` only |
-| `decision-gateway` | decision-model gateway for Legion | internal 29406, `llm_net` only |
 
-Only the five admin web apps publish ports (on `127.0.0.1`; the ZimaOS overlay opens them to the LAN). The rest talk over the internal `core` network; the two gateways sit on a separate `llm_net` that only Legion also joins, and no gateway port is published. Laya is not in this stack: it runs
+Only the five admin web apps publish ports (on `127.0.0.1`; the ZimaOS overlay opens them to the LAN). The rest talk over the internal `core` network; Legion also joins `llm_net` to reach model providers. Laya is not in this stack: it runs
 from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:29220`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
-1. **The gateways are part of the stack.** ConversationGateway and DecisionGateway are built from `AI/ModelProviders/<name>` (set `CONVERSATION_GATEWAY_DIR` or `DECISION_GATEWAY_DIR` in the root `.env` if the folders live elsewhere, as on ZimaOS `/media/ZimaOS-HD/Apps/ModelProviders/`). Their two admin passwords go in the root `.env`; provider keys go in `.env.gateways` (copy `.env.gateways.example`, git-ignored, loaded by the two gateway containers only). Legion reaches them at `http://conversation-gateway:29407` and `http://decision-gateway:29406`. See "ConversationGateway" and "DecisionGateway" below for the first-start steps.
+1. **The model gateways are built into Legion.** There are no gateway containers, ports, tokens or admin passwords. Gateway entries, with their keys, are added on the Legion admin app, **Connections**, **Model gateways**, and kept in Legion's database. See "Model gateways" below.
 2. **Create the `.env` files.** Run `python tools/setup_env.py` (the `live` branch carries it too). It makes the root `.env`, an empty `.env.gateways` and each `apps/<app>/.env` from its `.env.example`, fills `BOOTSTRAP_ADMIN_PASSWORD` and the two gateway admin passwords with random values, and never overwrites a file that exists or prints a secret. Open the files to read the passwords. The root `.env` is required: every service bind-mounts it.
    Service identity keys are made on first start; no shared token or auth setting is needed. Each service writes only its own public trust folder and private `identity_*` volume; peers mount that public folder read-only. Backing up private identity volumes is optional: a lost key is remade and peers reload its new public key.
 3. Start the stack:
@@ -81,15 +79,14 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    git clone -b live <your-repo-url> /media/ZimaOS-HD/Apps/Applications/Citadel
    ```
 
-   Put `ConversationGateway` and `DecisionGateway` in `/media/ZimaOS-HD/Apps/ModelProviders/` and they are built by the same `docker compose up -d --build` (set `CONVERSATION_GATEWAY_DIR` and `DECISION_GATEWAY_DIR` in the root `.env` to those folders; see "ConversationGateway" and "DecisionGateway" below).
    Already cloned `main`? Switch in place; the containers keep running:
    `git fetch origin live && git switch -c live --track origin/live`.
 
 2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Run
    `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/ModelServices/DSC_Laya_Model`), in any order relative
-   to Citadel. It publishes port 29220 on the host and DecisionGateway reaches it at `http://host.docker.internal:29220`
+   to Citadel. It publishes port 29220 on the host and Legion's decision gateway reaches it at `http://host.docker.internal:29220`
    (Compose maps that name to the host with `extra_hosts`), so the two stacks share no Docker network. Set
-   that address on the `laya` gateway in DecisionGateway (see "DecisionGateway" below); if you change `LAYA_PORT` in `LayaModel`,
+   that address on the `laya` entry under Model gateways (see below); if you change `LAYA_PORT` in `LayaModel`,
    change the port there to match. A container cannot resolve the server's own hostname (`scutiserver1`). See
    `LayaModel/deployment.md` for replicas, port and weights.
 
@@ -110,7 +107,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | File | Keys to fill in |
    |---|---|
    | `apps/armory/.env` | Nothing is needed. Set the capability keys you use (Tavily, Firecrawl), `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) and the email account in Armory Admin (Settings and Email pages) |
-   | `apps/legion/.env` | `HF_TOKEN` if used. Model provider keys, the Laya token and the TypeSafe key are saved in ConversationGateway and DecisionGateway, not here |
+   | `apps/legion/.env` | `HF_TOKEN` if used. Model provider keys are saved with the gateway entries in Legion's database, not here |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if a connection saved in Treasury Admin references any |
    | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account) |
    | `apps/stronghold/.env` | Nothing is needed |
@@ -118,7 +115,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
    - Compose supplies `CITADEL_SERVICE`, `CITADEL_TRUST_DIR` and `CITADEL_IDENTITY_DIR`. Keep the trust and identity mounts; authentication is mandatory.
    - Compose sets `TREASURY_URL` and `CITADEL_ADVERTISE_URL` for each service; every service registers its own address with Treasury at start, and finds the others in Treasury's catalog (Treasury Admin, Services). A gateway entry that points at a service
-     published on the host uses `http://host.docker.internal:<port>` (both gateway containers have that name, so a ConversationGateway entry can reach OmniRoute at `http://host.docker.internal:20128`). Do not use `localhost` or
+     published on the host uses `http://host.docker.internal:<port>` (Legion has that name, so a chat gateway entry can reach OmniRoute at `http://host.docker.internal:20128`). Do not use `localhost` or
      the server's hostname for another service.
    - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaModel`'s own `.env`, not here. Each
      replica loads its own copy of the models in RAM, so keep `LAYA_REPLICAS` low on a small box.
@@ -229,16 +226,18 @@ cookie when the request came through a `trusted_proxies` peer with that header. 
 
 The five admin apps refuse to be framed (`frame-ancestors 'none'`). To let ServiceHub show them in its frame, set `HUB_FRAME_ANCESTORS` in the root `.env` to the exact origins you open the hub with (space-separated, quoted), for example `HUB_FRAME_ANCESTORS="http://scutiserver1.local:29880 http://192.168.1.50:29880"`, then run `docker compose up -d` to recreate the admin containers. Only those pages may frame them. In ServiceHub register each admin with "Open directly" ticked (the proxy would break their absolute `/assets` and `/api` paths), URL `http://host.docker.internal:26501` (the hub probes it from its container) and Link address `http://scutiserver1.local:26501` (what your browser frames). Unset or empty keeps `'none'`.
 
-The two gateways have no host port by default. To show their admin pages (`/admin/`, `/admin/gateways.html`) in ServiceHub, start them with the hub overlay: `docker compose -f docker-compose.yml -f docker-compose.gateway-hub.yml up -d conversation-gateway decision-gateway` (stop the setup overlay first: same ports). It publishes `29407` (ConversationGateway) and `29406` (DecisionGateway) on the LAN, so anyone on the network can reach their admin pages and API, protected only by the admin password and the access tokens. They send no `frame-ancestors` header, so no framing setting is needed. In ServiceHub register each with "Open directly" ticked, URL `http://host.docker.internal:29407` (or `:29406`) and Link address `http://scutiserver1.local:29407` (or `:29406`). Legion keeps using `http://conversation-gateway:29407` and `http://decision-gateway:29406` on `llm_net`.
+## Model gateways
 
-## ConversationGateway
+Legion's agents call their models through two gateways that run inside Legion: a chat gateway (Anthropic, OpenAI-compatible and model-service providers) and a decision gateway (Laya, Jev, Ollama). They have no container, host port, access token or admin password, and they are not registered in ServiceHub.
 
-Legion's Anthropic-protocol and OpenAI-protocol agents call their models through ConversationGateway. It runs inside this stack, private to Legion.
+- **Keys and tokens**: paste them into the entry's key or token field on the page. They are saved in Legion's settings database (`.data/legion/settings.db`), write-only (the page shows only that one is saved), and no `.env` file is needed. Optionally a field can hold `env:NAME` to read a variable from `.env.gateways` instead.
+- **Entries**: open the Legion admin app (`http://<host>:26500`), **Connections**, **Model gateways**. Add a gateway under *Chat models* or *Decision models*, start from a preset if one fits, then press its Test icon. Entries need no restart; agents pick them up within a minute.
+- **Decision entries**: save two with exactly these ids. `laya`: kind `scuti`, URL of the Laya model service (`http://host.docker.internal:29220`), its token if it has one, strategy `english-then-typed`, window `4096`. `jev`: kind `typesafe`, model `jev-latest`, API key `env:TYPESAFE_API_KEY`. Legion treats `laya` as the local gateway and `jev` as the cloud one.
+- **Reaching the host**: an entry for a service published on the host (OmniRoute, Ollama, vLLM, Laya) uses `host.docker.internal`, never `127.0.0.1`. Legion's container maps that name to the host.
+- **Data**: entries are rows in the `conversation_gateways` and `decision_gateways` tables of `.data/legion/settings.db`. Entries of the older gateway containers are not imported: add them again on the page (the old `gateways.json` files list what they were). The old access tokens are no longer used.
+- **Standalone copies**: `AI/ModelProviders/ConversationGateway` and `DecisionGateway` stay as separate projects for other callers. Legion's copy is part of `apps/legion/src/gateway` and is not kept in sync.
+- `LAYA_SERVICE_URL`, `LAYA_TOKEN` and `TYPESAFE_API_KEY` in `apps/legion/.env` are not read.
 
-- **Source and start**: built from `AI/ModelProviders/ConversationGateway` (on ZimaOS `/media/ZimaOS-HD/Apps/ModelProviders/ConversationGateway`; set `CONVERSATION_GATEWAY_DIR` in the root `.env` for another folder) by the Citadel compose file, service `conversation-gateway`. It joins `llm_net` only and has no host port.
-- **First start**: (1) copy `.env.gateways.example` to `.env.gateways` and fill the provider keys you use; (2) start with the setup overlay, `docker compose -f docker-compose.yml -f docker-compose.gateway-admin.yml up -d --build`, after stopping any standalone ConversationGateway stack (same host port 29407); (3) open `http://127.0.0.1:29407/admin/`, sign in with `CONVERSATION_GATEWAY_ADMIN_PASSWORD` from the root `.env`, and create exactly one access token named `legion`; (4) on `/admin/gateways.html` save one gateway per file in `apps/legion/gateways/anthropic/` that your agents use, with the same id as the filename (`claude`, `openrouter`, ...), typing `env:ANTHROPIC_API_KEY` (or the variable name you set) into the key field; (5) in the Legion admin app (`http://<host>:26500`), **Connections**, save `http://conversation-gateway:29407` and that token; (6) restart without the overlay (`docker compose up -d`): the gateway has no host port again. They are stored in Treasury, not in a `.env` file. No restart is needed for later entry changes; agents pick the settings up within half a minute.
-- **Outside callers**: none. A project that needs ConversationGateway runs its own standalone copy (`AI/ModelProviders/ConversationGateway/docker-compose.yml`), which is unchanged.
-- Gateway entries and tokens live in `.data/conversationgateway`. To keep the entries and tokens of an older standalone copy, copy its `conversationgateway_data` volume into that folder by hand once; those tokens stay valid for the old callers, so delete them on the admin page. Provider keys stay in `.env.gateways`.
 
 ## Stronghold
 
@@ -282,17 +281,6 @@ Before using read aloud, dictation, audio attachments, or document attachments, 
 
 Armory's REST façade and dictation relay are gone (Plan 22). Its Connections page remains because extensions are still stored as connection records there. Citadel's speech, dictation, and attachment features use the new Stronghold configuration. Stronghold only streams Bard files whose origin it recorded, so clips created before cutover or through Bard's MCP tool return 404. Legion chooses MCP origins independently. Separate Scribe or Reader backing stores can make files uploaded to a REST backup unavailable to an agent using a different origin.
 
-## DecisionGateway
-
-Legion's decision agents and its automatic routing ask Laya and Jev through DecisionGateway. It runs inside this stack, private to Legion.
-
-- **Source and start**: built from `AI/ModelProviders/DecisionGateway` (on ZimaOS `/media/ZimaOS-HD/Apps/ModelProviders/DecisionGateway`; set `DECISION_GATEWAY_DIR` in the root `.env` for another folder) by the Citadel compose file, service `decision-gateway`. It joins `llm_net` only and has no host port.
-- **First start**: (1) copy `.env.gateways.example` to `.env.gateways` and fill the provider keys you use; (2) start with the setup overlay, `docker compose -f docker-compose.yml -f docker-compose.gateway-admin.yml up -d --build`, after stopping any standalone DecisionGateway stack (same host port 29406); (3) open `http://127.0.0.1:29406/admin/`, sign in with `DECISION_GATEWAY_ADMIN_PASSWORD` from the root `.env`, and create exactly one access token named `legion`; (4) save the entries described under Gateways below; (5) in the Legion admin app (`http://<host>:26500`), **Connections**, save `http://decision-gateway:29406` and that token; (6) restart without the overlay (`docker compose up -d`): the gateway has no host port again. They are stored in Treasury, not in a `.env` file. No restart is needed for later entry changes; agents pick the settings up within half a minute.
-- **Gateways**: on `/admin/gateways.html` save two entries with exactly these ids. `laya`: kind `scuti`, URL of the Laya model service (`http://host.docker.internal:29220`), its token if it has one (or `env:NAME`), and the strategy and window that used to be in `gateways/decision/laya.json` (`english-then-typed`, `4096`). `jev`: kind `typesafe`, model `jev-latest`, and the TypeSafe API key as `env:TYPESAFE_API_KEY`. Legion treats `laya` as the local gateway and `jev` as the cloud one.
-- **Outside callers**: none. A project that needs DecisionGateway runs its own standalone copy (`AI/ModelProviders/DecisionGateway/docker-compose.yml`), which is unchanged.
-- Gateway entries and tokens live in `.data/decisiongateway`. To keep the entries and tokens of an older standalone copy, copy its `decisiongateway_data` volume into that folder by hand once; those tokens stay valid for the old callers, so delete them on the admin page. Provider keys stay in `.env.gateways`.
-- `LAYA_SERVICE_URL`, `LAYA_TOKEN` and `TYPESAFE_API_KEY` in `apps/legion/.env` are no longer read.
-
 ## 3. Server Manager
 
 The Server Manager capability (chat id `server`) lists, starts, stops and restarts Docker containers and reads their
@@ -335,8 +323,8 @@ A service reports 'connection refused' to a peer: open Treasury Admin, Services;
 | legion cannot reach Laya | LayaModel is not running, or its published port is not 29220. Run `docker compose ps` in `LayaModel`, then `docker compose exec legion python -c "import urllib.request as u; print(u.urlopen('http://host.docker.internal:29220/health').status)"`. Expect 200. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
-| Legion: `ConversationGateway is unreachable` | Run `docker compose ps`. The address saved in Connections must be the hyphenated `http://conversation-gateway:29407` (DecisionGateway: `http://decision-gateway:29406`). The gateways have no host port by design, so they do not answer from the host. |
-| A gateway answers `401` to Legion | Legion's token is missing or was deleted on the gateway's admin page. Create a token named `legion` (setup overlay) and save it again in Connections. |
+| Legion: `no gateway is saved` or a gateway named in an agent is missing | Add it under Connections, Model gateways, with the same name the agent uses, and press Test. |
+| A model gateway Test says the key was refused | The key is wrong (or an `env:NAME` is not set in `.env.gateways`). Paste it again on the entry and test. |
 | A service fails and its `.env` (or the root `.env`) is a directory | Compose created it because the file was missing. Remove the directory, run `python tools/setup_env.py`, then start again. |
 | UI loads on the box but not on another device | Overlay not used. Check `COMPOSE_FILE` in the root `.env`, or add `-f docker-compose.zima.yml`. |
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
@@ -359,7 +347,7 @@ Other root variables, such as `CITADEL_DATA_DIR`, never reach a service's settin
 
 ## Security
 
-The gateways are reachable only from Legion's network (`llm_net`); no host port is published unless you add the setup overlay, which binds `127.0.0.1` only. Provider keys sit in `.env.gateways`, which only the two gateway containers load. The root `.env` is mounted into every service, which is why keys are not kept there. Run `uv run --project libs/citadel_auth python scripts/check_compose.py` from the Citadel root to check these rules.
+The model gateways run inside Legion and publish no port. Their keys are rows in Legion's database; the optional `.env.gateways` is loaded by Legion only. The root `.env` is mounted into every service, which is why keys are not kept there. Run `uv run --project libs/citadel_auth python scripts/check_compose.py` from the Citadel root to check these rules.
 
 ## Liveness, readiness, and tool failures
 

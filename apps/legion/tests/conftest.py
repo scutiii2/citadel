@@ -91,29 +91,4 @@ def _no_decision_gateway_listing(monkeypatch):
     """DecisionGateway cannot be asked which gateways it has; tests never call the service."""
     from src.providers.decision import gateway_client
 
-    monkeypatch.setattr(gateway_client, "saved_gateways", lambda: None)
-
-
-@pytest.fixture(autouse=True)
-def _no_treasury(monkeypatch):
-    """ConversationGateway's settings come from the environment; tests never call Treasury."""
-    from src.runtime import gateway_settings
-
-    async def no_record(which=None):
-        return {}
-
-    monkeypatch.setattr(gateway_settings, "_read", no_record)
-    monkeypatch.setattr(gateway_settings, "_read_sync", lambda which=None: {})
-    gateway_settings.reset_cache()
-    yield
-    gateway_settings.reset_cache()
-
-
-@pytest.fixture(autouse=True)
-def gateways_are_unreachable(monkeypatch):
-    """Tests never reach a real ConversationGateway or DecisionGateway: nothing listens on the discard port."""
-    from src.runtime import gateway_settings
-
-    unreachable = gateway_settings.GatewaySettings("http://127.0.0.1:9", "")
-    monkeypatch.setattr(gateway_settings, "_cache", {
-        gateway_settings.KEY: (unreachable, float("inf")), gateway_settings.DECISION_KEY: (unreachable, float("inf"))})
+    monkeypatch.setattr(gateway_client, "saved_gateways", lambda: {"laya": True, "jev": True})

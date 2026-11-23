@@ -155,69 +155,6 @@ def test_role_config_is_forwarded_and_retired_key_refusal_is_preserved(client, u
     assert "orchestrator is not a known field" in response.json()["detail"]
 
 
-def gateway_settings_agent(request: httpx.Request) -> httpx.Response:
-    if request.url.path != "/agents/gateway-settings":
-        return ai_agent(request)
-    if request.method == "GET":
-        return httpx.Response(200, json={"url": "http://conversationgateway:29407", "has_token": False})
-    body = json.loads(request.content)
-    if body.get("url") == "nope":
-        return httpx.Response(400, json={"error": "url must be an http(s) address"})
-    return httpx.Response(200, json={"url": body.get("url", "http://conversationgateway:29407"), "has_token": True})
-
-
-def test_gateway_settings_read_change_and_never_echo_the_token(client, upstream: FakeUpstream) -> None:
-    upstream.handler = gateway_settings_agent
-    as_admin(client)
-
-    assert client.get("/api/admin/gateway-settings").json() == {
-        "url": "http://conversationgateway:29407", "has_token": False}
-    changed = client.put("/api/admin/gateway-settings", json={"token": "cg_secret"})
-    assert (changed.status_code, changed.json()["has_token"]) == (200, True)
-    assert json.loads(upstream.requests[-1].content) == {"token": "cg_secret"}
-    assert "cg_secret" not in changed.text
-    refused = client.put("/api/admin/gateway-settings", json={"url": "nope"})
-    assert (refused.status_code, refused.json()["detail"]) == (400, "url must be an http(s) address")
-    assert client.put("/api/admin/gateway-settings", json={"password": "x"}).status_code == 422
-
-
-def test_gateway_settings_need_agents_manage(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
-    upstream.handler = gateway_settings_agent
-    assert client_factory().get("/api/admin/gateway-settings").status_code == 401
-    member = client_factory()
-    make_member(member, email)
-    login(member, "alice")
-    assert member.get("/api/admin/gateway-settings").status_code == 403
-    assert member.put("/api/admin/gateway-settings", json={"token": "x"}).status_code == 403
-    assert upstream.requests == []
-
-
-def test_decision_gateway_settings_use_their_own_legion_route(client, upstream: FakeUpstream) -> None:
-    def agent(request: httpx.Request) -> httpx.Response:
-        if request.url.path != "/agents/decision-gateway-settings":
-            return ai_agent(request)
-        return httpx.Response(200, json={"url": "http://decisiongateway:29406", "has_token": request.method == "PUT"})
-
-    upstream.handler = agent
-    as_admin(client)
-    assert client.get("/api/admin/decision-gateway-settings").json() == {
-        "url": "http://decisiongateway:29406", "has_token": False}
-    changed = client.put("/api/admin/decision-gateway-settings", json={"token": "dg_secret"})
-    assert (changed.status_code, changed.json()["has_token"]) == (200, True)
-    assert json.loads(upstream.requests[-1].content) == {"token": "dg_secret"}
-    assert "dg_secret" not in changed.text
-    assert client.put("/api/admin/decision-gateway-settings", json={"password": "x"}).status_code == 422
-
-
-def test_decision_gateway_settings_need_agents_manage(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
-    assert client_factory().get("/api/admin/decision-gateway-settings").status_code == 401
-    member = client_factory()
-    make_member(member, email)
-    login(member, "alice")
-    assert member.put("/api/admin/decision-gateway-settings", json={"token": "x"}).status_code == 403
-    assert upstream.requests == []
-
-
 def servers_agent(stored: dict):
     def handler(request: httpx.Request) -> httpx.Response:
         if not request.url.path.startswith("/agents/servers"):
@@ -352,37 +289,38 @@ def test_catalog_save_preserves_legions_treasury_outage_message(client, upstream
     assert response.json()["detail"] == message
 
 
-def test_gateway_settings_forward_partial_descriptions_to_the_matching_route(client, upstream: FakeUpstream) -> None:
-    seen = []
-
-    def gateway(request):
-        patch = json.loads(request.content)
-        seen.append((request.url.path, patch))
-        return httpx.Response(200, json={"url": "https://gateway.test", "description": patch["description"], "has_token": True})
-
-    upstream.handler = gateway
-    as_admin(client)
-    for route, description in (("gateway-settings", "Chat models"), ("decision-gateway-settings", "")):
-        response = client.put(f"/api/admin/{route}", json={"description": description, "token": None})
-        assert response.status_code == 200
-        assert response.json() == {"url": "https://gateway.test", "description": description, "has_token": True}
-        assert seen[-1] == (f"/agents/{route}", {"description": description})
-        assert client.put(f"/api/admin/{route}", json={"description": "x" * 501}).status_code == 422
-        invalid_token = "private-token-" * 100
-        refused = client.put(f"/api/admin/{route}", json={"token": invalid_token})
-        assert refused.status_code == 422
-        assert invalid_token not in refused.text
-    assert len(seen) == 2
-
-
 def test_connection_tests_reach_legion_and_need_agents_manage(client_factory, client, email: FakeEmailSender, upstream: FakeUpstream) -> None:
     upstream.handler = lambda request: (httpx.Response(200, json={"ok": True, "message": request.url.path})
                                         if request.url.path.endswith("/test") else ai_agent(request))
     as_admin(client)
-    assert client.post("/api/admin/gateway-settings/test", json={}).json()["message"] == "/agents/gateway-settings/test"
-    assert client.post("/api/admin/decision-gateway-settings/test", json={}).json()["message"] == "/agents/decision-gateway-settings/test"
+    assert client.post("/api/admin/model-gateways/decision/laya/test", json={}).json()["message"] == "/agents/model-gateways/decision/laya/test"
     assert client.post("/api/admin/servers/docs/test", json={}).json()["message"] == "/agents/servers/docs/test"
     member = client_factory()
     make_member(member, email)
     login(member, "alice")
-    assert member.post("/api/admin/gateway-settings/test", json={}).status_code == 403
+    assert member.post("/api/admin/model-gateways/conversation/claude/test", json={}).status_code == 403
+
+
+def test_model_gateways_pass_through_to_legion_and_need_agents_manage(client_factory, client, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    seen = []
+
+    def legion(request):
+        seen.append((request.method, request.url.path))
+        if request.url.path.startswith("/agents/model-gateways/"):
+            return httpx.Response(200, json={"gateways": []} if request.method == "GET" else {"ok": True})
+        return ai_agent(request)
+
+    upstream.handler = legion
+    as_admin(client)
+    assert client.get("/api/admin/model-gateways/conversation").json() == {"gateways": []}
+    assert client.put("/api/admin/model-gateways/decision/laya", json={"kind": "scuti"}).status_code == 200
+    assert client.delete("/api/admin/model-gateways/decision/laya").status_code == 200
+    assert client.get("/api/admin/model-gateways/conversation/claude/models").status_code == 200
+    assert client.get("/api/admin/model-gateways/other").status_code == 422
+    assert client.put("/api/admin/model-gateways/decision/Bad Id", json={}).status_code == 422
+    assert ("PUT", "/agents/model-gateways/decision/laya") in seen and ("DELETE", "/agents/model-gateways/decision/laya") in seen
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.get("/api/admin/model-gateways/conversation").status_code == 403
+    assert member.put("/api/admin/model-gateways/decision/laya", json={}).status_code == 403
