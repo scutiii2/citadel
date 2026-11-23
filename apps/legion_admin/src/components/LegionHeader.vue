@@ -2,14 +2,13 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { agentsAdminClient } from "../api/AgentsAdminClient";
-import { useTheme } from "../composables/useTheme";
+import ThemeSelect from "./ThemeSelect.vue";
 import { useAuthStore } from "../stores/auth";
 
 defineProps<{ title: string; expanded: boolean }>();
 defineEmits<{ toggle: [] }>();
 const auth = useAuthStore();
 const route = useRoute();
-const { theme, setTheme } = useTheme();
 const panel = ref<"notifications" | "help" | "profile">();
 const trigger = ref<HTMLElement>();
 const header = ref<HTMLElement>();
@@ -88,11 +87,7 @@ watch(() => route.fullPath, () => { panel.value = undefined; });
       </template>
       <template v-else>
         <strong>{{ auth.account?.username }}</strong>
-        <label>Theme
-          <select :value="theme" @change="setTheme(($event.target as HTMLSelectElement).value as typeof theme)">
-            <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
-          </select>
-        </label>
+        <ThemeSelect />
         <button type="button" class="chip" @click="auth.logout().catch(() => {})">Log out</button>
       </template>
     </section>
@@ -108,8 +103,6 @@ h1 { min-width: 0; padding-inline-start: 10px; border-inline-start: 1px solid va
 .indicator { position: absolute; inset: 5px 5px auto auto; width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--warning); }
 .header-popover { position: absolute; inset: calc(100% + 4px) 8px auto auto; display: grid; gap: 10px; width: min(265px, calc(100vw - 16px)); padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow-wrap: anywhere; }
 .header-popover p { margin: 0; color: var(--muted); }
-.header-popover label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.header-popover select { min-height: 36px; }
 @media (max-width: 767px) {
   .legion-header { padding-inline: 4px; gap: 4px; }
   h1 { padding-inline-start: 4px; }

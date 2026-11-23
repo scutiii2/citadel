@@ -28,6 +28,8 @@ it("toggles navigation and keeps theme and logout inside Profile", async () => {
   expect(wrapper.get("h1").text()).toBe("Agents");
   expect(wrapper.find("select").exists()).toBe(false);
   await wrapper.get('[aria-label="Profile"]').trigger("click");
+  expect(wrapper.get(".theme-field").text()).toContain("Theme");
+  expect(wrapper.find(".theme-select svg").exists()).toBe(true);
   await wrapper.get("select").setValue("dark");
   expect(useTheme().theme.value).toBe("dark");
   await wrapper.get(".header-popover button").trigger("click");

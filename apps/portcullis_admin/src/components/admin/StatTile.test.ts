@@ -15,6 +15,12 @@ describe("StatTile", () => {
     expect(mount(StatTile, { props: { label: "Disabled", value: 0 } }).text()).toContain("0");
   });
 
+  it("says Unavailable rather than zero when the server could not give the count", () => {
+    const wrapper = mount(StatTile, { props: { label: "Disabled", value: null, unavailable: true } });
+    expect(wrapper.text()).toContain("Unavailable");
+    expect(wrapper.text()).not.toContain("0");
+  });
+
   it("only flags a non-zero value as a warning", () => {
     const classes = (value: number) =>
       mount(StatTile, { props: { label: "Unverified", value, warn: true } }).get(".value").classes();

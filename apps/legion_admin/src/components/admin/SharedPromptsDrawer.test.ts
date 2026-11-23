@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentsAdminClient, type SharedPrompts } from "../../api/AgentsAdminClient";
-import SharedPromptsModal from "./SharedPromptsModal.vue";
+import SharedPromptsDrawer from "./SharedPromptsDrawer.vue";
 
 const DEFAULTS = {
   app_name: "Ember", app_description: "Support tool.", identity_template: "Your name is {app_name}: {role}.",
@@ -24,13 +24,15 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
+const restart = (w: ReturnType<typeof mount>) => w.findAllComponents({ name: "ConfirmModal" }).find((c) => c.props("title") === "Restart every agent?")!;
+
 async function opened() {
-  const wrapper = mount(SharedPromptsModal, { attachTo: document.body, props: { open: true } });
+  const wrapper = mount(SharedPromptsDrawer, { attachTo: document.body, props: { open: true } });
   await flushPromises();
   return wrapper;
 }
 
-describe("SharedPromptsModal", () => {
+describe("SharedPromptsDrawer", () => {
   it("shows every shared text and marks the ones that differ from the default", async () => {
     const wrapper = await opened();
     expect(wrapper.findAll("textarea")).toHaveLength(6);
@@ -54,7 +56,7 @@ describe("SharedPromptsModal", () => {
     await wrapper.find("[data-test=roster_intro]").setValue("Hand off:");
     await wrapper.find("[data-test=save-prompts]").trigger("click");
     expect(set).not.toHaveBeenCalled();
-    const confirm = wrapper.findComponent({ name: "ConfirmModal" });
+    const confirm = restart(wrapper);
     expect(confirm.props("message")).toContain("Every agent restarts");
     await confirm.vm.$emit("confirm");
     await flushPromises();
@@ -69,7 +71,7 @@ describe("SharedPromptsModal", () => {
     const wrapper = await opened();
     await wrapper.find("[data-test=identity_template]").setValue("Hi {nope}");
     await wrapper.find("[data-test=save-prompts]").trigger("click");
-    await wrapper.findComponent({ name: "ConfirmModal" }).vm.$emit("confirm");
+    await restart(wrapper).vm.$emit("confirm");
     await flushPromises();
 
     expect(wrapper.find("[data-test=prompts-error]").text()).toContain("identity_template");

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
 import AdminSearch from "../components/admin/AdminSearch.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
+import DraftActions from "../components/admin/DraftActions.vue";
+import { useDraftPanel } from "../composables/useDraftPanel";
 import SettingRow from "../components/SettingRow.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import PageLayout from "../components/PageLayout.vue";
@@ -86,10 +88,7 @@ function at(source: Record<string, unknown> | undefined, path: string): number |
 }
 
 const dirty = computed(() => Object.keys(draft.value).length > 0);
-watch(dirty, (value) => {
-  const active = document.activeElement as HTMLElement | null;
-  if (!value && active?.closest(".tuning-actions")) void nextTick(() => searchField.value?.focus());
-});
+const { discardOpen, keepFocus, answerDiscard: closeDiscard } = useDraftPanel(dirty, searchField);
 const isChanged = (path: string): boolean => path in (view.value?.overrides ?? {});
 /** What the field shows: the draft when edited, else the value the agents use now. */
 function shown(field: Field): number | boolean | string {
@@ -148,31 +147,24 @@ async function save(): Promise<void> {
     document.getElementById(invalid.path)?.focus();
     return;
   }
-  const saveHadFocus = !!document.activeElement?.closest(".tuning-actions");
   saving.value = true;
-  try {
-    view.value = await tuningClient.save(draft.value as TuningChanges);
-    cancel();
-    await nextTick();
-    if (saveHadFocus && document.activeElement === document.body) searchField.value?.focus();
-  } catch (error) {
-    saveError.value = errorMessage(error);
-  } finally {
-    saving.value = false;
-  }
+  await keepFocus(async () => {
+    try {
+      view.value = await tuningClient.save(draft.value as TuningChanges);
+      cancel();
+    } catch (error) {
+      saveError.value = errorMessage(error);
+    } finally {
+      saving.value = false;
+    }
+  });
 }
 
-const discardOpen = ref(false);
 let discardAnswer: ((value: boolean) => void) | null = null;
 function answerDiscard(discard: boolean): void {
-  if (discard) cancel();
-  if (!discardAnswer && discard) {
-    void nextTick(async () => {
-      await nextTick();
-      searchField.value?.focus();
-    });
-  }
-  discardOpen.value = false;
+  // A route-leave question holds the promise; answering it moves on, so focus stays out of the way.
+  if (discardAnswer) { if (discard) cancel(); discardOpen.value = false; }
+  else closeDiscard(discard, cancel);
   discardAnswer?.(discard);
   discardAnswer = null;
 }
@@ -196,13 +188,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
       <header class="admin-panel-head">
         <h2 id="tuning-title">Runtime settings</h2>
         <div class="admin-panel-tools tuning-tools">
-          <div class="tuning-actions" aria-label="Tuning changes" role="group">
-            <button v-if="dirty" type="button" class="small" data-test="cancel" :disabled="saving" @click="discardOpen = true">Cancel</button>
-            <button v-if="dirty" type="button" class="admin-icon save-icon" data-test="save" title="Save tuning changes" aria-label="Save tuning changes"
-              :disabled="saving" :aria-busy="saving" @click="save">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h13l4 4v14H3V3h1zm3 0v6h10V3M7 21v-8h10v8" /></svg>
-            </button>
-          </div>
+          <DraftActions :dirty="dirty" :saving="saving" label="tuning changes" @cancel="discardOpen = true" @save="save" />
           <AdminSearch ref="searchField" v-model="search" label="Search settings" />
         </div>
       </header>
@@ -238,12 +224,9 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
 input[type="number"], select { width: 10em; min-width: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; }
 .tuning-group { padding: 14px 16px; }
 .tuning-group + .tuning-group { border-top: 1px solid var(--border); }
-.tuning-tools { display: grid; grid-template-columns: 112px minmax(0, 240px); gap: 6px; }
+.tuning-tools { display: grid; grid-template-columns: 76px minmax(0, 240px); gap: 6px; }
 .tuning-tools :deep(.search) { min-width: 0; }
-.tuning-actions { display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
-.save-icon { color: var(--accent); }
 @media (max-width: 767px) {
-  .tuning-actions .small { min-height: 44px; }
-  .tuning-tools { width: min(100%, 358px); grid-template-columns: 112px minmax(0, 1fr); }
+  .tuning-tools { width: min(100%, 358px); grid-template-columns: 88px minmax(0, 1fr); }
 }
 </style>

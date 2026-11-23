@@ -12,7 +12,7 @@ async function logInAdmin(page: Page): Promise<void> {
   await page.getByLabel("Username").fill(ACCOUNT.username);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByRole("heading", { name: "Workspace overview", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Overview", level: 1 })).toBeVisible();
 }
 
 test("an administrator deletes an account from the Danger zone by typing its name", async ({ page }) => {
@@ -59,40 +59,49 @@ test("an administrator deletes an account from the Danger zone by typing its nam
   expect(api.unexpected).toEqual([]);
 });
 
-test("an administrator saves tool approval through the unsaved bar", async ({ page }) => {
+test("an administrator saves tool approval through the reserved icon slots", async ({ page }) => {
   const api = await installFakeApi(page);
   await logInAdmin(page);
   await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Workspace settings', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/settings/);
 
   const approval = page.getByRole("switch", { name: "Require approval for every tool" });
-  const bar = page.getByRole("group", { name: "Unsaved change" });
-  await expect(page.locator("section.card").filter({ has: page.getByRole("heading", { name: "Tool approval", exact: true }) }).getByText("Applies to all accounts", { exact: true })).toBeVisible();
-  await expect(bar).toHaveCount(0);
+  const actions = page.getByRole("group", { name: "tool approval changes" });
+  const cancel = actions.getByRole("button", { name: "Cancel tool approval changes" });
+  const save = actions.getByRole("button", { name: "Save tool approval changes" });
+  const panel = page.locator("section.admin-panel-card").filter({ has: page.getByRole("heading", { name: "Tool approval", exact: true }) });
+  await expect(panel.getByText("Applies to all accounts", { exact: true })).toBeVisible();
+  await expect(actions.getByRole("button")).toHaveCount(0);
 
-  // Flipping it is only a draft: the bar says who it reaches, and nothing is sent.
+  // Flipping it is only a draft: the panel says who it reaches, and nothing is sent.
   await flipSwitch(page, "Require approval for every tool");
-  await expect(bar).toContainText("Turning it on applies to every account");
+  await expect(panel.locator(".unsaved")).toContainText("Turning it on applies to every account");
   expect(api.settings.forceToolApproval).toBe(false);
 
-  // Cancel drops the draft.
-  await bar.getByRole("button", { name: "Cancel" }).click();
-  await expect(bar).toHaveCount(0);
+  // Cancel asks, and dismissing the question keeps the draft.
+  await cancel.click();
+  const discard = page.getByRole("dialog", { name: "Discard unsaved change?" });
+  await discard.getByRole("button", { name: "Cancel" }).click();
+  await expect(approval).toBeChecked();
+  await cancel.click();
+  await discard.getByRole("button", { name: "Discard change" }).click();
+  await expect(actions.getByRole("button")).toHaveCount(0);
   await expect(approval).not.toBeChecked();
+  await expect(panel.getByRole("searchbox", { name: "Search tool approval" })).toBeFocused();
   expect(api.settings.forceToolApproval).toBe(false);
 
   // Save sends it, and the setting then counts as modified.
   await flipSwitch(page, "Require approval for every tool");
-  await bar.getByRole("button", { name: "Save" }).click();
+  await save.click();
   await expect.poll(() => api.settings.forceToolApproval).toBe(true);
-  await expect(bar).toHaveCount(0);
+  await expect(actions.getByRole("button")).toHaveCount(0);
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
   // Back to default is a draft too, until it is saved.
   await page.getByRole("button", { name: "Back to default" }).click();
-  await expect(bar).toContainText("Turning it off applies to every account");
+  await expect(panel.locator(".unsaved")).toContainText("Turning it off applies to every account");
   expect(api.settings.forceToolApproval).toBe(true);
-  await bar.getByRole("button", { name: "Save" }).click();
+  await save.click();
   await expect.poll(() => api.settings.forceToolApproval).toBe(false);
 
   // The fake knew every request the page made.
@@ -104,19 +113,21 @@ test("deleting a role: one that accounts hold needs its name typed, an unused on
   await logInAdmin(page);
   await page.getByRole("link", { name: "Overview", exact: true }).click();
   await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Roles & permissions', exact: true }).click();
-  const roleButton = (name: string) => page.locator("button.role").filter({ hasText: name });
-  await expect(roleButton("Member")).toBeVisible();
+  const roleRow = (name: string) => page.locator("tbody .admin-row-button").filter({ hasText: name });
+  const closeDrawer = () => page.locator("dialog[open]").getByRole("button", { name: "Close", exact: true }).click();
+  await expect(roleRow("Member")).toBeVisible();
 
   // The protected Administrator role has no Danger zone.
-  await roleButton("Administrator").click();
+  await roleRow("Administrator").click();
   await expect(page.locator(".danger-zone")).toHaveCount(0);
+  await closeDrawer();
 
   // Member is held by an account: its name must be typed.
-  await roleButton("Member").click();
+  await roleRow("Member").click();
   const zone = page.locator(".danger-zone");
   await expect(zone).toContainText("Danger zone");
   await zone.getByRole("button", { name: "Delete role" }).click();
-  const dialog = page.getByRole("dialog", { name: "Delete role" });
+  const dialog = page.getByRole("dialog", { name: "Delete role", exact: true });
   await expect(dialog).toContainText("Delete role 'Member'? It is removed from 1 account.");
   const confirm = dialog.getByRole("button", { name: "Delete" });
   await expect(dialog.getByRole("textbox")).toBeFocused();
@@ -127,16 +138,16 @@ test("deleting a role: one that accounts hold needs its name typed, an unused on
   await expect(confirm).toBeEnabled();
   await confirm.click();
   await expect.poll(() => api.roles.has(2)).toBe(false);
-  await expect(roleButton("Member")).toHaveCount(0);
+  await expect(roleRow("Member")).toHaveCount(0);
 
   // Ops holds no account: no text to type, the button is ready at once.
-  await roleButton("Ops").click();
+  await roleRow("Ops").click();
   await page.locator(".danger-zone").getByRole("button", { name: "Delete role" }).click();
   await expect(dialog).toContainText("It is removed from 0 accounts.");
   await expect(dialog.getByRole("textbox")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Delete" }).click();
   await expect.poll(() => api.roles.has(3)).toBe(false);
-  await expect(roleButton("Ops")).toHaveCount(0);
+  await expect(roleRow("Ops")).toHaveCount(0);
 
   expect(api.unexpected).toEqual([]);
 });
@@ -152,7 +163,7 @@ test('overview shortcuts retain account filters across reload and legacy links o
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await page.goto('/admin?tab=roles&source=bookmark');
   await expect(page).toHaveURL(/\/admin\/roles\?source=bookmark/);
-  await expect(page.getByRole('heading', { name: 'Roles & permissions', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Roles & permissions', level: 1 })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Roles & permissions', exact: true })).toHaveAttribute('aria-current', 'page');
   expect(api.unexpected).toEqual([]);
 });
@@ -161,19 +172,19 @@ test('a role viewer sees only the permitted pages and cannot change permissions'
   const api = await installFakeApi(page, ['roles.view']);
   await logInAdmin(page);
   const nav = page.getByRole('navigation', { name: 'Admin sections' });
-  await expect(nav.getByRole('link')).toHaveCount(1);
+  await expect(nav.getByRole('link')).toHaveCount(2);
   await expect(page.locator('.stats')).toHaveCount(0);
   await nav.getByRole('link', { name: 'Roles & permissions', exact: true }).click();
-  await expect(page.getByRole('button', { name: '＋ New role', exact: true })).toHaveCount(0);
-  await page.locator('button.role').filter({ hasText: 'Member' }).click();
+  await expect(page.locator('[data-test="new-role"]')).toHaveCount(0);
+  await page.locator('tbody .admin-row-button').filter({ hasText: 'Member' }).click();
   for (const control of await page.getByRole('switch').all()) await expect(control).toBeDisabled();
   await page.goto('/admin/settings');
   await expect(page).toHaveURL(/\/overview$/);
-  await expect(page.getByRole('heading', { name: 'Workspace overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
   expect(api.unexpected).toEqual([]);
 });
 
-test('Invite member uses a focus-trapped drawer and confirms delivery', async ({ page }) => {
+test('Invite member opens a drawer, keeps ?create out of the address and confirms delivery', async ({ page }) => {
   const api = await installFakeApi(page);
   await logInAdmin(page);
   await page.getByRole('link', { name: 'Invite member', exact: true }).click();
@@ -197,9 +208,10 @@ test('admin pages fit desktop, tablet, and mobile in both themes', async ({ page
       await page.setViewportSize({ width, height: 812 });
       for (const route of ['/overview', '/admin/accounts', '/admin/roles', '/admin/invites', '/admin/settings']) {
         await page.goto(route);
-        await expect(page.getByRole('navigation', { name: 'Admin sections' })).toBeVisible();
-        await expect(page.locator('.admin-sidebar')).toHaveCount(0);
-        await expect(page.locator('.rail a[aria-current="page"]')).toHaveCount(1);
+        await expect(page.locator('header.portcullis-header h1')).toBeVisible();
+        await expect(page.locator('#portcullis-sidebar')).toHaveCount(1);
+        if (width >= 768) await expect(page.getByRole('navigation', { name: 'Admin sections' })).toBeVisible();
+        await expect(page.locator('#portcullis-sidebar a[aria-current="page"]')).toHaveCount(1);
         expect(await page.evaluate<string>('document.documentElement.style.colorScheme')).toBe(color);
         expect(await page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true);
       }
@@ -209,31 +221,32 @@ test('admin pages fit desktop, tablet, and mobile in both themes', async ({ page
 });
 
 
-test("role drafts save and revert with a bottom bar, and affected accounts open on demand", async ({ page }) => {
+test("role edits save through the drawer footer after confirmation, discard on Cancel, and affected accounts load on demand", async ({ page }) => {
   const api = await installFakeApi(page);
   await logInAdmin(page);
   await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Roles & permissions', exact: true }).click();
-  await page.locator('button.role').filter({ hasText: 'Member' }).click();
-  const bar = page.getByRole('group', { name: 'Unsaved role changes' });
+  await page.locator('tbody .admin-row-button').filter({ hasText: 'Member' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Role Member', exact: true });
+  await drawer.getByRole('button', { name: 'View affected accounts' }).click();
+  await expect(drawer.locator('.affected-accounts')).toContainText('maria');
+  await expect(drawer.locator('.affected-accounts')).not.toContainText('ada');
+
+  // Switches are read-only until Edit; Cancel asks before dropping the draft.
+  await expect(page.getByRole('switch', { name: 'chat.use', exact: true })).toBeDisabled();
+  await drawer.getByRole('button', { name: 'Edit', exact: true }).click();
   await flipSwitch(page, 'chat.use');
   expect(api.roles.get(2)!.permissions).toContain('chat.use');
-  await expect(bar).toBeVisible();
-  await bar.getByRole('button', { name: 'Revert' }).click();
-  await expect(bar).toHaveCount(0);
+  await drawer.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Discard changes?' }).getByRole('button', { name: 'Discard changes' }).click();
+  expect(api.roles.get(2)!.permissions).toContain('chat.use');
+  await drawer.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByRole('switch', { name: 'chat.use', exact: true })).toBeChecked();
+
   await flipSwitch(page, 'chat.use');
-  for (const width of [1280, 375]) {
-    await page.setViewportSize({ width, height: 800 });
-    const box = await bar.boundingBox();
-    expect(box!.y + box!.height).toBe(width < 768 ? 748 : 800);
-  }
-  await bar.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(bar).toHaveCount(0);
-  expect(api.roles.get(2)!.permissions).not.toContain('chat.use');
-  await page.getByRole('button', { name: 'View affected accounts' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Accounts with Member' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.affected-accounts')).toContainText('maria');
-  await expect(dialog.locator('.affected-accounts')).not.toContainText('ada');
+  await drawer.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Save changes?' }).getByRole('button', { name: 'Save changes' }).click();
+  await expect.poll(() => api.roles.get(2)!.permissions.includes('chat.use')).toBe(false);
+  await expect(drawer.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
   expect(api.unexpected).toEqual([]);
 });
 
@@ -241,7 +254,8 @@ test('permission switch appearance follows repeated pointer and keyboard changes
   const api = await installFakeApi(page);
   await logInAdmin(page);
   await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Roles & permissions', exact: true }).click();
-  await page.locator('button.role').filter({ hasText: 'Member' }).click();
+  await page.locator('tbody .admin-row-button').filter({ hasText: 'Member' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   const control = page.getByRole('switch', { name: 'chat.use', exact: true });
   await expect(control).toBeChecked();
   const on = await page.evaluate("getComputedStyle(document.querySelector('input[aria-label=\"chat.use\"] + .track')).backgroundColor");
@@ -253,7 +267,6 @@ test('permission switch appearance follows repeated pointer and keyboard changes
   await control.focus();
   await page.keyboard.press('Space');
   await expect(control).toBeChecked();
-  await expect(page.getByRole('group', { name: 'Unsaved role changes' })).toHaveCount(0);
   expect(api.roles.get(2)!.permissions).toContain('chat.use');
   expect(api.unexpected).toEqual([]);
 });
@@ -267,34 +280,27 @@ test('an invites administrator can use the overview and sees only available dest
   expect(api.unexpected).toEqual([]);
 });
 
-test('role list and permission options scroll independently', async ({ page }) => {
+test('the drawer expands, scrolls its own body and keeps the footer reachable', async ({ page }) => {
   const api = await installFakeApi(page);
-  for (let id = 4; id <= 35; id++) api.roles.set(id, { ...api.roles.get(2)!, id, name: `Role ${id}`, account_count: 0 });
   await logInAdmin(page);
   await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Roles & permissions', exact: true }).click();
-  await expect(page.locator('.role-options')).toBeVisible();
+  await page.locator('tbody .admin-row-button').filter({ hasText: 'Member' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Role Member', exact: true });
+  await drawer.getByRole('button', { name: 'Edit', exact: true }).click();
   for (const width of [1280, 768, 375]) {
-    await page.setViewportSize({ width, height: 800 });
-    const overflow = await page.evaluate(`(() => {
-      const list = document.querySelector('.roles-panel .list');
-      const options = document.querySelector('.role-options');
-      return { list: getComputedStyle(list).overflowY, options: getComputedStyle(options).overflowY, outer: getComputedStyle(document.querySelector('.roles-page')).overflowY, scrollable: options.scrollHeight > options.clientHeight };
-    })()`);
-    expect(overflow).toEqual({ list: width < 768 ? 'hidden' : 'auto', options: 'auto', outer: 'hidden', scrollable: true });
-    await page.evaluate(`(() => { document.querySelector('.role-options').scrollTop = 150; })()`);
-    const position = await page.evaluate<{ options: number; outer: number; list: number }>(`({ options: document.querySelector('.role-options').scrollTop, outer: document.querySelector('.roles-page').scrollTop, list: document.querySelector('.roles-panel .list').scrollTop })`);
-    expect(position.options).toBeGreaterThan(0);
-    expect(position.outer).toBe(0);
-    expect(position.list).toBe(0);
-    if (width >= 768) {
-      await page.evaluate(`(() => { document.querySelector('.roles-panel .list').scrollTop = 250; })()`);
-      const after = await page.evaluate<{ options: number; list: number }>(`({ options: document.querySelector('.role-options').scrollTop, list: document.querySelector('.roles-panel .list').scrollTop })`);
-      expect(after.options).toBe(position.options);
-      expect(after.list).toBeGreaterThan(0);
-      await page.evaluate(`(() => { document.querySelector('.roles-panel .list').scrollTop = 0; })()`);
-    } else {
-      await expect(page.locator('.list ul')).toHaveCSS('overflow-x', 'auto');
-    }
+    await page.setViewportSize({ width, height: 600 });
+    const body = drawer.locator('.drawer-body');
+    expect(await body.evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto');
+    expect(await page.evaluate<boolean>('document.documentElement.scrollHeight <= window.innerHeight')).toBe(true);
+    const footer = (await drawer.locator('.drawer-footer').boundingBox())!;
+    expect(footer.y + footer.height).toBeLessThanOrEqual(600);
+    const normal = (await drawer.boundingBox())!.width;
+    await drawer.getByRole('button', { name: 'Expand drawer' }).click();
+    const wide = (await drawer.boundingBox())!.width;
+    expect(wide).toBeGreaterThanOrEqual(normal);
+    expect(Math.abs(wide - (width < 768 ? width : Math.max(normal, width * 0.9)))).toBeLessThanOrEqual(2);
+    await drawer.getByRole('button', { name: 'Restore drawer size' }).click();
+    expect((await drawer.boundingBox())!.width).toBe(normal);
   }
   expect(api.unexpected).toEqual([]);
 });

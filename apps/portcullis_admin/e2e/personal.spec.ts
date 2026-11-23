@@ -48,8 +48,8 @@ test("settings applies theme instantly and saves sidebar drafts for reload", asy
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(1);
   expect(await page.evaluate<string>("document.documentElement.style.colorScheme")).toBe("dark");
-  await page.getByRole("button", { name: "root - account menu", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: /^Theme\s+Dark$/ })).toBeVisible();
+  await page.getByRole("button", { name: "Profile", exact: true }).click();
+  await expect(page.locator(".header-popover select")).toHaveValue("dark");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Revert", exact: true }).click();
   await expect(inviteSwitch).toBeChecked();
@@ -65,9 +65,10 @@ test("settings applies theme instantly and saves sidebar drafts for reload", asy
     const bar = await page.getByRole("group", { name: "Unsaved settings" }).boundingBox();
     expect(bar!.y + bar!.height).toBe(width < 768 ? 748 : 800);
   }
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("link").first()).toHaveAttribute("aria-label", "Accounts");
+  await expect(nav.getByRole("link").nth(1)).toHaveAttribute("aria-label", "Accounts");
   await page.reload();
   await expect(page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(0);
@@ -76,9 +77,9 @@ test("settings applies theme instantly and saves sidebar drafts for reload", asy
   for (const width of [1280, 768, 375]) {
     await page.setViewportSize({ width, height: 800 });
     expect(await page.evaluate<boolean>("document.documentElement.scrollWidth <= innerWidth")).toBe(true);
-    await page.getByRole("button", { name: "root - account menu", exact: true }).click();
-    await expect(page.getByRole("menuitem", { name: "Profile", exact: true })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Settings", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Profile", exact: true }).click();
+    await expect(page.locator(".header-popover").getByRole("link", { name: "Profile", exact: true })).toBeVisible();
+    await expect(page.locator(".header-popover").getByRole("link", { name: "Settings", exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
   }
   expect(state.unexpected).toEqual([]);

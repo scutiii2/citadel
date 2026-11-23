@@ -1,159 +1,102 @@
-import { useAuthStore } from "../../stores/auth";
-import { createPinia, setActivePinia } from "pinia";
 import { mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AdminAccount, Role } from "../../api/AdminClient";
+import { useAuthStore } from "../../stores/auth";
 import AccountDrawer from "./AccountDrawer.vue";
 
-const ROLES: Role[] = [
-  { id: 1, name: "Administrator", description: null, is_protected: true, permissions: [], account_count: 1 },
-  { id: 2, name: "Member", description: null, is_protected: false, permissions: [], account_count: 2 },
-  { id: 3, name: "Ops", description: null, is_protected: false, permissions: [], account_count: 0 },
-];
+const ALL = ["accounts.manage", "accounts.delete", "roles.assign", "chat.use"];
+const role = (id: number, name: string, permissions: string[] = []): Role => ({ id, name, description: null, is_protected: false, permissions, account_count: 0 });
+const ROLES = [role(2, "Member"), role(3, "Support"), role(4, "Owner", ["billing.manage"])];
 
-const MARIA: AdminAccount = {
-  id: 7,
-  username: "maria",
-  email: "maria@mail.com",
-  email_verified: false,
-  is_active: true,
-  is_protected: false,
-  created_at: "2026-09-12T10:00:00",
-  roles: [{ id: 2, name: "Member" }],
-};
+function account(extra: Partial<AdminAccount> = {}): AdminAccount {
+  return { id: 2, username: "maria", email: "maria@mail.com", email_verified: true, is_active: true, is_protected: false, created_at: "2026-09-12T10:00:00", roles: [{ id: 2, name: "Member" }, { id: 3, name: "Support" }], ...extra };
+}
 
-function drawer(account: Partial<AdminAccount> = {}, props: { isSelf?: boolean; busy?: boolean } = {}) {
+function show(extra: Record<string, unknown> = {}, permissions = ALL) {
+  const pinia = createPinia();
+  setActivePinia(pinia);
+  useAuthStore().account = { id: 1, username: "admin", email: "a@b.c", email_verified: true, roles: [], permissions };
   return mount(AccountDrawer, {
-    props: { account: { ...MARIA, ...account }, roles: ROLES, isSelf: false, busy: false, error: "", notice: "", ...props },
+    props: { account: account(), roles: ROLES, isSelf: false, busy: false, error: "", notice: "", editing: false, draft: { username: "maria", email: "maria@mail.com", roleIds: [2, 3] }, ...extra },
+    global: { plugins: [pinia] },
   });
 }
 
-const buttonLabels = (wrapper: ReturnType<typeof drawer>) => wrapper.findAll("button").map((b) => b.text());
+const choice = (w: ReturnType<typeof show>, name: string) => w.findAll(".role-choice").find((l) => l.text() === name)!.get("input");
 
 describe("AccountDrawer", () => {
-  it("shows who the account is and its roles", () => {
-    const wrapper = drawer();
+  beforeEach(() => localStorage.clear());
 
-    expect(wrapper.text()).toContain("maria");
-    expect(wrapper.text()).toContain("maria@mail.com");
-    expect(wrapper.findAll(".chip").map((c) => c.text().replace(/\s+/g, " "))).toEqual(["Member ×"]);
+  it("shows every role, or No roles for an empty set", () => {
+    expect(show().findAll(".roles-section .chip").map((c) => c.text())).toEqual(["Member", "Support"]);
+    expect(show({ account: account({ roles: [] }) }).get(".roles-section").text()).toContain("No roles");
   });
 
-  it("offers only the roles the account does not hold", () => {
-    const options = drawer().findAll("select option").map((o) => o.text());
-
-    expect(options).toEqual(["+ Add role", "Administrator", "Ops"]);
+  it("stages role choices by ID and keeps what it did not change", async () => {
+    const w = show({ editing: true });
+    await choice(w, "Support").setValue(false);
+    expect(w.emitted("update:draft")![0]).toEqual([{ username: "maria", email: "maria@mail.com", roleIds: [2] }]);
+    await w.get('input[type="email"]').setValue("x@y.z");
+    expect(w.emitted("update:draft")![1]).toEqual([{ username: "maria", email: "x@y.z", roleIds: [2, 3] }]);
   });
 
-  it("reports an added role and resets the dropdown", async () => {
-    const wrapper = drawer();
-    const select = wrapper.get("select");
-
-    await select.setValue("3");
-
-    expect(wrapper.emitted("addRole")).toEqual([[3]]);
-    expect((select.element as HTMLSelectElement).value).toBe("");
+  it("locks roles the actor may not grant, but still allows removing a held one", () => {
+    const w = show({ editing: true, account: account({ roles: [{ id: 4, name: "Owner" }] }), draft: { username: "maria", email: "m@x.y", roleIds: [4] } });
+    expect(choice(w, "Owner").element.disabled).toBe(false);
+    expect(choice(w, "Support").element.disabled).toBe(false);
+    expect(show({ editing: true }).findAll(".role-choice").find((l) => l.text() === "Owner")!.get("input").element.disabled).toBe(true);
   });
 
-  it("reports a removed role", async () => {
-    const wrapper = drawer();
-
-    await wrapper.get(".chip-x").trigger("click");
-
-    expect(wrapper.emitted("removeRole")).toEqual([[{ id: 2, name: "Member" }]]);
+  it("hides the staged fields the actor may not use", () => {
+    const noAssign = show({ editing: true }, ["accounts.manage"]);
+    expect(noAssign.find('input[type="email"]').exists()).toBe(true);
+    expect(choice(noAssign, "Member").element.disabled).toBe(true);
+    const noManage = show({ editing: true }, ["roles.assign"]);
+    expect(noManage.find('input[type="email"]').exists()).toBe(false);
+    expect(noManage.find(".role-choice").exists()).toBe(true);
   });
 
-  it("saves only the fields that changed", async () => {
-    const wrapper = drawer();
-    await wrapper.findAll("button").find((b) => b.text() === "Edit details")!.trigger("click");
-
-    await wrapper.get('input[aria-label="Email"]').setValue("new@mail.com");
-    await wrapper.get("form").trigger("submit");
-
-    expect(wrapper.emitted("save")).toEqual([[{ email: "new@mail.com" }]]);
-    expect(wrapper.find("form").exists()).toBe(false);
-  });
-
-  it("closes the edit form without saving when nothing changed", async () => {
-    const wrapper = drawer();
-    await wrapper.findAll("button").find((b) => b.text() === "Edit details")!.trigger("click");
-
-    await wrapper.get("form").trigger("submit");
-
-    expect(wrapper.emitted("save")).toBeUndefined();
-  });
-
-  it("asks to disable an active account when the switch is clicked", async () => {
-    const wrapper = drawer();
-
-    await wrapper.get('input[role="switch"]').setValue(!(wrapper.get('input[role="switch"]').element as HTMLInputElement).checked);
-
-    expect(wrapper.emitted("setActive")).toEqual([[false]]);
-  });
-
-  it("asks to enable a disabled account", async () => {
-    const wrapper = drawer({ is_active: false });
-
-    await wrapper.get('input[role="switch"]').setValue(!(wrapper.get('input[role="switch"]').element as HTMLInputElement).checked);
-
-    expect(wrapper.emitted("setActive")).toEqual([[true]]);
+  it("asks to disable an active account and to enable a disabled one", async () => {
+    const active = show();
+    await active.get('input[role="switch"]').setValue(false);
+    expect(active.emitted("setActive")![0]).toEqual([false]);
+    const off = show({ account: account({ is_active: false }) });
+    await off.get('input[role="switch"]').setValue(true);
+    expect(off.emitted("setActive")![0]).toEqual([true]);
   });
 
   it("offers send verification only while the email is unverified", () => {
-    expect(buttonLabels(drawer())).toContain("Send verification");
-    expect(buttonLabels(drawer({ email_verified: true }))).not.toContain("Send verification");
+    expect(show().text()).not.toContain("Send verification");
+    expect(show({ account: account({ email_verified: false }) }).text()).toContain("Send verification");
   });
 
-  it("reports delete, send verification and close", async () => {
-    const wrapper = drawer();
-    const click = (label: string) => wrapper.findAll("button").find((b) => b.text() === label)!.trigger("click");
-
-    await click("Delete account");
-    await click("Send verification");
-    await wrapper.get('button[aria-label="Close"]').trigger("click");
-
-    expect(wrapper.emitted("remove")).toHaveLength(1);
-    expect(wrapper.emitted("sendVerification")).toHaveLength(1);
-    expect(wrapper.emitted("close")).toHaveLength(1);
+  it("reports delete and send verification", async () => {
+    const w = show({ account: account({ email_verified: false }) });
+    await w.findAll("button").find((b) => b.text() === "Send verification")!.trigger("click");
+    await w.findAll("button").find((b) => b.text() === "Delete account")!.trigger("click");
+    expect(w.emitted("sendVerification")).toHaveLength(1);
+    expect(w.emitted("remove")).toHaveLength(1);
   });
 
   it("keeps your own account from being disabled or deleted", () => {
-    const wrapper = drawer({}, { isSelf: true });
-
-    expect(wrapper.find('input[role="switch"]').exists()).toBe(false);
-    expect(buttonLabels(wrapper)).not.toContain("Delete account");
+    const w = show({ isSelf: true });
+    expect(w.text()).toContain("Your account");
+    expect(w.find('input[role="switch"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("Delete account");
   });
 
   it("offers nothing to change on the protected account", () => {
-    const wrapper = drawer({ is_protected: true, roles: [{ id: 1, name: "Administrator" }] });
-
-    expect(wrapper.text()).toContain("protected admin account");
-    expect(wrapper.find('input[role="switch"]').exists()).toBe(false);
-    expect(wrapper.find("select").exists()).toBe(false);
-    expect(wrapper.find(".chip-x").exists()).toBe(false);
-    expect(wrapper.findAll("button").map((button) => button.attributes("aria-label"))).toEqual(["Close"]);
+    const w = show({ account: account({ is_protected: true }) });
+    expect(w.text()).toContain("protected admin account");
+    expect(w.find('input[role="switch"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("Delete account");
   });
 
-  it("disables the controls while a call runs", () => {
-    const wrapper = drawer({}, { busy: true });
-
-    expect(wrapper.get(".chip-x").attributes("disabled")).toBeDefined();
-    expect(wrapper.get("select").attributes("disabled")).toBeDefined();
-    expect(wrapper.get('input[role="switch"]').attributes("disabled")).toBeDefined();
+  it("disables the controls while a call runs and shows the error and notice", () => {
+    const w = show({ busy: true, error: "It failed", notice: "Done" });
+    expect(w.get(".error").text()).toBe("It failed");
+    expect(w.get(".notice").text()).toBe("Done");
+    expect(w.findAll("button").every((b) => b.element.disabled)).toBe(true);
   });
-
-  it("shows the error and the notice it is given", () => {
-    const wrapper = mount(AccountDrawer, {
-      props: { account: MARIA, roles: ROLES, isSelf: false, busy: false, error: "Email already in use", notice: "Sent" },
-    });
-
-    expect(wrapper.get(".error").text()).toBe("Email already in use");
-    expect(wrapper.get(".notice").text()).toBe("Sent");
-  });
-});
-
-
-beforeEach(() => {
-  setActivePinia(createPinia());
-  useAuthStore().account = { id: 1, username: "admin", email: "a@example.com", email_verified: true, roles: [], permissions: ["accounts.manage", "accounts.delete", "roles.assign"] };
 });

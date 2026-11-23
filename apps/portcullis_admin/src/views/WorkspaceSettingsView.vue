@@ -4,7 +4,8 @@ import SettingsPanel from "../components/admin/SettingsPanel.vue";
 import SidebarPagesPanel from "../components/admin/SidebarPagesPanel.vue";
 import AppConfigCard from "../components/AppConfigCard.vue";
 </script>
+
 <template>
-  <PageLayout class="admin-panel" title="Workspace settings" description="Changes here apply to every account."><SettingsPanel /><SidebarPagesPanel /><AppConfigCard />
+  <PageLayout class="admin-panel" title="Workspace settings" wide><SettingsPanel /><SidebarPagesPanel /><AppConfigCard />
   </PageLayout>
 </template>

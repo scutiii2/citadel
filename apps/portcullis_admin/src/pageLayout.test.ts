@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 const views = join(dirname(fileURLToPath(import.meta.url)), "views");
 const EXEMPT = new Set([
   "ChatView.vue", "LoginView.vue", "RegisterView.vue", "VerifyEmailView.vue",
-  "NoAccessView.vue", "SharedChatView.vue", "ConfigIssuesView.vue", "AdminView.vue",
+  "NoAccessView.vue", "SharedChatView.vue", "AdminView.vue",
 ]);
 
 describe("page layouts", () => {

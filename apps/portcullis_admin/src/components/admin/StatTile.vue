@@ -1,14 +1,16 @@
 <script setup lang="ts">
 /** One number of the Admin overview, with a small label above it. `value` is
- * null while the count loads. `warn` colours it for counts that want attention. */
-defineProps<{ label: string; value: number | null; warn?: boolean }>();
+ * null while the count loads; `unavailable` says the server could not give it
+ * (never shown as zero). `warn` colours it for counts that want attention. */
+defineProps<{ label: string; value: number | null; warn?: boolean; unavailable?: boolean }>();
 </script>
 
 <template>
   <div class="tile">
     <span v-if="$slots.default" :class="['icon', { warn: warn && value }]" aria-hidden="true"><slot /></span>
     <span class="label">{{ label }}</span>
-    <span :class="['value', { warn: warn && value }]">{{ value ?? "–" }}</span>
+    <span v-if="unavailable" class="value unavailable">Unavailable</span>
+    <span v-else :class="['value', { warn: warn && value }]">{{ value ?? "–" }}</span>
   </div>
 </template>
 
@@ -42,6 +44,11 @@ defineProps<{ label: string; value: number | null; warn?: boolean }>();
   font-size: 1.6em;
   font-weight: 600;
   line-height: 1.2;
+}
+.value.unavailable {
+  font-size: 0.95em;
+  font-weight: 500;
+  color: var(--muted);
 }
 .value.warn {
   color: var(--warning);

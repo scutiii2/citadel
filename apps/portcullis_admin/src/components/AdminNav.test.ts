@@ -1,118 +1,77 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, expect, it } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import AdminNav from "./AdminNav.vue";
+import { useConfigIssuesStore } from "../stores/configIssues";
 import { useNavPrefsStore } from "../stores/navPrefs";
+import AdminNav from "./AdminNav.vue";
 
 beforeEach(() => {
   localStorage.clear();
-  document.documentElement.style.colorScheme = "";
 });
 
-async function show(permissions: string[] | null, path = "/overview") {
+async function show(permissions: string[], path = "/overview", expanded = false) {
   const pinia = createPinia();
   setActivePinia(pinia);
   const auth = useAuthStore();
-  if (permissions) auth.account = { id: 1, username: "ada", email: "ada@example.com", email_verified: true, roles: [], permissions };
-  const router = createRouter({ history: createMemoryHistory(), routes: ["/", "/profile", "/settings", "/capabilities", "/extensions", "/agents", "/analytics", "/usage", "/overview", "/admin/accounts", "/admin/roles", "/admin/invites", "/admin/settings"].map(path => ({ path, component: { template: "<div />" } })) });
+  auth.account = { id: 1, username: "ada", email: "ada@example.com", email_verified: true, roles: [], permissions };
+  const router = createRouter({ history: createMemoryHistory(), routes: ["/", "/overview", "/config-issues", "/admin/accounts", "/admin/roles", "/admin/invites", "/admin/settings"].map((p) => ({ path: p, component: { template: "<div />" } })) });
   await router.push(path);
-  const w = mount(AdminNav, { global: { plugins: [pinia, router] } });
+  const wrapper = mount(AdminNav, { props: { expanded }, global: { plugins: [pinia, router] } });
   await flushPromises();
-  return w;
+  return wrapper;
 }
+
+const labels = (w: Awaited<ReturnType<typeof show>>) => w.findAll("nav[aria-label='Admin sections'] a").map((a) => a.attributes("aria-label"));
 
 it("names icon-only links and marks the current page", async () => {
   const w = await show(["invites.manage", "settings.manage", "accounts.view"]);
   const links = w.findAll("nav[aria-label='Admin sections'] a");
-  expect(links.map(a => a.attributes("aria-label"))).toEqual(["Accounts", "Workspace settings", "Invites"]);
-  expect(links.every(a => a.text() === "" && a.find("svg").exists())).toBe(true);
-  expect(w.get("a.wordmark[aria-label='Overview']").attributes("aria-current")).toBe("page");
-  expect(w.find("nav a[aria-label='Overview']").exists()).toBe(false);
+  expect(labels(w)).toEqual(["Overview", "Accounts", "Workspace settings", "Invites"]);
+  expect(links.every((a) => a.text() === "" && a.find("svg").exists())).toBe(true);
+  expect(w.get("a[aria-label='Overview']").attributes("aria-current")).toBe("page");
 });
 
-it("marks only the current administration page in the main rail", async () => {
+it("shows labels when expanded", async () => {
+  const w = await show(["invites.manage"], "/overview", true);
+  expect(w.get("a[aria-label='Invites']").text()).toBe("Invites");
+});
+
+it("marks only the current administration page", async () => {
   const w = await show(["accounts.view", "roles.view", "invites.manage", "settings.manage"], "/admin/roles");
-  expect(w.findAll('nav[aria-label="Admin sections"] a[aria-current="page"]').map(a => a.attributes('aria-label'))).toEqual(['Roles & permissions']);
-  expect(w.get("a[aria-label='Overview']").attributes('aria-current')).toBeUndefined();
-  expect(w.findAll('nav[aria-label="Admin sections"] a').map(a => a.attributes('aria-label'))).toEqual(['Roles & permissions', 'Accounts', 'Workspace settings', 'Invites']);
+  expect(w.findAll("nav[aria-label='Admin sections'] a[aria-current='page']").map((a) => a.attributes("aria-label"))).toEqual(["Roles & permissions"]);
 });
 
-it("lists the pages in the default arrangement", async () => {
+it("lists the pages in the default arrangement after Overview", async () => {
   const w = await show(["accounts.manage", "roles.manage", "invites.manage", "settings.manage"]);
-  expect(w.findAll("nav[aria-label='Admin sections'] a").map(a => a.attributes("aria-label"))).toEqual([
-    "Roles & permissions", "Accounts", "Workspace settings", "Invites",
-  ]);
+  expect(labels(w)).toEqual(["Overview", "Roles & permissions", "Accounts", "Workspace settings", "Invites"]);
 });
 
-it("lets an invite manager reach Invites without offering other pages", async () => {
-  const w = await show(["invites.manage"]);
-  expect(w.findAll("nav[aria-label='Admin sections'] a").map(a => a.attributes("aria-label"))).toEqual(["Invites"]);
-});
-
-it("lets visitors cycle and save their theme", async () => {
-  const w = await show(null);
-  expect(w.find("nav[aria-label='Admin sections']").exists()).toBe(false);
-  const button = w.get("button[aria-label^='Theme:']");
-  await button.trigger("click");
-  expect(document.documentElement.style.colorScheme).toBe("light");
-  expect(localStorage.getItem("ember_admin.theme")).toBe("light");
-  await button.trigger("click");
-  expect(document.documentElement.style.colorScheme).toBe("dark");
-  await button.trigger("click");
-  expect(document.documentElement.style.colorScheme).toBe("light dark");
-});
-
-it("keeps personal pages reachable without admin grants, in the account menu", async () => {
-  const w = await show([], "/profile");
-  await w.get("button.account").trigger("click");
-  expect(w.get(".menu .email").text()).toBe("ada@example.com");
-  expect(w.findAll(".menu a.row").map(a => [a.text(), a.attributes("href")])).toEqual([["Profile", "/profile"], ["Settings", "/settings"], ["Ember", "http://localhost:26502/overview"]]);
-  expect(w.get(".menu a.web-link").attributes("target")).toBe("_blank");
-  expect(w.get(".menu a.router-link-exact-active").text()).toBe("Profile");
-  expect(w.find("nav a[aria-label='Settings']").exists()).toBe(false);
-});
-
-it("opens the account menu with Theme and Log out, and closes it on Escape", async () => {
-  const w = await show([]);
-  expect(w.find(".menu").exists()).toBe(false);
-  await w.get("button.account").trigger("click");
-  expect(w.get(".theme-row").text()).toContain("Theme");
-  await w.get(".theme-row").trigger("click");
-  expect(localStorage.getItem("ember_admin.theme")).toBe("light");
-  await w.get(".menu").trigger("keydown", { key: "Escape" });
-  expect(w.find(".menu").exists()).toBe(false);
-});
-
-it("logs out from the account menu", async () => {
-  const w = await show([]);
-  const auth = useAuthStore();
-  const logout = vi.spyOn(auth, "logout").mockResolvedValue(undefined as never);
-  await w.get("button.account").trigger("click");
-  await w.get("button.logout").trigger("click");
-  expect(logout).toHaveBeenCalled();
-  expect(w.find(".menu").exists()).toBe(false);
-});
-
-it("keeps Overview reachable when every administration page is hidden", async () => {
-  const w = await show(["invites.manage"]);
-  useNavPrefsStore().update({ order: ["/admin/invites"], pinned: [], hidden: ["/admin/invites"] });
+it("follows the saved order and hidden pages", async () => {
+  const w = await show(["accounts.manage", "invites.manage", "settings.manage"]);
+  useNavPrefsStore().update({ order: ["/admin/invites", "/admin/accounts", "/admin/settings"], pinned: [], hidden: ["/admin/settings"] });
   await flushPromises();
-  expect(w.find("nav[aria-label='Admin sections']").exists()).toBe(false);
-  expect(w.get("a[aria-label='Overview']").attributes("href")).toBe("/overview");
-  expect(w.find("button.account").exists()).toBe(true);
+  expect(labels(w)).toEqual(["Overview", "Invites", "Accounts"]);
+});
+
+it("offers only the permitted pages", async () => {
+  const w = await show(["invites.manage"]);
+  expect(labels(w)).toEqual(["Overview", "Invites"]);
+});
+
+it("links Config issues with its counts only while there are issues", async () => {
+  const w = await show(["config.issues.view"]);
+  expect(labels(w)).toEqual(["Overview"]);
+  useConfigIssuesStore().issues = [{ file: "a.json", key: "k", severity: "error", message: "m" }, { file: "b.json", key: "k", severity: "warning", message: "m" }];
+  await flushPromises();
+  expect(labels(w)).toEqual(["Overview", "Config issues: 1 error, 1 warning"]);
+  expect(w.get("a.alert .count").text()).toBe("2");
 });
 
 it("links to the other admin apps, not to itself", async () => {
   const w = await show(["roles.view"]);
   const links = w.findAll("nav[aria-label='Other admin apps'] a");
-  expect(links.map(a => a.attributes("aria-label"))).toEqual(["Legion Admin", "Armory Admin", "Stronghold Admin", "Treasury Admin"]);
-  expect(links.map(a => new URL(a.attributes("href")!).port)).toEqual(["26500", "26503", "26504", "26505"]);
-});
-
-it("links the wordmark to the canonical overview and marks it current", async () => {
-  const wrapper = await show(["roles.view"], "/overview");
-  expect(wrapper.get("a.wordmark").attributes("href")).toBe("/overview");
-  expect(wrapper.get("a.wordmark").attributes("aria-current")).toBe("page");
+  expect(links.map((a) => a.attributes("aria-label"))).toEqual(["Legion Admin", "Armory Admin", "Stronghold Admin", "Treasury Admin"]);
+  expect(links.map((a) => new URL(a.attributes("href")!).port)).toEqual(["26500", "26503", "26504", "26505"]);
 });

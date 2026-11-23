@@ -83,7 +83,7 @@ defineExpose({ requestSave, requestCancel: () => requestClose(false) });
   <ConfirmModal
     :open="!!confirmation"
     :title="confirmation === 'save' ? 'Save changes?' : 'Discard changes?'"
-    :message="confirmation === 'save' ? 'Apply these changes to Legion?' : 'Your changes will be lost.'"
+    :message="confirmation === 'save' ? 'Apply these changes?' : 'Your changes will be lost.'"
     :confirm-label="confirmation === 'save' ? saveLabel || 'Save changes' : 'Discard changes'"
     @confirm="confirm"
     @close="confirmation = undefined"
@@ -103,6 +103,7 @@ dialog.record-drawer.expanded:modal { width: 90vw; }
 .drawer-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 24px 24px; }
 .drawer-footer { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border); padding: 12px 24px calc(12px + env(safe-area-inset-bottom, 0px)); }
 @media (max-width: 767px) {
+  dialog.record-drawer.expanded:modal { width: 100vw; max-width: 100vw; }
   .record-drawer > :deep(header) { padding-inline: 16px 8px; }
   .drawer-tools { inset-inline-end: 52px; }
   .drawer-body, .drawer-footer { padding-inline: 16px; }

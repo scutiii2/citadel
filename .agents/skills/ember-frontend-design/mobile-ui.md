@@ -12,7 +12,7 @@ Use with [Citadel frontend design](SKILL.md) and `ember-design-system` for Ember
 
 - Check the 767px and 768px transition. At narrow widths, give the active task the full content width. Use list-to-detail navigation or a labeled mode switch for Ember workspaces. Follow the [admin shell](SKILL.md#admin-design-reference) for the header-controlled sidebar and record drawers.
 - Preserve primary actions such as Save, Send, download and confirmation. Place secondary setup and management behind clear disclosure. Reflow header actions before shrinking text or targets; do not hide supported actions merely to fit a phone.
-- Keep DOM reading order aligned with visual order. Retain meaningful labels and selected states. Mobile actions work without hover. In admin panel headers, let the search and its reserved Save slot move together to a new line when space is tight.
+- Keep DOM reading order aligned with visual order. Retain meaningful labels and selected states. Mobile actions work without hover. In admin panel headers, move search and its reserved Cancel and Save slots together to a new line when space is tight.
 - The view owns scrolling; preserve `min-width: 0` and `min-height: 0` through flex/grid ancestors. Wrap long titles, names, errors and URLs. Keep code or genuinely wide tables in a labeled local horizontal scroller instead of making the whole page scroll sideways.
 - For dense admin content, choose task-specific rows, a detail view or a contained table. Retain the data and actions needed to complete the task. Do not create a separate mobile data contract.
 

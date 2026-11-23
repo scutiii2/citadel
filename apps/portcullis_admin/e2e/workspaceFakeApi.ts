@@ -86,6 +86,18 @@ export async function installFakeApi(page: Page, permissions?: string[]) {
       return json(route, { force_tool_approval: value });
     }
 
+    if (method === "GET" && path === "/api/admin/app-config") {
+      return json(route, {
+        session_hours: 12, default_role: "Member",
+        rate_limit: { enabled: true, scope: "both", max_attempts: 5, window_seconds: 900, lockout_seconds: 900 },
+        ip_filter: { allow_list: [], deny_list: [] },
+        headers: { enabled: true, hsts_max_age: 0 },
+        fingerprint: { enabled: true, signals: ["user_agent", "accept_language", "ip_subnet"] },
+        backup: { enabled: true, keep: 14, every_hours: 24 },
+        stored: [],
+      });
+    }
+
     // The Admin page: overview counts, the accounts list and deleting one.
     if (method === "GET" && path === "/api/admin/summary") {
       const all = [...api.accounts.values()];
