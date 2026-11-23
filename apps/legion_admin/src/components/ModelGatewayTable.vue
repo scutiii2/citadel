@@ -7,6 +7,7 @@ import ConfirmModal from "./admin/ConfirmModal.vue";
 import PanelHelp from "./admin/PanelHelp.vue";
 import RecordDrawer from "./admin/RecordDrawer.vue";
 import ConnectionTestCells from "./ConnectionTestCells.vue";
+import FieldLabel from "./FieldLabel.vue";
 import PasswordInput from "./PasswordInput.vue";
 import { errorMessage } from "../utils/errors";
 
@@ -68,6 +69,33 @@ const presetGroups = computed(() => {
   return [...groups].sort(([a], [b]) => rank(a) - rank(b)).map(([group, items]) => ({ group, title: GROUP_TITLES[group] ?? group, items: items.sort((a, b) => a.label.localeCompare(b.label)) }));
 });
 const presets = computed(() => presetGroups.value.flatMap((entry) => entry.items));
+// What each field means, shown in the help popover beside its label.
+const FIELD_HELP: Record<string, string[]> = {
+  api_key: ["The secret key from the provider's dashboard. It is kept in Legion's database and never shown again.", "When editing, leave it empty to keep the saved key."],
+  token: ["The access token the service expects, if it needs one. Kept in Legion's database and never shown again."],
+  base_url: ["Where requests go. Empty uses the provider's own address.", "Set it for gateways such as OpenRouter, or a local server such as Ollama (http://host.docker.internal:11434/v1)."],
+  aws_region: ["The AWS region that serves your Bedrock models, for example us-east-1."],
+  aws_access_key_id: ["The access key id of an AWS user allowed to call Bedrock."],
+  aws_secret_access_key: ["The secret that goes with the access key id. Never shown again."],
+  project_id: ["The Google Cloud project that has Vertex AI enabled."],
+  region: ["The Google Cloud region that serves your models, for example us-east5."],
+  azure_endpoint: ["The address of your Azure OpenAI resource, for example https://name.openai.azure.com."],
+  api_version: ["The Azure OpenAI API version to call, for example 2025-04-01-preview."],
+  url: ["The address of the service. A service running on this computer is reached at host.docker.internal."],
+  project: ["The model name this service runs. Leave empty to use its default."],
+  model: ["The model id sent with each request."],
+  strategy: ["How the service reads long input. Leave empty for the default."],
+  window: ["How many tokens of input the service reads at once. Leave empty for the default."],
+};
+const fieldHelp = (name: string) => FIELD_HELP[name];
+// Where the chosen preset's provider lists its model names.
+const modelsUrl = computed(() => {
+  const found = (key: string) => list.value?.presets?.[key]?.models_url;
+  const url = found(preset.value) ?? found(id.value);
+  return typeof url === "string" ? url : "";
+});
+// A new chat gateway gets its models from a preset, so the Models tab waits for one.
+const modelsLocked = computed(() => needsModel.value && creating.value && !preset.value);
 const tabItems = [{ id: "connection", label: "Connection" }, { id: "models", label: "Models" }] as const;
 const typeKey = computed(() => (chat.value ? "provider" : "kind"));
 
@@ -120,7 +148,10 @@ function add() {
 
 function startFrom() {
   const chosen = list.value?.presets[preset.value];
-  if (!chosen) return;
+  if (!chosen) {
+    tab.value = "connection";
+    return;
+  }
   if (!id.value) id.value = preset.value;
   fill(chosen);
 }
@@ -172,6 +203,11 @@ function submit() {
   if (!/^[a-z0-9][a-z0-9_-]{0,47}$/.test(id.value)) {
     tab.value = "connection";
     error.value = "The name needs lowercase letters, digits, - or _, up to 48 characters.";
+    return;
+  }
+  if (needsModel.value && creating.value && !preset.value) {
+    tab.value = "connection";
+    error.value = "Choose a preset first.";
     return;
   }
   const missing = fields.value.find(([name, , secret, required]) => required && !secret && !(values.value[name] ?? "").trim());
@@ -272,11 +308,13 @@ onMounted(load);
         <div v-if="needsModel" class="tabs" role="tablist" :aria-label="`${title} settings`">
           <button v-for="item in tabItems" :key="item.id" type="button" role="tab"
             :id="`${kind}-tab-${item.id}`" :aria-selected="tab === item.id" :aria-controls="`${kind}-panel-${item.id}`" :tabindex="tab === item.id ? 0 : -1"
-            :data-test="`tab-${item.id}`" @click="tab = item.id" @keydown.right.prevent="tab = 'models'" @keydown.left.prevent="tab = 'connection'">{{ item.label }}</button>
+            :data-test="`tab-${item.id}`" 
+            :disabled="item.id === 'models' && modelsLocked" :title="item.id === 'models' && modelsLocked ? 'Choose a preset on the Connection tab first' : undefined"
+            @click="tab = item.id" @keydown.right.prevent="!modelsLocked && (tab = 'models')" @keydown.left.prevent="tab = 'connection'">{{ item.label }}</button>
         </div>
         <section v-show="!needsModel || tab === 'connection'" :id="`${kind}-panel-connection`" class="pane" role="tabpanel" :aria-labelledby="`${kind}-tab-connection`">
           <template v-if="creating && presets.length">
-            <label :for="`${kind}-preset`">Preset</label>
+            <FieldLabel :for="`${kind}-preset`" title="Preset" :help="['Fills the connection and the models for a known provider.', 'Choose one first: the Models tab stays locked until you do. Change any field afterwards if yours differs.']">Preset</FieldLabel>
             <select :id="`${kind}-preset`" v-model="preset" data-test="preset" :disabled="saving" @change="startFrom">
               <option value="">None</option>
               <optgroup v-for="entry in presetGroups" :key="entry.group" :label="entry.title">
@@ -284,31 +322,28 @@ onMounted(load);
               </optgroup>
             </select>
           </template>
-          <label :for="`${kind}-id`">Name</label>
+          <FieldLabel :for="`${kind}-id`" title="Name" :help="['The short name agents and logs use for this gateway: lowercase letters, digits, - and _.', 'It cannot be changed after saving.']">Name</FieldLabel>
           <input :id="`${kind}-id`" v-model="id" maxlength="48" autocomplete="off" spellcheck="false" data-test="id" :disabled="saving || !creating" />
           <div class="pair">
             <div>
-              <label :for="`${kind}-type`">{{ chat ? "Provider" : "Kind" }}</label>
+              <FieldLabel :for="`${kind}-type`" :title="chat ? 'Provider' : 'Kind'"
+                :help="chat ? ['The protocol Legion speaks to this gateway.', 'anthropic: Claude and gateways that copy its API. openai: GPT and any OpenAI-compatible server. scuti: Citadel model services.'] : ['Which kind of decision service this is: TypeSafe, Ollama, a Citadel model service or FreeLLMAPI.']">{{ chat ? "Provider" : "Kind" }}</FieldLabel>
               <select :id="`${kind}-type`" v-model="type" data-test="type" :disabled="saving || !creating" @change="fill({ [typeKey]: type })">
                 <option v-for="name in types" :key="name" :value="name">{{ name }}</option>
               </select>
             </div>
             <div v-if="chat && variants.length">
-              <label :for="`${kind}-auth`">Sign-in</label>
+              <FieldLabel :for="`${kind}-auth`" title="Sign-in" :help="['How Legion proves who it is to the provider.', 'key: an API key. bedrock: AWS credentials. vertex: a Google Cloud project. azure: an Azure resource and key.']">Sign-in</FieldLabel>
               <select :id="`${kind}-auth`" v-model="auth" data-test="auth" :disabled="saving">
                 <option v-for="name in variants" :key="name" :value="name">{{ name }}</option>
               </select>
             </div>
             <div v-if="chat && type === 'openai'">
-              <div class="label-row">
-                <label :for="`${kind}-api`">API style</label>
-                <PanelHelp title="API style">
-                  <p>Which OpenAI endpoint the gateway calls.</p>
-                  <p><strong>chat</strong> uses Chat Completions (<code>/v1/chat/completions</code>). Every OpenAI-compatible server supports it: Ollama, Groq, OpenRouter, vLLM, LiteLLM and so on.</p>
-                  <p><strong>responses</strong> uses the newer Responses API (<code>/v1/responses</code>). Only OpenAI itself and Azure OpenAI support it reliably.</p>
-                  <p>Choose responses for GPT and Azure OpenAI, chat for any other server or custom base address. A preset sets the right one.</p>
-                </PanelHelp>
-              </div>
+              <FieldLabel :for="`${kind}-api`" title="API style" :help="[
+                'Which OpenAI endpoint the gateway calls.',
+                'chat uses Chat Completions (/v1/chat/completions). Every OpenAI-compatible server supports it: Ollama, Groq, OpenRouter, vLLM, LiteLLM and so on.',
+                'responses uses the newer Responses API (/v1/responses). Only OpenAI itself and Azure OpenAI support it reliably.',
+                'Choose responses for GPT and Azure OpenAI, chat for any other server or custom base address. A preset sets the right one.']">API style</FieldLabel>
               <select :id="`${kind}-api`" v-model="api" :disabled="saving">
                 <option v-for="name in list?.form?.choices.api ?? []" :key="name" :value="name">{{ name }}</option>
               </select>
@@ -316,25 +351,28 @@ onMounted(load);
           </div>
           <template v-for="[name, label, secret, required] in fields" :key="name">
             <PasswordInput v-if="secret" v-model="secrets[name]" :label="label" autocomplete="off" :data-test="name" :disabled="saving"
-              :placeholder="hasSecret(name) ? 'Leave empty to keep the saved value' : 'Paste it here; kept in Legion’s database, never shown again'" />
+              :placeholder="hasSecret(name) ? 'Leave empty to keep the saved value' : 'Paste it here; kept in Legion’s database, never shown again'">
+              <template v-if="fieldHelp(name)" #help><PanelHelp :title="label"><p v-for="line in fieldHelp(name)" :key="line">{{ line }}</p></PanelHelp></template>
+            </PasswordInput>
             <template v-else>
-              <label :for="`${kind}-${name}`">{{ label }}<span v-if="required" class="req" aria-hidden="true"> *</span></label>
+              <FieldLabel :for="`${kind}-${name}`" :title="label" :help="fieldHelp(name)">{{ label }}<span v-if="required" class="req" aria-hidden="true"> *</span></FieldLabel>
               <input :id="`${kind}-${name}`" v-model="values[name]" autocomplete="off" spellcheck="false" :aria-required="required" :data-test="name" :disabled="saving" />
             </template>
           </template>
-          <label :for="`${kind}-timeout`">Time allowed (seconds)</label>
+          <FieldLabel :for="`${kind}-timeout`" title="Time allowed" :help="['How many seconds one request may take before Legion gives up on it.', 'Zero uses the gateway default.']">Time allowed (seconds)</FieldLabel>
           <input :id="`${kind}-timeout`" v-model.number="timeout" type="number" min="0" max="1800" :disabled="saving" :aria-describedby="`${kind}-timeout-help`" />
           <p :id="`${kind}-timeout-help`" class="hint">0 uses the gateway's default.</p>
         </section>
         <section v-if="needsModel" v-show="tab === 'models'" :id="`${kind}-panel-models`" class="pane" role="tabpanel" :aria-labelledby="`${kind}-tab-models`">
-          <label :for="`${kind}-model`">Default model</label>
+          <p v-if="modelsUrl" class="hint"><a :href="modelsUrl" target="_blank" rel="noopener noreferrer" data-test="models-link">Browse the model list for this provider</a> to find the ids to enter below.</p>
+          <FieldLabel :for="`${kind}-model`" title="Default model" :help="['The model id used when an agent names no tier.', 'Copy it exactly from the provider model list.']">Default model</FieldLabel>
           <input :id="`${kind}-model`" v-model="model" maxlength="200" autocomplete="off" spellcheck="false" data-test="model" :disabled="saving" />
           <p class="hint">Used when an agent names no tier. The tiers below are optional: an empty model uses the default, an empty description keeps the built-in one. Agents that delegate read the descriptions to pick the lightest tier that fits a task.</p>
           <div v-for="tier in TIERS" :key="tier" class="tier">
             <h4>{{ tier[0]?.toUpperCase() }}{{ tier.slice(1) }}</h4>
-            <label :for="`${kind}-tier-${tier}`">Model<span class="sr-only"> for {{ tier }}</span></label>
+            <FieldLabel :for="`${kind}-tier-${tier}`" :title="`${tier} model`" :help="['The model id used for this tier. Empty uses the default model.', 'Agents pick a tier by how hard the task is: lighter tiers are cheaper and faster.']">Model<span class="sr-only"> for {{ tier }}</span></FieldLabel>
             <input :id="`${kind}-tier-${tier}`" v-model="tiers[tier]" maxlength="200" autocomplete="off" spellcheck="false" :data-test="`tier-${tier}`" :disabled="saving" />
-            <label :for="`${kind}-note-${tier}`">When to use<span class="sr-only"> {{ tier }}</span></label>
+            <FieldLabel :for="`${kind}-note-${tier}`" :title="`When to use ${tier}`" :help="['What this tier is good for. Agents that delegate read it to choose the lightest tier that fits a task.', 'Empty keeps the built-in description.']">When to use<span class="sr-only"> {{ tier }}</span></FieldLabel>
             <input :id="`${kind}-note-${tier}`" v-model="notes[tier]" maxlength="300" autocomplete="off" :data-test="`note-${tier}`" :disabled="saving" placeholder="Built-in description" />
           </div>
         </section>
@@ -374,7 +412,6 @@ onMounted(load);
 .pair > div { display: grid; gap: 6px; min-width: 0; }
 .tier { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .tier h4 { margin: 0; font-size: 0.9rem; }
-.label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .hint { margin: 0; font-size: 0.85rem; color: var(--muted); }
 .req { color: var(--accent); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

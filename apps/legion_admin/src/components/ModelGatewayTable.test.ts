@@ -10,7 +10,7 @@ beforeAll(() => {
 
 const list = {
   gateways: [],
-  presets: { ollama: { provider: "openai", auth: "key", api: "chat", label: "Ollama", base_url: "http://host.docker.internal:11434/v1", model: "qwen", models: { light: "qwen-small" }, descriptions: { light: "quick" } } },
+  presets: { ollama: { provider: "openai", auth: "key", api: "chat", label: "Ollama", models_url: "https://ollama.com/library", base_url: "http://host.docker.internal:11434/v1", model: "qwen", models: { light: "qwen-small" }, descriptions: { light: "quick" } } },
   form: {
     providers: { openai: { key: [["api_key", "API key", true, false], ["base_url", "Base address", false, false]] }, scuti: { "": [["url", "Model service address", false, true]] } },
     choices: { api: ["chat", "responses"] },
@@ -58,8 +58,12 @@ it("splits a chat gateway into Connection and Models tabs and returns to Connect
   const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
   await flushPromises();
   await wrapper.get('[data-test="add-conversation"]').trigger("click");
-  await wrapper.get('[data-test="type"]').setValue("openai");
+  expect(wrapper.get('[data-test="tab-models"]').attributes("disabled")).toBeDefined();
+  await wrapper.get('[data-test="preset"]').setValue("ollama");
+  await wrapper.get('[data-test="preset"]').trigger("change");
+  expect(wrapper.get('[data-test="tab-models"]').attributes("disabled")).toBeUndefined();
   await wrapper.get('[data-test="tab-models"]').trigger("click");
+  expect(wrapper.get('[data-test="models-link"]').attributes("href")).toBe("https://ollama.com/library");
   expect(wrapper.get('[data-test="tab-models"]').attributes("aria-selected")).toBe("true");
   expect(wrapper.get("#conversation-panel-models").isVisible()).toBe(true);
   expect(wrapper.get("#conversation-panel-connection").isVisible()).toBe(false);
@@ -67,6 +71,18 @@ it("splits a chat gateway into Connection and Models tabs and returns to Connect
   await wrapper.get("form").trigger("submit");
   expect(wrapper.get('[data-test="tab-connection"]').attributes("aria-selected")).toBe("true");
   expect(wrapper.get('[data-test="error"]').text()).toContain("lowercase");
+  wrapper.unmount();
+});
+
+it("will not save a new chat gateway before a preset is chosen", async () => {
+  vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue(list as never);
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
+  await flushPromises();
+  await wrapper.get('[data-test="add-conversation"]').trigger("click");
+  await wrapper.get('[data-test="type"]').setValue("openai");
+  await wrapper.get('[data-test="id"]').setValue("mine");
+  await wrapper.get("form").trigger("submit");
+  expect(wrapper.get('[data-test="error"]').text()).toContain("Choose a preset first");
   wrapper.unmount();
 });
 

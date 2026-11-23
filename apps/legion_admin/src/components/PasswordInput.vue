@@ -10,7 +10,7 @@ const visible = ref(false);
 
 <template>
   <div class="password-field">
-    <label :for="id ?? inputId">{{ label }}</label>
+    <div class="label-row"><label :for="id ?? inputId">{{ label }}</label><slot name="help" /></div>
     <div class="password-control">
       <input v-bind="$attrs" :id="id ?? inputId" v-model="model" :type="visible ? 'text' : 'password'" :disabled="disabled" />
       <button
@@ -28,6 +28,8 @@ const visible = ref(false);
 
 <style scoped>
 .password-field { display: grid; gap: 4px; min-width: 0; }
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+.label-row :slotted(.admin-icon) { min-width: 28px; min-height: 28px; width: 28px; height: 28px; }
 .password-field label { font-size: 0.9em; font-weight: 600; }
 .password-control { position: relative; min-width: 0; }
 .password-field .password-control input {
