@@ -21,7 +21,8 @@ export interface OriginLookup {
   group: { service_id: string; name: string } | null;
 }
 
-export interface ToolTestResult { ok: boolean; message: string; origins: { origin_id: string; ok: boolean; message: string }[]; }
+/** `code` says why a failed test failed: an HTTP status (401, 503, ...) or SETUP, NET, TIME, GONE. */
+export interface ToolTestResult { ok: boolean; message: string; code?: string; origins: { origin_id: string; ok: boolean; message: string; code?: string }[]; }
 
 export interface ToolSaveBody {
   enabled?: boolean;

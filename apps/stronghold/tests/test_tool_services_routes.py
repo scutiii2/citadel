@@ -229,5 +229,6 @@ def test_the_admin_probes_the_saved_origin_without_returning_the_token(client, t
 
     refused = admin.post("/admin/tool-services/bard/test")
     assert refused.status_code == 200 and "parent" not in refused.text
-    assert refused.json()["origins"] == [{"origin_id": "o1", "ok": False, "message": "The token was refused."}]
+    assert refused.json()["origins"] == [{"origin_id": "o1", "ok": False, "code": "401", "message": "The token was refused."}]
+    assert refused.json()["code"] == "401"
     assert seen == ["/health", "/api/voices", "/health", "/api/voices"]

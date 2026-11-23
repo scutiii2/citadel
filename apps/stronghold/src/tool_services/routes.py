@@ -199,7 +199,7 @@ async def admin_test(name: str, request: Request, store: ToolStore = Depends(_st
     record = await asyncio.to_thread(store.get, name)
     state = ready_status(name, record)
     if not state["ready"]:
-        return {"ok": False, "message": state["reason"], "origins": []}
+        return {"ok": False, "code": "SETUP", "message": state["reason"], "origins": []}
     who = current_requester()
     if who is None or not who.username:
         raise HTTPException(400, "Missing requester identity")
@@ -212,11 +212,13 @@ async def admin_test(name: str, request: Request, store: ToolStore = Depends(_st
         address = outside.origin_address(origin["origin_id"])
         token = token_for(record, origin)
         if address is None:
-            results.append({"origin_id": origin["origin_id"], "ok": False, "message": "This address left Treasury's catalog."})
+            results.append({"origin_id": origin["origin_id"], "ok": False, "code": "GONE", "message": "This address left Treasury's catalog."})
             continue
         results.append({"origin_id": origin["origin_id"], **await _probe(http, address, {**headers, "X-Internal-Token": token}, check, name == "reader")})
     ok = all(result["ok"] for result in results)
-    return {"ok": ok, "message": "Every address is ready." if ok else "Some addresses are not ready.", "origins": results}
+    failed = next((result for result in results if not result["ok"]), None)
+    return {"ok": ok, "message": "Every address is ready." if ok else "Some addresses are not ready.",
+            **({"code": failed["code"]} if failed else {}), "origins": results}
 
 
 async def _probe(http: httpx.AsyncClient, address: str, headers: dict[str, str],
@@ -227,15 +229,17 @@ async def _probe(http: httpx.AsyncClient, address: str, headers: dict[str, str],
             async with http.stream("GET", address + "/health", headers={"X-Internal-Token": headers["X-Internal-Token"]},
                                    follow_redirects=False) as health:
                 if health.status_code in (401, 403):
-                    return {"ok": False, "message": "The token was refused."}
+                    return {"ok": False, "code": str(health.status_code), "message": "The token was refused."}
                 if not health.is_success:
-                    return {"ok": False, "message": f"Health returned HTTP {health.status_code}."}
+                    return {"ok": False, "code": str(health.status_code), "message": f"Health returned HTTP {health.status_code}."}
             async with http.stream(method, address + path, headers=headers, json={} if json_body else None,
                                    follow_redirects=False) as answer:
                 if answer.status_code in (401, 403):
-                    return {"ok": False, "message": "The token was refused."}
+                    return {"ok": False, "code": str(answer.status_code), "message": "The token was refused."}
                 if answer.status_code == expected and (not error_code or (await _read_json(answer)).get("error") == error_code):
                     return {"ok": True, "message": "Ready."}
-                return {"ok": False, "message": f"The authenticated check returned HTTP {answer.status_code}."}
-    except (httpx.HTTPError, TimeoutError, ValueError):
-        return {"ok": False, "message": "Unreachable."}
+                return {"ok": False, "code": str(answer.status_code), "message": f"The authenticated check returned HTTP {answer.status_code}."}
+    except TimeoutError:
+        return {"ok": False, "code": "TIME", "message": "No answer within 10 seconds."}
+    except (httpx.HTTPError, ValueError):
+        return {"ok": False, "code": "NET", "message": "Unreachable."}

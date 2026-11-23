@@ -126,7 +126,8 @@ describe("ToolServicesView", () => {
     await wrapper.get('[data-test="row-test-bard"]').trigger("click");
     await flushPromises();
     expect(test).toHaveBeenCalledWith("bard");
-    expect(wrapper.get('[data-test="row-result-bard"]').text()).toContain("Every address is ready.");
+    expect(wrapper.get('[data-test="row-result-bard"]').attributes("aria-label")).toBe("Connected");
+    expect(wrapper.get('[data-test="row-popover"]').text()).toContain("Every address is ready.");
     expect(wrapper.find('[data-test="service-bard"]').exists()).toBe(false);
   });
 
@@ -161,4 +162,17 @@ it("keeps a draft when search hides its service, and discards after asking on Ca
   expect(wrapper.findAllComponents(ConfirmModal)[0]!.props("open")).toBe(true);
   await confirmDrawer(wrapper);
   expect(card.get<HTMLInputElement>('input[role="switch"]').element.checked).toBe(true);
+});
+
+describe("ToolServicesView row test result", () => {
+  it("shows a cross with the error code of a failed test and what it means", async () => {
+    vi.spyOn(toolServicesClient, "test").mockResolvedValue({ ok: false, code: "401", message: "Some addresses are not ready.",
+      origins: [{ origin_id: "o1", ok: false, code: "401", message: "The token was refused." }] });
+    const { wrapper } = await mounted(false);
+    await wrapper.get('[data-test="row-test-bard"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[data-test="row-code"]').text()).toBe("401");
+    expect(wrapper.get('[data-test="row-result-bard"]').attributes("aria-label")).toBe("Failed, code 401");
+    expect(wrapper.get('[data-test="row-popover"]').text()).toContain("Some addresses are not ready.");
+  });
 });

@@ -6,6 +6,7 @@ import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import PanelHelp from "../components/admin/PanelHelp.vue";
 import RecordDrawer from "../components/admin/RecordDrawer.vue";
 import StatusFilters from "../components/admin/StatusFilters.vue";
+import TestResultCells from "../components/TestResultCells.vue";
 import PageLayout from "../components/PageLayout.vue";
 import PasswordInput from "../components/PasswordInput.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
@@ -218,7 +219,7 @@ function resultAddress(draft: Draft, originId: string): string {
       <p v-else-if="!visible.length" class="admin-panel-text muted">No tool services match. <button v-if="search || filter !== 'all'" type="button" class="chip" @click="search = ''; filter = 'all'; searchField?.focus()">Clear filters</button></p>
       <div v-else class="admin-table-scroll" role="region" aria-labelledby="tool-services-title" tabindex="0">
         <table class="admin-records">
-          <thead><tr><th scope="col">Service</th><th scope="col">Status</th><th scope="col">Enabled</th><th scope="col">Addresses</th><th scope="col">Test</th></tr></thead>
+          <thead><tr><th scope="col">Service</th><th scope="col">Status</th><th scope="col">Enabled</th><th scope="col">Addresses</th><th scope="col">Test</th><th scope="col">Result</th></tr></thead>
           <tbody>
             <tr v-for="draft in visible" :key="draft.saved.name" :data-test="'row-' + draft.saved.name">
               <th scope="row">
@@ -230,16 +231,8 @@ function resultAddress(draft: Draft, originId: string): string {
               <td><span class="state" :class="{ ready: draft.saved.ready }"><span aria-hidden="true">{{ draft.saved.ready ? "✓" : "○" }}</span> {{ draft.saved.ready ? "Ready" : draft.saved.reason ?? "Not ready" }}</span></td>
               <td>{{ draft.saved.enabled ? "On" : "Off" }}</td>
               <td>{{ draft.saved.origins.length }}</td>
-              <td>
-                <div class="row-test">
-                  <button type="button" class="admin-icon" :data-test="'row-test-' + draft.saved.name" :aria-label="`Test ${draft.saved.label}`" :title="`Test ${draft.saved.label}`"
-                    :disabled="!!draft.pending" :aria-busy="draft.pending === 'test'" @click="test(draft)">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h3l2-6 4 12 2-6h3" /></svg>
-                  </button>
-                  <span v-if="draft.pending === 'test'" class="muted" role="status">Testing…</span>
-                  <span v-else-if="draft.result" role="status" :data-test="'row-result-' + draft.saved.name"><span aria-hidden="true">{{ draft.result.ok ? "✓" : "✕" }}</span> {{ draft.result.message }}</span>
-                </div>
-              </td>
+              <TestResultCells :id="draft.saved.name" :label="draft.saved.label" :testing="draft.pending === 'test'" :busy="!!draft.pending"
+                :result="draft.result" @test="test(draft)" />
             </tr>
           </tbody>
         </table>
@@ -353,7 +346,6 @@ function resultAddress(draft: Draft, originId: string): string {
 </template>
 
 <style scoped>
-.row-test { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 0.85rem; }
 .service { display: grid; gap: 12px; min-width: 0; padding-top: 4px; }
 .service p { margin: 0; overflow-wrap: anywhere; }
 .state, .help { color: var(--muted); font-size: 0.9em; }
