@@ -180,6 +180,18 @@ async def set_decision_gateway_settings(
     return result
 
 
+@prompts_router.post("/gateway-settings/test")
+async def test_gateway(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
+    """Whether ConversationGateway answers at the saved address and token: `{ok, message}`."""
+    return await _call(admin.test_gateway(account, False))
+
+
+@prompts_router.post("/decision-gateway-settings/test")
+async def test_decision_gateway(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
+    """Whether DecisionGateway answers at the saved address and token: `{ok, message}`."""
+    return await _call(admin.test_gateway(account, True))
+
+
 SERVER_ID_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,62}$"
 
 
@@ -234,6 +246,16 @@ async def lookup_server_address(
 ) -> Any:
     """Is this address in Treasury's outside catalog? Legion asks; nothing is saved."""
     return await _call(admin.lookup_origin(account, body.address))
+
+
+@prompts_router.post("/servers/{server_id}/test")
+async def test_server(
+    server_id: str = Path(pattern=SERVER_ID_PATTERN),
+    account: Account = Depends(require_agents_manage),
+    admin: AgentAdmin = Depends(get_agent_admin),
+) -> Any:
+    """Whether each address of this MCP server answers: `{ok, message, origins}`."""
+    return await _call(admin.test_server(account, server_id))
 
 
 @prompts_router.put("/servers/{server_id}")

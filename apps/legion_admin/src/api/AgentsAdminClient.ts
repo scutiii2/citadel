@@ -135,6 +135,13 @@ export interface McpServer {
 }
 
 /** portcullis's /api/admin/agents (needs agents.manage), which ai_agent validates and applies. */
+/** What a connection test found: one line for the whole connection, and one per address when it has several. */
+export interface ConnectionTestResult {
+  ok: boolean;
+  message: string;
+  origins?: { ok: boolean; message: string }[];
+}
+
 export const agentsAdminClient = {
   gateways: async () => (await apiRequest<{ providers: ProviderCatalog }>("GET", "/api/admin/agents/gateways")).providers,
   list: async () => (await apiRequest<{ agents: AgentFile[] }>("GET", "/api/admin/agents")).agents,
@@ -150,6 +157,10 @@ export const agentsAdminClient = {
   decisionGatewaySettings: () => apiRequest<GatewaySettingsView>("GET", "/api/admin/decision-gateway-settings"),
   setDecisionGatewaySettings: (changes: GatewaySettingsPatch) =>
     apiRequest<GatewaySettingsView>("PUT", "/api/admin/decision-gateway-settings", changes),
+  testGateway: () => apiRequest<ConnectionTestResult>("POST", "/api/admin/gateway-settings/test"),
+  testDecisionGateway: () => apiRequest<ConnectionTestResult>("POST", "/api/admin/decision-gateway-settings/test"),
+  /** Does each saved address of this MCP server answer? Reads only. */
+  testServer: (id: string) => apiRequest<ConnectionTestResult>("POST", `/api/admin/servers/${encodeURIComponent(id)}/test`),
   servers: async () => (await apiRequest<{ servers: Record<string, McpServer> }>("GET", "/api/admin/servers")).servers,
   /** Add or change a server; an auth header sent without its value keeps the saved value. Applies at Legion's next start. */
   /** Does Treasury's outside catalog know this address? Changes nothing. */
