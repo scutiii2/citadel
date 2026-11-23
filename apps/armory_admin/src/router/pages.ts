@@ -10,6 +10,7 @@ export interface ArmoryPage {
 }
 
 export const ARMORY_PAGES: ArmoryPage[] = [
+  { to: "/overview", label: "Overview", icon: ["m3 10 9-7 9 7v11h-7v-7h-4v7H3z"], permission: ["capabilities.manage", "tickets.manage"] },
   {
     to: "/capabilities",
     label: "Capabilities",
@@ -31,7 +32,7 @@ export const ARMORY_PAGES: ArmoryPage[] = [
   {
     to: "/limits",
     label: "Limits",
-    icon: ["M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3", "M1 14h6M9 8h6M17 16h6"],
+    icon: ["m12 14 4-4", "M3.34 19a10 10 0 1 1 17.32 0"],
     permission: "capabilities.manage",
   },
   {
@@ -41,3 +42,6 @@ export const ARMORY_PAGES: ArmoryPage[] = [
     permission: "capabilities.manage",
   },
 ];
+
+/** The heading the header shows for a route path. */
+export const pageTitle = (path: string): string => ARMORY_PAGES.find((page) => page.to === path)?.label ?? "";

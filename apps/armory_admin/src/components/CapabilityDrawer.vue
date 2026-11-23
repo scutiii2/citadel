@@ -6,8 +6,8 @@ import type { ToolInfo, ToolRunResult } from "../api/types";
 import { useAuthStore } from "../stores/auth";
 import { errorMessage } from "../utils/errors";
 import { commandsByTool } from "../utils/toolCommands";
-import BaseModal from "./BaseModal.vue";
 import CopyButton from "./CopyButton.vue";
+import RecordDrawer from "./admin/RecordDrawer.vue";
 import ToolRunForm from "./ToolRunForm.vue";
 import "./admin/admin.css";
 
@@ -83,11 +83,11 @@ async function run(args: Record<string, unknown>): Promise<void> {
     if (request === generation) result.value = { text: errorMessage(err), isError: true };
   } finally { running.value = false; }
 }
-function close(): void { if (!running.value) emit("close"); }
+function close(): void { emit("close"); }
 </script>
 
 <template>
-  <BaseModal :open="open" :title="title" class="integration-modal" @close="close">
+  <RecordDrawer :open="open" :title="title" :busy="running" @close="close">
     <div class="admin-panel tools-modal">
       <div class="integration-summary">
         <span class="integration-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path v-if="kind === 'extension'" d="M12 2v6M8 8h8v4a4 4 0 0 1-8 0zM12 16v6" /><path v-else d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5" /></svg></span>
@@ -131,17 +131,12 @@ function close(): void { if (!running.value) emit("close"); }
         </div>
       </div>
     </div>
-  </BaseModal>
+  </RecordDrawer>
 </template>
 
 <style scoped>
-dialog.integration-modal { width: min(980px, calc(100vw - 48px)); height: min(720px, calc(100dvh - 64px)); max-height: calc(100dvh - 64px); padding: 0; overflow: hidden; background: var(--bg); }
-.integration-modal :deep(> header) { height: 70px; box-sizing: border-box; margin: 0; padding: 20px 24px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
-.integration-modal :deep(> header h3) { font-size: 1.2em; font-weight: 600; }
-.integration-modal :deep(> header .close) { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-md); }
-.integration-modal :deep(> header .close:hover) { color: var(--text); background: var(--bg); }
-.tools-modal { height: calc(100% - 72px); display: flex; flex-direction: column; overflow: hidden; }
-.integration-summary { flex-shrink: 0; display: flex; align-items: flex-start; gap: 14px; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.tools-modal { display: flex; flex-direction: column; }
+.integration-summary { flex-shrink: 0; display: flex; align-items: flex-start; gap: 14px; padding: 4px 0 16px; border-bottom: 1px solid var(--border); }
 .integration-icon, .empty-icon { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: var(--radius-lg); color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
 svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .summary-copy { flex: 1; min-width: 0; }
@@ -152,8 +147,8 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .summary-description :deep(p) { margin: 4px 0 0; }
 .availability { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); font-size: 0.8em; color: var(--muted); white-space: nowrap; }
 .availability.online { color: var(--success); background: color-mix(in srgb, var(--success) 6%, var(--bg)); }
-.workspace { display: grid; grid-template-columns: 290px minmax(0, 1fr); flex: 1; min-height: 0; overflow: hidden; }
-.tool-browser { display: flex; flex-direction: column; min-height: 0; overflow: hidden; min-width: 0; padding: 20px 14px; border-right: 1px solid var(--border); background: var(--surface); }
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr); }
+.tool-browser { display: flex; flex-direction: column; min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
 h4, h5, p { margin: 0; }
 .section-heading h4, h5 { font-size: 0.9em; font-weight: 600; }
@@ -165,16 +160,16 @@ h4, h5, p { margin: 0; }
 .tool-search svg { width: 16px; height: 16px; color: var(--muted); flex-shrink: 0; }
 .tools-modal .tool-search input[type="search"] { width: 100%; min-width: 0; padding: 0; border: none; background: transparent; border-radius: 0; font-size: 0.85em; }
 .browser-note { font-size: 0.85em; color: var(--muted); padding: 10px 4px; }
-.tool-list { flex: 1; min-height: 0; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; }
+.tool-list { max-height: 40dvh; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; }
 .tool-list button { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 12px; border: 1px solid transparent; border-radius: var(--radius-lg); background: transparent; text-align: left; transition: background 0.15s ease, border-color 0.15s ease; }
-.tool-list button:hover { background: var(--bg); }
+.tool-list button:hover { background: var(--surface); }
 .tool-list button[aria-pressed=true] { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
 .tool-label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.9em; }
 .tool-label strong { font-weight: 500; overflow-wrap: anywhere; }
 .tool-label svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--muted); }
 .tool-list code { font-size: 0.75em; color: var(--muted); overflow-wrap: anywhere; }
 .tool-preview { font-size: 0.8em; line-height: 1.5; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.tester { min-height: 0; overflow-y: auto; overscroll-behavior: contain; min-width: 0; padding: 24px; display: flex; flex-direction: column; gap: 22px; }
+.tester { min-width: 0; padding: 20px 0; display: flex; flex-direction: column; gap: 22px; }
 .eyebrow { display: block; font-size: 0.7em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
 .tool-heading h4 { font-size: 1.15em; font-weight: 600; margin-bottom: 3px; overflow-wrap: anywhere; }
 .cmd-badge { flex-shrink: 0; padding: 0 6px; border-radius: var(--radius-sm); font: 0.75em var(--mono); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
@@ -189,19 +184,13 @@ h4, h5, p { margin: 0; }
 .result.failed { border-color: var(--danger); }
 .result pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 280px; overflow-y: auto; margin: 8px 0 0; font: 0.85em/1.55 var(--mono); }
 .output-placeholder { font-size: 0.85em; color: var(--muted); padding: 18px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-lg); }
-.empty-selection { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px 32px; text-align: center; }
+.empty-selection { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px 32px; text-align: center; }
 .empty-selection h4 { font-size: 1em; font-weight: 600; }
 .empty-selection p { max-width: 330px; color: var(--muted); font-size: 0.9em; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 767px) {
-  dialog.integration-modal { width: calc(100vw - 24px); height: calc(100dvh - var(--rail-height) - 24px); max-height: calc(100dvh - var(--rail-height) - 24px); }
-  .integration-modal :deep(> header) { padding: 16px; }
-  .integration-summary { display: grid; grid-template-columns: 42px minmax(0, 1fr); padding: 16px; gap: 10px; }
+  .integration-summary { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 10px; }
   .availability { grid-column: 2; margin-left: 0; justify-self: start; }
-  .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(120px, 38%) minmax(0, 1fr); }
-  .tool-browser { padding: 16px; border-right: none; border-bottom: 1px solid var(--border); }
-
-  .tester { padding: 20px 16px; }
-  .empty-selection { padding: 32px 20px; }
+  .empty-selection { padding: 32px 0; }
 }
 </style>

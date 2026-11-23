@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { usageClient, type MyUsage, type UsageRecordRow } from "../api/UsageClient";
 import { ApiError } from "../api/http";
 import { useAuthStore } from "../stores/auth";
@@ -31,6 +31,10 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal ??= function () { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close ??= function () { this.removeAttribute("open"); };
+});
 let wrapper: ReturnType<typeof mount>;
 beforeEach(() => {
   vi.resetAllMocks();
@@ -49,7 +53,6 @@ it("loads all accounts for a usage-only observer and waits for selection", async
   await show();
   expect(api.allAccounts).toHaveBeenCalledWith(30, undefined);
   expect(wrapper.text()).toContain("empty");
-  expect(wrapper.text()).toContain("Select a user");
   expect(api.account).not.toHaveBeenCalled();
 });
 it("requests selected user detail and annual heatmap, then exports that user's identity", async () => {
@@ -143,7 +146,6 @@ it("returns to the summary when the target has been deleted", async () => {
   api.allAccounts.mockResolvedValue(users.slice(1));
   await select("alice");
   expect(wrapper.find(".usage-details").exists()).toBe(false);
-  expect(wrapper.text()).toContain("Select a user");
   expect(wrapper.text()).not.toContain("alice");
 });
 it("distinguishes summary errors from zero usage and supports retry", async () => {

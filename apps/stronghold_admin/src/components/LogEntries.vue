@@ -11,7 +11,7 @@ import { KIND_LABELS } from "../utils/logAnalytics";
  * tab needs its own permission; each shows one actor at a time - the
  * server or one account - newest first, the latest 200. `kind` and `actor`
  * open it on that list (read once, when the component is created). */
-const props = defineProps<{ kind?: LogKind; actor?: LogActor }>();
+const props = defineProps<{ kind?: LogKind; actor?: LogActor; search?: string }>();
 
 const auth = useAuthStore();
 const kinds = ref<LogKind[]>([]);
@@ -23,6 +23,10 @@ const actors = ref<Record<LogKind, LogActor>>({ action: "server", error: "server
 const entries = ref<LogEntry[]>([]);
 const loading = ref(false);
 const error = ref("");
+const visible = computed(() => {
+  const query = (props.search ?? "").trim().toLowerCase();
+  return entries.value.filter((e) => !query || `${e.source} ${e.message}`.toLowerCase().includes(query));
+});
 
 // Chat turns can show each agent's run and prompt, for accounts allowed to read prompts.
 type ChatView = "normal" | "advanced";
@@ -99,15 +103,18 @@ watch(
       label="Detail"
       aria-label="Chat turn detail"
     />
-    <button type="button" class="chip" :disabled="loading" @click="loadEntries">Refresh</button>
+    <button type="button" class="admin-icon" title="Refresh" aria-label="Refresh" :disabled="loading" :aria-busy="loading" @click="loadEntries">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" /></svg>
+    </button>
   </div>
 
   <p v-if="error" class="error">{{ error }}</p>
   <p v-else-if="loading" class="muted">loading ...</p>
   <p v-else-if="tab && entries.length === 0" class="muted">No entries yet.</p>
+  <p v-else-if="tab && visible.length === 0" class="muted">No entries match your search.</p>
 
   <ul v-if="!loading" class="entries">
-    <li v-for="e in entries" :key="e.id">
+    <li v-for="e in visible" :key="e.id">
       <div class="line">
         <span class="time">{{ time(e.created_at) }}</span>
         <code class="source">{{ e.source }}</code>

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { emailSettingsClient, type EmailChanges, type EmailSettings } from "../api/EmailSettingsClient";
-import PageLayout from "../components/PageLayout.vue";
+import SettingsPanel from "../components/admin/SettingsPanel.vue";
 import PasswordInput from "../components/PasswordInput.vue";
+import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
 
 /** The SMTP account Armory sends mail through. Saved in Armory's database; a send uses the saved values at once.
  * The password is write-only: the page only says whether one is saved. */
@@ -21,6 +21,8 @@ const loading = ref(true);
 const saving = ref(false);
 const error = ref("");
 const notice = ref("");
+const search = ref("");
+const panel = ref<InstanceType<typeof SettingsPanel>>();
 
 const lines = (text: string) => text.split(/[\n,]/).map((item) => item.trim()).filter(Boolean);
 
@@ -65,30 +67,40 @@ const changes = computed<EmailChanges>(() => {
 const changed = computed(() => Object.keys(changes.value).length > 0);
 
 async function save() {
+  if (!changed.value || saving.value) return;
   saving.value = true;
   error.value = notice.value = "";
-  try {
-    apply(await emailSettingsClient.save(changes.value));
-    notice.value = "Saved. The next email uses it.";
-  } catch (err) {
-    error.value = errorMessage(err);
-  } finally {
-    saving.value = false;
-  }
+  await panel.value?.keepFocus(async () => {
+    try {
+      apply(await emailSettingsClient.save(changes.value));
+      notice.value = "Saved. The next email uses it.";
+    } catch (err) {
+      error.value = errorMessage(err);
+    } finally {
+      saving.value = false;
+    }
+  });
+}
+
+function discard() {
+  apply(saved.value);
+  error.value = notice.value = "";
 }
 </script>
 
 <template>
-  <PageLayout
-    class="info-content email-settings"
-    title="Email"
-    description="The mail account Armory sends from. It is saved in Armory's database. Gmail, Outlook, Yahoo and iCloud need an app password."
-  >
-    <p v-if="loading" class="muted">Loading…</p>
+  <SettingsPanel ref="panel" v-model:search="search" title="Email" heading="Mail account" label="email settings" :dirty="changed" :saving="saving" @save="save" @discard="discard">
+    <template #help>
+      <p>The mail account Armory sends from. It is saved in Armory's database, and the next email uses it at once.</p>
+      <p>Gmail, Outlook, Yahoo and iCloud need an app password. The password is never shown again after it is saved.</p>
+    </template>
+    <p v-if="loading" class="note muted" role="status">Loading…</p>
     <form v-else class="form" data-test="form" @submit.prevent="save">
-      <p v-if="!saved.configured" class="muted" data-test="empty">Email is not set up. Fill in the server, port and sender, then save.</p>
-      <section class="card" aria-labelledby="smtp-title">
-        <h2 id="smtp-title" class="title">Mail server</h2>
+      <p v-if="!saved.configured" class="note muted" data-test="empty">Email is not set up. Fill in the server, port and sender, then save.</p>
+      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
+      <section v-show="panel?.matches('Mail server', 'Server', 'Port', 'Connection', 'Sender address', 'Password')" class="group" aria-labelledby="smtp-title">
+        <h3 id="smtp-title">Mail server</h3>
         <div class="field">
           <label for="smtp-server">Server</label>
           <input id="smtp-server" v-model="server" :disabled="saving" autocomplete="off" spellcheck="false" placeholder="smtp.gmail.com" data-test="server" />
@@ -120,14 +132,12 @@ async function save() {
             :placeholder="saved.has_password ? 'Leave empty to keep the saved password' : 'None saved (a relay without a login needs none)'"
           />
           <p class="help" data-test="password-state">{{ saved.has_password ? "A password is saved. It is never shown again." : "No password is saved." }}</p>
-          <label v-if="saved.has_password" class="check">
-            <input v-model="clearPassword" type="checkbox" :disabled="saving" data-test="clear-password" /> Remove the saved password
-          </label>
+          <ToggleSwitch v-if="saved.has_password" :checked="clearPassword" :disabled="saving" data-test="clear-password" @change="clearPassword = ($event.target as HTMLInputElement).checked">Remove the saved password</ToggleSwitch>
         </div>
       </section>
 
-      <section class="card" aria-labelledby="who-title">
-        <h2 id="who-title" class="title">Recipients</h2>
+      <section v-show="panel?.matches('Recipients', 'Standing recipients', 'Domains')" class="group" aria-labelledby="who-title">
+        <h3 id="who-title">Recipients</h3>
         <div class="field">
           <label for="smtp-to">Standing recipients</label>
           <textarea id="smtp-to" v-model="recipients" rows="3" :disabled="saving" spellcheck="false" data-test="to"></textarea>
@@ -139,24 +149,20 @@ async function save() {
           <p class="help">One domain per line. Empty means no domain.</p>
         </div>
       </section>
-
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
-      <div class="actions">
-        <button type="submit" class="primary" data-test="save" :disabled="saving || !changed">{{ saving ? "Saving…" : "Save" }}</button>
-      </div>
     </form>
-  </PageLayout>
+  </SettingsPanel>
 </template>
 
 <style scoped>
-.form { display: grid; gap: 16px; max-width: 720px; }
-.card { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.title { margin: 0; font-size: 1em; font-weight: 600; }
+.note { margin: 0; padding: 12px 16px 0; }
+.error { color: var(--danger); }
+.muted { color: var(--muted); }
+.form { display: grid; }
+.group { display: grid; gap: 16px; max-width: 720px; padding: 16px; }
+.group + .group { border-top: 1px solid var(--border); }
+.group h3 { margin: 0; font-size: 1em; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label:first-child { font-size: 0.9em; font-weight: 600; }
-.field > input, .field > select, .field > textarea { width: 100%; min-width: 0; min-height: 44px; }
-.check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.field > input, .field > select, .field > textarea { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
-.actions { display: flex; justify-content: flex-end; }
 </style>

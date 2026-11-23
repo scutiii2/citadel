@@ -30,7 +30,7 @@ type Wrapper = Awaited<ReturnType<typeof mounted>>;
 const field = (wrapper: Wrapper, name: string) => wrapper.get(`[data-test="${name}"]`);
 const save = (wrapper: Wrapper) => wrapper.get('[data-test="save"]');
 const submit = async (wrapper: Wrapper) => {
-  await wrapper.get('[data-test="form"]').trigger("submit");
+  await wrapper.get('[data-test="save"]').trigger("click");
   await flushPromises();
 };
 
@@ -43,8 +43,9 @@ describe("BrainSettingsView", () => {
     expect((field(wrapper, "stack.warn_ratio").element as HTMLInputElement).value).toBe("0.8");
     expect((field(wrapper, "sharing.max_inbox").element as HTMLInputElement).value).toBe("100");
     expect(wrapper.text()).toContain("/data/brain");
-    expect(wrapper.text()).toContain("STRONGHOLD_BRAIN_ROOT");
-    expect(save(wrapper).attributes("disabled")).toBeDefined();
+    await wrapper.get('[data-test="panel-help"]').trigger("click");
+    expect(document.body.textContent).toContain("STRONGHOLD_BRAIN_ROOT");
+    expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -88,7 +89,7 @@ describe("BrainSettingsView", () => {
   it("does not count 040 for 40 as a change", async () => {
     const wrapper = await mounted();
     await field(wrapper, "stack.max_items").setValue("040");
-    expect(save(wrapper).attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -108,7 +109,8 @@ describe("BrainSettingsView", () => {
     expect(wrapper.get('[data-test="problem-stack.max_items"]').text()).toContain("2 to 200");
     expect(field(wrapper, "stack.max_items").attributes("aria-invalid")).toBe("true");
     expect(field(wrapper, "stack.max_items").attributes("aria-describedby")).toContain("problem");
-    expect(save(wrapper).attributes("disabled")).toBeDefined();
+    await wrapper.get('[data-test="save"]').trigger("click");
+    expect(wrapper.get('[role="alert"]').text()).toContain("highlighted");
     await field(wrapper, "stack.max_items").setValue("2.5");
     expect(wrapper.get('[data-test="problem-stack.max_items"]').text()).toContain("whole number");
     await field(wrapper, "stack.max_items").setValue("");
@@ -129,7 +131,7 @@ describe("BrainSettingsView", () => {
     await submit(wrapper);
     expect(wrapper.get('[role="alert"]').text()).toBe("max_files must be a whole number from 1 to 5000.");
     expect((field(wrapper, "long_term.max_files").element as HTMLInputElement).value).toBe("50");
-    expect(save(wrapper).attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="save"]').exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -140,7 +142,7 @@ describe("BrainSettingsView", () => {
     await field(wrapper, "long_term.max_files").setValue("50");
     await submit(wrapper);
     expect((field(wrapper, "long_term.max_files").element as HTMLInputElement).value).toBe("50");
-    expect(save(wrapper).attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
     wrapper.unmount();
   });
 

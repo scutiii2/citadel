@@ -29,7 +29,7 @@ describe("EnvironmentSettingsView", () => {
     expect((input(wrapper, "stronghold_url").element as HTMLInputElement).value).toBe("http://127.0.0.1:29650");
     expect((input(wrapper, "media_signing_key").element as HTMLInputElement).value).toBe("");
     expect(wrapper.html()).not.toContain("s3cret");
-    expect(wrapper.get('[data-test="save"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -40,7 +40,7 @@ describe("EnvironmentSettingsView", () => {
     await input(wrapper, "obsidian_timeout").setValue("12");
     await input(wrapper, "obsidian_allow_write").setValue(true);
     await input(wrapper, "media_signing_key").setValue("new-key");
-    await wrapper.get('[data-test="form"]').trigger("submit");
+    await wrapper.get('[data-test="save"]').trigger("click");
     await flushPromises();
     expect(save).toHaveBeenCalledWith({
       stronghold_url: "http://stronghold:29650", obsidian_timeout: 12, obsidian_allow_write: true, media_signing_key: "new-key",
@@ -53,7 +53,7 @@ describe("EnvironmentSettingsView", () => {
     const save = vi.spyOn(environmentClient, "save").mockResolvedValue({ settings: SETTINGS });
     const wrapper = await mounted();
     await wrapper.get('[data-test="row-stronghold_url"] [data-test="reset"]').trigger("click");
-    await wrapper.get('[data-test="form"]').trigger("submit");
+    await wrapper.get('[data-test="save"]').trigger("click");
     await flushPromises();
     expect(save).toHaveBeenCalledWith({ stronghold_url: null });
     expect(wrapper.get('[data-test="notice"]').text()).toContain("uses it now");
@@ -64,7 +64,7 @@ describe("EnvironmentSettingsView", () => {
     vi.spyOn(environmentClient, "save").mockRejectedValue(new Error("Stronghold address: use an http(s) address without a login."));
     const wrapper = await mounted();
     await input(wrapper, "stronghold_url").setValue("ftp://x");
-    await wrapper.get('[data-test="form"]').trigger("submit");
+    await wrapper.get('[data-test="save"]').trigger("click");
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain("http(s) address");
     expect((input(wrapper, "stronghold_url").element as HTMLInputElement).value).toBe("ftp://x");

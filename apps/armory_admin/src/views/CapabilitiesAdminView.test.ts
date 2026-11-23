@@ -158,3 +158,11 @@ it("searches capability labels and tool names without changing their state", asy
   await search.setValue("");
   expect(wrapper.findAll("[data-test=capability]")).toHaveLength(4);
 });
+
+it("filters by status and opens a drawer, not a modal, from the row", async () => {
+  const wrapper = await mounted();
+  await wrapper.get('[aria-label="Filter capabilities"] button:nth-child(2)').trigger("click");
+  expect(wrapper.findAll("[data-test=capability]").map((r) => r.attributes("data-name"))).toEqual(["pdf_merger"]);
+  await wrapper.get('button[aria-label="Open PDF merger"]').trigger("click");
+  expect(wrapper.find("dialog.record-drawer").exists()).toBe(true);
+});

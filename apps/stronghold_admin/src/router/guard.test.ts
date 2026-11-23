@@ -24,13 +24,13 @@ describe("resolveGuard", () => {
   });
   it("moves an account off login and no-access to its first allowed page", () => {
     const only = holds("tickets.manage");
-    const home = { path: "/tickets" };
+    const home = { path: "/overview" };
     const first = holds("usage.all.view", "tickets.manage");
     expect(resolveGuard({ name: "login", fullPath: "/login", guestOnly: true }, only)).toEqual(home);
-    expect(resolveGuard({ name: "no-access", fullPath: "/no-access" }, first)).toEqual({ path: "/usage" });
+    expect(resolveGuard({ name: "no-access", fullPath: "/no-access" }, first)).toEqual({ path: "/overview" });
   });
-  it("opens usage settings for settings managers", () => {
+  it("sends a settings manager to Overview", () => {
     expect(resolveGuard({ name: "login", fullPath: "/login", guestOnly: true }, holds("settings.manage")))
-      .toEqual({ path: "/usage-settings" });
+      .toEqual({ path: "/overview" });
   });
 });

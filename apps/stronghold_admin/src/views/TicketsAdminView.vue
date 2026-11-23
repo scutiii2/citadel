@@ -37,7 +37,7 @@ function updateFilters(next: TicketFilterState): void {
 </script>
 
 <template>
-  <PageLayout class="info-content tickets-admin" title="Tickets" description="A clear view of what needs attention and what’s moving forward." wide fill>
+  <PageLayout class="info-content tickets-admin" title="Tickets" wide fill>
     <TicketsPanel :filters="filters" @filter="updateFilters" />
   </PageLayout>
 </template>

@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { usageSettingsClient, type UsageLimits, type UsageSettings, type UsageSettingsChanges } from "../api/UsageSettingsClient";
-import PageLayout from "../components/PageLayout.vue";
+import SettingsPanel from "../components/admin/SettingsPanel.vue";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
 
 /** The token limits every account gets and the price of each model (USD per 1,000,000 tokens). Saved in Stronghold's
  * database; Stronghold uses a change for the next question and the next cost estimate, with no restart. */
@@ -25,6 +24,8 @@ const loading = ref(true);
 const saving = ref(false);
 const error = ref("");
 const notice = ref("");
+const search = ref("");
+const panel = ref<InstanceType<typeof SettingsPanel>>();
 
 function apply(view: UsageSettings) {
   saved.value = view;
@@ -61,7 +62,7 @@ const problem = computed(() => {
   if (prices.value.some((row) => String(row.input).trim() === "" || String(row.output).trim() === "")) return "Every price needs an input and an output value.";
   return "";
 });
-const canSave = computed(() => (limitsChanged.value || pricesChanged.value) && !problem.value);
+const dirty = computed(() => !!saved.value && (limitsChanged.value || pricesChanged.value));
 
 function addPrice() {
   prices.value.push({ key: nextKey++, model: "", input: "", output: "" });
@@ -72,6 +73,9 @@ function removePrice(key: number) {
 }
 
 async function save() {
+  if (!dirty.value || saving.value) return;
+  error.value = notice.value = "";
+  if (problem.value) { error.value = problem.value; return; }
   const changes: UsageSettingsChanges = {};
   if (limitsChanged.value) {
     changes.usage = Object.fromEntries(LIMITS.map((field) => [field.key, Number(limits.value[field.key])])) as Partial<UsageLimits>;
@@ -80,69 +84,79 @@ async function save() {
     changes.pricing = { models: Object.fromEntries(prices.value.map((row) => [row.model.trim(), { input: Number(row.input), output: Number(row.output) }])) };
   }
   saving.value = true;
+  await panel.value?.keepFocus(async () => {
+    try {
+      apply(await usageSettingsClient.save(changes));
+      notice.value = "Saved. Stronghold uses it from the next question.";
+    } catch (err) {
+      error.value = errorMessage(err);
+    } finally {
+      saving.value = false;
+    }
+  });
+}
+
+function discard() {
+  if (saved.value) apply(saved.value);
   error.value = notice.value = "";
-  try {
-    apply(await usageSettingsClient.save(changes));
-    notice.value = "Saved. Stronghold uses it from the next question.";
-  } catch (err) {
-    error.value = errorMessage(err);
-  } finally {
-    saving.value = false;
-  }
 }
 </script>
 
 <template>
-  <PageLayout
-    class="info-content usage-settings"
-    title="Usage settings"
-    description="The token limits every account gets and what each model costs. Stronghold is the only owner of both."
-  >
-    <p v-if="loading" class="muted">Loading…</p>
+  <SettingsPanel ref="panel" v-model:search="search" title="Usage settings" heading="Limits and prices" label="usage settings" :dirty="dirty" :saving="saving" @save="save" @discard="discard">
+    <template #help>
+      <p>The token limits every account gets and what each model costs. Stronghold is the only owner of both.</p>
+      <p>Prices are USD per 1,000,000 tokens; a model that is not listed has no cost estimate. Stronghold uses a change from the next question, with no restart.</p>
+    </template>
+    <p v-if="loading" class="note muted" role="status">Loading…</p>
     <form v-else class="form" data-test="form" @submit.prevent="save">
-      <section class="card" aria-labelledby="limits-title">
-        <h2 id="limits-title" class="title">Limits</h2>
-        <div v-for="field in LIMITS" :key="field.key" class="field">
+      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
+      <p v-if="problem && dirty" class="note muted" data-test="problem">{{ problem }}</p>
+      <section v-show="panel?.matches('Limits', ...LIMITS.map((field) => field.label))" class="group" aria-labelledby="limits-title">
+        <h3 id="limits-title">Limits</h3>
+        <div v-for="field in LIMITS" v-show="panel?.matches('Limits', field.label)" :key="field.key" class="field">
           <label :for="`l-${field.key}`">{{ field.label }}</label>
           <input :id="`l-${field.key}`" v-model="limits[field.key]" type="number" min="0" :step="field.step ?? '1'" :disabled="saving" :data-test="field.key" />
           <p v-if="field.help" class="help">{{ field.help }}</p>
         </div>
       </section>
 
-      <section class="card" aria-labelledby="prices-title">
-        <h2 id="prices-title" class="title">Prices</h2>
-        <p class="help">USD per 1,000,000 tokens. A model that is not listed has no cost estimate.</p>
+      <section v-show="panel?.matches('Prices', 'Model', ...prices.map((row) => row.model))" class="group" aria-labelledby="prices-title">
+        <h3 id="prices-title">Prices</h3>
         <div v-for="row in prices" :key="row.key" class="price" data-test="price">
           <input v-model="row.model" aria-label="Model name" placeholder="Model name" autocomplete="off" spellcheck="false" :disabled="saving" data-test="price-model" />
           <input v-model="row.input" aria-label="Input price" type="number" min="0" step="any" placeholder="Input" :disabled="saving" data-test="price-input" />
           <input v-model="row.output" aria-label="Output price" type="number" min="0" step="any" placeholder="Output" :disabled="saving" data-test="price-output" />
-          <button type="button" class="chip" :disabled="saving" data-test="price-remove" @click="removePrice(row.key)">Remove</button>
+          <button type="button" class="admin-icon" title="Remove model" aria-label="Remove model" :disabled="saving" data-test="price-remove" @click="removePrice(row.key)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" /></svg>
+          </button>
         </div>
-        <div><button type="button" class="chip" :disabled="saving" data-test="price-add" @click="addPrice">Add a model</button></div>
+        <div>
+          <button type="button" class="admin-icon" title="Add a model" aria-label="Add a model" :disabled="saving" data-test="price-add" @click="addPrice">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+        </div>
       </section>
-
-      <p v-if="problem" class="help" data-test="problem">{{ problem }}</p>
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
-      <div class="actions">
-        <button type="submit" class="primary" data-test="save" :disabled="saving || !canSave">{{ saving ? "Saving…" : "Save" }}</button>
-      </div>
     </form>
-  </PageLayout>
+  </SettingsPanel>
 </template>
 
 <style scoped>
-.form { display: grid; gap: 16px; max-width: 720px; }
-.card { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.title { margin: 0; font-size: 1em; font-weight: 600; }
+.note { margin: 0; padding: 12px 16px 0; }
+.error { color: var(--danger); }
+.muted { color: var(--muted); }
+.form { display: grid; }
+.group { display: grid; gap: 12px; max-width: 720px; padding: 16px; }
+.group + .group { border-top: 1px solid var(--border); }
+.group h3 { margin: 0; font-size: 1em; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }
-.field > input, .price > input { min-width: 0; min-height: 44px; width: 100%; }
+.field > input, .price > input { min-width: 0; min-height: 44px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
 .price { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
-.actions { display: flex; justify-content: flex-end; }
 @media (max-width: 560px) {
-  .price { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .price { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
   .price > input:first-child { grid-column: 1 / -1; }
 }
 </style>

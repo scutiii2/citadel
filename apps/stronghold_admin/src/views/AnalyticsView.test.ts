@@ -49,7 +49,7 @@ async function mountView(permissions: string[] = [...LOGS, "traffic.view"]) {
 }
 
 const button = (wrapper: Awaited<ReturnType<typeof mountView>>, label: string) =>
-  wrapper.findAll("button").find((b) => b.text() === label)!;
+  wrapper.findAll("button").find((b) => b.text() === label || b.attributes("aria-label") === label)!;
 
 beforeEach(() => {
   vi.clearAllMocks();

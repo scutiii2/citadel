@@ -3,13 +3,20 @@ import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { capabilitiesAdminClient, type CapabilityStatus } from "../api/CapabilitiesAdminClient";
 import { commandsClient } from "../api/CommandsClient";
-import IntegrationToolsModal from "../components/IntegrationToolsModal.vue";
+import AdminSearch from "../components/admin/AdminSearch.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
+import StatusFilters from "../components/admin/StatusFilters.vue";
+import CapabilityDrawer from "../components/CapabilityDrawer.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
+import { useNoticesStore } from "../stores/notices";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
+import "../components/admin/admin.css";
 
+const notices = useNoticesStore();
 const capabilities = ref<CapabilityStatus[]>([]);
 const query = ref("");
+const filter = ref<"all" | "online" | "offline">("all");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
 const selectedName = ref<string | null>(null);
 const selected = computed(() => capabilities.value.find((c) => c.name === selectedName.value) ?? null);
 const summaries = ref<Record<string, string>>({});
@@ -53,16 +60,25 @@ const STATE_LABELS: Record<State, string> = {
 
 const rows = computed(() => {
   const search = query.value.trim().toLowerCase();
-  return capabilities.value.filter((c) => `${c.name} ${c.label ?? ''} ${c.tools.join(' ')}`.toLowerCase().includes(search))
+  return capabilities.value
+    .filter((c) => filter.value === "all" || (filter.value === "online") === c.enabled)
+    .filter((c) => `${c.name} ${c.label ?? ""} ${c.tools.join(" ")}`.toLowerCase().includes(search))
     .map((c) => ({ c, state: stateOf(c) }));
 });
+const options = computed(() => [
+  { id: "all" as const, label: "All", count: capabilities.value.length },
+  { id: "online" as const, label: "Online", count: capabilities.value.filter((c) => c.enabled).length, tone: "success" as const },
+  { id: "offline" as const, label: "Offline", count: capabilities.value.filter((c) => !c.enabled).length, tone: "muted" as const },
+]);
 
 async function load(): Promise<void> {
   try {
     capabilities.value = await capabilitiesAdminClient.list();
     error.value = "";
+    notices.report(true);
   } catch (err) {
     error.value = errorMessage(err);
+    notices.report(false);
   } finally {
     loading.value = false;
   }
@@ -109,162 +125,72 @@ onMounted(load);
 </script>
 
 <template>
-  <PageLayout class="info-content capabilities-admin" title="Capabilities" description="Offline hides a capability's tools from every client. Going online, or Restart on an online one, loads its code from disk again. Refresh finds capability folders added while mcp_server runs; they start offline.">
-    <template v-if="!loading" #toolbar><label class="page-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="query" type="search" aria-label="Search capabilities" placeholder="Search capabilities or tools" /></label>
-      <p class="search-count" role="status">{{ rows.length }} of {{ capabilities.length }} capabilities</p></template>
-    <template #actions><button type="button" class="refresh" data-test="refresh" :disabled="refreshing" @click="refresh">
-          {{ refreshing ? "Refreshing…" : "Refresh" }}
-        </button></template>
+  <PageLayout class="admin-panel" title="Capabilities" wide>
+    <StatusFilters v-if="!loading" v-model="filter" label="Filter capabilities" :options="options" />
+    <section class="admin-panel-card" aria-labelledby="capability-roster">
+      <header class="admin-panel-head">
+        <h2 id="capability-roster">Capabilities</h2>
+        <div class="admin-panel-tools">
+          <PanelHelp title="Capabilities">
+            <p>Offline hides a capability's tools from every client. Going online, or Restart on an online one, loads its code from disk again.</p>
+            <p>Refresh finds capability folders added while mcp_server runs; they start offline. Open a row to see its tools.</p>
+          </PanelHelp>
+          <button type="button" class="admin-icon" data-test="refresh" title="Refresh" aria-label="Refresh" :disabled="refreshing" :aria-busy="refreshing" @click="refresh">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" /></svg>
+          </button>
+          <AdminSearch ref="searchField" v-model="query" label="Search capabilities" />
+        </div>
+      </header>
+      <p v-if="error" class="admin-panel-text error" role="alert">{{ error }}</p>
+      <p v-if="loading" class="admin-panel-text muted" role="status">Loading…</p>
+      <p v-else-if="!rows.length" class="admin-panel-text muted">{{ capabilities.length ? "No capabilities match your search." : "No capabilities are available." }} <button v-if="query || filter !== 'all'" type="button" class="chip" @click="query = ''; filter = 'all'; searchField?.focus()">Clear filters</button></p>
+      <div v-else class="admin-table-scroll" role="region" aria-labelledby="capability-roster" tabindex="0">
+        <table class="admin-records">
+          <thead><tr><th scope="col">Capability</th><th scope="col">Status</th><th scope="col">Tools</th><th scope="col">Online</th></tr></thead>
+          <tbody>
+            <tr v-for="{ c, state } in rows" :key="c.name" data-test="capability" :data-name="c.name" :data-state="state">
+              <th scope="row">
+                <div class="admin-record-name">
+                  <div>
+                    <button type="button" class="admin-row-button" aria-haspopup="dialog" :aria-label="`Open ${c.label ?? c.name}`" @click="selectedName = c.name">{{ c.label ?? c.name }}</button>
+                    <code>{{ c.name }}</code>
+                  </div>
+                </div>
+                <pre v-if="c.load_error" class="load-error" data-test="load-error">{{ c.load_error }}</pre>
+                <p v-if="rowErrors[c.name]" class="error" role="alert" data-test="row-error">{{ rowErrors[c.name] }}</p>
+              </th>
+              <td><span class="state" :class="state"><span aria-hidden="true">{{ state === "online" ? "●" : "○" }}</span> {{ STATE_LABELS[state] }}</span></td>
+              <td>{{ c.tools.length }}<template v-if="!c.loaded"> · not loaded yet</template></td>
+              <td>
+                <div class="controls">
+                  <button v-if="c.enabled && !c.missing" type="button" class="admin-icon restart" data-test="restart" :disabled="pending.has(c.name)" :aria-label="`Restart ${c.label ?? c.name}`" title="Restart: load its code from disk again" @click="setOnline(c, true)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" /></svg>
+                  </button>
+                  <ToggleSwitch :checked="c.enabled" :disabled="pending.has(c.name) || (c.missing && !c.enabled)" :aria-label="`${c.label ?? c.name} online`" @change="onToggle(c, $event)" />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p v-if="loading" class="muted">Loading…</p>
-      <template v-else>
-
-      <p v-if="!rows.length" class="muted">{{ capabilities.length ? 'No capabilities match your search.' : 'No capabilities are available.' }}</p>
-      <ul class="list">
-        <li v-for="{ c, state } in rows" :key="c.name" class="card cap" data-test="capability" :data-name="c.name" :data-state="state">
-          <div class="top">
-            <button type="button" class="who open-card" aria-haspopup="dialog" :aria-label="`Open ${c.label ?? c.name}`" @click="selectedName = c.name">
-              <strong>{{ c.label ?? c.name }}</strong>
-              <code>{{ c.name }}</code>
-              <span class="state" :class="state"><span aria-hidden="true">{{ state === 'online' ? '●' : '○' }}</span> {{ STATE_LABELS[state] }}</span>
-            </button>
-            <div class="controls">
-              <button
-                v-if="c.enabled && !c.missing"
-                type="button"
-                class="restart"
-                data-test="restart"
-                :disabled="pending.has(c.name)"
-                :aria-label="`Restart ${c.label ?? c.name}`"
-                title="Restart: load its code from disk again"
-                @click="setOnline(c, true)"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" /></svg>
-              </button>
-              <ToggleSwitch
-                :checked="c.enabled"
-                :disabled="pending.has(c.name) || (c.missing && !c.enabled)"
-                :aria-label="`${c.label ?? c.name} online`"
-                @change="onToggle(c, $event)"
-              />
-            </div>
-          </div>
-          <p class="tools">{{ c.tools.length }} tool{{ c.tools.length === 1 ? "" : "s" }}<template v-if="!c.loaded"> · not loaded yet</template></p>
-          <pre v-if="c.load_error" class="load-error" data-test="load-error">{{ c.load_error }}</pre>
-          <p v-if="rowErrors[c.name]" class="error" role="alert" data-test="row-error">{{ rowErrors[c.name] }}</p>
-        </li>
-      </ul>
-      </template>
-
-    <IntegrationToolsModal kind="capability" :status="selected ? STATE_LABELS[stateOf(selected)] : ''" :open="selected !== null" :title="selected?.label ?? selected?.name ?? ''" :identity="selected?.name ?? ''" :names="selected?.tools ?? []" :available="selected?.enabled ?? false" @close="selectedName = null">
+    <CapabilityDrawer kind="capability" :status="selected ? STATE_LABELS[stateOf(selected)] : ''" :open="selected !== null" :title="selected?.label ?? selected?.name ?? ''" :identity="selected?.name ?? ''" :names="selected?.tools ?? []" :available="selected?.enabled ?? false" @close="selectedName = null">
       <template v-if="selected"><p>{{ summaries[selected.name] ?? `Workspace tools provided by ${selected.label ?? selected.name}. Select a tool below to explore what it does.` }}</p><pre v-if="selected.load_error" class="load-error">{{ selected.load_error }}</pre></template>
-    </IntegrationToolsModal>
-
+    </CapabilityDrawer>
   </PageLayout>
 </template>
 
 <style scoped>
-
-.refresh {
-  padding: 6px 16px;
-  border: none;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 600;
-  color: var(--accent-contrast);
-  background: var(--accent);
-}
-.refresh:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-.list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
-  grid-auto-rows: 1fr;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.card.cap .load-error { max-height: 4.5em; }
-.card.cap { position: relative; transition: border-color 0.15s ease; }
-.card.cap:hover { border-color: var(--accent); }
-.open-card { border: none; padding: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
-.open-card::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); }
-.top :deep(.toggle) { position: relative; z-index: 1; flex-shrink: 0; }
-.controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.restart {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-.restart svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.restart:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
-.restart:disabled { opacity: 0.6; cursor: default; }
+.admin-records :is(th, td):first-child { width: 40%; }
+.controls { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
+.controls .restart { border: 1px solid var(--border); }
 .restart:disabled svg { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-button.open-card:focus-visible { outline: none; }
-.open-card:focus-visible::after { box-shadow: inset 0 0 0 2px var(--accent); }
-.who strong { flex-basis: 100%; }
-.top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.who {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.who code {
-  color: var(--muted);
-}
-.state {
-  padding: 1px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 0.8em;
-  background: var(--surface);
-}
-.state.online {
-  color: var(--success);
-}
-.state.error,
-.state.missing {
-  color: var(--danger);
-}
-.tools {
-  margin: 6px 0 0;
-  font-size: 0.9em;
-  color: var(--muted);
-}
-.load-error {
-  margin: 8px 0 0;
-  padding: 8px 10px;
-  max-height: 220px;
-  overflow: auto;
-  border-radius: var(--radius-md);
-  background: var(--code-bg);
-  font: 0.8em/1.4 var(--mono);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.error {
-  color: var(--danger);
-}
-.muted {
-  color: var(--muted);
-}
+.state { padding: 1px 8px; border-radius: var(--radius-sm); font-size: 0.8em; background: var(--surface); white-space: nowrap; }
+.state.online { color: var(--success); }
+.state.error, .state.missing { color: var(--danger); }
+.load-error { margin: 8px 0 0; padding: 8px 10px; max-height: 4.5em; overflow: auto; border-radius: var(--radius-md); background: var(--code-bg); font: 0.8em/1.4 var(--mono); font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
+.error { margin: 6px 0 0; color: var(--danger); font-weight: 400; }
+.muted { color: var(--muted); }
 </style>

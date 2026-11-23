@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { toolServicesClient, type ToolSaveBody, type ToolService, type ToolTestResult } from "../api/ToolServicesClient";
+import AdminSearch from "../components/admin/AdminSearch.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
+import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import StatusFilters from "../components/admin/StatusFilters.vue";
 import PageLayout from "../components/PageLayout.vue";
 import PasswordInput from "../components/PasswordInput.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
+import "../components/admin/admin.css";
 
 interface AddressRow {
   key: number;
@@ -36,6 +40,22 @@ const cards = ref<Draft[]>([]);
 const loading = ref(true);
 const loadError = ref("");
 const removing = ref<Draft | null>(null);
+const search = ref("");
+const filter = ref<"all" | "enabled" | "disabled">("all");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
+const drawer = ref<InstanceType<typeof RecordDrawer>>();
+const selectedName = ref<string | null>(null);
+const selected = computed(() => cards.value.find((draft) => draft.saved.name === selectedName.value) ?? null);
+const options = computed(() => [
+  { id: "all" as const, label: "All", count: cards.value.length },
+  { id: "enabled" as const, label: "Enabled", count: cards.value.filter((d) => d.saved.enabled).length, tone: "success" as const },
+  { id: "disabled" as const, label: "Disabled", count: cards.value.filter((d) => !d.saved.enabled).length, tone: "muted" as const },
+]);
+const visible = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  return cards.value.filter((draft) => (filter.value === "all" || (filter.value === "enabled") === draft.saved.enabled)
+    && `${draft.saved.label} ${draft.saved.name} ${draft.saved.origins.map((o) => o.origin ?? "").join(" ")}`.toLowerCase().includes(query));
+});
 
 function addressRow(): AddressRow {
   return { key: nextKey++, address: "", name: "", found: null, hasOverride: false,
@@ -156,55 +176,89 @@ async function clear() {
   removing.value = null;
 }
 
+/** Whether the draft differs from what Stronghold saved: the drawer then asks before it closes. */
+function isDirty(draft: Draft): boolean {
+  if (draft.enabled !== draft.saved.enabled || draft.token) return true;
+  if (draft.addresses.length !== Math.max(1, draft.saved.origins.length)) return true;
+  return draft.addresses.some((row, index) => row.address.trim() !== (draft.saved.origins[index]?.origin ?? "")
+    || !!row.token || (row.found === false && !!row.name.trim()));
+}
+
+function discard(draft: Draft) {
+  apply(draft, draft.saved);
+  draft.error = draft.notice = "";
+}
+
+function closeDrawer() {
+  if (selected.value) discard(selected.value);
+  selectedName.value = null;
+}
+
 function resultAddress(draft: Draft, originId: string): string {
   return draft.saved.origins.find((origin) => origin.origin_id === originId)?.origin ?? "Unavailable address";
 }
 </script>
 
 <template>
-  <PageLayout
-    class="info-content tool-services"
-    title="Tool services"
-    description="Citadel services call Bard, Scribe and Reader through these addresses. Treasury stores the addresses. Stronghold keeps the tokens and never displays them again. Add a backup address to keep working when the first one is down."
-  >
-    <p v-if="loading" class="muted" role="status">Loading…</p>
-    <div v-else-if="loadError">
-      <p class="error" role="alert">{{ loadError }}</p>
-      <button class="chip" type="button" @click="load">Retry</button>
-    </div>
+  <PageLayout class="admin-panel" title="Tool services" wide>
+    <StatusFilters v-if="!loading && !loadError" v-model="filter" label="Filter tool services" :options="options" />
+    <section class="admin-panel-card" aria-labelledby="tool-services-title">
+      <header class="admin-panel-head">
+        <h2 id="tool-services-title">Tool services</h2>
+        <div class="admin-panel-tools">
+          <PanelHelp title="Tool services">
+            <p>Citadel services call Bard, Scribe and Reader through these addresses. Treasury stores the addresses. Stronghold keeps the tokens and never displays them again.</p>
+            <p>Open a service to change its addresses and tokens. Add a backup address to keep working when the first one is down.</p>
+          </PanelHelp>
+          <AdminSearch ref="searchField" v-model="search" label="Search tool services" />
+        </div>
+      </header>
+      <p v-if="loading" class="admin-panel-text muted" role="status">Loading…</p>
+      <p v-else-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button class="chip" type="button" @click="load">Retry</button></p>
+      <p v-else-if="!visible.length" class="admin-panel-text muted">No tool services match. <button v-if="search || filter !== 'all'" type="button" class="chip" @click="search = ''; filter = 'all'; searchField?.focus()">Clear filters</button></p>
+      <div v-else class="admin-table-scroll" role="region" aria-labelledby="tool-services-title" tabindex="0">
+        <table class="admin-records">
+          <thead><tr><th scope="col">Service</th><th scope="col">Status</th><th scope="col">Enabled</th><th scope="col">Addresses</th></tr></thead>
+          <tbody>
+            <tr v-for="draft in visible" :key="draft.saved.name" :data-test="'row-' + draft.saved.name">
+              <th scope="row">
+                <div class="admin-record-name"><div>
+                  <button type="button" class="admin-row-button" aria-haspopup="dialog" :aria-label="`Open ${draft.saved.label}`" @click="selectedName = draft.saved.name">{{ draft.saved.label }}</button>
+                  <code>{{ draft.saved.name }}</code>
+                </div></div>
+              </th>
+              <td><span class="state" :class="{ ready: draft.saved.ready }"><span aria-hidden="true">{{ draft.saved.ready ? "✓" : "○" }}</span> {{ draft.saved.ready ? "Ready" : draft.saved.reason ?? "Not ready" }}</span></td>
+              <td>{{ draft.saved.enabled ? "On" : "Off" }}</td>
+              <td>{{ draft.saved.origins.length }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-    <div v-else class="cards">
-      <form
-        v-for="draft in cards"
-        :key="draft.saved.name"
-        class="card"
-        :aria-labelledby="draft.saved.name + '-title'"
-        :data-test="'service-' + draft.saved.name"
-        @submit.prevent="save(draft)"
-      >
-        <header>
-          <h2 :id="draft.saved.name + '-title'">{{ draft.saved.label }}</h2>
-          <p class="state" :class="{ ready: draft.saved.ready }">
-            <span aria-hidden="true">{{ draft.saved.ready ? "✓" : "○" }}</span>
-            {{ draft.saved.ready ? "Ready" : draft.saved.reason ?? "Not ready" }}
-          </p>
-        </header>
+    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected?.saved.label ?? 'Tool service'" :editing="!!selected && isDirty(selected)" :busy="!!selected?.pending"
+      :fallback-focus="() => searchField?.focus()" @discard="selected && discard(selected)" @save="selected && save(selected)" @close="closeDrawer">
+      <form v-if="selected" class="service" :aria-label="selected.saved.label" :data-test="'service-' + selected.saved.name" @submit.prevent="drawer?.requestSave()">
+        <p class="state" :class="{ ready: selected.saved.ready }">
+          <span aria-hidden="true">{{ selected.saved.ready ? "✓" : "○" }}</span>
+          {{ selected.saved.ready ? "Ready" : selected.saved.reason ?? "Not ready" }}
+        </p>
 
         <ToggleSwitch
-          :checked="draft.enabled"
-          :disabled="!!draft.pending"
-          @change="draft.enabled = ($event.target as HTMLInputElement).checked"
+          :checked="selected.enabled"
+          :disabled="!!selected.pending"
+          @change="selected.enabled = ($event.target as HTMLInputElement).checked"
         >Enabled</ToggleSwitch>
 
         <PasswordInput
-          v-model="draft.token"
+          v-model="selected.token"
           label="Connection token"
           autocomplete="new-password"
-          :placeholder="draft.saved.has_token ? 'Leave empty to keep the saved token' : undefined"
-          :disabled="!!draft.pending"
+          :placeholder="selected.saved.has_token ? 'Leave empty to keep the saved token' : undefined"
+          :disabled="!!selected.pending"
         />
 
-        <fieldset v-for="(row, index) in draft.addresses" :key="row.key" class="address-row" :disabled="!!draft.pending">
+        <fieldset v-for="(row, index) in selected.addresses" :key="row.key" class="address-row" :disabled="!!selected.pending">
           <legend>{{ index === 0 ? "Primary address" : "Backup address " + index }}</legend>
           <div class="field">
             <label :for="'address-' + row.key">Address</label>
@@ -218,7 +272,7 @@ function resultAddress(draft: Draft, originId: string): string {
               :aria-invalid="!!row.error"
               :aria-describedby="row.error ? 'address-error-' + row.key : undefined"
               @input="addressChanged(row)"
-              @blur="check(draft, row)"
+              @blur="check(selected, row)"
             />
             <p v-if="row.checking" class="help" role="status">Checking Treasury…</p>
             <p v-if="row.error" :id="'address-error-' + row.key" class="error" role="alert">{{ row.error }}</p>
@@ -240,45 +294,40 @@ function resultAddress(draft: Draft, originId: string): string {
             label="Address token (optional)"
             autocomplete="new-password"
             :placeholder="row.hasOverride ? 'Leave empty to keep the saved token' : undefined"
-            :disabled="!!draft.pending"
+            :disabled="!!selected.pending"
           />
-          <div v-if="draft.addresses.length > 1">
-            <button class="chip" type="button" @click="draft.addresses.splice(index, 1)">Remove address</button>
+          <div v-if="selected.addresses.length > 1">
+            <button class="admin-icon" type="button" title="Remove address" aria-label="Remove address" @click="selected.addresses.splice(index, 1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" /></svg>
+            </button>
           </div>
         </fieldset>
 
         <div>
-          <button class="chip" type="button" data-test="add-address" :disabled="!!draft.pending" @click="draft.addresses.push(addressRow())">
-            Add a backup address
+          <button class="admin-icon" type="button" title="Add a backup address" aria-label="Add a backup address" data-test="add-address" :disabled="!!selected.pending" @click="selected.addresses.push(addressRow())">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
           </button>
         </div>
-        <p v-if="draft.error" class="error" role="alert">{{ draft.error }}</p>
-        <p v-if="draft.notice" class="help" role="status">{{ draft.notice }}</p>
-        <div v-if="draft.result" data-test="test-result" role="status">
-          <p>{{ draft.result.message }}</p>
-          <ul v-if="draft.result.origins.length">
-            <li v-for="origin in draft.result.origins" :key="origin.origin_id">
-              {{ resultAddress(draft, origin.origin_id) }} — {{ origin.message }}
+        <p v-if="selected.error" class="error" role="alert">{{ selected.error }}</p>
+        <p v-if="selected.notice" class="help" role="status">{{ selected.notice }}</p>
+        <div v-if="selected.result" data-test="test-result" role="status">
+          <p>{{ selected.result.message }}</p>
+          <ul v-if="selected.result.origins.length">
+            <li v-for="origin in selected.result.origins" :key="origin.origin_id">
+              {{ resultAddress(selected, origin.origin_id) }} — {{ origin.message }}
             </li>
           </ul>
         </div>
-        <div class="actions">
-          <button
-            class="chip" type="button" data-test="test" :disabled="!!draft.pending"
-            :aria-busy="draft.pending === 'test'" @click="test(draft)"
-          >{{ draft.pending === "test" ? "Testing…" : "Test" }}</button>
-          <button
-            class="primary" type="submit" data-test="save" :disabled="!!draft.pending || !canSave(draft)"
-            :aria-busy="draft.pending === 'save'"
-          >{{ draft.pending === "save" ? "Saving…" : "Save" }}</button>
-        </div>
-        <div v-if="draft.saved.origins.length || draft.saved.has_token || !draft.saved.enabled" class="remove">
-          <button
-            class="danger" type="button" data-test="clear" :disabled="!!draft.pending" @click="removing = draft"
-          >Remove connection</button>
+        <div v-if="selected.saved.origins.length || selected.saved.has_token || !selected.saved.enabled" class="remove">
+          <button class="danger" type="button" data-test="clear" :disabled="!!selected.pending" @click="removing = selected">Remove connection</button>
         </div>
       </form>
-    </div>
+      <template v-if="selected" #footer>
+        <button class="chip" type="button" data-test="test" :disabled="!!selected.pending" :aria-busy="selected.pending === 'test'" @click="test(selected)">{{ selected.pending === "test" ? "Testing…" : "Test" }}</button>
+        <button class="chip" type="button" data-test="cancel" :disabled="!!selected.pending || !isDirty(selected)" @click="drawer?.requestCancel()">Cancel</button>
+        <button class="primary" type="button" data-test="save" :disabled="!!selected.pending || !isDirty(selected) || !canSave(selected)" :aria-busy="selected.pending === 'save'" @click="drawer?.requestSave()">{{ selected.pending === "save" ? "Saving…" : "Save" }}</button>
+      </template>
+    </RecordDrawer>
 
     <ConfirmModal
       :open="removing !== null"
@@ -294,18 +343,17 @@ function resultAddress(draft: Draft, originId: string): string {
 </template>
 
 <style scoped>
-.cards { display: grid; gap: 16px; max-width: 720px; }
-.card { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.card h2 { margin: 0; font-size: 1em; font-weight: 600; }
-.card p { margin: 0; overflow-wrap: anywhere; }
+.service { display: grid; gap: 12px; min-width: 0; padding-top: 4px; }
+.service p { margin: 0; overflow-wrap: anywhere; }
 .state, .help { color: var(--muted); font-size: 0.9em; }
 .state.ready { color: var(--success); }
 .address-row { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .address-row legend { padding: 0 4px; font-size: 0.9em; font-weight: 600; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field label { font-size: 0.9em; font-weight: 600; }
-.field input { min-width: 0; min-height: 44px; width: 100%; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.field input { min-width: 0; min-height: 44px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
+.error { color: var(--danger); }
+.muted { color: var(--muted); }
 .remove { padding-top: 12px; border-top: 1px solid var(--border); }
-.card li { overflow-wrap: anywhere; }
+.service li { overflow-wrap: anywhere; }
 </style>

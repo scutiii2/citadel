@@ -1,14 +1,37 @@
 <script setup lang="ts">
 import { storeToRefs } from "pinia";
-import { watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
+import ThemeSelect from "./components/ThemeSelect.vue";
+import ArmoryHeader from "./components/ArmoryHeader.vue";
 import ArmoryNav from "./components/ArmoryNav.vue";
+import { pageTitle } from "./router/pages";
 import { useAuthStore } from "./stores/auth";
 
 const { account } = storeToRefs(useAuthStore());
 const route = useRoute();
 const router = useRouter();
+const signedInShell = computed(() => account.value && !route.meta.guestOnly && route.name !== "no-access");
+const title = computed(() => pageTitle(route.path));
+const viewport = window.matchMedia("(max-width: 767px)");
+const narrow = ref(viewport.matches);
+const desktopExpanded = ref(true);
+const mobileExpanded = ref(false);
+const expanded = computed(() => (narrow.value ? mobileExpanded.value : desktopExpanded.value));
 
+function syncViewport(event: MediaQueryListEvent) {
+  narrow.value = event.matches;
+  mobileExpanded.value = false;
+}
+
+function toggleNav() {
+  if (narrow.value) mobileExpanded.value = !mobileExpanded.value;
+  else desktopExpanded.value = !desktopExpanded.value;
+}
+
+onMounted(() => viewport.addEventListener("change", syncViewport));
+onUnmounted(() => viewport.removeEventListener("change", syncViewport));
+watch(() => route.fullPath, () => { mobileExpanded.value = false; });
 // The session can end mid-page (expired, or logged out elsewhere): any 401
 // clears the account, and this sends the user back to the login page.
 watch(account, (now) => {
@@ -17,14 +40,23 @@ watch(account, (now) => {
 </script>
 
 <template>
-  <div class="shell">
-    <ArmoryNav v-if="account && $route.name !== 'no-access'" />
-    <main class="page"><RouterView :key="account?.id ?? 'guest'" /></main>
+  <div class="shell" :class="{ 'armory-shell': signedInShell }">
+    <ArmoryHeader v-if="signedInShell" :key="account?.id" :title="title" :expanded="expanded" @toggle="toggleNav" />
+    <ThemeSelect v-else class="guest-theme" />
+    <div class="shell-body">
+      <ArmoryNav v-if="signedInShell" v-show="!narrow || expanded" :expanded="expanded" />
+      <main class="shell-page"><RouterView :key="account?.id ?? 'guest'" /></main>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.shell { display: flex; flex: 1; min-height: 0; }
-.page { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-@media (max-width: 767px) { .shell { flex-direction: column-reverse; } }
+.shell { position: relative; }
+.shell, .shell-page { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; }
+.shell-body { display: flex; flex: 1; min-height: 0; min-width: 0; }
+.armory-shell .shell-page { background: var(--surface); }
+.armory-shell :deep(.page-head-copy) { display: none; }
+.armory-shell :deep(.page-head:not(:has(.page-actions))) { display: none; }
+.guest-theme { position: absolute; inset: 8px 12px auto auto; z-index: 2; }
+@media (max-width: 767px) { .shell-body { flex-direction: column; } }
 </style>
