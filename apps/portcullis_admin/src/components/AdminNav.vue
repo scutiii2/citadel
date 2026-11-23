@@ -60,7 +60,7 @@ watch([() => route.path, pages], async () => {
 </template>
 
 <style scoped>
-.sidebar { display: flex; flex-direction: column; flex: none; width: 52px; padding: 8px; gap: 12px; border-inline-end: 1px solid var(--border); background: var(--bg); overflow-y: auto; }
+.sidebar { display: flex; flex-direction: column; flex: none; width: 52px; padding: 8px; gap: 12px; border-inline-end: 1px solid var(--border); background: var(--bg); overflow-y: auto; scrollbar-gutter: stable; }
 .sidebar.expanded { width: 210px; }
 nav { display: grid; gap: 4px; }
 .shortcuts { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border); }

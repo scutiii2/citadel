@@ -190,7 +190,7 @@ onMounted(load);
 .state { padding: 1px 8px; border-radius: var(--radius-sm); font-size: 0.8em; background: var(--surface); white-space: nowrap; }
 .state.online { color: var(--success); }
 .state.error, .state.missing { color: var(--danger); }
-.load-error { margin: 8px 0 0; padding: 8px 10px; max-height: 4.5em; overflow: auto; border-radius: var(--radius-md); background: var(--code-bg); font: 0.8em/1.4 var(--mono); font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
+.load-error { margin: 8px 0 0; padding: 8px 10px; max-height: 4.5em; overflow: auto; scrollbar-gutter: stable; border-radius: var(--radius-md); background: var(--code-bg); font: 0.8em/1.4 var(--mono); font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
 .error { margin: 6px 0 0; color: var(--danger); font-weight: 400; }
 .muted { color: var(--muted); }
 </style>

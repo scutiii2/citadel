@@ -189,7 +189,7 @@ const ACTIVITY_LINES = [{ id: "tokens", label: "Tokens", color: "var(--accent)" 
 .usage-view {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
 }
 
 .head {

@@ -21,7 +21,7 @@
 
 
 /* PageLayout owns the view scroll area and the header in both apps. */
-.page.info-page { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
+.page.info-page { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
 .page-column-wide { max-width: none; }
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .page-head-copy { min-width: 0; overflow-wrap: anywhere; }

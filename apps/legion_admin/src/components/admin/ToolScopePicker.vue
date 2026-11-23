@@ -55,7 +55,7 @@ function toggle(capability: CapabilityInfo, on: boolean): void {
 <style scoped>
 .tool-picker { display: grid; gap: 6px; }
 .hint { margin: 0; color: var(--muted); font-size: 0.8em; }
-.list { display: grid; gap: 2px; max-height: 220px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.list { display: grid; gap: 2px; max-height: 220px; margin: 0; padding: 0; overflow: auto; scrollbar-gutter: stable; list-style: none; }
 label { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: var(--radius-md); cursor: pointer; font-size: 0.9em; }
 label:hover { background: var(--surface); }
 .name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }

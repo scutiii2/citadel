@@ -404,7 +404,7 @@ function setPinned(group: TicketGroup, event: Event): void {
 .tickets-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .admin-panel-tools .field select { min-height: 36px; border-radius: var(--radius-md); }
 .tickets-card { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.tickets-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 14px 16px; overflow: auto; }
+.tickets-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 14px 16px; overflow: auto; scrollbar-gutter: stable; }
 .refresh svg { width: 16px; height: 16px; }
 .spinning { animation: ticket-refresh 0.8s linear infinite; }
 @keyframes ticket-refresh { to { transform: rotate(360deg); } }
@@ -430,7 +430,7 @@ function setPinned(group: TicketGroup, event: Event): void {
   gap: 14px;
   align-items: start;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
 }
 .group {
   margin-bottom: 10px;

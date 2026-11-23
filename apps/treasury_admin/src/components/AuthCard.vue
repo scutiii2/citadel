@@ -18,7 +18,7 @@ defineProps<{ title: string; subtitle?: string }>();
 .auth-page {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: auto; scrollbar-gutter: stable;
   display: grid;
   place-items: center;
   padding: 24px 16px;
