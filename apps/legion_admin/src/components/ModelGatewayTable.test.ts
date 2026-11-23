@@ -20,9 +20,9 @@ const list = {
 it("adds a chat gateway from a preset and sends only what the form holds", async () => {
   vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue(list as never);
   const save = vi.spyOn(agentsAdminClient, "saveModelGateway").mockResolvedValue({ id: "ollama", provider: "openai" });
-  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", search: "" }, global: { stubs: { Teleport: true } } });
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
   await flushPromises();
-  expect(wrapper.text()).toContain("No chat models gateway is saved yet.");
+  expect(wrapper.text()).toContain("No gateway is saved yet.");
   await wrapper.get('[data-test="add-conversation"]').trigger("click");
   await wrapper.get('[data-test="preset"]').setValue("ollama");
   await wrapper.get('[data-test="preset"]').trigger("change");
@@ -39,7 +39,7 @@ it("adds a chat gateway from a preset and sends only what the form holds", async
 
 it("refuses a name the gateway would not accept before asking to save", async () => {
   vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue(list as never);
-  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", search: "" }, global: { stubs: { Teleport: true } } });
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
   await flushPromises();
   await wrapper.get('[data-test="add-conversation"]').trigger("click");
   await wrapper.get('[data-test="id"]').setValue("Bad Name");

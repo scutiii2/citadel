@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { agentsAdminClient } from "../api/AgentsAdminClient";
 import type { ModelGatewayField, ModelGatewayKind, ModelGatewayList, ModelGatewayRow } from "../api/AgentsAdminClient";
+import AdminSearch from "./admin/AdminSearch.vue";
 import ConfirmModal from "./admin/ConfirmModal.vue";
+import PanelHelp from "./admin/PanelHelp.vue";
 import RecordDrawer from "./admin/RecordDrawer.vue";
 import ConnectionTest from "./ConnectionTest.vue";
 import PasswordInput from "./PasswordInput.vue";
 import { errorMessage } from "../utils/errors";
 
-const props = defineProps<{ kind: ModelGatewayKind; title: string; search: string; fallbackFocus?: () => void }>();
-const emit = defineEmits<{ visible: [visible: boolean] }>();
+const props = defineProps<{ kind: ModelGatewayKind; title: string; help: string }>();
+const search = ref("");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
 
 const list = ref<ModelGatewayList>();
 const loading = ref(false);
@@ -49,10 +52,9 @@ const presets = computed(() => Object.entries(list.value?.presets ?? {}).map(([k
 const typeKey = computed(() => (chat.value ? "provider" : "kind"));
 
 const rows = computed(() => (list.value?.gateways ?? []).filter((row) => {
-  const needle = props.search.trim().toLowerCase();
+  const needle = search.value.trim().toLowerCase();
   return !needle || [row.id, row.label, row.model, row.provider, row.kind].some((value) => String(value ?? "").toLowerCase().includes(needle));
 }));
-watch(() => rows.value.length > 0 || !list.value?.gateways.length, (value) => emit("visible", value), { immediate: true });
 
 async function load() {
   if (loading.value) return;
@@ -186,41 +188,50 @@ const summary = (row: ModelGatewayRow) => String(row.model ?? row.project ?? row
 const drawerTitle = computed(() => (creating.value ? `Add ${props.title.toLowerCase()} gateway` : selected.value?.id ?? props.title));
 
 onMounted(load);
-defineExpose({ reload: load });
 </script>
 
 <template>
-  <h3 :id="`${kind}-gateways`" class="gateway-group">{{ title }}</h3>
-  <div class="admin-table-scroll" tabindex="0" role="region" :aria-labelledby="`${kind}-gateways`">
-    <table class="admin-records">
-      <thead><tr><th scope="col">Name</th><th scope="col">{{ chat ? "Provider and model" : "Kind and address" }}</th><th scope="col">Test</th></tr></thead>
-      <tbody>
-        <tr v-for="row in rows" :key="row.id">
-          <th scope="row">
-            <div class="admin-record-name">
-              <span class="admin-record-badge" aria-hidden="true">{{ row.id.slice(0, 2).toUpperCase() }}</span>
-              <div>
-                <button type="button" class="admin-row-button" aria-haspopup="dialog" @click="show(row)">{{ row.id }}</button>
-                <p v-if="row.label">{{ row.label }}</p>
+  <section :id="`${kind}-gateways`" class="admin-panel-card" :aria-labelledby="`${kind}-gateways-title`">
+    <header class="admin-panel-head">
+      <h2 :id="`${kind}-gateways-title`">{{ title }}</h2>
+      <div class="admin-panel-tools">
+        <PanelHelp :title="title">{{ help }}</PanelHelp>
+        <button type="button" class="admin-icon accent" :data-test="`add-${kind}`" :aria-label="`Add ${title.toLowerCase()} gateway`"
+          :title="`Add ${title.toLowerCase()} gateway`" :disabled="!list" @click="add">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+        <AdminSearch ref="searchField" v-model="search" :label="`Search ${title.toLowerCase()}`" />
+      </div>
+    </header>
+    <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button type="button" class="chip" @click="load">Retry</button></p>
+    <p v-else-if="loading && !list" class="admin-panel-text muted" role="status">Loading…</p>
+    <p v-else-if="list && !rows.length" class="admin-panel-text muted" :data-test="`empty-${kind}`">
+      {{ list.gateways.length ? "No gateways match your search." : "No gateway is saved yet. Use + to add one." }}
+      <button v-if="search" type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button>
+    </p>
+    <div v-else-if="list" class="admin-table-scroll" tabindex="0" role="region" :aria-labelledby="`${kind}-gateways-title`">
+      <table class="admin-records">
+        <thead><tr><th scope="col">Name</th><th scope="col">{{ chat ? "Provider and model" : "Kind and address" }}</th><th scope="col">Test</th></tr></thead>
+        <tbody>
+          <tr v-for="row in rows" :key="row.id">
+            <th scope="row">
+              <div class="admin-record-name">
+                <span class="admin-record-badge" aria-hidden="true">{{ row.id.slice(0, 2).toUpperCase() }}</span>
+                <div>
+                  <button type="button" class="admin-row-button" aria-haspopup="dialog" @click="show(row)">{{ row.id }}</button>
+                  <p v-if="row.label">{{ row.label }}</p>
+                </div>
               </div>
-            </div>
-          </th>
-          <td><code>{{ row.provider ?? row.kind }}</code> <span class="muted">{{ summary(row) }}</span></td>
-          <td><ConnectionTest :label="row.id" :run="() => agentsAdminClient.testModelGateway(kind, row.id)" /></td>
-        </tr>
-        <tr v-if="loading"><td colspan="3" class="muted" role="status">Loading…</td></tr>
-        <tr v-else-if="loadError">
-          <td colspan="3"><span class="error" role="alert">{{ loadError }}</span> <button class="chip" type="button" @click="load">Retry</button></td>
-        </tr>
-        <tr v-else-if="list && !list.gateways.length">
-          <td colspan="3" class="muted">No {{ title.toLowerCase() }} gateway is saved yet.</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  <p><button type="button" class="chip" :data-test="`add-${kind}`" :disabled="!list" @click="add">Add a gateway</button></p>
+            </th>
+            <td><code>{{ summary(row) || "—" }}</code><p class="kind">{{ row.provider ?? row.kind }}</p></td>
+            <td><ConnectionTest :label="row.id" :run="() => agentsAdminClient.testModelGateway(kind, row.id)" /></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
   <Teleport to="body">
-    <RecordDrawer ref="drawer" :open="open" :title="drawerTitle" editable :editing="editing" :busy="saving" :fallback-focus="fallbackFocus"
+    <RecordDrawer ref="drawer" :open="open" :title="drawerTitle" editable :editing="editing" :busy="saving" :fallback-focus="() => searchField?.focus()"
       @edit="edit" @close="close" @discard="discard" @save="save">
       <form v-if="editing" :id="`${kind}-editor`" class="admin-editor" @submit.prevent="submit">
         <template v-if="creating && presets.length">
@@ -287,5 +298,6 @@ defineExpose({ reload: load });
 </template>
 
 <style scoped>
-.gateway-group { margin: 14px 0 6px; font-size: 1rem; }
+.admin-panel-card { margin-bottom: 14px; }
+.kind { margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
 </style>
