@@ -52,7 +52,22 @@ const fields = computed<ModelGatewayField[]>(() => {
 });
 // Chat gateways other than Scuti services name their model outside the variant fields; decision kinds list it among them.
 const needsModel = computed(() => chat.value && type.value !== "" && type.value !== "scuti");
-const presets = computed(() => Object.entries(list.value?.presets ?? {}).map(([key, value]) => ({ key, label: String(value.label ?? key) })));
+const GROUP_TITLES: Record<string, string> = {
+  anthropic: "Anthropic protocol", openai: "OpenAI protocol", scuti: "Model services",
+  typesafe: "TypeSafe", ollama: "Ollama", freellmapi: "FreeLLMAPI",
+};
+// Presets grouped by what they talk to, each group sorted by name.
+const presetGroups = computed(() => {
+  const groups = new Map<string, { key: string; label: string }[]>();
+  for (const [key, value] of Object.entries(list.value?.presets ?? {})) {
+    const group = String(value[chat.value ? "provider" : "kind"] ?? "other");
+    groups.set(group, [...(groups.get(group) ?? []), { key, label: String(value.label ?? key) }]);
+  }
+  const order = Object.keys(GROUP_TITLES);
+  const rank = (group: string) => (order.includes(group) ? order.indexOf(group) : order.length);
+  return [...groups].sort(([a], [b]) => rank(a) - rank(b)).map(([group, items]) => ({ group, title: GROUP_TITLES[group] ?? group, items: items.sort((a, b) => a.label.localeCompare(b.label)) }));
+});
+const presets = computed(() => presetGroups.value.flatMap((entry) => entry.items));
 const tabItems = [{ id: "connection", label: "Connection" }, { id: "models", label: "Models" }] as const;
 const typeKey = computed(() => (chat.value ? "provider" : "kind"));
 
@@ -261,10 +276,12 @@ onMounted(load);
         </div>
         <section v-show="!needsModel || tab === 'connection'" :id="`${kind}-panel-connection`" class="pane" role="tabpanel" :aria-labelledby="`${kind}-tab-connection`">
           <template v-if="creating && presets.length">
-            <label :for="`${kind}-preset`">Start from</label>
+            <label :for="`${kind}-preset`">Preset</label>
             <select :id="`${kind}-preset`" v-model="preset" data-test="preset" :disabled="saving" @change="startFrom">
-              <option value="">Nothing</option>
-              <option v-for="item in presets" :key="item.key" :value="item.key">{{ item.label }}</option>
+              <option value="">None</option>
+              <optgroup v-for="entry in presetGroups" :key="entry.group" :label="entry.title">
+                <option v-for="item in entry.items" :key="item.key" :value="item.key">{{ item.label }}</option>
+              </optgroup>
             </select>
           </template>
           <label :for="`${kind}-id`">Name</label>

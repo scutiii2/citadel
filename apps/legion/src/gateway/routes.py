@@ -41,7 +41,7 @@ def _parts(kind: str) -> tuple[Any, Any] | None:
 
 def _with_tiers(presets: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Each chat preset that has a template file in gateways/<provider>/<name>.json also carries that file's tier models
-    and descriptions, so Start from fills the whole Models tab."""
+    and descriptions, so choosing the preset fills the whole Models tab."""
     from src.providers import llm_config
 
     try:
