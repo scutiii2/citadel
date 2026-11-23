@@ -25,6 +25,12 @@ const draft = ref("");
 type Filter = "all" | ServiceRow["source"];
 const filter = ref<Filter>("all");
 const labels = { pinned: "Pinned", registered: "Registered", default: "Default" } as const;
+/** What each source means and how to change it, shown in the helper popover beside the source. */
+const sourceHelp = {
+  pinned: "You set this address by hand. It wins over the registered one. Open the service and remove the pin to go back to the registered address.",
+  registered: "The service announced this address itself when it started. Open the service and pin an address to override it.",
+  default: "No address is registered, so Treasury uses the built-in default. Start the service so it registers, or pin an address.",
+} as const;
 
 const rows = computed(() => view.value?.services ?? []);
 const options = computed(() => [
@@ -98,7 +104,7 @@ async function save(unpin = false) {
             <tr v-for="row in visible" :key="row.name" :data-test="'row-' + row.name">
               <th scope="row"><button type="button" class="admin-row-button" aria-haspopup="dialog" @click="select(row)">{{ row.name }}</button></th>
               <td><code>{{ row.url }}</code></td>
-              <td>{{ labels[row.source] }}</td>
+              <td><div class="source-cell">{{ labels[row.source] }}<PanelHelp :title="labels[row.source]"><p>{{ sourceHelp[row.source] }}</p></PanelHelp></div></td>
             </tr>
           </tbody>
         </table>
@@ -130,5 +136,6 @@ async function save(unpin = false) {
 </template>
 
 <style scoped>
+.source-cell { display: flex; align-items: center; gap: 4px; }
 .error { margin: 8px 0 0; }
 </style>
