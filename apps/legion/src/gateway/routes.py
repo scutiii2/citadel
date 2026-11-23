@@ -31,6 +31,15 @@ DECISION_FORM = {  # what the page shows per kind: (field, label, secret, requir
 }
 
 
+# Almost every upstream failure reaches the caller as 502; the Test result names what really went wrong instead.
+TEST_CODES = {"gateway_auth": "401", "gateway_quota": "402", "gateway_rate_limit": "429", "gateway_refused": "4XX",
+              "gateway_unavailable": "5XX", "gateway_unreachable": "NET", "gateway_timeout": "TIME", "gateway_bad_reply": "BAD"}
+
+
+def _test_code(error: Any) -> str:
+    return TEST_CODES.get(error.code, str(error.status))
+
+
 def _parts(kind: str) -> tuple[Any, Any] | None:
     if kind == "conversation":
         return gateway.chat_service(), gateway.chat_store()
@@ -120,7 +129,7 @@ def register(mcp: FastMCP) -> None:
                     return JSONResponse({"ok": False, "code": "422", "message": str(error)})
                 message = await gateway.call(parts[0].test_entry(gid, entry))
         except (GatewayError, DecisionGatewayError) as error:  # each service raises its own class
-            return JSONResponse({"ok": False, "code": str(error.status), "message": error.message})
+            return JSONResponse({"ok": False, "code": _test_code(error), "message": error.message})
         return JSONResponse({"ok": True, "message": message})
 
     @mcp.custom_route("/agents/model-gateways/conversation/{gateway_id}/models", methods=["GET"])
