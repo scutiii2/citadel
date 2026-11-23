@@ -1,3 +1,4 @@
+import { createMemoryHistory, createRouter } from "vue-router";
 import { createPinia } from "pinia";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,10 +36,31 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-async function mounted() {
-  const wrapper = mount(AgentsAdminView, { attachTo: document.body, global: { plugins: [createPinia()] } });
+async function mounted(path = "/agents") {
+  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/agents", component: AgentsAdminView }] });
+  await router.push(path);
+  const wrapper = mount(AgentsAdminView, { attachTo: document.body, global: { plugins: [createPinia(), router] } });
   await flushPromises();
   return wrapper;
+}
+
+async function details(wrapper: Awaited<ReturnType<typeof mounted>>, id: string) {
+  await wrapper.get(`[data-id="${id}"] .admin-row-button`).trigger("click");
+}
+
+async function edit(wrapper: Awaited<ReturnType<typeof mounted>>, id: string) {
+  await details(wrapper, id);
+  await wrapper.get('dialog[open] [data-test="edit"]').trigger("click");
+}
+
+async function confirmDrawer(wrapper: Awaited<ReturnType<typeof mounted>>, title: string) {
+  await wrapper.get(`dialog[aria-label="${title}"][open] button.confirm`).trigger("click");
+  await flushPromises();
+}
+
+async function submit(wrapper: Awaited<ReturnType<typeof mounted>>) {
+  await wrapper.get("form").trigger("submit");
+  if (wrapper.find('dialog[aria-label="Save changes?"][open]').exists()) await confirmDrawer(wrapper, "Save changes?");
 }
 
 describe("per-agent gateway order", () => {
@@ -55,8 +77,8 @@ describe("per-agent gateway order", () => {
   it("shows an agent's configured primary and backups on its card", async () => {
     configuredAgent();
     const wrapper = await mounted();
-    expect(wrapper.find("[data-id=calc]").text()).toContain("claude → openrouter → bedrock");
-    expect(wrapper.find("[data-id=ember]").text()).not.toContain("bedrock");
+    await details(wrapper, "calc");
+    expect(wrapper.get("dialog[open]").text()).toContain("claude → openrouter → bedrock");
     wrapper.unmount();
   });
 
@@ -64,7 +86,7 @@ describe("per-agent gateway order", () => {
     const agent = configuredAgent();
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(agent);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     const rows = wrapper.findAll("[data-test=gateway-row]");
     expect(rows).toHaveLength(3);
     await rows[1]!.find("[data-test=move-up]").trigger("click");
@@ -72,7 +94,7 @@ describe("per-agent gateway order", () => {
     expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("openrouter");
     expect(wrapper.find<HTMLInputElement>("[data-test=model]").element.value).toBe("router-custom");
     expect(update).not.toHaveBeenCalled();
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update).toHaveBeenCalledWith("calc", expect.objectContaining({ llm: expect.objectContaining({
       gateway: "openrouter", model: "router-custom", fallback_gateways: [
@@ -85,7 +107,7 @@ describe("per-agent gateway order", () => {
 
   it("adds and removes backup rows, excludes used gateways, and keeps a primary", async () => {
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     expect(wrapper.find<HTMLButtonElement>("[data-test=remove-gateway]").element.disabled).toBe(true);
     await wrapper.find("[data-test=add-gateway]").trigger("click");
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(2);
@@ -102,13 +124,13 @@ describe("per-agent gateway order", () => {
     configuredAgent();
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     const rows = wrapper.findAll("[data-test=gateway-row]");
     await rows[2]!.find("[data-test=drag-handle]").trigger("dragstart", { dataTransfer: { setData: vi.fn() } });
     await rows[0]!.trigger("drop");
     expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("bedrock");
     expect(update).not.toHaveBeenCalled();
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update.mock.calls[0]![1].llm).toMatchObject({ gateway: "bedrock", fallback_gateways: [
       { gateway: "claude", model: "claude-custom" }, { gateway: "openrouter", model: "router-custom" },
@@ -118,14 +140,18 @@ describe("per-agent gateway order", () => {
 
   it("discards canceled gateway edits and isolates each agent's draft", async () => {
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     await wrapper.find("[data-test=add-gateway]").trigger("click");
-    await wrapper.find(".agent-form .actions .cancel").trigger("click");
-    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    await wrapper.get("[data-test=cancel-edit]").trigger("click");
+    await confirmDrawer(wrapper, "Discard changes?");
+    await wrapper.get('dialog[open] button[aria-label="Close"]').trigger("click");
+    await edit(wrapper, "ember");
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
     expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("openrouter");
-    await wrapper.find(".agent-form .actions .cancel").trigger("click");
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await wrapper.get("[data-test=cancel-edit]").trigger("click");
+    await confirmDrawer(wrapper, "Discard changes?");
+    await wrapper.get('dialog[open] button[aria-label="Close"]').trigger("click");
+    await edit(wrapper, "calc");
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
     expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("claude");
     wrapper.unmount();
@@ -135,7 +161,7 @@ describe("per-agent gateway order", () => {
     configuredAgent();
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     await wrapper.find("[data-test=provider]").setValue("openai");
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
     expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("");
@@ -144,7 +170,7 @@ describe("per-agent gateway order", () => {
     expect(wrapper.find("[data-test=add-gateway]").exists()).toBe(false);
     await wrapper.find("[data-test=decision-strategy]").setValue("jev-only");
     await wrapper.find("[data-test=min-confidence]").setValue("0.85");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update.mock.calls[0]![1].llm).toEqual({ provider: "decision", strategy: "jev-only", min_confidence: 0.85 });
     expect(update.mock.calls[0]![1].llm).not.toHaveProperty("fallback_gateways");
@@ -159,9 +185,9 @@ describe("AgentsAdminView", () => {
     vi.mocked(agentsAdminClient.list).mockResolvedValue([router]);
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(router);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=router] [data-test=edit]").trigger("click");
+    await edit(wrapper, "router");
     await wrapper.find("[data-test=role]").setValue("specialist");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     const config = update.mock.calls[0]![1];
     expect(config.role).toBe("specialist");
@@ -177,14 +203,15 @@ describe("AgentsAdminView", () => {
     vi.mocked(agentsAdminClient.list).mockResolvedValue([EMBER, router]);
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(router);
     const wrapper = await mounted();
-    expect(wrapper.find("[data-id=router]").text()).toContain("Internal / Router");
-    expect(wrapper.find("[data-id=router]").text()).toContain("Local Laya only");
-    await wrapper.find("[data-id=router] [data-test=edit]").trigger("click");
+    expect(wrapper.get("[data-id=router]").text()).toContain("Internal router");
+    await details(wrapper, "router");
+    expect(wrapper.get("dialog[open]").text()).toContain("Local Laya only");
+    await wrapper.get('dialog[open] [data-test="edit"]').trigger("click");
     await wrapper.find("[data-test=routing-deadline]").setValue("7");
     expect(wrapper.find("[data-test=allow]").exists()).toBe(false);
     expect(wrapper.find("[data-test=preview]").exists()).toBe(false);
     expect(wrapper.find("[data-test=decision-strategy]").exists()).toBe(false);
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update.mock.calls[0]![1]).toMatchObject({ role: "router", delegable: false,
       decision: { deadline_seconds: 7, strategy: "laya-only" }, tools: { deny: ["*"] } });
@@ -194,9 +221,10 @@ describe("AgentsAdminView", () => {
   it("lists agents with model, port and live status", async () => {
     const wrapper = await mounted();
     expect(wrapper.findAll("[data-test=agent]")).toHaveLength(2);
-    expect(wrapper.find("[data-id=ember]").text()).toContain("openrouter");
-    expect(wrapper.find("[data-id=ember]").text()).toContain("29603");
-    expect(wrapper.find("[data-id=ember] [aria-label='Model tiers']").text()).toContain("big-model");
+    await details(wrapper, "ember");
+    expect(wrapper.get("dialog[open]").text()).toContain("openrouter");
+    expect(wrapper.get("dialog[open]").text()).toContain("29603");
+    expect(wrapper.get("[aria-label='Model tiers']").text()).toContain("big-model");
     expect(wrapper.find("[data-id=calc] [data-test=status]").text()).toContain("Offline");
   });
 
@@ -204,7 +232,7 @@ describe("AgentsAdminView", () => {
     vi.spyOn(agentsAdminClient, "live").mockRejectedValue(new Error("Forbidden"));
     const wrapper = await mounted();
     expect(wrapper.findAll("[data-test=agent]")).toHaveLength(2);
-    expect(wrapper.find("[data-test=status]").exists()).toBe(false);
+    expect(wrapper.get("[data-test=status]").text()).toContain("Unknown");
   });
 
   it("creates an agent from the form with the chosen provider and gateway", async () => {
@@ -219,7 +247,7 @@ describe("AgentsAdminView", () => {
     await wrapper.find("[data-test=url]").setValue("http://10.0.0.5:29606/mcp");
     await wrapper.find("[data-test=persona]").setValue("Be brief.");
     await wrapper.find("[data-test=allow]").setValue("docs_*, wiki_*");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
 
     expect(create).toHaveBeenCalledOnce();
@@ -235,7 +263,7 @@ describe("AgentsAdminView", () => {
 
   it("clears a gateway the new provider does not offer", async () => {
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     const gateway = wrapper.find<HTMLSelectElement>("[data-test=gateway]");
     expect(gateway.element.value).toBe("claude");
     await wrapper.find("[data-test=provider]").setValue("openai");
@@ -246,10 +274,10 @@ describe("AgentsAdminView", () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();
 
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     expect(wrapper.find<HTMLInputElement>("[data-test=id]").element.disabled).toBe(true);
     await wrapper.find("[data-test=label]").setValue("Calculator");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
 
     const [id, config] = update.mock.calls[0]!;
@@ -263,7 +291,7 @@ describe("AgentsAdminView", () => {
     const wrapper = await mounted();
     await wrapper.find("[data-test=new]").trigger("click");
     await wrapper.find("[data-test=id]").setValue("docs");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
 
     expect(wrapper.find("[data-test=form-error]").text()).toContain("already used");
@@ -276,7 +304,7 @@ describe("AgentsAdminView", () => {
     await wrapper.find("[data-test=new]").trigger("click");
     await wrapper.find("[data-test=id]").setValue("docs");
     await wrapper.find("[data-test=port]").setValue("70000");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     expect(create).not.toHaveBeenCalled();
     expect(wrapper.find("[data-test=form-error]").text()).toContain("Port");
   });
@@ -285,8 +313,11 @@ describe("AgentsAdminView", () => {
     const remove = vi.spyOn(agentsAdminClient, "remove").mockResolvedValue(undefined);
     const wrapper = await mounted();
 
-    expect(wrapper.find<HTMLButtonElement>("[data-id=ember] [data-test=remove]").element.disabled).toBe(true);
-    await wrapper.find("[data-id=calc] [data-test=remove]").trigger("click");
+    await details(wrapper, "ember");
+    expect(wrapper.get<HTMLButtonElement>("[data-test=remove]").element.disabled).toBe(true);
+    await wrapper.get('dialog[open] button[aria-label="Close"]').trigger("click");
+    await details(wrapper, "calc");
+    await wrapper.get("[data-test=remove]").trigger("click");
     const confirm = wrapper.findAllComponents({ name: "ConfirmModal" }).find((c) => c.props("title") === "Remove agent")!;
     expect(confirm.props("requireText")).toBe("calc");
     expect(remove).not.toHaveBeenCalled();
@@ -302,8 +333,11 @@ describe("AgentsAdminView", () => {
     const reset = vi.spyOn(agentsAdminClient, "reset").mockResolvedValue(CALC);
     const wrapper = await mounted();
 
-    expect(wrapper.find("[data-id=ember] [data-test=reset]").exists()).toBe(false);
-    await wrapper.find("[data-id=calc] [data-test=reset]").trigger("click");
+    await details(wrapper, "ember");
+    expect(wrapper.find("dialog[open] [data-test=reset]").exists()).toBe(false);
+    await wrapper.get('dialog[open] button[aria-label="Close"]').trigger("click");
+    await details(wrapper, "calc");
+    await wrapper.get("[data-test=reset]").trigger("click");
     const confirm = wrapper.findAllComponents({ name: "ConfirmModal" }).find((c) => c.props("title") === "Reset agent")!;
     expect(reset).not.toHaveBeenCalled();
     await confirm.vm.$emit("confirm");
@@ -316,7 +350,7 @@ describe("AgentsAdminView", () => {
   it("previews which tiers an agent may use and saves the range", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
 
     const allowed = () => wrapper.findAll("[data-test=tier-preview] li:not(.off)").map((li) => li.attributes("data-tier"));
     expect(allowed()).toEqual(["light", "standard", "heavy", "extreme"]);
@@ -325,7 +359,7 @@ describe("AgentsAdminView", () => {
     expect(allowed()).toEqual(["standard"]);
     expect(wrapper.find("[data-tier=standard]").text()).toContain("sonnet");
 
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update.mock.calls[0]![1].llm).toMatchObject({ min_tier: "standard", max_tier: "standard" });
   });
@@ -333,10 +367,10 @@ describe("AgentsAdminView", () => {
   it("refuses a weakest tier that is stronger than the strongest", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     await wrapper.find("[data-test=min-tier]").setValue("heavy");
     await wrapper.find("[data-test=max-tier]").setValue("light");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     expect(update).not.toHaveBeenCalled();
     expect(wrapper.find("[data-test=form-error]").text()).toContain("weakest");
   });
@@ -344,14 +378,14 @@ describe("AgentsAdminView", () => {
   it("saves the model settings, identity override and no routing for an orchestrator", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(EMBER);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    await edit(wrapper, "ember");
 
     await wrapper.find("[data-test=identity]").setValue("You are Ember.");
     await wrapper.find("[data-test=temperature]").setValue("0.3");
     await wrapper.find("[data-test=max-tokens]").setValue("2048");
     await wrapper.find("[data-test=max-tool-rounds]").setValue("8");
     await wrapper.find("[data-test=max-effort]").setValue("medium");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
 
     const config = update.mock.calls[0]![1];
@@ -367,7 +401,7 @@ describe("AgentsAdminView", () => {
     vi.mocked(agentsAdminClient.list).mockResolvedValue([agent, CALC]);
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(agent);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    await edit(wrapper, "ember");
     expect(wrapper.find<HTMLInputElement>("[data-test=max-turn-tokens]").element.value).toBe("250000");
     expect(wrapper.find<HTMLInputElement>("[data-test=max-turn-seconds]").element.value).toBe("600");
     expect(wrapper.find("[data-test=unsaved]").exists()).toBe(false);
@@ -375,7 +409,7 @@ describe("AgentsAdminView", () => {
     await wrapper.find("[data-test=max-turn-seconds]").setValue("900.5");
     expect(wrapper.find("[data-test=unsaved]").exists()).toBe(true);
     expect(update).not.toHaveBeenCalled();
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update).toHaveBeenCalledWith("ember", expect.objectContaining({
       llm: expect.objectContaining({ max_turn_tokens: 500000, max_turn_seconds: 900.5 }),
@@ -387,12 +421,12 @@ describe("AgentsAdminView", () => {
   it("leaves default turn limits unset and explains their scope", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(EMBER);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    await edit(wrapper, "ember");
     expect(wrapper.find<HTMLInputElement>("[data-test=max-turn-tokens]").element.placeholder).toContain("100,000");
     expect(wrapper.find<HTMLInputElement>("[data-test=max-turn-seconds]").element.placeholder).toContain("300");
     expect(wrapper.find("[data-test=run-limits]").text()).toContain("input and output");
     expect(wrapper.find("[data-test=run-limits]").text()).toContain("one response");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update.mock.calls[0]![1].llm).not.toHaveProperty("max_turn_tokens");
     expect(update.mock.calls[0]![1].llm).not.toHaveProperty("max_turn_seconds");
@@ -405,13 +439,13 @@ describe("AgentsAdminView", () => {
     vi.mocked(agentsAdminClient.list).mockResolvedValue([agent, CALC]);
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(agent);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    await edit(wrapper, "ember");
     for (const field of ["max-turn-tokens", "max-turn-seconds", "max-tokens", "max-tool-rounds"]) {
       await wrapper.find(`[data-setting-id="${field}"] button[title="Back to default"]`).trigger("click");
       expect(wrapper.find<HTMLInputElement>(`[data-test=${field}]`).element.value).toBe("");
     }
     expect(update).not.toHaveBeenCalled();
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     for (const key of ["max_turn_tokens", "max_turn_seconds", "max_tokens", "max_tool_rounds"]) {
       expect(update.mock.calls[0]![1].llm).not.toHaveProperty(key);
@@ -426,9 +460,9 @@ describe("AgentsAdminView", () => {
   ])("rejects invalid %s value %s before saving", async (field, value) => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(EMBER);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    await edit(wrapper, "ember");
     await wrapper.find(`[data-test=${field}]`).setValue(value);
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     expect(update).not.toHaveBeenCalled();
     expect(wrapper.find("[data-test=form-error]").text()).toContain("must be");
     wrapper.unmount();
@@ -439,11 +473,11 @@ describe("AgentsAdminView", () => {
     vi.mocked(agentsAdminClient.list).mockResolvedValue([EMBER, agent]);
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(agent);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     await wrapper.find("[data-test=max-turn-tokens]").setValue("invalid");
     await wrapper.find("[data-test=provider]").setValue("decision");
     expect(wrapper.find("[data-test=run-limits]").exists()).toBe(false);
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update).toHaveBeenCalledOnce();
     expect(update.mock.calls[0]![1].llm).not.toHaveProperty("max_turn_tokens");
@@ -454,18 +488,19 @@ describe("AgentsAdminView", () => {
   it("leaves plan_tool out while the checklist is on and writes false when it is switched off", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(EMBER);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    await edit(wrapper, "ember");
     expect((wrapper.find("input[data-test=plan-tool]").element as HTMLInputElement).checked).toBe(true);
 
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update.mock.calls[0]![1]).not.toHaveProperty("plan_tool");
 
+    await wrapper.get('dialog[open] [data-test="edit"]').trigger("click");
     expect(wrapper.find("[data-test=plan-tool-cost]").text()).toContain("200 input tokens");
 
     await wrapper.find("input[data-test=plan-tool]").setValue(false);
     expect(wrapper.find("[data-test=plan-tool-cost]").exists()).toBe(false);
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     await flushPromises();
     expect(update.mock.calls[1]![1]).toMatchObject({ plan_tool: false });
   });
@@ -473,9 +508,9 @@ describe("AgentsAdminView", () => {
   it("refuses a model setting that is out of range before calling the server", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     await wrapper.find("[data-test=temperature]").setValue("5");
-    await wrapper.find("form").trigger("submit");
+    await submit(wrapper);
     expect(update).not.toHaveBeenCalled();
     expect(wrapper.find("[data-test=form-error]").text()).toContain("Temperature");
   });
@@ -483,7 +518,7 @@ describe("AgentsAdminView", () => {
   it("previews the assembled prompt for the draft and shows a refusal", async () => {
     const preview = vi.spyOn(agentsAdminClient, "previewPrompt").mockResolvedValue("Your name is Ember: Calc.");
     const wrapper = await mounted();
-    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await edit(wrapper, "calc");
     await wrapper.find("[data-test=preview-caveman]").setValue(true);
     await wrapper.find("[data-test=preview]").trigger("click");
     await flushPromises();
@@ -504,4 +539,14 @@ describe("AgentsAdminView", () => {
     await wrapper.find("[data-test=shared-prompts]").trigger("click");
     expect(wrapper.findComponent({ name: "SharedPromptsModal" }).props("open")).toBe(true);
   });
+});
+
+
+it("uses the offline deep link and counts the roster before applying search", async () => {
+  const wrapper = await mounted("/agents?status=offline");
+  expect(wrapper.findAll("[data-test=agent]").map((row) => row.attributes("data-id"))).toEqual(["calc"]);
+  await wrapper.get('input[type="search"]').setValue("ember");
+  expect(wrapper.findAll("[data-test=agent]")).toHaveLength(0);
+  expect(wrapper.get('button[aria-pressed="true"]').text()).toContain("Offline 1");
+  wrapper.unmount();
 });

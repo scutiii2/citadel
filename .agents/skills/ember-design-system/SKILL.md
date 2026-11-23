@@ -1,11 +1,11 @@
 ---
 name: ember-design-system
-description: Use when building or restyling any UI (web app, dashboard, admin page, tool front end, mobile or desktop shell) that should look and behave like the ember app - ember orange accent, light-dark theme tokens, one radius scale, icon rail, pill controls. Also use when adding screens to ember_web, or reviewing a UI for visual or interaction consistency with ember.
+description: Use when building or reviewing Citadel UI that uses Ember colors, theme tokens, radius, typography, controls, or focus styles.
 ---
 
 # Ember design system
 
-The look and interaction rules of ember_web, extracted so a new UI feels like the same product. Source of truth in code: `apps/ember_web/src/style.css` (tokens) and `apps/ember_web/src/components/`. Framework-agnostic: the examples are Vue, the rules are CSS and behavior.
+Use the target app's `style.css` and shared components as the token and implementation source. For Citadel admin layout and interactions, follow the [approved admin design reference](../ember-frontend-design/SKILL.md#admin-design-reference).
 
 **Core idea:** one coherent system, not per-component choices. Pick tokens and patterns first, write styles second. Never hardcode a colour or a pixel radius.
 
@@ -16,7 +16,7 @@ The look and interaction rules of ember_web, extracted so a new UI feels like th
 3. Build from the patterns in [components.md](components.md): copy the CSS, keep the tokens.
 4. Check against the rules and checklist below.
 
-If the new UI is ember_web or ember_admin (they carry the same shared components and tokens), reuse the existing components instead (`ember-feature-scaffold` lists them).
+In existing Citadel apps, reuse the target app's tokens and components.
 
 ## Foundations
 
@@ -47,7 +47,7 @@ Rules: tinted fills use `color-mix(in srgb, var(--x) N%, var(--bg))`, never a ne
 
 A nested corner is `calc(outer - padding)`. An element flush to an edge is square on that side. Only 10-11px chart marks keep a literal `2px`.
 
-**Layout** - the page never scrolls (`body { overflow: hidden }`); each view scrolls its own area (`flex: 1; min-height: 0; overflow-y: auto`). Content column centred, `max-width` 820px (forms) to 980px (info pages), `padding: 24px 16px`. Navigation is a 52px icon rail on the left; below 768px it becomes a bottom bar of height `--rail-height`. Breakpoints used: 767/768 (rail flips). Test at desktop, 768 and 375.
+**Layout.** Use `PageLayout` for the view's geometry and scrolling. Let the view own its scroll area. Follow the admin design reference for header, collapsible sidebar, panel toolbar, and drawer placement.
 
 **Surfaces** - cards: `1px solid --border`, `--radius-lg`, `--surface`, `12px 14px` padding. Raised tiles use a soft shadow (`0 2px 10px rgba(0,0,0,.14)`, lifting 2px on hover). No heavy shadows elsewhere; modals use a `rgb(0 0 0 / 45%)` backdrop.
 
@@ -59,10 +59,10 @@ A nested corner is `calc(outer - padding)`. An element flush to an edge is squar
 
 - **Controls:** primary action = accent-filled pill (`--radius-full`, weight 600, `--accent-contrast` text). Secondary = outlined pill. Inputs = `--radius-md`, `--border`, `--bg` fill, accent border on focus. On/off = `ToggleSwitch` pill (real checkbox, `role="switch"`), never a bare checkbox. A handful of exclusive choices = segmented pill (accent track, white sliding thumb). Both in [components.md](components.md).
 - **Confirmations:** never the browser's `confirm()`. Use an in-app modal; friction scales with severity. Severe actions (delete account, delete something in use, delete all) require typing the name or phrase (`requireText`) before the confirm button enables. Destructive buttons are red-outlined pills and sit in a red-tinted **Danger zone** block, last in the form.
-- **Settings:** a setting that only touches this browser applies instantly and says "Applies instantly. Saved on this device." A setting that reaches other accounts or the server is a draft with an unsaved bar until Save. A setting that differs from its default shows an accent dot and its own reset button; no reset-all.
+- **Settings:** browser-only preferences apply instantly. Server settings stay in a draft until Save. In admin panels, follow the shared dirty-only Save slot or drawer footer pattern. A setting that differs from its default shows an accent dot and its own reset button.
 - **Busy state:** disable the control, set `aria-busy`, show progress on the control itself (spinner ring, drawn globally for `button[aria-busy="true"]` in ember_web, so no per-component copy); ignore clicks while busy.
 - **Icons:** stroked 24x24 SVG path data, `stroke: currentColor; stroke-width: 1.8; fill: none; round caps and joins`. Icon-only controls get a name on hover and keyboard focus (`data-label` tooltip) and an `aria-label`.
-- **Bottom sheets** sit above the mobile nav bar: `bottom: var(--rail-height)`, not `0`.
+- **Bottom sheets:** on shells with mobile bottom navigation, place sheets above `--rail-height`.
 - **Persistence:** theme and local preferences in `localStorage`, every read and write in try/catch (storage may be blocked); a failed read means the default.
 
 ## Theme

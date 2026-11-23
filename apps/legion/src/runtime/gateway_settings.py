@@ -15,6 +15,7 @@ Where Treasury itself is: `treasury_address()`, from TREASURY_URL or tracked con
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -40,6 +41,8 @@ _SERVICES = {
 }
 DEFAULT_TREASURY_URL = "http://127.0.0.1:29602"
 MAX_TOKEN_LENGTH = 512
+MAX_DESCRIPTION_LENGTH = 500
+_save_locks = {key: asyncio.Lock() for key in _SERVICES}
 
 _TIMEOUT = httpx.Timeout(3.0)
 _TTL_SECONDS = 30.0
@@ -61,6 +64,7 @@ class GatewaySettingsError(Exception):
 class GatewaySettings:
     url: str
     token: str
+    description: str = ""
 
 
 def treasury_address() -> str:
@@ -89,7 +93,8 @@ def _from_doc(doc: Any, which: str = KEY) -> GatewaySettings:
     doc = doc if isinstance(doc, dict) else {}
     url = doc.get("url") or _SERVICES[which]
     token = doc.get("token") or ""
-    return GatewaySettings(str(url).rstrip("/"), str(token))
+    description = doc.get("description")
+    return GatewaySettings(str(url).rstrip("/"), str(token), description if isinstance(description, str) else "")
 
 
 def _doc(response: httpx.Response) -> dict[str, Any] | None:
@@ -155,7 +160,11 @@ def current_sync(which: str = KEY) -> GatewaySettings:
 def _checked_url(value: Any) -> str:
     if not isinstance(value, str) or not value.strip():
         raise GatewaySettingsError("url must be an http(s) address")
-    parts = urlsplit(value.strip())
+    try:
+        parts = urlsplit(value.strip())
+        _ = parts.port
+    except ValueError as error:
+        raise GatewaySettingsError("url must be an http(s) address with a valid host and port") from error
     if parts.scheme not in ("http", "https") or not parts.hostname or parts.username or parts.password \
             or parts.query or parts.fragment:
         raise GatewaySettingsError("url must be an http(s) address without credentials, query or fragment")
@@ -168,33 +177,38 @@ def _checked_token(value: Any) -> str:
     return value
 
 
+def _checked_description(value: Any) -> str:
+    if not isinstance(value, str) or len(value.strip()) > MAX_DESCRIPTION_LENGTH:
+        raise GatewaySettingsError(f"description must be text, at most {MAX_DESCRIPTION_LENGTH} characters")
+    return value.strip()
+
+
 async def save(changes: dict[str, Any], which: str = KEY) -> GatewaySettings:
-    """Store `changes` ({"url"?, "token"?}). A missing key keeps the stored value; an empty
-    token clears it. Nothing is saved when a value is refused or Treasury cannot be reached."""
-    unknown = set(changes) - {"url", "token"}
+    """Merge a partial edit into one Treasury record. Empty text clears description or token."""
+    validators = {"url": _checked_url, "token": _checked_token, "description": _checked_description}
+    unknown = changes.keys() - validators.keys()
     if unknown:
         raise GatewaySettingsError(f"unknown setting: {', '.join(sorted(unknown))}")
-    stored = await _read(which)
-    if stored is None:
-        raise GatewaySettingsError("Treasury is not reachable; the settings were not saved")
-    doc = {key: stored[key] for key in ("url", "token") if stored.get(key)}
-    if "url" in changes:
-        doc["url"] = _checked_url(changes["url"])
-    if "token" in changes:
-        doc["token"] = _checked_token(changes["token"])
-    try:
-        async with service_client(internal_auth.keyring, "treasury", transport=_TRANSPORT, timeout=_TIMEOUT) as client:
-            response = await client.put(_record_url(which), json={"doc": doc}, headers=_headers())
-    except httpx.HTTPError as error:
-        raise GatewaySettingsError("Treasury is not reachable; the settings were not saved") from error
-    if response.status_code >= 400:
-        raise GatewaySettingsError(f"Treasury refused the settings ({response.status_code})")
-    return _remember(doc, which)
+    patch = {key: validators[key](value) for key, value in changes.items()}
+    # Treasury replaces the full record. Serialize concurrent partial writes per gateway.
+    async with _save_locks[which]:
+        stored = await _read(which)
+        if stored is None:
+            raise GatewaySettingsError("Treasury is not reachable; the settings were not saved")
+        doc = {**stored, **patch}
+        try:
+            async with service_client(internal_auth.keyring, "treasury", transport=_TRANSPORT, timeout=_TIMEOUT) as client:
+                response = await client.put(_record_url(which), json={"doc": doc}, headers=_headers())
+        except (httpx.HTTPError, AuthError) as error:
+            raise GatewaySettingsError("Treasury is not reachable; the settings were not saved") from error
+        if not response.is_success:
+            raise GatewaySettingsError(f"Treasury refused the settings ({response.status_code})")
+        return _remember(doc, which)
 
 
 def view(settings: GatewaySettings) -> dict[str, Any]:
     """What the admin page shows. The token itself never leaves Legion."""
-    return {"url": settings.url, "has_token": bool(settings.token)}
+    return {"url": settings.url, "description": settings.description, "has_token": bool(settings.token)}
 
 
 def reset_cache() -> None:

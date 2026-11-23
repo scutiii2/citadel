@@ -1,54 +1,99 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import type { GatewaySettingsView } from "../api/AgentsAdminClient";
+import { computed, onMounted, ref, watch } from "vue";
+import type { GatewaySettingsPatch, GatewaySettingsView } from "../api/AgentsAdminClient";
 import PasswordInput from "./PasswordInput.vue";
+import RecordDrawer from "./admin/RecordDrawer.vue";
 import { errorMessage } from "../utils/errors";
 
-/** Address and access token of one service Legion calls. Saved in the database, not in a file.
- * The token is write-only: the server only says whether one is set. */
 const props = defineProps<{
-  /** Unique on the page; prefixes the field ids. */
   id: string;
   title: string;
   example: string;
+  search: string;
+  fallbackFocus?: () => void;
   load: () => Promise<GatewaySettingsView>;
-  store: (changes: { url?: string; token?: string }) => Promise<GatewaySettingsView>;
+  store: (changes: GatewaySettingsPatch) => Promise<GatewaySettingsView>;
 }>();
-
-const savedUrl = ref("");
+const emit = defineEmits<{ visible: [visible: boolean] }>();
+const saved = ref<GatewaySettingsView>();
 const url = ref("");
+const description = ref("");
 const token = ref("");
-const hasToken = ref(false);
-const loading = ref(true);
+const clearToken = ref(false);
+const loading = ref(false);
+const loadError = ref("");
 const saving = ref(false);
 const error = ref("");
 const notice = ref("");
+const open = ref(false);
+const editing = ref(false);
+const drawer = ref<InstanceType<typeof RecordDrawer>>();
 
-const changed = computed(() => url.value.trim() !== savedUrl.value || token.value !== "");
+const visible = computed(() => !saved.value || [props.title, saved.value.description, saved.value.url]
+  .some((value) => value?.toLowerCase().includes(props.search.trim().toLowerCase())));
+watch(visible, (value) => emit("visible", value), { immediate: true });
+const changes = computed<GatewaySettingsPatch>(() => ({
+  ...(url.value.trim() !== saved.value?.url ? { url: url.value.trim() } : {}),
+  ...(description.value.trim() !== (saved.value?.description ?? "") ? { description: description.value.trim() } : {}),
+  ...(clearToken.value || token.value ? { token: clearToken.value ? "" : token.value } : {}),
+}));
 
-function apply(view: { url: string; has_token: boolean }) {
-  savedUrl.value = url.value = view.url;
-  hasToken.value = view.has_token;
-  token.value = "";
-}
-
-onMounted(async () => {
+async function load() {
+  if (loading.value) return;
+  loading.value = true;
+  loadError.value = "";
   try {
-    apply(await props.load());
+    saved.value = await props.load();
   } catch (err) {
-    error.value = errorMessage(err);
+    loadError.value = errorMessage(err);
   } finally {
     loading.value = false;
   }
-});
+}
 
-/** Sends only what changed, so an untouched token field keeps the stored token. */
-async function save(changes: { url?: string; token?: string }, done: string) {
-  saving.value = true;
+function edit() {
+  if (!saved.value) return;
+  url.value = saved.value.url;
+  description.value = saved.value.description ?? "";
+  token.value = "";
+  clearToken.value = false;
   error.value = notice.value = "";
+  editing.value = true;
+}
+
+function discard() {
+  editing.value = false;
+  token.value = "";
+  clearToken.value = false;
+}
+
+function close() {
+  discard();
+  open.value = false;
+}
+
+function submit() {
+  if (!Object.keys(changes.value).length || saving.value) return;
+  error.value = "";
   try {
-    apply(await props.store(changes));
-    notice.value = done;
+    const parsed = new URL(url.value.trim());
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password ||
+      parsed.search || parsed.hash || url.value.trim().length > 300) throw new Error();
+  } catch {
+    error.value = "Enter an HTTP(S) address without credentials, query, or fragment.";
+    return;
+  }
+  drawer.value?.requestSave();
+}
+
+async function save() {
+  if (saving.value) return;
+  saving.value = true;
+  error.value = "";
+  try {
+    saved.value = await props.store(changes.value);
+    notice.value = "Saved. Agents use the new values within half a minute.";
+    discard();
   } catch (err) {
     error.value = errorMessage(err);
   } finally {
@@ -56,98 +101,61 @@ async function save(changes: { url?: string; token?: string }, done: string) {
   }
 }
 
-function submit() {
-  const changes: { url?: string; token?: string } = {};
-  if (url.value.trim() !== savedUrl.value) changes.url = url.value.trim();
-  if (token.value) changes.token = token.value;
-  void save(changes, "Saved. Agents use the new values within half a minute.");
-}
+onMounted(load);
 </script>
 
 <template>
-  <section class="card" :aria-labelledby="`${id}-title`">
-    <h2 :id="`${id}-title`" class="title">{{ title }}</h2>
-    <p v-if="loading" class="muted">Loading…</p>
-    <form v-else class="fields" @submit.prevent="submit">
-      <div class="field">
-        <label :for="`${id}-url`">Address</label>
-        <input
-          :id="`${id}-url`"
-          v-model="url"
-          type="url"
-          inputmode="url"
-          autocomplete="off"
-          spellcheck="false"
-          required
-          data-test="url"
-          :disabled="saving"
-          :aria-describedby="`${id}-url-help`"
-        />
-        <p :id="`${id}-url-help`" class="help">For example {{ example }} inside Docker.</p>
+  <tr v-show="visible">
+    <th scope="row">
+      <div class="admin-record-name">
+        <span class="admin-record-badge" aria-hidden="true">{{ title.slice(0, 2).toUpperCase() }}</span>
+        <div>
+          <button v-if="saved" type="button" class="admin-row-button" aria-haspopup="dialog" @click="open = true">{{ title }}</button>
+          <span v-else>{{ title }}</span>
+          <p v-if="saved?.description">{{ saved.description }}</p>
+        </div>
       </div>
-
-      <div class="field">
-        <PasswordInput
-          v-model="token"
-          label="Access token"
-          autocomplete="off"
-          data-test="token"
-          :disabled="saving"
-          :placeholder="hasToken ? 'Leave empty to keep the saved token' : 'Paste the token made for Legion'"
-          :aria-describedby="`${id}-token-help`"
-        />
-        <p :id="`${id}-token-help`" class="help" data-test="token-state">
-          {{ hasToken ? "A token is saved. It is never shown again." : "No token is saved yet." }}
-          Make one on the service's admin page, under Access tokens.
-        </p>
-      </div>
-
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p v-if="notice" class="notice" role="status" data-test="notice">{{ notice }}</p>
-
-      <div class="actions">
-        <button
-          v-if="hasToken"
-          type="button"
-          class="chip"
-          data-test="clear-token"
-          :disabled="saving"
-          @click="save({ token: '' }, 'Token removed.')"
-        >Remove token</button>
-        <button type="submit" class="primary" data-test="save" :disabled="saving || !changed">
-          {{ saving ? "Saving…" : "Save" }}
+    </th>
+    <td>
+      <code v-if="saved">{{ saved.url }}</code>
+      <span v-else-if="loading" class="muted" role="status">Loading…</span>
+      <template v-else-if="loadError">
+        <span class="error" role="alert">{{ loadError }}</span>
+        <button class="chip" type="button" @click="load">Retry</button>
+      </template>
+    </td>
+  </tr>
+  <Teleport to="body">
+    <RecordDrawer ref="drawer" :open="open" :title="title" editable :editing="editing" :busy="saving" :fallback-focus="fallbackFocus"
+      @edit="edit" @close="close" @discard="discard" @save="save">
+      <form v-if="editing" :id="`${id}-editor`" class="admin-editor" @submit.prevent="submit">
+        <label :for="`${id}-description`">Description</label>
+        <textarea :id="`${id}-description`" v-model="description" maxlength="500" rows="3" :disabled="saving" data-test="description" />
+        <label :for="`${id}-url`">Connection URL</label>
+        <input :id="`${id}-url`" v-model="url" type="url" inputmode="url" maxlength="300" autocomplete="off" spellcheck="false"
+          required data-test="url" :disabled="saving" :aria-describedby="`${id}-url-help`" />
+        <p :id="`${id}-url-help`" class="muted">For example {{ example }} inside Docker.</p>
+        <PasswordInput v-model="token" label="Access token" autocomplete="off" data-test="token" :disabled="saving || clearToken"
+          :placeholder="saved?.has_token ? 'Leave empty to keep the saved token' : 'Paste the token made for Legion'" />
+        <button v-if="saved?.has_token" type="button" class="chip" data-test="clear-token" :disabled="saving" :aria-pressed="clearToken" @click="clearToken = !clearToken">
+          {{ clearToken ? 'Keep saved token' : 'Remove token' }}
         </button>
+        <p v-if="clearToken" role="status">The saved token will be removed when you save.</p>
+        <p v-if="error" class="error" role="alert">{{ error }}</p>
+      </form>
+      <div v-else-if="open && saved" class="admin-details">
+        <p v-if="saved.description">{{ saved.description }}</p>
+        <dl>
+          <dt>Connection URL</dt><dd><code>{{ saved.url }}</code></dd>
+          <dt>Access token</dt><dd data-test="token-state">{{ saved.has_token ? 'A token is saved.' : 'No token is saved yet.' }}</dd>
+        </dl>
+        <p class="muted">Manage tokens on the gateway’s admin page under Access tokens.</p>
+        <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
       </div>
-    </form>
-  </section>
+      <template v-if="editing" #footer>
+        <button type="button" class="chip" :disabled="saving" data-test="cancel-edit" @click="drawer?.requestCancel()">Cancel</button>
+        <button type="submit" :form="`${id}-editor`" class="primary" data-test="save" :disabled="saving || !Object.keys(changes).length" :aria-busy="saving">Save changes</button>
+      </template>
+    </RecordDrawer>
+  </Teleport>
 </template>
-
-<style scoped>
-.card {
-  display: grid;
-  gap: 12px;
-  max-width: 560px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-.title { margin: 0; font-size: 1em; font-weight: 600; }
-.fields { display: grid; gap: 16px; }
-.field { display: grid; gap: 4px; min-width: 0; }
-.field > label { font-size: 0.9em; font-weight: 600; }
-.field > input {
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text);
-  background: var(--bg);
-}
-.field > input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.help { margin: 0; font-size: 0.85em; color: var(--muted); }
-.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.error { margin: 0; color: var(--danger); }
-.notice { margin: 0; color: var(--muted); }
-</style>

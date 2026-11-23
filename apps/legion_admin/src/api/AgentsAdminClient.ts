@@ -98,6 +98,13 @@ export interface SharedPrompts {
 export interface GatewaySettingsView {
   url: string;
   has_token: boolean;
+  description?: string;
+}
+
+export interface GatewaySettingsPatch {
+  url?: string;
+  description?: string;
+  token?: string;
 }
 
 /** One MCP server Legion connects to. A header value is write-only: reads carry `has_value` instead. */
@@ -138,10 +145,10 @@ export const agentsAdminClient = {
   remove: (id: string) => apiRequest<void>("DELETE", `/api/admin/agents/${encodeURIComponent(id)}`),
   gatewaySettings: () => apiRequest<GatewaySettingsView>("GET", "/api/admin/gateway-settings"),
   /** Only the fields given are changed; an empty token removes the saved one. */
-  setGatewaySettings: (changes: { url?: string; token?: string }) =>
+  setGatewaySettings: (changes: GatewaySettingsPatch) =>
     apiRequest<GatewaySettingsView>("PUT", "/api/admin/gateway-settings", changes),
   decisionGatewaySettings: () => apiRequest<GatewaySettingsView>("GET", "/api/admin/decision-gateway-settings"),
-  setDecisionGatewaySettings: (changes: { url?: string; token?: string }) =>
+  setDecisionGatewaySettings: (changes: GatewaySettingsPatch) =>
     apiRequest<GatewaySettingsView>("PUT", "/api/admin/decision-gateway-settings", changes),
   servers: async () => (await apiRequest<{ servers: Record<string, McpServer> }>("GET", "/api/admin/servers")).servers,
   /** Add or change a server; an auth header sent without its value keeps the saved value. Applies at Legion's next start. */

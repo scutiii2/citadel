@@ -1,13 +1,13 @@
 ---
 name: ember-frontend-design
-description: Use when designing, building, restyling or reviewing any screen, component or layout in ember_web or ember_admin (the two Vue 3 apps in apps/). Covers which app a page belongs in, the shared tokens and components to reuse, page layout, navigation placement, confirmations, settings behaviour, the radius test and how to check a UI. Use even for small visual tweaks ("make this card nicer", "add a settings row", "fix the spacing on the tickets page").
+description: Use when designing, building, restyling, or reviewing Citadel's Ember desktop or admin UI, including app shells, searchable panels, record rows, and editor drawers.
 ---
 
-# Ember frontend design (ember_web + ember_admin)
+# Citadel frontend design
 
-Project-specific layer on top of `ember-design-system` (tokens, radius scale, focus, motion, interaction rules). Read that skill for the visual rules; this one says how to apply them in these two apps. For routes, stores and API wiring use `ember-feature-scaffold`.
+Use `ember-design-system` for tokens, radius, focus, and interaction rules. Use the target app's `AGENTS.md` for routing, permissions, and API conventions. Treat `apps/ember_web` as reference material for Ember patterns.
 
-**Core idea:** one product, two apps. Reuse before writing. Pick tokens and a pattern first, write styles second.
+Reuse the target app's components and tokens before adding styles.
 
 **Mobile and responsive work:** read [mobile-ui.md](mobile-ui.md) before changing narrow layouts, touch controls, keyboard behavior, sheets or mobile navigation, and when reviewing those interactions. It adds mobile acceptance checks to this skill and the existing design system. Its shared usability rules also apply to the affected desktop flow.
 
@@ -15,16 +15,43 @@ Project-specific layer on top of `ember-design-system` (tokens, radius scale, fo
 
 | Page is for | App |
 |---|---|
-| Every signed-in user, chat, capability tools (Notes, Memory, Generator, Tickets as a user) | `ember_web` (port 26502) |
-| Staff: accounts, roles, invites, agents, capabilities, analytics, ticket triage, workspace settings | `ember_admin` (port 26501) |
+| User-facing chat and tools | `apps/ember` |
+| Staff accounts, roles, and invites | `apps/portcullis_admin` |
+| Agents, gateway connections, MCP servers, and tuning | `apps/legion_admin` |
+| Admin pages owned by Armory, Stronghold, or Treasury | The corresponding `apps/*_admin` app |
 
-Gate admin pages by permission in `ember_admin/src/router/pages.ts`; the guard is cosmetic, portcullis enforces.
+Use the target app's permission rules for admin routes. Portcullis enforces permissions server-side.
+
+## Admin design reference
+
+Use the approved [Legion Admin mockup](../../../apps/legion_admin/mockups/legion-redesign.html) and its [Vue implementation](../../../apps/legion_admin/src/mockups/LegionRedesign.vue) for new or redesigned admin shells, panels, and drawers. Apply the patterns within the requested scope and reuse the target app's components and permissions.
+
+### Shell
+
+- Use Ember orange as the primary accent and keep Dark, Light, and System theme choices. The reference mockup opens in Dark mode.
+- Use a compact full-width header. Put the sidebar toggle, app identity, thin vertical divider, and current page title on the left. Put Notifications, Help, and Profile on the right. Theme and Log out belong inside Profile.
+- Keep cross-app shortcuts at the bottom of the sidebar. Use labels in the expanded desktop sidebar and named icons in the collapsed rail. On mobile, the header toggle reveals navigation above the content.
+- Keep `PageLayout` for content geometry and scrolling. Use the header as the single visible page title and omit the generic subtitle from the body. Keep task-specific section headings.
+
+### Panels and rows
+
+- Put a labeled search at the right of roster, connection, and settings panel headers. Filter only that panel. Keep drafts when rows are filtered, and validate pending fields even when search hides them.
+- Put the inline Save icon immediately left of search. Show it only while edits differ from the last saved values. Reserve the same slot when clean so the header and search field stay still.
+- Make the whole row open details when it has no dedicated details control. Use one native opener and a row-wide focus indicator. Preserve table semantics and independent row actions.
+- Keep hover, selection, and focus paint inside token-rounded panel bounds. Clip paint at the panel edge and draw clipped focus rings inward. Keep wide tables in a separate local scroller. Check the last row in both themes.
+- In Legion, group model gateways and MCP servers under **Connections**. Give both sections the same name, description, and URL row layout. Reuse one drawer pattern for editing description and URL.
+
+### Drawers
+
+- Open record details and editors in a full-height drawer anchored to the right edge. Keep the originating list visible behind a dimmed backdrop. Reuse `BaseModal` in `side` mode as the base, as in Portcullis Admin's Accounts panel.
+- Put a labeled Edit icon immediately beside Expand and Close in the header. Expand to about 90% of viewport width, and let the same control restore the default width. Keep the record, draft, and scroll position when resizing.
+- Edit inside the same drawer. Keep Save and Cancel in a persistent footer outside the scrolling form. Validate before opening save confirmation. Confirm discard on Cancel, Close, Escape, or backdrop dismissal while editing. Dismissing confirmation keeps the draft open. Closing details returns focus to the opener.
 
 ## 2. Shared base
 
 - Both `style.css` files hold the same tokens (admin's also sets `:focus-visible`). Change a token in **both** or the apps drift.
 - Every page view uses `PageLayout`; chat and auth screens are exempt. The enforced exemption list is `ChatView`, `LoginView`, `ConnectView`, `RegisterView`, `VerifyEmailView`, `NoAccessView`, `SharedChatView`, `ConfigIssuesView`, and the headerless `AdminView` route shell. Each routed child of `AdminView` owns its layout; the shell adds no column padding.
-- `PageLayout` owns the title, optional description, `actions` and `toolbar` slots, and view scrolling. Use `wide` for full-width pages and `fill` for workspace panels that scroll their own lists. Header geometry and typography live only in `ember_web/src/components/layout/pageLayout.css` (admin imports it by relative path). Admin panel content styles stay in `adminPages.css` and `admin.css`. Existing information pages retain `info-content` to opt into `infoPage.css` body decorations; adding PageLayout alone must not restyle page content.
+- `PageLayout` owns view scrolling, shared geometry, and the `actions` and `toolbar` slots. Its standard header provides the title and optional description on shells that delegate their heading to the view. Use `wide` for full-width pages and `fill` for workspace panels that scroll their own lists. Use the target app's `pageLayout.css` and preserve existing `info-content` where needed.
 - Components exist in **both** apps as copies: `PageLayout`, `BaseModal`, `ConfirmModal`, `ToggleSwitch`, `SegmentedControl`, `SettingRow`, `ActionButton`, `CopyButton`, `DeleteButton`, `AuthCard`, `EmberLogo`, `AccountMenu`, `UsageHeatmap`, `ToolRunForm`, `IntegrationToolsModal`, `SidebarEditor`. A fix to one needs the same fix in the other; say so in the proposal.
 - `ConfirmModal` lives in `components/ui/dialogs/` (web) and `components/admin/` (admin). Never call native `confirm()`.
 - Admin extras: `StatTile`, `*Panel`, `*Drawer`, `TicketBoard`, `RoleEditor`.
@@ -77,9 +104,9 @@ These are the user's preferred Ember patterns. Choose the shape that fits the ta
 - **Hierarchy:** give the active task one clear primary action. Keep metadata quiet and move occasional setup, publishing, and management controls into labeled accordions, dialogs, or secondary modes. Keep progress and results easy to find.
 - **Desktop workspaces:** pair a working area with a useful companion pane, such as a note list, folder browser, or temporary files. Use `PageLayout wide fill` when the panes should own their scrolling; keep `min-width: 0` and `min-height: 0` through the flex/grid chain.
 - **Mobile modes:** below 768px give the active task the full width. Use list-to-editor navigation with a visible Back action, or a small segmented mode selector. Preserve reachable Save/download actions, readable text, and 44px touch controls. Put sheets above `--rail-height`.
-- **Lists:** use readable rows with light separators, short secondary metadata, and one clear contextual action. Use an editor/details dialog for occasional management and place deletion in its final Danger zone with confirmation.
+- **Lists:** use readable rows with light separators, short secondary metadata, and one clear contextual action. Follow the admin drawer pattern for record details and editing. Place deletion in its final Danger zone with confirmation.
 - **List/editor workspaces:** match Memory and Notes structurally: compact searchable list, readable titles, document-style editor, collapsed tools and management, persistent Save, and mobile Back. Move focus into the editor on entry and restore it to the originating row (or search) on return. Keep group explanations once beneath headings and usage counts secondary. Use the shared scrollbar opt-in when requested, with search and Save outside scrolling bodies.
-- **Row actions:** use `ListRow`'s `actions` slot for Approve: the selection outline encloses both content and action, with separate buttons. Put occasional status actions and the final Danger zone in a labeled management disclosure, as Skills does.
+- **Row actions:** use `ListRow`'s `actions` slot for secondary actions such as Approve on Ember workspaces. Follow the admin row pattern for tables and rosters.
 - **Browser/reader workspaces:** keep the scope switch and search inside the browsing sidebar, above breadcrumbs or search results, as Brains does. Use the same pane spacing, row selection and scrollbar utility as Skills. Keep source setup and path controls in labeled disclosures; the main pane is for reading, with its audience and read-only state visible. Search and status checks preserve the current reader. Mobile Back restores focus to the originating row or search. Keep connection dialogs mounted outside the sidebar so drafts and open dialogs survive a viewport change.
 - **Notes search:** for a fully loaded note list, filter saved titles, full text and tags locally without changing its ordering. Search only changes the list: keep the open editor, new-note draft and publishing panel alive, including when no notes match. Use `StateMessage` with a clear-search action for no results. Let note text grow through `growToContent` so the editor pane owns scrolling; keep each secondary tool in its own disclosure on mobile as well as desktop.
 - **State:** keep draft-bearing panels and job watchers mounted when changing modes. Place dialogs outside hidden tab ancestors. Refreshing status must preserve the current document/result. Clear private content before changing scopes, and open search hits in their originating scope.
@@ -98,8 +125,8 @@ Use these existing pages as implementation references:
 ## 3. Navigation placement
 
 - **ember_web rail** (`NavRail.vue`): header = Overview (wordmark) + Chat. Main list = only pages backed by a dedicated mcp_server capability (Notes, Memory, Generator, Tickets). Every other page (Capabilities, Agents, Usage, Settings, Profile) goes in `AccountMenu.vue`.
-- **ember_admin rail** (`AdminNav.vue`): pages from `ADMIN_NAV_PAGES`, filtered by permission, ordered by nav prefs. New admin page = entry in `router/pages.ts` with an icon path and permission.
-- Below 768px the rail becomes a bottom bar of height `--rail-height`; sheets use `bottom: var(--rail-height)`.
+- **Admin navigation:** use the target app's page registry, permission filtering, and navigation preferences where supported. Use the approved admin shell as the design reference.
+- On existing shells with a mobile bottom rail, use `bottom: var(--rail-height)` for sheets above that rail.
 
 ## 4. Rules that cost us before
 
@@ -107,7 +134,7 @@ Use these existing pages as implementation references:
 - Scoped CSS that a parent page also styles: use the more specific selector (`button.delete-button`).
 - A switch that calls the server stays pending until the server answers; never show unconfirmed state. Browser-local settings apply instantly ("Applies instantly. Saved on this device."); settings that reach other accounts are a draft with an unsaved bar and Save.
 - Destructive: red-outlined pill in a Danger zone last in the form; severe ones use `requireText`.
-- Admin and Analytics pages exist only in ember_admin. Do not copy them back to ember_web.
+- Keep admin-only pages in the admin app that owns their domain.
 - No reduced-motion setting, media query or test. Animations always play.
 - Status needs icon + text, not colour alone.
 
@@ -127,13 +154,13 @@ Distilled from `Brain/Maps/UI UX Frontend Rulesets.md` (consult it for rationale
 
 1. Use the approved design and scope already in the conversation. Implement an approved mockup when asked to proceed. When the layout is undecided, propose a concrete design with the files, reused components, and any dependencies before implementation.
 2. Implement with existing components; copy shared-component changes to both apps.
-3. Check: `pnpm exec vue-tsc -b`, `pnpm test` (includes `radiusScale.test.ts`), `pnpm run test:e2e` in the touched app. Web e2e uses `e2e/fakeApi.ts`; click a switch's label, not its hidden checkbox.
-4. Do not spawn browser-verification agents; the user tests manually. If a visual check is needed, use a throwaway Vite config with a fake `/api` and clear `localStorage` first (theme persists per origin).
-5. Test widths: desktop, 768, 375, light and dark.
+3. Run `pnpm exec vue-tsc -b` and the nearest relevant tests for the touched app. Include `radiusScale.test.ts` when changing radius or layout styles. Follow the workspace testing budget.
+4. Verify affected UI states in the browser when available. Use sample data or a fake `/api` for previews and isolate browser preferences from production.
+5. Check desktop, 768px, 767px, and 375px in Light and Dark. For admin panels, verify the last row's hover and focus corners and dirty/clean header geometry. For drawers, verify expand, shrink, scroll, confirmation, and focus return.
 
 ## Review checklist
 
-- [ ] Right app; admin-only page not in ember_web
+- [ ] Page belongs to the app that owns its domain
 - [ ] Existing component reused; copies updated in both apps
 - [ ] Rows, search, loading/error/empty, danger zone, counters, retention and back buttons use the shared pieces table, no page-local copies
 - [ ] No hex or literal radius outside `style.css`
@@ -147,4 +174,4 @@ Distilled from `Brain/Maps/UI UX Frontend Rulesets.md` (consult it for rationale
 - [ ] Form asks only what is needed; errors beside fields, values kept
 - [ ] Links vs buttons vs tabs semantics correct; popovers not trapped as modals
 - [ ] Decoration non-blocking with a readable fallback; auto-moving content has pause/stop
-- [ ] `vue-tsc`, `pnpm test` pass
+- [ ] Type check and focused tests pass

@@ -2,18 +2,27 @@
 import { computed, onMounted, ref } from "vue";
 import { agentsAdminClient, type McpServer } from "../api/AgentsAdminClient";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import PageLayout from "../components/PageLayout.vue";
+import AdminSearch from "../components/admin/AdminSearch.vue";
+import RecordDrawer from "../components/admin/RecordDrawer.vue";
 import PasswordInput from "../components/PasswordInput.vue";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
 
 /** The MCP servers Legion's agents use as tools. Saved in Legion's database; a change applies at Legion's next start.
  * The header value of a server is write-only: the server only says whether one is saved. */
 const servers = ref<Record<string, McpServer>>({});
 const loading = ref(true);
+const loaded = ref(false);
 const error = ref("");
 const notice = ref("");
 const saving = ref(false);
+const loadError = ref("");
+const search = ref("");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
+const drawer = ref<InstanceType<typeof RecordDrawer>>();
+const panelTitle = ref<HTMLElement>();
+const selected = ref<string | null>(null);
+const selectedServer = computed(() => selected.value ? servers.value[selected.value] : undefined);
+defineExpose({ focusPanel: () => panelTitle.value?.focus() });
 
 const editing = ref<string | null>(null); // the id being edited; "" while adding
 const id = ref("");
@@ -25,6 +34,8 @@ const url = ref("");
 type AddressRow = {
   key: number;
   address: string;
+  revision: number;
+  unresolvedId?: string;
   name: string;
   found: boolean | null;
   overrideSet: boolean;
@@ -33,7 +44,7 @@ type AddressRow = {
 
 let nextAddressKey = 0;
 function newAddress(): AddressRow {
-  return { key: nextAddressKey++, address: "", name: "", found: null, overrideSet: false, token: "" };
+  return { key: nextAddressKey++, revision: 0, address: "", name: "", found: null, overrideSet: false, token: "" };
 }
 
 const mode = ref<"catalog" | "direct">("catalog");
@@ -46,7 +57,19 @@ const headerValue = ref("");
 const hadHeader = ref(false);
 const removing = ref<string | null>(null);
 
-const rows = computed(() => Object.entries(servers.value).sort(([a], [b]) => a.localeCompare(b)));
+function endpoint(server: McpServer) {
+  if (server.transport === "stdio") return [server.command, ...(server.args ?? [])].filter(Boolean).join(" ");
+  if (server.origins?.length) return server.origins.map((origin) => origin.origin
+    ? origin.origin + (server.path ?? "/mcp") : `Unavailable catalog address (${origin.origin_id})`).join(", ");
+  return server.url ?? "";
+}
+
+const rows = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  return Object.entries(servers.value).filter(([key, server]) =>
+    [key, server.label, server.description, endpoint(server)].some((value) => value?.toLowerCase().includes(query)))
+    .sort(([a], [b]) => a.localeCompare(b));
+});
 const isNew = computed(() => editing.value === "");
 const overrideNeedsConnectionToken = computed(() =>
   transport.value === "http" && mode.value === "catalog" &&
@@ -67,10 +90,13 @@ const valid = computed(
 );
 
 async function load() {
+  loading.value = true;
+  loadError.value = "";
   try {
     servers.value = await agentsAdminClient.servers();
+    loaded.value = true;
   } catch (err) {
-    error.value = errorMessage(err);
+    loadError.value = errorMessage(err);
   } finally {
     loading.value = false;
   }
@@ -79,6 +105,7 @@ onMounted(load);
 
 function open(serverId: string) {
   const server = serverId ? servers.value[serverId] : undefined;
+  selected.value = serverId;
   editing.value = serverId;
   id.value = serverId;
   label.value = server?.label ?? "";
@@ -88,7 +115,7 @@ function open(serverId: string) {
   const path = server?.path ?? "/mcp";
   if (server?.origins?.length) {
     mode.value = "catalog";
-    addressRows.value = server.origins.map((o) => ({ ...newAddress(), address: o.origin ? o.origin + path : "", found: o.origin ? true : null, overrideSet: !!o.has_override }));
+    addressRows.value = server.origins.map((o) => ({ ...newAddress(), address: o.origin ? o.origin + path : "", found: o.origin ? true : null, overrideSet: !!o.has_override, unresolvedId: o.origin ? undefined : o.origin_id }));
   } else {
     mode.value = server?.url ? "direct" : "catalog";
     addressRows.value = [newAddress()];
@@ -102,6 +129,7 @@ function open(serverId: string) {
 }
 
 function addressChanged(row: AddressRow) {
+  row.revision++;
   row.found = null;
   row.name = "";
   row.overrideSet = false;
@@ -111,24 +139,58 @@ function addressChanged(row: AddressRow) {
 
 async function check(row: AddressRow) {
   const address = row.address.trim();
-  if (!address) return;
+  if (!address || row.found !== null) return;
+  const revision = ++row.revision;
+  const current = () => addressRows.value.includes(row) && row.revision === revision && editing.value !== null;
   try {
     const result = await agentsAdminClient.lookupOrigin(address);
-    if (!addressRows.value.includes(row) || row.address.trim() !== address || editing.value === null) return;
+    if (!current()) return;
     row.found = result.found;
+    row.unresolvedId = undefined;
     if (result.found && result.group) row.name = result.group.name;
   } catch (err) {
-    if (addressRows.value.includes(row) && row.address.trim() === address && editing.value !== null) {
+    if (current()) {
       error.value = errorMessage(err);
     }
   }
 }
 
 function addAddress() { addressRows.value.push(newAddress()); }
-function removeAddress(index: number) { addressRows.value.splice(index, 1); }
+function removeAddress(index: number) {
+  addressRows.value.splice(index, 1);
+  if (!addressRows.value.length) addAddress();
+}
+
+function discard() {
+  editing.value = null;
+  headerValue.value = "";
+  addressRows.value = [];
+  if (selected.value === "") selected.value = null;
+}
 
 function close() {
-  editing.value = null;
+  discard();
+  selected.value = null;
+}
+
+function submit() {
+  if (saving.value || !valid.value) return;
+  error.value = "";
+  if (transport.value === "http") {
+    const addresses = mode.value === "direct" ? [url.value] : addressRows.value.map((row) => row.address);
+    const validUrls = addresses.every((address) => {
+      try {
+        return ["https:", "http:"].includes(new URL(address.trim()).protocol);
+      } catch {
+        return false;
+      }
+    });
+    if (!validUrls) {
+      error.value = "Enter an HTTP(S) URL for each connection address.";
+      return;
+    }
+  }
+  drawer.value?.requestSave();
 }
 
 /** An untouched header value is left out, so the stored one stays. */
@@ -164,7 +226,12 @@ async function save() {
     await agentsAdminClient.saveServer(id.value, entry());
     await load();
     notice.value = "Saved. Legion uses the change at its next start.";
-    close();
+    if (servers.value[id.value]) {
+      selected.value = id.value;
+      discard();
+    } else {
+      close();
+    }
   } catch (err) {
     error.value = errorMessage(err);
   } finally {
@@ -178,7 +245,8 @@ async function remove() {
   error.value = notice.value = "";
   try {
     await agentsAdminClient.removeServer(removing.value);
-    await load();
+    delete servers.value[removing.value];
+    close();
     notice.value = "Removed. Legion drops it at its next start.";
   } catch (err) {
     error.value = errorMessage(err);
@@ -190,41 +258,43 @@ async function remove() {
 </script>
 
 <template>
-  <PageLayout
-    class="info-content servers"
-    title="MCP servers"
-    description="The tool servers Legion's agents connect to, such as Armory. They are saved in Legion's database and a change applies at Legion's next start."
-  >
-    <template #actions>
-      <button type="button" class="primary" data-test="add" @click="open('')">Add server</button>
-    </template>
-
-    <p v-if="error && editing === null" class="error" role="alert">{{ error }}</p>
-    <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
-    <p v-else-if="!rows.length" class="muted" data-test="empty">
-      No server yet. Add Armory (for example http://127.0.0.1:29600/mcp) as <code>main</code> so the agents get tools.
+  <section id="mcp-servers" class="admin-panel-card" aria-labelledby="mcp-servers-title">
+    <header class="admin-panel-head">
+      <h2 id="mcp-servers-title" ref="panelTitle" tabindex="-1">MCP servers</h2>
+      <div class="admin-panel-tools">
+        <button type="button" class="primary" data-test="add" :disabled="loading || !!loadError" @click="open('')">Add server</button>
+        <AdminSearch ref="searchField" v-model="search" label="Search MCP servers" />
+      </div>
+    </header>
+    <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button type="button" class="chip" @click="load">Retry</button></p>
+    <p v-if="!loaded && loading" class="admin-panel-text muted" role="status">Loading servers…</p>
+    <p v-else-if="loaded && !rows.length" class="admin-panel-text muted" data-test="empty">
+      {{ Object.keys(servers).length ? 'No servers match your search.' : 'No MCP servers configured.' }}
+      <button v-if="search" type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button>
     </p>
+    <div v-else-if="loaded" class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="mcp-servers-title">
+      <table class="admin-records">
+        <thead><tr><th scope="col">Name</th><th scope="col">{{ rows.some(([, server]) => server.transport === "stdio") ? "Connection URL or command" : "Connection URL" }}</th></tr></thead>
+        <tbody>
+          <tr v-for="[serverId, server] in rows" :key="serverId" :data-test="`row-${serverId}`">
+            <th scope="row">
+              <div class="admin-record-name">
+                <span class="admin-record-badge" aria-hidden="true">{{ server.label.slice(0, 2).toUpperCase() }}</span>
+                <div><button type="button" class="admin-row-button" aria-haspopup="dialog" @click="selected = serverId">{{ server.label }}</button>
+                  <p v-if="server.description">{{ server.description }}</p></div>
+              </div>
+            </th>
+            <td><code>{{ endpoint(server) }}</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p v-if="notice" class="admin-panel-text muted" role="status" data-test="notice">{{ notice }}</p>
 
-    <table v-else>
-      <thead>
-        <tr><th>Id</th><th>Name</th><th>Where</th><th></th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="[serverId, server] in rows" :key="serverId" :data-test="`row-${serverId}`">
-          <td><code>{{ serverId }}</code></td>
-          <td>{{ server.label }}<span v-if="server.description" class="muted"> — {{ server.description }}</span></td>
-          <td>{{ server.transport !== "http" ? `${server.command} ${(server.args ?? []).join(" ")}` : server.origins?.length ? server.origins.map((o) => o.origin ?? "(removed from Treasury)").join(", ") : server.url }}</td>
-          <td class="row-actions">
-            <button type="button" class="chip" data-test="edit" @click="open(serverId)">Edit</button>
-            <button type="button" class="danger" data-test="remove" @click="removing = serverId">Remove</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <form v-if="editing !== null" class="card" data-test="form" @submit.prevent="save">
-      <h2 class="title">{{ isNew ? "Add server" : `Edit ${editing}` }}</h2>
+    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected === '' ? 'Add server' : 'Server details'"
+      :editable="!!selectedServer" :editing="editing !== null" :busy="saving" :fallback-focus="() => searchField?.focus()"
+      @edit="selected && open(selected)" @discard="discard" @close="close" @save="save">
+    <form v-if="editing !== null" id="mcp-server-editor" class="admin-editor" data-test="form" @submit.prevent="submit">
       <div class="field">
         <label for="server-id">Id</label>
         <input id="server-id" v-model="id" :disabled="!isNew || saving" autocomplete="off" spellcheck="false" data-test="id" />
@@ -236,7 +306,7 @@ async function remove() {
       </div>
       <div class="field">
         <label for="server-description">Description</label>
-        <input id="server-description" v-model="description" :disabled="saving" autocomplete="off" data-test="description" />
+        <input id="server-description" v-model="description" :disabled="saving" autocomplete="off" data-test="description" maxlength="500" />
       </div>
       <div class="field">
         <label for="server-transport">Connects by</label>
@@ -261,12 +331,13 @@ async function remove() {
           <legend>{{ index === 0 ? "Address" : `Backup address ${index}` }}</legend>
           <input v-model="row.address" type="url" inputmode="url" :disabled="saving" autocomplete="off" spellcheck="false"
                  :aria-label="`Address ${index + 1}`" :data-test="`address-${index}`" @input="addressChanged(row)" @blur="check(row)" />
+          <p v-if="row.unresolvedId" class="error" role="status">Address {{ row.unresolvedId }} is unavailable in Treasury. Enter its current URL or remove this address to save.</p>
           <input v-model="row.name" :disabled="saving || row.found === true" autocomplete="off"
                  :aria-label="`Service name for address ${index + 1}`" :data-test="`name-${index}`"
                  :placeholder="row.found === false ? 'Give this service a name' : 'Service name'" />
           <PasswordInput v-model="row.token" :label="`Token for address ${index + 1} (optional)`" :data-test="`override-${index}`" autocomplete="off" :disabled="saving"
                          :placeholder="row.overrideSet ? 'Leave empty to keep its saved token' : 'Empty uses the connection token below'" />
-          <button v-if="addressRows.length > 1" type="button" class="chip" :disabled="saving" @click="removeAddress(index)">Remove address</button>
+          <button v-if="(addressRows.length > 1 || row.unresolvedId)" type="button" class="chip" :disabled="saving" @click="removeAddress(index)">Remove address</button>
         </fieldset>
         <button type="button" class="chip" :disabled="saving || addressRows.length >= 10" data-test="add-address" @click="addAddress">Add a backup address</button>
         <p class="help">Legion tries the addresses in this order, switches only when one cannot be reached, and goes back when the first answers again.</p>
@@ -300,11 +371,24 @@ async function remove() {
         Set a connection token header and value to use address overrides.
       </p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <div class="actions">
-        <button type="button" class="chip" :disabled="saving" @click="close">Cancel</button>
-        <button type="submit" class="primary" data-test="save" :disabled="saving || !valid">{{ saving ? "Saving…" : "Save" }}</button>
-      </div>
     </form>
+    <div v-else-if="selectedServer" class="admin-details">
+      <h3>{{ selectedServer.label }}</h3>
+      <p v-if="selectedServer.description">{{ selectedServer.description }}</p>
+      <dl>
+        <dt>ID</dt><dd><code>{{ selected }}</code></dd>
+        <dt>{{ selectedServer.transport === "stdio" ? "Command" : "Connection URL" }}</dt><dd><code>{{ endpoint(selectedServer) }}</code></dd>
+        <dt>Transport</dt><dd>{{ selectedServer.transport }}</dd>
+      </dl>
+      <p class="muted">{{ notice || "Changes take effect at Legion’s next start." }}</p>
+      <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <button class="danger" type="button" data-test="remove" :disabled="saving" @click="removing = selected">Remove server</button>
+    </div>
+    <template v-if="editing !== null" #footer>
+      <button type="button" class="chip" :disabled="saving" data-test="cancel-edit" @click="drawer?.requestCancel()">Cancel</button>
+      <button type="submit" form="mcp-server-editor" class="primary" data-test="save" :disabled="saving || !valid" :aria-busy="saving">Save changes</button>
+    </template>
+    </RecordDrawer>
 
     <ConfirmModal
       :open="removing !== null"
@@ -316,26 +400,14 @@ async function remove() {
       @confirm="remove"
       @close="removing = null"
     />
-  </PageLayout>
+  </section>
 </template>
 
 <style scoped>
-.card {
-  display: grid;
-  gap: 12px;
-  max-width: 560px;
-  margin-top: 16px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-.title { margin: 0; font-size: 1em; font-weight: 600; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }
 .field > input, .field > select { width: 100%; min-width: 0; min-height: 44px; }
 .origin { gap: 8px; margin: 0; padding: 0; border: 0; }
 .origin legend { font-size: 0.9em; font-weight: 600; padding: 0; }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
-.actions, .row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.actions { justify-content: flex-end; }
 </style>

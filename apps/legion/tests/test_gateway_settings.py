@@ -100,7 +100,7 @@ def test_save_an_empty_token_clears_it(treasury):
 @pytest.mark.parametrize("changes", [
     {"url": "ftp://gateway.test"}, {"url": ""}, {"url": "http://user:pw@gateway.test"},
     {"url": "http://gateway.test/?a=1"}, {"token": "has space"}, {"token": "x" * 513},
-    {"token": 5}, {"password": "x"},
+    {"token": 5}, {"password": "x"}, {"description": "x" * 501}, {"description": None},
 ])
 def test_save_refuses_bad_values_and_writes_nothing(treasury, changes):
     with pytest.raises(settings.GatewaySettingsError):
@@ -116,7 +116,7 @@ def test_save_fails_clearly_when_treasury_is_down(treasury):
 
 def test_the_view_never_carries_the_token():
     assert settings.view(settings.GatewaySettings("http://gateway.test:29407", "cg_secret")) == {
-        "url": "http://gateway.test:29407", "has_token": True}
+        "url": "http://gateway.test:29407", "has_token": True, "description": ""}
 
 
 def test_routes_read_and_save_without_showing_the_token(treasury):
@@ -125,10 +125,10 @@ def test_routes_read_and_save_without_showing_the_token(treasury):
     from src import server
 
     client = TestClient(server.mcp.streamable_http_app())
-    assert client.get("/agents/gateway-settings").json() == {"url": settings.DEFAULT_URL, "has_token": False}
+    assert client.get("/agents/gateway-settings").json() == {"url": settings.DEFAULT_URL, "has_token": False, "description": ""}
     response = client.put("/agents/gateway-settings", json={"url": "http://gateway.test:29407", "token": "cg_new"})
     assert response.status_code == 200
-    assert response.json() == {"url": "http://gateway.test:29407", "has_token": True}
+    assert response.json() == {"url": "http://gateway.test:29407", "has_token": True, "description": ""}
     assert treasury.doc == {"url": "http://gateway.test:29407", "token": "cg_new"}
     refused = client.put("/agents/gateway-settings", json={"url": "nope"})
     assert refused.status_code == 400 and "http(s)" in refused.json()["error"]
@@ -142,3 +142,37 @@ def test_the_decision_gateway_has_its_own_record(treasury):
     assert saved == settings.GatewaySettings("http://127.0.0.1:29406", "dg_new")
     assert str(treasury.requests[-1].url).endswith("/records/decision_gateway")
     assert settings._fresh(settings.KEY) is None  # the other service's cache is untouched
+
+
+@pytest.mark.parametrize("which", [settings.KEY, settings.DECISION_KEY])
+def test_description_edit_preserves_legacy_url_and_token(treasury, which):
+    treasury.doc = {"url": "https://old.test", "token": "saved"}
+    assert asyncio.run(settings.current(which)).description == ""
+    saved = asyncio.run(settings.save({"description": "  Model provider  "}, which))
+    assert settings.view(saved) == {"url": "https://old.test", "description": "Model provider", "has_token": True}
+    assert asyncio.run(settings.save({"url": "https://new.test"}, which)).description == "Model provider"
+    assert asyncio.run(settings.save({"description": ""}, which)).description == ""
+    assert treasury.doc == {"url": "https://new.test", "token": "saved", "description": ""}
+
+
+def test_overlapping_partial_edits_merge_after_a_failed_save(treasury, monkeypatch):
+    async def delayed_read(which):
+        doc = await _read(which)
+        await asyncio.sleep(0)
+        return doc
+
+    monkeypatch.setattr(settings, "_read", delayed_read)
+    treasury.doc = {"url": "https://old.test", "token": "saved"}
+
+    async def edits():
+        treasury.down = True
+        with pytest.raises(settings.GatewaySettingsError):
+            await settings.save({"description": "Never saved"})
+        treasury.down = False
+        await asyncio.gather(
+            settings.save({"description": "Model provider"}),
+            settings.save({"url": "https://new.test"}),
+        )
+
+    asyncio.run(edits())
+    assert treasury.doc == {"url": "https://new.test", "token": "saved", "description": "Model provider"}

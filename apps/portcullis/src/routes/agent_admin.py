@@ -130,14 +130,15 @@ class GatewaySettingsIn(BaseModel):
     model_config = {"extra": "forbid"}
 
     url: str | None = Field(default=None, max_length=300)
-    token: str | None = Field(default=None, max_length=512)
+    token: str | None = Field(default=None, max_length=512, repr=False)
+    description: str | None = Field(default=None, max_length=500)
 
 
 @prompts_router.get("/gateway-settings")
 async def get_gateway_settings(
     account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)
 ) -> Any:
-    """Where legion reaches ConversationGateway: `{url, has_token}`."""
+    """Where legion reaches ConversationGateway: `{url, description, has_token}`."""
     return await _call(admin.gateway_settings(account))
 
 
@@ -160,7 +161,7 @@ async def set_gateway_settings(
 async def get_decision_gateway_settings(
     account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)
 ) -> Any:
-    """Where legion reaches DecisionGateway: `{url, has_token}`."""
+    """Where legion reaches DecisionGateway: `{url, description, has_token}`."""
     return await _call(admin.decision_gateway_settings(account))
 
 

@@ -254,6 +254,12 @@ def test_servers_list_add_and_remove_never_show_a_header_value(client, upstream:
 
     assert client.put("/api/admin/servers/docs", json={"label": "docs", "transport": "http"}).json()["detail"] == (
         "transport 'http' requires 'url'")
+    invalid_token = "private-header-" * 200
+    refused = client.put("/api/admin/servers/main", json={
+        **edit, "auth": {**edit["auth"], "header_value": invalid_token}})
+    assert refused.status_code == 422
+    assert invalid_token not in refused.text
+
     assert client.put("/api/admin/servers/Bad Id", json=edit).status_code == 422
     assert client.put("/api/admin/servers/x", json={**edit, "extra": 1}).status_code == 422
     assert client.delete("/api/admin/servers/main").json() == {"deleted": "main"}
@@ -344,3 +350,26 @@ def test_catalog_save_preserves_legions_treasury_outage_message(client, upstream
     })
     assert response.status_code == 502
     assert response.json()["detail"] == message
+
+
+def test_gateway_settings_forward_partial_descriptions_to_the_matching_route(client, upstream: FakeUpstream) -> None:
+    seen = []
+
+    def gateway(request):
+        patch = json.loads(request.content)
+        seen.append((request.url.path, patch))
+        return httpx.Response(200, json={"url": "https://gateway.test", "description": patch["description"], "has_token": True})
+
+    upstream.handler = gateway
+    as_admin(client)
+    for route, description in (("gateway-settings", "Chat models"), ("decision-gateway-settings", "")):
+        response = client.put(f"/api/admin/{route}", json={"description": description, "token": None})
+        assert response.status_code == 200
+        assert response.json() == {"url": "https://gateway.test", "description": description, "has_token": True}
+        assert seen[-1] == (f"/agents/{route}", {"description": description})
+        assert client.put(f"/api/admin/{route}", json={"description": "x" * 501}).status_code == 422
+        invalid_token = "private-token-" * 100
+        refused = client.put(f"/api/admin/{route}", json={"token": invalid_token})
+        assert refused.status_code == 422
+        assert invalid_token not in refused.text
+    assert len(seen) == 2

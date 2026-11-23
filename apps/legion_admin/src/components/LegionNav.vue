@@ -1,106 +1,47 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
-import { useTheme } from "../composables/useTheme";
 import { LEGION_PAGES } from "../router/pages";
 import { ADMIN_APPS, adminAppUrl } from "../utils/siblings";
 import { useAuthStore } from "../stores/auth";
 
+defineProps<{ expanded: boolean }>();
 const auth = useAuthStore();
 const route = useRoute();
-const { theme, next, cycle } = useTheme();
-const LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
-const pages = computed(() => LEGION_PAGES.filter((p) => auth.hasPermission(p.permission)));
-const others = ADMIN_APPS.filter((a) => a.port !== 26500);
-const themeLabel = computed(() => `Theme: ${LABELS[theme.value]}. Switch to ${LABELS[next()]}`);
+const pages = computed(() => LEGION_PAGES.filter((page) => auth.hasPermission(page.permission)));
+const shortcuts = ADMIN_APPS.filter((app) => app.port !== 26500);
 </script>
 
 <template>
-  <aside class="rail" aria-label="Legion Admin">
-    <span class="wordmark" role="img" aria-label="Legion Admin">L</span>
-    <nav v-if="pages.length" class="pages" aria-label="Legion sections">
-      <RouterLink v-for="page in pages" :key="page.to" :to="page.to" :data-label="page.label" :aria-label="page.label" :aria-current="route.path === page.to ? 'page' : undefined">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path v-for="d in page.icon" :key="d" :d="d" /></svg>
+  <aside id="legion-sidebar" class="sidebar" :class="{ expanded }" aria-label="Legion Admin">
+    <nav aria-label="Legion sections">
+      <RouterLink v-for="page in pages" :key="page.to" :to="page.to" :title="page.label" :aria-label="page.label"
+        :aria-current="route.path === page.to ? 'page' : undefined">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path v-for="path in page.icon" :key="path" :d="path" /></svg>
+        <span v-if="expanded">{{ page.label }}</span>
       </RouterLink>
     </nav>
-    <nav v-if="others.length" class="apps" aria-label="Other admin apps">
-      <a v-for="app in others" :key="app.port" :href="adminAppUrl(app.port)" :data-label="app.name" :aria-label="app.name">{{ app.letter }}</a>
+    <nav class="shortcuts" aria-label="Admin shortcuts">
+      <a v-for="app in shortcuts" :key="app.port" :href="adminAppUrl(app.port)" :title="app.name" :aria-label="app.name">
+        <span class="initial" aria-hidden="true">{{ app.letter }}</span><span v-if="expanded">{{ app.name }}</span>
+      </a>
     </nav>
-    <div class="bottom">
-      <button type="button" :data-label="themeLabel" :aria-label="themeLabel" @click="cycle">
-        <svg v-if="theme === 'light'" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-        <svg v-else-if="theme === 'dark'" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" /></svg>
-        <svg v-else viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
-      </button>
-      <button v-if="auth.account" type="button" data-label="Log out" aria-label="Log out" @click="auth.logout()">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
-      </button>
-    </div>
   </aside>
 </template>
 
 <style scoped>
-.rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  width: 52px;
-  flex-shrink: 0;
-  padding: 10px 0;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  position: relative;
-  z-index: 30;
-}
-.pages, .apps, .bottom { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.pages { margin-top: 8px; }
-.apps { margin-top: auto; }
-.apps a { font-size: 0.85rem; font-weight: 600; }
-.bottom { margin-top: 8px; }
-.wordmark { display: grid; place-items: center; width: 36px; height: 36px; font-weight: 700; color: var(--accent); }
-.pages a, .apps a, button {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  color: var(--muted);
-  background: transparent;
-  text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-.pages a:hover, .apps a:hover, button:hover { color: var(--text); background: var(--bg); }
-a[aria-current="page"] { color: var(--text); background: var(--bg); box-shadow: inset 2px 0 0 var(--accent); }
-svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-[data-label]:hover::after, [data-label]:focus-visible::after {
-  content: attr(data-label);
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  white-space: nowrap;
-  font-size: 0.85rem;
-  color: var(--text);
-  background: var(--surface);
-  pointer-events: none;
-}
+.sidebar { display: flex; flex-direction: column; flex: none; width: 52px; padding: 8px; gap: 12px; border-inline-end: 1px solid var(--border); background: var(--bg); }
+.sidebar.expanded { width: 210px; }
+nav { display: grid; gap: 4px; }
+.shortcuts { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border); }
+a { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 36px; border-radius: var(--radius-md); color: var(--muted); text-decoration: none; font-size: 0.84rem; }
+.expanded a { justify-content: flex-start; padding-inline: 8px; }
+a:hover, a[aria-current="page"] { background: var(--surface); color: var(--text); }
+a[aria-current="page"] { box-shadow: inset 2px 0 var(--accent); }
+svg { flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.initial { width: 18px; text-align: center; font-weight: 600; }
 @media (max-width: 767px) {
-  .rail { flex-direction: row; width: 100%; height: var(--rail-height); padding: 0 4px env(safe-area-inset-bottom, 0px); gap: 4px; border-right: none; border-top: 1px solid var(--border); }
-  .wordmark { width: 28px; height: 28px; flex-shrink: 0; }
-  .pages { flex: 1; min-width: 0; margin: 0; flex-direction: row; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; gap: 0; }
-  .apps { flex-direction: row; flex-shrink: 0; margin: 0; gap: 0; }
-  .bottom { flex-direction: row; flex-shrink: 0; margin: 0; gap: 0; }
-  .pages a, .apps a, button { width: 44px; height: 44px; flex-shrink: 0; }
-  a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--accent); }
-  [data-label]::after { display: none; }
+  .sidebar.expanded { width: 100%; max-height: 45dvh; overflow: auto; border-inline-end: 0; border-bottom: 1px solid var(--border); }
+  .sidebar a { min-height: 44px; }
 }
 </style>

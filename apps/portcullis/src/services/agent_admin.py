@@ -114,19 +114,19 @@ class AgentAdmin:
         return providers if isinstance(providers, dict) else {}
 
     async def gateway_settings(self, account: Account) -> dict[str, Any]:
-        """Where legion reaches ConversationGateway: {url, has_token}. The token is never returned."""
+        """Where legion reaches ConversationGateway: {url, description, has_token}. The token is never returned."""
         return await self._request("GET", "/agents/gateway-settings", account)
 
     async def set_gateway_settings(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
-        """Save {"url"?, "token"?} (legion keeps them in the database service); returns the new view."""
+        """Save {"url"?, "description"?, "token"?} (legion keeps them in the database service); returns the new view."""
         return await self._request("PUT", "/agents/gateway-settings", account, json=changes)
 
     async def decision_gateway_settings(self, account: Account) -> dict[str, Any]:
-        """Where legion reaches DecisionGateway: {url, has_token}. The token is never returned."""
+        """Where legion reaches DecisionGateway: {url, description, has_token}. The token is never returned."""
         return await self._request("GET", "/agents/decision-gateway-settings", account)
 
     async def set_decision_gateway_settings(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
-        """Save {"url"?, "token"?} for DecisionGateway; returns the new view."""
+        """Save {"url"?, "description"?, "token"?} for DecisionGateway; returns the new view."""
         return await self._request("PUT", "/agents/decision-gateway-settings", account, json=changes)
 
     async def servers(self, account: Account) -> dict[str, Any]:

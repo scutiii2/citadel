@@ -26,4 +26,15 @@ describe("router", () => {
     await router.push("/agents");
     expect(router.currentRoute.value.name).toBe("no-access");
   });
+  it("redirects the old servers URL without dropping query parameters", async () => {
+    const router = await freshRouter(["agents.manage"]);
+    await router.push("/servers?from=bookmark");
+    expect(router.currentRoute.value.fullPath).toBe("/connections?from=bookmark#mcp-servers");
+  });
+
+  it("guards the redirected servers URL with agents.manage", async () => {
+    const router = await freshRouter(["tuning.manage"]);
+    await router.push("/servers");
+    expect(router.currentRoute.value.name).toBe("tuning");
+  });
 });

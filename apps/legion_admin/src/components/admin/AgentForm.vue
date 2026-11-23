@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { AgentConfig, AgentFile, ProviderCatalog } from "../../api/AgentsAdminClient";
-import BaseModal from "../BaseModal.vue";
 import ToggleSwitch from "../ToggleSwitch.vue";
 import SettingRow from "../SettingRow.vue";
 import AgentGatewayList, { type GatewayRow } from "./AgentGatewayList.vue";
@@ -11,7 +10,7 @@ import type { CapabilityInfo } from "../../api/CommandsClient";
 import { routerPolicyDefaults, validateRouterPolicy } from "../../utils/routerPolicy";
 
 /** Create or edit one agent file. The parent keeps `open`, saves on `save`
- * and closes on `close`; `preview` asks the parent for the assembled system
+ * and handles confirmation; `preview` asks the parent for the assembled system
  * prompt of the draft. Fields the form does not show are carried over from
  * `initial` unchanged. */
 const props = defineProps<{
@@ -26,7 +25,7 @@ const props = defineProps<{
   previewing: boolean;
   previewError: string;
 }>();
-const emit = defineEmits<{ save: [id: string, config: AgentConfig]; preview: [id: string, config: AgentConfig, caveman: boolean]; close: [] }>();
+const emit = defineEmits<{ save: [id: string, config: AgentConfig]; preview: [id: string, config: AgentConfig, caveman: boolean] }>();
 
 const EFFORTS = ["off", "low", "medium", "high"];
 const TIERS = ["light", "standard", "heavy", "extreme"];
@@ -299,8 +298,7 @@ function previewPrompt(): void {
 </script>
 
 <template>
-  <BaseModal :open="open" :title="editing ? `Edit ${initial?.label || initial?.id}` : 'New agent'" @close="emit('close')">
-    <form class="agent-form" @submit.prevent="submit">
+    <form id="agent-editor" class="agent-form" @submit.prevent="submit">
       <label class="field">
         <span>Id</span>
         <input v-model="id" data-test="id" type="text" required maxlength="63" pattern="[a-z0-9][a-z0-9\-]*" autocomplete="off" :disabled="editing" placeholder="data-analyst" />
@@ -433,13 +431,8 @@ function previewPrompt(): void {
       </fieldset>
 
       <p v-if="localError || error" class="error" role="alert" data-test="form-error">{{ localError || error }}</p>
-      <div class="actions">
-        <span v-if="modified" class="unsaved" role="status" data-test="unsaved">● Unsaved changes</span>
-        <button type="button" class="cancel" :disabled="busy" @click="emit('close')">Cancel</button>
-        <button type="submit" class="primary" :disabled="busy" data-test="save">{{ busy ? "Saving…" : editing ? "Save" : "Create" }}</button>
-      </div>
+      <span v-if="modified" class="unsaved" role="status" data-test="unsaved">● Unsaved changes</span>
     </form>
-  </BaseModal>
 </template>
 
 <style scoped>
@@ -474,10 +467,8 @@ legend { padding: 0 6px; color: var(--muted); font-size: 0.85em; }
 .switches { display: grid; gap: 8px; }
 .preview-bar { align-items: center; justify-content: space-between; }
 .prompt-text { max-height: 280px; margin: 0; padding: 10px 12px; overflow: auto; border-radius: var(--radius-md); background: var(--code-bg); color: var(--text); font-family: var(--mono); font-size: 0.8em; white-space: pre-wrap; overflow-wrap: anywhere; }
-.actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .unsaved { margin-right: auto; color: var(--muted); font-size: 0.8em; }
 .unsaved::first-letter { color: var(--accent); }
-.cancel { padding: 6px 16px; border: 1px solid var(--border); border-radius: var(--radius-full); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
 .primary { padding: 6px 16px; border: none; border-radius: var(--radius-full); cursor: pointer; font: inherit; font-weight: 600; color: var(--accent-contrast); background: var(--accent); }
 .primary:disabled, .cancel:disabled { opacity: 0.6; cursor: default; }
 .error { margin: 0; color: var(--danger); }

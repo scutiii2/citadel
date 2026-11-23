@@ -1,18 +1,18 @@
-# Ember mobile UI instructions
+# Citadel mobile UI instructions
 
-Use with `ember-frontend-design` and `ember-design-system` for both Ember Vue apps. This guide adapts the Brain's UI/UX rules to Citadel's existing frontend. Explicit user requirements take precedence; otherwise follow repository and app instructions. Follow Citadel's existing motion policy.
+Use with [Citadel frontend design](SKILL.md) and `ember-design-system` for Ember and admin UI. Follow the target app's instructions and motion policy.
 
 ## Read the existing implementation first
 
-- Find the affected route, `PageLayout` usage, shared components and current mobile styles. Reuse the existing interaction before introducing a new one. Use `ember-feature-scaffold` for routing and API wiring.
+- Find the affected route, `PageLayout` usage, shared components, and current mobile styles. Use the target app's conventions for routing and API wiring.
 - Use `style.css` as the token source. Keep the orange accent, semantic colors, typography and radius scale. Give related fields smaller gaps than separate groups; preserve existing spacing conventions rather than imposing a new global scale.
 - Use Notes for list/editor workspaces, Brains for scoped browser/reader flows, Memory for row editing, and Video Downloader for jobs/results. Adapt the task pattern rather than copying a screen's unrelated controls.
 
 ## Layout and navigation
 
-- The existing shell switches below 768px (`max-width: 767px`). Keep 767 and 768 distinct when checking the transition. At narrow widths, give the active task the full content width. Use list-to-detail/editor navigation with a visible Back action, or a short labeled segmented selector.
+- Check the 767px and 768px transition. At narrow widths, give the active task the full content width. Use list-to-detail navigation or a labeled mode switch for Ember workspaces. Follow the [admin shell](SKILL.md#admin-design-reference) for the header-controlled sidebar and record drawers.
 - Preserve primary actions such as Save, Send, download and confirmation. Place secondary setup and management behind clear disclosure. Reflow header actions before shrinking text or targets; do not hide supported actions merely to fit a phone.
-- Keep DOM reading order aligned with visual order. Retain meaningful labels and selected states; mobile actions must work without hover. Keep product navigation in its existing rail/account-menu locations.
+- Keep DOM reading order aligned with visual order. Retain meaningful labels and selected states. Mobile actions work without hover. In admin panel headers, let the search and its reserved Save slot move together to a new line when space is tight.
 - The view owns scrolling; preserve `min-width: 0` and `min-height: 0` through flex/grid ancestors. Wrap long titles, names, errors and URLs. Keep code or genuinely wide tables in a labeled local horizontal scroller instead of making the whole page scroll sideways.
 - For dense admin content, choose task-specific rows, a detail view or a contained table. Retain the data and actions needed to complete the task. Do not create a separate mobile data contract.
 
@@ -27,8 +27,8 @@ Use with `ember-frontend-design` and `ember-design-system` for both Ember Vue ap
 
 - Reuse the shell's viewport handling. `ember_web/src/App.vue` maintains `--app-viewport-height` and `--app-viewport-top` from `visualViewport`; the global stylesheet uses them with a `100dvh` fallback. The admin shell currently uses `100dvh` without that bridge. Inspect the affected app before assuming identical keyboard behavior.
 - Keep the focused input, validation message and relevant Save/Send action reachable when the keyboard opens. Prefer scrolling the owning content pane; avoid fixed full-screen overlays and page-level scrolling that fight the shell. Do not add another independent viewport listener to each page.
-- `--rail-height` already includes the bottom safe-area inset in both apps. Anchor ordinary mobile sheets above the rail with `bottom: var(--rail-height)`. Avoid charging the same inset twice. Reuse the shell's top/side safe-area padding.
-- Size modal/sheet content to the available viewport and allow its body to scroll. Check the last field and final destructive action with the keyboard open. A document-level native dialog can have different positioning from the app shell; verify its actual behavior rather than assuming shell variables automatically fix it.
+- On shells with a bottom rail, anchor ordinary sheets above `--rail-height`, which already includes the bottom safe-area inset. Count the inset once.
+- Keep record drawers full-height on the right, matching the admin reference. Let the body scroll independently and keep the drawer header and Save/Cancel footer reachable. Count safe-area padding once and verify the last field and footer with the keyboard open.
 - Rotation, keyboard dismissal and browser chrome changes must leave the active pane usable. Preserve user zoom; follow the shell's existing treatment of viewport scale.
 
 ## Drafts, dialogs and async state
@@ -42,7 +42,7 @@ Use with `ember-frontend-design` and `ember-design-system` for both Ember Vue ap
 
 ## Checks for the affected flow
 
-Use the parent skill's existing type, unit and e2e commands in each touched app. For instruction-only changes, verify documentation references and `python sync_skills.py --check`; do not claim UI behavior was tested. Shared-component changes require checks in both apps.
+Follow the parent skill's focused check budget in each affected app. For instruction-only changes, verify documentation references and consistency.
 
 For UI implementation, cover the relevant cases below in existing automated tests where practical and give the user concrete manual checks for device-only behavior. Follow the parent skill's manual browser-verification policy.
 
@@ -54,6 +54,8 @@ For UI implementation, cover the relevant cases below in existing automated test
 | Edit the last field with the keyboard open; rotate and dismiss keyboard | Field, error and Save/Send remain reachable; scroll ownership stays stable. |
 | Back, mode switch and refresh with unsaved edits | Draft and context survive, or explicit discard is confirmed. |
 | Open dialog, then change mobile mode | Dialog stays usable or closes deliberately; focus returns to visible content. |
+| Expand or shrink a drawer with an edit in progress | Draft survives, footer stays reachable, and confirming or dismissing Save or Discard behaves as labeled. |
+| Filter a panel while editing inline, then revert or save | Search preserves drafts, and the Save slot keeps the same size whether clean or dirty. |
 | Slow, failed and out-of-order searches; clear input or switch scope | Latest valid query/scope owns results and status; old replies cannot leak content back. |
 | Open a long sheet above the bottom rail | Last action and Danger zone remain reachable; safe-area padding is counted once. |
 
