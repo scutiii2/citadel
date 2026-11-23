@@ -21,5 +21,6 @@
     ],
     "deny": []
   },
-  "role": "orchestrator"
+  "role": "orchestrator",
+  "mode": "plan"
 }
