@@ -34,6 +34,7 @@ The spec covers independent subsystems, so it is built as separate plans. Each p
 | 25 | [Built](2026-11-22-plan-25-start-rule.md) Start rule everywhere: error codes 1000 to 1005 (shared library, Stronghold and Armory tools, Legion loop guard), `/health` and `/ready` in all five services with a Portcullis admin aggregate route (no screen), `depends_on` kept as hints by a compose check, Treasury discovery by probing compose names | any | none |
 | 26 | [Built](2026-11-22-plan-26-obsidian-leftovers-cleanup.md) Leftovers of 22b: Legion `vault-librarian` agent, `brain_scope` / `X-Brain-Destination` plumbing (Legion, Armory, Portcullis), `ember_cli` second-brain fields, dead Stronghold-to-Armory auth paths | 22b | none |
 | 27 | [Built](2026-11-22-plan-27-final-leftovers.md) Final leftovers: Armory prune script for the unused `extensions` and `connections` tables (removed again afterwards: a fresh install never creates them), starter role names (`Power User` to `Tool Services Manager`, `Operator` text), Plan 14 closed | 22c, 22e | none |
+| 28 | [Built](2026-11-23-plan-28-invite-by-email.md) Invite by email only (no code in the admin page, address must match, registration verifies the account), verification always required, Armory `tool_email_checkHealth` used by Invite member, verify screen requests its own code | 25 | none |
 
 Order: 16, 17, then 18 and 19 and 23 and 24 may run in parallel (different services). 20a to 20d follow 18. 22 comes last of the data moves. 25 may run alongside.
 
