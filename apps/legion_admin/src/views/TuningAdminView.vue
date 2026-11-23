@@ -188,7 +188,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
     <section class="admin-panel-card" aria-labelledby="tuning-title">
       <header class="admin-panel-head">
         <h2 id="tuning-title">Runtime settings</h2>
-        <div class="admin-panel-tools tuning-tools">
+        <div class="admin-panel-tools">
           <PanelHelp title="Runtime settings">Response-limit ceilings that cap what any agent may ask for. Edit, then Save; the new limits apply at once.</PanelHelp>
           <DraftActions :dirty="dirty" :saving="saving" label="tuning changes" @cancel="discardOpen = true" @save="save" />
           <AdminSearch ref="searchField" v-model="search" label="Search settings" />
@@ -226,9 +226,4 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
 input[type="number"], select { width: 10em; min-width: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; }
 .tuning-group { padding: 14px 16px; }
 .tuning-group + .tuning-group { border-top: 1px solid var(--border); }
-.tuning-tools { display: grid; grid-template-columns: 76px minmax(0, 240px); gap: 6px; }
-.tuning-tools :deep(.search) { min-width: 0; }
-@media (max-width: 767px) {
-  .tuning-tools { width: min(100%, 358px); grid-template-columns: 88px minmax(0, 1fr); }
-}
 </style>
