@@ -298,6 +298,7 @@ def test_connection_tests_reach_legion_and_need_agents_manage(client_factory, cl
     member = client_factory()
     make_member(member, email)
     login(member, "alice")
+    assert client.post("/api/admin/model-gateways/decision/laya/test", headers={"Content-Type": "application/json"}).status_code == 200  # no body: the saved gateway
     assert member.post("/api/admin/model-gateways/conversation/claude/test", json={}).status_code == 403
 
 
