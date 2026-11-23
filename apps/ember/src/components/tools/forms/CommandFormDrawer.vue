@@ -3,7 +3,7 @@ import { computed } from "vue";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
 import type { JsonSchema } from "../../../api/types";
 import { commandText } from "../../../utils/tools/toolSchema";
-import BaseModal from "../../ui/dialogs/BaseModal.vue";
+import RecordDrawer from "../../ui/panel/RecordDrawer.vue";
 import ToolRunForm from "./ToolRunForm.vue";
 
 /** Fills a slash command's parameters from a form (port of chat_app's
@@ -23,12 +23,12 @@ function run(args: Record<string, unknown>): void {
 </script>
 
 <template>
-  <BaseModal :open="!!(command && schema)" :title="title" @close="emit('close')">
+  <RecordDrawer :open="!!(command && schema)" :title="title" @close="emit('close')">
     <template v-if="command && schema">
       <p v-if="command.description" class="description">{{ command.description }}</p>
       <ToolRunForm :key="command.tool_name" :schema="schema" :running="false" submit-label="Run command" @run="run" />
     </template>
-  </BaseModal>
+  </RecordDrawer>
 </template>
 
 <style scoped>

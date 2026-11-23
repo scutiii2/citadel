@@ -7,10 +7,11 @@ import { McpServerClient } from "../../../api/tools/McpServerClient";
 import type { UserExtension } from "../api/UserExtensionsClient";
 import type { ResourceInfo, ToolInfo, ToolRunResult } from "../../../api/types";
 import PageLayout from "../../../components/layout/PageLayout.vue";
+import PanelHelp from "../../../components/ui/panel/PanelHelp.vue";
 import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
-import ToolRunModal from "../../../components/tools/forms/ToolRunModal.vue";
+import ToolRunDrawer from "../../../components/tools/forms/ToolRunDrawer.vue";
 import ResourceReader from "../components/ResourceReader.vue";
-import UserExtensionModal from "../components/UserExtensionModal.vue";
+import UserExtensionDrawer from "../components/UserExtensionDrawer.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { useUserExtensionsStore } from "../stores/userExtensions";
@@ -212,7 +213,7 @@ onActivated(() => { if (canSeePrivate.value) void userExt.refresh(); });
 </script>
 
 <template>
-  <PageLayout wide fill title="Capabilities" description="Your tools and connected services." class="caps-view" :class="{ 'detail-open': detailOpen }">
+  <PageLayout wide fill title="Capabilities" class="caps-view" :class="{ 'detail-open': detailOpen }">
     <template #actions><button v-if="tab === 'extensions' && canPrivate" class="add-extension secondary" type="button" @click="edit(null)">+ Add extension</button></template>
     <p v-if="actionError || userExt.error" class="error action-error" role="alert">{{ actionError || userExt.error }}</p>
     <p v-if="loading" class="notice" role="status">Loading capabilities…</p>
@@ -225,7 +226,7 @@ onActivated(() => { if (canSeePrivate.value) void userExt.refresh(); });
         </div>
         <label class="search-box"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input v-model="query" type="search" :aria-label="tab === 'capabilities' ? 'Search capabilities and tools' : 'Search extensions and tools'" :placeholder="tab === 'capabilities' ? 'Search capabilities and tools…' : 'Search extensions and tools…'" /></label>
         <p v-if="discoveryError" class="error discovery-error">Tool details unavailable: {{ discoveryError }} <button class="link" @click="load">Retry</button></p>
-        <div class="list-heading"><h3>{{ tab === 'capabilities' ? 'Capabilities' : 'Extensions' }}</h3><span>{{ enabledCount }} enabled · {{ tabItems.filter(i => i.kind !== 'other').length }} total</span></div>
+        <div class="list-heading"><h3>{{ tab === 'capabilities' ? 'Capabilities' : 'Extensions' }}</h3><PanelHelp title="Capabilities">Your tools and connected services. Pick one to see its tools and resources and to run a tool. Private extensions are yours alone and always ask before a tool runs.</PanelHelp><span>{{ enabledCount }} enabled · {{ tabItems.filter(i => i.kind !== 'other').length }} total</span></div>
         <div id="caps-catalog" ref="catalog" class="catalog" role="tabpanel" :aria-labelledby="`caps-tab-${tab}`" tabindex="0">
           <p v-if="!shown.length" class="notice">{{ query.trim() ? `Nothing matches “${query.trim()}”.` : `No ${tab} are available.` }}</p>
           <article v-for="i in shown" :key="i.key" class="catalog-row" :class="{ active: selected?.key === i.key, disabled: !i.enabled, offline: i.online === false }" :aria-busy="i.key in pending">
@@ -261,8 +262,8 @@ onActivated(() => { if (canSeePrivate.value) void userExt.refresh(); });
       </aside>
     </div>
     <!-- Dialogs stay outside the panes hidden by the mobile list/detail mode. -->
-    <ToolRunModal :tool="tool" :running="running" :result="result" :command="toolCommand" class="capability-tool-modal" @close="closeTool" @run="run" />
-    <UserExtensionModal class="capability-extension-modal" v-if="canPrivate" :open="modalOpen" :extension="editing" @close="modalOpen = false" @saved="saved" />
+    <ToolRunDrawer :tool="tool" :running="running" :result="result" :command="toolCommand" @close="closeTool" @run="run" />
+    <UserExtensionDrawer v-if="canPrivate" :open="modalOpen" :extension="editing" @close="modalOpen = false" @saved="saved" />
     <ConfirmModal v-if="pendingRemove" open title="Remove private extension" :message="`Remove &quot;${pendingRemove.label}&quot;? Its saved headers are deleted too.`" confirm-label="Remove" danger :busy="removing" @confirm="remove" @close="!removing && (pendingRemove = null)" />
   </PageLayout>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import { useNarrow } from "../../composables/useNarrow";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
@@ -8,7 +9,7 @@ import ActionButton from '../../components/ui/buttons/ActionButton.vue'
 import DangerZone from "../../components/ui/status/DangerZone.vue";
 import RetentionNote from "../../components/ui/status/RetentionNote.vue";
 import ConfirmModal from '../../components/ui/dialogs/ConfirmModal.vue'
-import BaseModal from '../../components/ui/dialogs/BaseModal.vue'
+import RecordDrawer from '../../components/ui/panel/RecordDrawer.vue'
 import SegmentedControl from '../../components/ui/forms/SegmentedControl.vue'
 import UrlBar from './components/UrlBar.vue'
 import ProbeCard from './components/ProbeCard.vue'
@@ -77,7 +78,8 @@ async function confirmAction(): Promise<void> {
 </script>
 
 <template>
-  <PageLayout class="media-page" title="Media downloader" description="Video, music, and photos. Start with a link." wide fill>
+  <PageLayout class="media-page" title="Media downloader" wide fill>
+    <template #actions><PanelHelp title="Media downloader">Video, music, and photos. Start with a link.</PanelHelp></template>
     <WorkspaceLayout mobile="stack" :class="['media-workspace', `mode-${tab}`]">
       <div class="mobile-tabs"><SegmentedControl mode="tabs" id-prefix="media-mobile" v-model="tab" :options="mobileTabs" aria-label="Media workspace" /></div>
       <div class="main-panel">
@@ -110,13 +112,13 @@ async function confirmAction(): Promise<void> {
         <RetentionNote class="retention">Save files to your device before they expire.</RetentionNote>
       </aside>
     </WorkspaceLayout>
-    <BaseModal :open="fileDetails !== null" title="File details" @close="!confirming && (fileDetails = null)">
+    <RecordDrawer :open="fileDetails !== null" title="File details" @close="!confirming && (fileDetails = null)">
       <div v-if="fileDetails" class="file-details">
         <p class="file-details-name">{{ fileDetails.name }}</p>
         <p class="muted">{{ formatBytes(fileDetails.size) }} · {{ fileDetails.expires_at > now ? `Expires in ${formatExpiry(fileDetails.expires_at, now)}` : 'Expired' }}</p>
         <DangerZone class="file-danger" label="Remove this file"><ActionButton labelled icon="clear" class="danger" :disabled="store.removing.includes(fileDetails.file_id)" @click="confirm = { kind: 'delete', id: fileDetails.file_id, name: fileDetails.name }">Delete file</ActionButton></DangerZone>
       </div>
-    </BaseModal>
+    </RecordDrawer>
     <ConfirmModal :open="confirm !== null" :title="confirm?.kind === 'delete' ? 'Delete file?' : 'Cancel download?'" :message="confirmationMessage" :confirm-label="confirm?.kind === 'delete' ? 'Delete file' : 'Cancel download'" danger :busy="confirming" @confirm="confirmAction" @close="!confirming && (confirm = null)" />
   </PageLayout>
 </template>

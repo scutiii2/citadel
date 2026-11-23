@@ -1,6 +1,10 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { commandsClient } from "../../api/tools/CommandsClient";
+import { agentsClient } from "../agents/api/AgentsClient";
+import { ticketsClient } from "../tickets/api/TicketsClient";
+import { usageClient } from "../usage/api/UsageClient";
 import { createMemoryHistory, createRouter } from "vue-router";
 import type { Account } from "../../api/auth/AuthClient";
 import { NAV_PAGES } from "../../router/pages";
@@ -25,7 +29,27 @@ function setup(permissions: string[], emailVerified = true) {
   return { wrapper, auth, router };
 }
 
+beforeEach(() => {
+  vi.spyOn(ticketsClient, "unreadCount").mockResolvedValue(2);
+  vi.spyOn(agentsClient, "list").mockResolvedValue([{ status: "running" }, { status: "offline" }] as never);
+  vi.spyOn(commandsClient, "capabilities").mockResolvedValue([{ enabled: true }, { enabled: false }, { enabled: true }] as never);
+  vi.spyOn(usageClient, "mine").mockResolvedValue({ report: { total_tokens: 1234 } } as never);
+});
+
 describe("OverviewView", () => {
+  it("shows live counts only for permitted pages, and Unavailable when a count fails", async () => {
+    vi.spyOn(agentsClient, "list").mockRejectedValue(new Error("down"));
+    const { wrapper } = setup(["chat.use"]);
+    await flushPromises();
+    const tiles = wrapper.findAll(".tile").map((t) => t.text());
+    expect(tiles).toEqual([
+      expect.stringContaining("Agents running"), expect.stringContaining("Capabilities on"), expect.stringContaining("Tokens, last 7 days"),
+    ]);
+    expect(tiles[0]).toContain("Unavailable");
+    expect(tiles[1]).toContain("2");
+    expect(tiles[2]).toContain("1234");
+  });
+
   it("only offers permitted pages, with real links and an account shortcut", async () => {
     const { wrapper, router } = setup(["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage", "watchers.view"]);
     expect(wrapper.find(".primary").attributes("href")).toBe("/");

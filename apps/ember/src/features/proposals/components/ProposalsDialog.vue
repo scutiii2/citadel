@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
+import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
+import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
 import StateMessage from "../../../components/ui/status/StateMessage.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { errorMessage } from "../../../utils/errors";
@@ -121,7 +122,7 @@ function decline(): void {
 </script>
 
 <template>
-  <BaseModal :open="open" class="proposal-review" title="Suggestions from your agents" wide @close="close">
+  <RecordDrawer :open="open" class="proposal-review" title="Suggestions from your agents" @close="close">
     <div v-if="open" class="suggestions">
       <template v-if="!chosen">
         <StateMessage v-if="store.status === 'idle' || store.status === 'loading'" kind="loading">Loading …</StateMessage>
@@ -150,10 +151,7 @@ function decline(): void {
           <label class="field"><span class="label">Title</span><input v-model="title" type="text" aria-label="Title" :maxlength="FILE_TITLE_MAX" :disabled="busy" /></label>
           <label class="field"><span class="label">Keep it in folder</span><input v-model="folder" type="text" aria-label="Folder" maxlength="130" :disabled="busy" :aria-invalid="!!problem" :aria-describedby="problem ? 'suggestion-folder-problem' : undefined" /></label>
           <p v-if="problem" id="suggestion-folder-problem" class="error problem" role="alert"><svg class="line-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 11.5h-13zM8 6.5v3M8 11.5v.5" /></svg> {{ problem }}</p>
-          <label v-if="chosen.item_ids.length > 0" class="check">
-            <input v-model="removeItems" type="checkbox" :disabled="busy" />
-            <span>Also remove the source items from short-term memory</span>
-          </label>
+          <ToggleSwitch v-if="chosen.item_ids.length > 0" class="check" :checked="removeItems" :disabled="busy" @change="removeItems = ($event.target as HTMLInputElement).checked">Also remove the source items from short-term memory</ToggleSwitch>
         </template>
         <p v-if="error" class="error problem" role="alert"><svg class="line-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 11.5h-13zM8 6.5v3M8 11.5v.5" /></svg> {{ error }}</p>
       </template>
@@ -166,7 +164,7 @@ function decline(): void {
         </template>
       </div>
     </div>
-  </BaseModal>
+  </RecordDrawer>
 </template>
 
 <style scoped>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import "../../components/layout/infoPage.css";
 import PageLayout from "../../components/layout/PageLayout.vue";
@@ -99,7 +100,8 @@ async function unblock(uid: string): Promise<void> {
 </script>
 
 <template>
-  <PageLayout class="shares info-content" title="Shares" description="Copies of files, skills and memory items: what was sent to you and what you sent.">
+  <PageLayout class="shares info-content" title="Shares">
+    <template #actions><PanelHelp title="Shares">Copies of files, skills and memory items: what was sent to you and what you sent.</PanelHelp></template>
     <p v-if="notice" class="notice" role="status">
       {{ notice }}
       <RouterLink v-if="destination" class="notice-link" :to="{ name: destination }">{{ destination === "skills" ? "Go to Skills" : "Go to Notes" }}</RouterLink>

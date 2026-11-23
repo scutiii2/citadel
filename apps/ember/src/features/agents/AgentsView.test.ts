@@ -32,7 +32,7 @@ const AGENTS = [
 
 type Wrapper = ReturnType<typeof mount>;
 
-const chip = (wrapper: Wrapper, text: string) => wrapper.findAll("button").find((b) => b.text() === text)!;
+const chip = (wrapper: Wrapper, text: string) => wrapper.findAll("button").find((b) => b.text() === text || b.attributes("aria-label") === text)!;
 
 async function mountView() {
   const wrapper = mount(AgentsView);

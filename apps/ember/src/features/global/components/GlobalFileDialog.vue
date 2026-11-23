@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { isApiStatus } from "../../../api/http";
-import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
+import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import CharacterCount from "../../../components/ui/status/CharacterCount.vue";
 import DangerZone from "../../../components/ui/status/DangerZone.vue";
@@ -103,7 +103,7 @@ function remove(): void {
 </script>
 
 <template>
-  <BaseModal :open="open" :title="fileId === null ? 'New global file' : 'Global file'" wide @close="close">
+  <RecordDrawer :open="open" :title="fileId === null ? 'New global file' : 'Global file'" @close="close">
     <div v-if="open" class="file-dialog">
       <p v-if="loadError" class="error" role="alert">{{ loadError }}</p>
       <p v-else-if="fileId !== null && !loaded" role="status">Loading file…</p>
@@ -152,7 +152,7 @@ function remove(): void {
         <div class="buttons"><button type="button" class="pill-btn ghost" @click="close">Close</button></div>
       </template>
     </div>
-  </BaseModal>
+  </RecordDrawer>
   <ConfirmModal v-if="confirmDelete && canWrite" :open="open" title="Delete global file?" message="This removes the file for everyone."
     danger confirm-label="Delete" :busy="busy" @close="confirmDelete = false" @confirm="remove" />
 </template>

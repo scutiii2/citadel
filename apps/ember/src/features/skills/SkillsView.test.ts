@@ -57,7 +57,7 @@ describe("SkillsView", () => {
 
   it("groups skills by status and says nothing is used before approval", async () => {
     await setup([skill(1, "proposed"), skill(2, "active", { successes: 2 }), skill(3, "retired")]);
-    expect(wrapper.text()).toContain("Nothing is used until you approve it");
+    expect(wrapper.text()).toContain("Nothing here is used until you approve it");
     expect(wrapper.get('section[aria-label="Waiting for approval"]').text()).toContain("Skill 1");
     expect(wrapper.get('section[aria-label="Active"]').text()).toContain("Worked 2×, failed 0×");
     expect(wrapper.get('section[aria-label="Retired"]').text()).toContain("Skill 3");

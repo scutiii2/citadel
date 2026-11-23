@@ -6,7 +6,8 @@ import { useRoute, useRouter } from "vue-router";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from "./api/TicketsClient";
 import { usePolling } from "../../composables/time/usePolling";
-import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import RecordDrawer from "../../components/ui/panel/RecordDrawer.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
@@ -90,6 +91,13 @@ const saving = ref(false);
 const formError = ref("");
 const canSubmit = computed(() => draft.title.trim() !== "" && draft.description.trim() !== "" && !saving.value);
 
+const newDrawer = ref<InstanceType<typeof RecordDrawer>>();
+function discardNew(): void {
+  draft.type = "bug";
+  draft.title = "";
+  draft.description = "";
+  newOpen.value = false;
+}
 function startNew(): void {
   formError.value = "";
   newOpen.value = true;
@@ -271,10 +279,13 @@ async function reopenTicket(): Promise<void> {
 </script>
 
 <template>
-  <PageLayout title="Tickets" description="Report an issue, share an idea, or follow a support reply." class="tickets info-content" :class="{ 'thread-open': detailOpen }" wide fill>
+  <PageLayout title="Tickets" class="tickets info-content" :class="{ 'thread-open': detailOpen }" wide fill>
     <template #actions>
       <BackButton v-if="detailOpen" @click="dismiss">All tickets</BackButton>
-      <button type="button" class="primary new-ticket" @click="startNew">New ticket</button>
+      <PanelHelp title="Tickets">Report an issue, share an idea, or follow a support reply. Only your own tickets appear here.</PanelHelp>
+      <button type="button" class="admin-icon accent new-ticket" aria-label="New ticket" title="New ticket" @click="startNew">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+      </button>
     </template>
     <template #toolbar>
       <div class="list-controls">
@@ -343,8 +354,8 @@ async function reopenTicket(): Promise<void> {
       <div v-else class="placeholder"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v5a2 2 0 0 0 0 4v5H3v-5a2 2 0 0 0 0-4zM15 5v3m0 3v2m0 3v3" /></svg><h3>Your support conversation</h3><p>Choose a ticket to read replies, or start a new report.</p></div>
     </WorkspaceLayout>
 
-    <BaseModal class="new-ticket-modal" :open="newOpen" title="New ticket" @close="newOpen = false">
-      <form class="form" @submit.prevent="submit">
+    <RecordDrawer ref="newDrawer" :open="newOpen" title="New ticket" :editing="draft.title !== '' || draft.description !== ''" :busy="saving" @close="newOpen = false" @discard="discardNew">
+      <form id="new-ticket-form" class="form" @submit.prevent="submit">
         <SegmentedControl v-model="draft.type" :options="TYPE_OPTIONS.map(option => ({ ...option, disabled: saving }))" label="Type" aria-label="Ticket type" />
         <label>Title<input v-model="draft.title" type="text" maxlength="120" aria-label="Title" aria-describedby="ticket-title-count" :disabled="saving" /><CharacterCount id="ticket-title-count" class="ticket-count" :length="draft.title.length" :max="120" /></label>
         <label>
@@ -353,12 +364,12 @@ async function reopenTicket(): Promise<void> {
           <CharacterCount id="ticket-description-count" class="ticket-count" :length="draft.description.length" :max="4000" />
         </label>
         <p v-if="formError" class="form-error error" role="alert">{{ formError }}</p>
-        <div class="actions">
-          <button type="button" class="chip" @click="newOpen = false">Cancel</button>
-          <button type="submit" class="primary submit-ticket" :disabled="!canSubmit" :aria-busy="saving">Submit</button>
-        </div>
       </form>
-    </BaseModal>
+      <template #footer>
+        <button type="button" class="chip" @click="newDrawer?.requestCancel()">Cancel</button>
+        <button type="submit" form="new-ticket-form" class="primary submit-ticket" :disabled="!canSubmit" :aria-busy="saving">Submit</button>
+      </template>
+    </RecordDrawer>
 
 
     <ConfirmModal :open="confirmOpen" title="Close this ticket?" message="Support will see it as closed. You can still add a comment later." confirm-label="Close the ticket" :busy="closing" @confirm="closeTicket" @close="confirmOpen = false" />
@@ -423,7 +434,6 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 .reply .manage-ticket { border-color: transparent; padding-left: 0; }
 .send-reply { min-width: 76px; min-height: 40px; }
 .notice { max-height: 20%; overflow: auto; }
-.new-ticket { min-height: 40px; }
 .tickets button:focus-visible, .tickets input:focus-visible, .tickets select:focus-visible, .tickets textarea:focus-visible, .conversation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: ticket-spin .7s linear infinite; }
 @keyframes ticket-spin { to { transform: rotate(360deg); } }
@@ -435,7 +445,6 @@ button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12
   .tickets :deep(.page-description) { max-width: 210px; }
   .tickets.thread-open :deep(.page-head-copy), .tickets.thread-open :deep(.page-toolbar) { display: none; }
   .tickets.thread-open :deep(.page-actions) { flex: 1; justify-content: space-between; align-items: center; }
-  .new-ticket { min-height: 44px; }
   .list-controls { gap: 8px; }
   .tickets .sort-control select { max-width: 135px; padding-inline: 7px; min-height: 44px; }
   .status-filters :deep(button.segment) { min-height: 44px; padding-inline: 9px; }
@@ -452,9 +461,5 @@ button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12
   .reply { padding: 12px 16px; }
   .reply textarea { font-size: max(1em, 16px); }
   .reply button { min-height: 44px; }
-  dialog.new-ticket-modal { position: fixed; inset: auto 0 var(--rail-height); width: 100%; max-width: none; max-height: calc(100dvh - var(--rail-height) - env(safe-area-inset-top, 0px) - 16px); margin: 0; padding: 22px 20px; border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
-  .new-ticket-modal .form input, .new-ticket-modal .form textarea { font-size: max(1em, 16px); }
-  .new-ticket-modal .actions button { min-height: 44px; }
-  .new-ticket-modal .actions .primary { flex: 1; }
 }
 </style>

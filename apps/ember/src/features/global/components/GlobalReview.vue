@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
+import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { errorMessage } from "../../../utils/errors";
 import { formatUtc } from "../../../utils/time";
@@ -101,7 +101,7 @@ function reject(): void {
 </script>
 
 <template>
-  <BaseModal :open="visible" title="Review a global share" wide @close="!busy && close()">
+  <RecordDrawer :open="visible" title="Review a global share" @close="!busy && close()">
     <div v-if="visible" class="review">
       <p class="meta">From <strong>{{ share.sender }}</strong> · {{ KIND[share.kind] }} · {{ formatUtc(share.created_at) }}</p>
       <p v-if="loadError" class="error" role="alert"><span class="warning" aria-hidden="true">⚠</span> {{ loadError }}</p>
@@ -133,7 +133,7 @@ function reject(): void {
         </template>
       </div>
     </div>
-  </BaseModal>
+  </RecordDrawer>
 </template>
 
 <style scoped>

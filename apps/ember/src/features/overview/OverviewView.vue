@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed } from "vue";
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import StatTile from "../../components/ui/panel/StatTile.vue";
+import { commandsClient } from "../../api/tools/CommandsClient";
+import { agentsClient } from "../agents/api/AgentsClient";
+import { ticketsClient } from "../tickets/api/TicketsClient";
+import { usageClient } from "../usage/api/UsageClient";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../../utils/navigation/adminLink";
 import { visiblePages } from "../../router/pages";
@@ -23,6 +29,30 @@ const descriptions: Record<string, string> = {
   "/usage": "Review your token usage and account limits.",
   "/settings": "Adjust chat and appearance preferences.",
 };
+/** Live counts from the clients each page already uses. A count that fails shows Unavailable, never zero. */
+type Count = number | null | "failed";
+const unread = ref<Count>(null);
+const agents = ref<Count>(null);
+const capabilities = ref<Count>(null);
+const tokens = ref<Count>(null);
+const can = (permission: string | string[]) => [permission].flat().some((p) => auth.hasPermission(p));
+const showTickets = computed(() => can("tickets.create"));
+const showAgents = computed(() => can("chat.use"));
+const showCapabilities = computed(() => can(["tools.view", "chat.use"]));
+const showUsage = computed(() => can("chat.use"));
+const tiles = computed(() => showTickets.value || showAgents.value || showCapabilities.value || showUsage.value);
+const value = (count: Count) => (typeof count === "number" ? count : null);
+const failed = (count: Count) => count === "failed";
+async function load(target: { value: Count }, fetch: () => Promise<number>): Promise<void> {
+  try { target.value = await fetch(); } catch { target.value = "failed"; }
+}
+onMounted(() => {
+  if (!auth.account || auth.needsVerification) return;
+  if (showTickets.value) void load(unread, () => ticketsClient.unreadCount());
+  if (showAgents.value) void load(agents, async () => (await agentsClient.list()).filter((a) => a.status === "running").length);
+  if (showCapabilities.value) void load(capabilities, async () => (await commandsClient.capabilities()).filter((c) => c.enabled).length);
+  if (showUsage.value) void load(tokens, async () => (await usageClient.mine(7)).report.total_tokens);
+});
 const groups = computed(() => {
   const monitor = new Set(["/usage"]);
   const manage = new Set(["/settings"]);
@@ -64,6 +94,18 @@ const groups = computed(() => {
         <div class="hero-art" aria-hidden="true">
           <span class="orbit" /><span class="orbit inner" /><span class="spark" /><span class="spark small" />
           <svg class="line-icon flame" viewBox="0 0 64 64"><path d="M35 5c4 15-13 18-10 29 3-2 5-6 6-9 9 6 16 12 14 21-1 10-9 15-18 13C12 56 10 43 17 32c-1 9 3 11 5 12-6-17 17-22 13-39z" /></svg>
+        </div>
+      </section>
+      <section v-if="tiles" class="panel admin-panel-card" aria-labelledby="now-heading">
+        <header class="admin-panel-head">
+          <h3 id="now-heading">Right now</h3>
+          <div class="admin-panel-tools"><PanelHelp title="Right now">Live counts from your pages. A count that cannot load shows Unavailable. Your access decides which appear.</PanelHelp></div>
+        </header>
+        <div class="tiles">
+          <StatTile v-if="showTickets" label="Unread ticket replies" :value="value(unread)" :unavailable="failed(unread)" :warn="true" />
+          <StatTile v-if="showAgents" label="Agents running" :value="value(agents)" :unavailable="failed(agents)" />
+          <StatTile v-if="showCapabilities" label="Capabilities on" :value="value(capabilities)" :unavailable="failed(capabilities)" />
+          <StatTile v-if="showUsage" label="Tokens, last 7 days" :value="value(tokens)" :unavailable="failed(tokens)" />
         </div>
       </section>
       <p v-if="pages.length === 0" class="empty">Your role gives you no pages yet - ask an administrator.</p>
@@ -118,6 +160,8 @@ svg { width: 24px; height: 24px; flex-shrink: 0; }
   60% { transform: scale(0.98, 1.02) skewX(1.5deg); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 35%, transparent)); }
 }
 @keyframes ember-breathe { 0%, 100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
+.panel { margin-bottom: 23px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; padding: 14px; }
 .section-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 11px; }
 h3 { font-size: 1em; font-weight: 600; margin: 0; }
 .section-head span { color: var(--muted); font-size: 0.8em; }

@@ -54,7 +54,6 @@ button.link, :deep(button.link) { border: none; padding: 0 4px; color: var(--acc
 :deep(button.primary .icon) { stroke: currentColor; }
 :deep(button.primary[aria-busy='true'])::before { content: ''; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); animation: pdf-spin .7s linear infinite; }
 :deep(:is(button, input, select, summary, [tabindex]):focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-.pdf-options-modal { max-width: min(560px, calc(100vw - 32px)); }
 @keyframes pdf-spin { to { transform: rotate(360deg); } }
 @media (max-width: 1050px) and (min-width: 768px) {
   .workspace { --workspace-columns: minmax(0, 1fr) 250px; }
@@ -83,5 +82,4 @@ button.link, :deep(button.link) { border: none; padding: 0 4px; color: var(--acc
   :deep(.page-moves button) { min-height: 44px; }
   :deep(.merge-bar) { flex-direction: column; align-items: stretch; gap: 10px; padding-top: 12px; }
   :deep(button.primary) { justify-content: center; min-height: 44px; width: 100%; }
-  .pdf-options-modal { position: fixed; inset: auto 0 var(--rail-height); margin: 0; width: 100%; max-width: none; max-height: calc(100dvh - var(--rail-height) - 24px); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 }

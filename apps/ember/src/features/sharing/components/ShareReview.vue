@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
+import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { errorMessage } from "../../../utils/errors";
 import { formatUtc } from "../../../utils/time";
@@ -106,7 +106,7 @@ const blockSender = () => answer(async () => {
 </script>
 
 <template>
-  <BaseModal :open="visible" title="Review a share" wide @close="close">
+  <RecordDrawer :open="visible" title="Review a share" @close="close">
     <div v-if="visible" class="review">
       <p class="meta">From <strong>{{ share.sender }}</strong> · {{ KIND[share.kind] }} · {{ formatUtc(share.created_at) }}</p>
       <p v-if="loadError" class="error" role="alert">{{ loadError }}</p>
@@ -139,7 +139,7 @@ const blockSender = () => answer(async () => {
         </template>
       </div>
     </div>
-  </BaseModal>
+  </RecordDrawer>
 </template>
 
 <style scoped>

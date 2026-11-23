@@ -77,5 +77,5 @@ it('retains slash command discovery and copying in tool details',async()=>{
 });
 it('clears a tool preview when navigation selects another integration',async()=>{
   const w=await show();await choose(w,'Notes');await w.get('.tool-list button').trigger('click');
-  await choose(w,'Generator');expect(w.findComponent({name:'ToolRunModal'}).props('tool')).toBeNull();
+  await choose(w,'Generator');expect(w.findComponent({name:'ToolRunDrawer'}).props('tool')).toBeNull();
 });

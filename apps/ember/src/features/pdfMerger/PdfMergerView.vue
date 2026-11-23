@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import { useNarrow } from "../../composables/useNarrow";
 import RetentionNote from "../../components/ui/status/RetentionNote.vue";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
@@ -6,7 +7,7 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import PageLayout from '../../components/layout/PageLayout.vue'
 import ActionButton from '../../components/ui/buttons/ActionButton.vue'
-import BaseModal from '../../components/ui/dialogs/BaseModal.vue'
+import RecordDrawer from '../../components/ui/panel/RecordDrawer.vue'
 import SegmentedControl from '../../components/ui/forms/SegmentedControl.vue'
 import DropZone from './components/DropZone.vue'
 import SourceList from './components/SourceList.vue'
@@ -34,8 +35,9 @@ onBeforeUnmount(stop)
 onBeforeRouteLeave(stop)
 </script>
 <template>
-  <PageLayout class="pdf-page" title="PDF merger" description="Combine PDFs and images. Put every page in place." wide fill>
-    <template #actions><button type="button" class="add-files" @click="dropZone?.openPicker()"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Add files</button></template>
+  <PageLayout class="pdf-page" title="PDF merger" wide fill>
+    <template #actions>
+      <PanelHelp title="PDF merger">Combine PDFs and images. Put every page in place.</PanelHelp><button type="button" class="add-files" @click="dropZone?.openPicker()"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Add files</button></template>
     <div v-if="files.uploading || files.errors.length" class="notices">
       <p v-if="files.uploading" class="muted small" role="status">Uploading {{ files.uploading }} file(s)...</p>
       <ul v-if="files.errors.length" class="errors"><li v-for="(message,index) in files.errors" :key="index" role="alert">{{ message }} <button type="button" class="link" @click="files.dismissError(index)">Dismiss</button></li></ul>
@@ -61,7 +63,7 @@ onBeforeRouteLeave(stop)
         <MergeBar />
       </footer>
     </WorkspaceLayout>
-    <BaseModal :open="outputOpen" title="Output options" class="pdf-options-modal" @close="outputOpen = false"><OutputPanel /><p class="muted small">Options apply to your next merge.</p></BaseModal>
+    <RecordDrawer :open="outputOpen" title="Output options" @close="outputOpen = false"><OutputPanel /><p class="muted small">Options apply to your next merge.</p></RecordDrawer>
   </PageLayout>
 </template>
 <style scoped src="./components/workspace.css"></style>

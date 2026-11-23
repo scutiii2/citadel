@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import { computed, ref, watch } from "vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
@@ -43,7 +44,8 @@ function refreshApproved(destination: "notes" | "skills"): void {
 </script>
 
 <template>
-  <PageLayout title="Global brain" description="Files and skills everyone on this instance and every agent can read.">
+  <PageLayout title="Global brain">
+    <template #actions><PanelHelp title="Global brain">Files and skills everyone on this instance and every agent can read.</PanelHelp></template>
     <p class="notice" role="note">
       <svg class="line-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 11.5h-13zM8 6.5v3M8 11.5v.5" /></svg>
       {{ GLOBAL_NOTICE }}

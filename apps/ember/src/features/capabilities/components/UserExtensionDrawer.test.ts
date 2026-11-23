@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../api/http";
 import { userExtensionsClient, type UserExtension } from "../api/UserExtensionsClient";
 import { useAuthStore } from "../../../stores/auth";
-import UserExtensionModal from "./UserExtensionModal.vue";
+import UserExtensionDrawer from "./UserExtensionDrawer.vue";
 import { makeAccount } from "../../../testing/account";
 
 vi.mock("../api/UserExtensionsClient", () => ({
@@ -30,7 +30,7 @@ function open(extension: UserExtension | null = null) {
   const pinia = createPinia();
   setActivePinia(pinia);
   useAuthStore().account = ACCOUNT;
-  return mount(UserExtensionModal, { props: { open: true, extension }, global: { plugins: [pinia] } });
+  return mount(UserExtensionDrawer, { props: { open: true, extension }, global: { plugins: [pinia] } });
 }
 
 const type = (w: ReturnType<typeof open>, name: string, value: string) => w.get(`input[name=${name}]`).setValue(value);

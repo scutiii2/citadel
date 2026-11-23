@@ -2,6 +2,7 @@
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { usageClient, type MyUsage, type UsageGroupBy, type UsageRecordRow } from "./api/UsageClient";
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import ActionButton from "../../components/ui/buttons/ActionButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import LineChart from "../../components/analytics/LineChart.vue";
@@ -190,8 +191,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageLayout title="Usage" description="Review your token usage and account limits." class="usage-view">
+  <PageLayout title="Usage" class="usage-view">
     <template #actions>
+      <PanelHelp title="Usage">Review your token usage and account limits. Pick a period; Export saves it as a Markdown file.</PanelHelp>
       <div class="ranges" role="group" aria-label="Period">
           <SegmentedControl v-model="range" :options="RANGE_OPTIONS" label="Period" aria-label="Period" />
           <ActionButton icon="export" class="export" :disabled="!usage" title="Download this period as a Markdown file" @click="exportReport">

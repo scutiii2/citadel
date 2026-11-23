@@ -5,7 +5,8 @@ import { usePolling } from "../../composables/time/usePolling";
 import { accountAgentsClient, agentsClient, type AgentListing } from "./api/AgentsClient";
 import AgentCard from "./components/AgentCard.vue";
 import AgentLlm from "./components/AgentLlm.vue";
-import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import RecordDrawer from "../../components/ui/panel/RecordDrawer.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
@@ -101,9 +102,12 @@ onMounted(() => void refresh());
 </script>
 
 <template>
-  <PageLayout class="agents-view" title="Agents" description="Meet the team behind your conversations. The entry agent brings in the right help.">
+  <PageLayout class="agents-view" title="Agents">
     <template #actions>
-      <button type="button" class="pill-btn ghost" :disabled="refreshing" :aria-busy="refreshing" @click="refresh">Refresh</button>
+      <PanelHelp title="Agents">Meet the team behind your conversations. The entry agent brings in the right help. Switches apply only to your chats; service status is separate.</PanelHelp>
+      <button type="button" class="admin-icon" aria-label="Refresh" title="Refresh" :disabled="refreshing" :aria-busy="refreshing" @click="refresh">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
+      </button>
     </template>
     <StateMessage v-if="error" kind="error" @retry="refresh">Could not update the agents: {{ error }}</StateMessage>
     <StateMessage v-if="loading" kind="loading">Loading agents…</StateMessage>
@@ -142,7 +146,7 @@ onMounted(() => void refresh());
       </section>
     </template>
   </PageLayout>
-  <BaseModal :open="!!opened" :title="opened?.label ?? 'Agent description'" @close="openedId = null">
+  <RecordDrawer :open="!!opened" :title="opened?.label ?? 'Agent description'" @close="openedId = null">
     <template v-if="opened">
       <code class="agent-id">{{ opened.id }}</code>
       <p class="full-description">{{ opened.focus || 'No description.' }}</p>
@@ -154,9 +158,8 @@ onMounted(() => void refresh());
         <template v-if="opened.decision?.local_status === 'unavailable'">Local models unavailable.</template>
         Internal routing; answers come from the selected agent.
       </p>
-      <button type="button" class="pill-btn primary done" @click="openedId = null">Done</button>
     </template>
-  </BaseModal>
+  </RecordDrawer>
 </template>
 
 <style scoped>

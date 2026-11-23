@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import "../../components/layout/infoPage.css";
@@ -210,7 +211,8 @@ onBeforeUnmount(() => {
 
 
 <template>
-  <PageLayout title="Generator" description="Passwords, passphrases, PINs and one-time codes." class="generator info-content" wide fill>
+  <PageLayout title="Generator" class="generator info-content" wide fill>
+    <template #actions><PanelHelp title="Generator">Passwords, passphrases, PINs and one-time codes.</PanelHelp></template>
     <WorkspaceLayout mobile="stack" as="form" class="generator-workspace" @submit.prevent="canRun && generate()">
       <div class="type-picker">
         <div class="desktop-types"><SegmentedControl :model-value="tab" aria-label="Generator type" :options="TABS" @update:model-value="requestTab" /></div>

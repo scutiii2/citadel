@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
+import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import SearchField from "../../../components/ui/lists/SearchField.vue";
 import CharacterCount from "../../../components/ui/status/CharacterCount.vue";
@@ -173,7 +173,7 @@ function remove(): void {
         </article>
       </section>
     </template>
-    <BaseModal v-if="canWrite && editing" :open="true" title="Edit global skill" @close="!busy && edit(null)">
+    <RecordDrawer v-if="canWrite && editing" :open="true" title="Edit global skill" @close="!busy && edit(null)">
       <form class="dialog-form" @submit.prevent="save">
         <div v-for="field in fields" :key="field.key" class="field">
           <label :for="'global-skill-' + field.key">{{ field.label }}</label>
@@ -196,7 +196,7 @@ function remove(): void {
           <button type="submit" class="pill-btn primary" :disabled="!canSave" :aria-busy="busy" @click.prevent="save">Save</button>
         </div>
       </form>
-    </BaseModal>
+    </RecordDrawer>
     <ConfirmModal v-if="canWrite && deleting" :open="true" title="Delete global skill?" message="This removes the skill for everyone."
       danger confirm-label="Delete" :busy="busy" @close="!busy && (deleting = null)" @confirm="remove" />
   </div>

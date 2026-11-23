@@ -55,7 +55,7 @@ async function mountView(path = "/tickets") {
 
 const rows = (wrapper: ReturnType<typeof mount>) => wrapper.findAll("button.ticket-row");
 const button = (wrapper: ReturnType<typeof mount>, text: string) =>
-  wrapper.findAll("button").find((b) => b.text() === text)!;
+  wrapper.findAll("button").find((b) => b.text() === text || b.attributes("aria-label") === text)!;
 
 beforeEach(() => {
   vi.clearAllMocks();

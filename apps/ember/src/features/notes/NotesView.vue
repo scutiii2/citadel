@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import "../../components/layout/infoPage.css";
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
@@ -347,8 +348,9 @@ watch(() => auth.account?.id, () => {
 </script>
 
 <template>
-  <PageLayout class="notes info-content" :class="{ 'file-open': selected !== null }" title="Notes" description="Your long-term memory: the files you and your agents keep." wide fill>
+  <PageLayout class="notes info-content" :class="{ 'file-open': selected !== null }" title="Notes" wide fill>
     <template #actions>
+      <PanelHelp title="Notes">Your long-term memory: the files you and your agents keep, in folders.</PanelHelp>
       <button v-if="proposals.items.length > 0" type="button" class="pill-btn ghost suggestions-btn" :disabled="busy" @click="suggesting = true">
         Suggestions ({{ proposals.items.length }})
       </button>

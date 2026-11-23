@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import { matchesWords } from "../../utils/search";
 import PageLayout from "../../components/layout/PageLayout.vue";
@@ -121,7 +122,8 @@ async function saveEdit(): Promise<void> {
 </script>
 
 <template>
-  <PageLayout title="Skills" class="skills info-content" :class="{ 'skill-open': editing !== null }" wide fill description="How-tos Ember proposed after solving a task. Nothing is used until you approve it.">
+  <PageLayout title="Skills" class="skills info-content" :class="{ 'skill-open': editing !== null }" wide fill>
+    <template #actions><PanelHelp title="Skills">How-tos Ember proposed after solving a task. Nothing is used until you approve it.</PanelHelp></template>
     <p v-if="notice" class="notice" role="status">{{ notice }}</p>
     <p v-if="actionError" class="error action-error" role="alert">{{ actionError }}</p>
     <StateMessage v-if="loading" kind="loading">Loading skills…</StateMessage>

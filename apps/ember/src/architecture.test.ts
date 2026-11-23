@@ -98,3 +98,19 @@ describe("shared module ownership", () => {
     expect(violations.sort()).toEqual([]);
   });
 });
+
+describe("modals", () => {
+  /** Panels open record drawers; only chat, attachment previews and the dialog and drawer bases use `BaseModal`. */
+  const ALLOWED = ["features/chat/", "components/content/ChatAttachment.vue", "components/ui/dialogs/", "components/ui/panel/"];
+
+  it("keeps BaseModal out of pages and panels", () => {
+    const files = ["features", "components"].flatMap((folder) =>
+      readdirSync(join(root, folder), { recursive: true })
+        .filter((name): name is string => typeof name === "string" && name.endsWith(".vue"))
+        .map((name) => join(root, folder, name).replaceAll("\\", "/")));
+    const users = files.filter((file) => /\bBaseModal\b/.test(readFileSync(file, "utf8")))
+      .map((file) => relative(root, file).replaceAll("\\", "/"))
+      .filter((file) => !ALLOWED.some((prefix) => file.startsWith(prefix)));
+    expect(users.sort()).toEqual([]);
+  });
+});

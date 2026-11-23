@@ -7,7 +7,7 @@ export type ShareTarget =
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
+import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { errorMessage } from "../../../utils/errors";
 import { SHARE_NAME_MAX, type NewShare, type Recipient, type Share } from "../api/SharingClient";
@@ -89,7 +89,7 @@ async function send(): Promise<void> {
 </script>
 
 <template>
-  <BaseModal :open="visible" title="Share a copy" @close="close">
+  <RecordDrawer :open="visible" title="Share a copy" @close="close">
     <template v-if="visible && target">
       <div v-if="done" class="result" role="status">
         <p v-if="mode === 'global'">Sent to the global brain review queue. A reviewer decides; if it is approved, every account and its agents can read it. You can withdraw it from Shares until then.</p>
@@ -121,7 +121,7 @@ async function send(): Promise<void> {
         </div>
       </form>
     </template>
-  </BaseModal>
+  </RecordDrawer>
 </template>
 
 <style scoped>

@@ -4,6 +4,8 @@ import { computed, onMounted, ref, useTemplateRef, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import DraftActions from "../../components/ui/panel/DraftActions.vue";
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import { checked } from "../../utils/browser/dom";
 import { errorMessage } from "../../utils/errors";
 import SettingRow from "../../components/ui/forms/SettingRow.vue";
@@ -379,9 +381,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageLayout title="Settings" description="Adjust chat, appearance, and navigation preferences." class="settings-view" :class="{ dirty }">
+  <PageLayout title="Settings" class="settings-view" :class="{ dirty }">
     <template #toolbar>
       <div class="top">
+        <PanelHelp title="Settings">Adjust chat, appearance and navigation preferences. Chat and appearance apply instantly and are saved on this device. Sidebar and response limits are saved to your account when you press Save.</PanelHelp>
         <label class="search-box">
           <svg class="line-icon search-icon" viewBox="0 0 16 16" aria-hidden="true"><path :d="SEARCH_ICON" /></svg>
           <input
@@ -405,6 +408,7 @@ onMounted(() => {
         >
           {{ modifiedCount }} modified
         </button>
+        <DraftActions label="settings" :dirty="dirty" :saving="saving || responseSaving || requestingNotifications" @cancel="revert" @save="save" />
       </div>
     </template>
     <div ref="root" class="column">
@@ -601,11 +605,7 @@ onMounted(() => {
       </fieldset></section>
 
     </div>
-    <div v-if="dirty || saving" class="settings-save-bar" role="group" aria-label="Unsaved settings" :aria-busy="saving">
-      <div><span>Unsaved changes</span><p v-if="saveError" class="save-error" role="alert">{{ saveError }}</p></div>
-      <button type="button" class="revert" :disabled="saving || responseSaving || requestingNotifications" @click="revert">Revert</button>
-      <button type="button" class="save" :disabled="saving || responseSaving || requestingNotifications" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
-    </div>
+    <p v-if="saveError" class="save-error" role="alert">{{ saveError }}</p>
     <ConfirmModal
       v-if="allowAllOpen"
       :open="allowAllOpen"
@@ -626,14 +626,7 @@ onMounted(() => {
 .voice-select:focus { outline: none; border-color: var(--accent); }
 .settings-controls:disabled { pointer-events: none; }
 .settings-controls { padding: 0; margin: 0; min-width: 0; border: none; }
-.settings-view.dirty .column { padding-bottom: 110px; }
-.settings-save-bar { position: fixed; bottom: 0; left: 52px; right: 0; z-index: 25; display: flex; align-items: center; gap: 12px; padding: 14px 32px; border-top: 1px solid var(--border); background: var(--surface); }
-.settings-save-bar > div { flex: 1; min-width: 0; font-size: .9em; }
-.settings-save-bar button { padding: 8px 20px; border: 1px solid var(--border); border-radius: var(--radius-full); color: var(--text); background: transparent; cursor: pointer; font: inherit; }
-.settings-save-bar button.save { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
 .save-error { margin: 4px 0 0; color: var(--danger); }
-@media (max-width: 767px) { .settings-save-bar { left: 0; bottom: var(--rail-height); padding: 12px 16px; gap: 8px; } }
-
 .column {
   display: flex;
   flex-direction: column;

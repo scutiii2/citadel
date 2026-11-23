@@ -7,7 +7,7 @@ import ChatHeader from "../components/ChatHeader.vue";
 import ChatInput from "../components/ChatInput.vue";
 import ApprovalModePicker from "../components/ApprovalModePicker.vue";
 import ChatSettingsMenu from "../components/ChatSettingsMenu.vue";
-import CommandFormModal from "../../../components/tools/forms/CommandFormModal.vue";
+import CommandFormDrawer from "../../../components/tools/forms/CommandFormDrawer.vue";
 import ElapsedTime from "../../../components/ui/status/ElapsedTime.vue";
 import ConversationSidebar from "../components/ConversationSidebar.vue";
 import FolderDialogs from "../components/FolderDialogs.vue";
@@ -519,7 +519,7 @@ useChatShortcuts({
             </span>
           </template>
         </ChatInput>
-        <CommandFormModal :command="formCommand" :schema="formSchema" @submit="runCommandForm" @close="closeCommandForm" />
+        <CommandFormDrawer :command="formCommand" :schema="formSchema" @submit="runCommandForm" @close="closeCommandForm" />
         <TriageQuestionModal :open="triageOpen" :submit="chat.askTriage" @close="triageOpen = false" />
         <TemplatesModal :open="templatesOpen" :draft="templatesDraft" @close="templatesOpen = false" />
         <ShareDialog :open="shareOpen" :chat-id="activeId" @close="shareOpen = false" />

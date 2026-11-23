@@ -3,7 +3,7 @@ import { computed, onUnmounted, reactive, ref, watch } from "vue";
 import type { UserExtension } from "../api/UserExtensionsClient";
 import { useUserExtensionsStore } from "../stores/userExtensions";
 import { errorMessage } from "../../../utils/errors";
-import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
+import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
 
 /** Adds a private extension (`extension` null) or edits one. Saved headers are
  * secrets ember_api never sends back, so an edit lists their names only and
@@ -20,6 +20,10 @@ const rows = ref<{ name: string; value: string }[]>([]);
 // Editing: the saved headers are being replaced by the rows below.
 const replacing = ref(false);
 const saving = ref(false);
+const drawer = ref<InstanceType<typeof RecordDrawer>>();
+const dirty = computed(() =>
+  form.label !== (props.extension?.label ?? "") || form.url !== (props.extension?.url ?? "") ||
+  form.description !== (props.extension?.description ?? "") || replacing.value || rows.value.length > 0);
 const error = ref("");
 let session = 0;
 onUnmounted(() => { session++; });
@@ -102,8 +106,8 @@ async function save(): Promise<void> {
 </script>
 
 <template>
-  <BaseModal :open="open" :title="editing ? 'Edit private extension' : 'Add your own extension'" @close="!saving && emit('close')">
-    <form class="form" @submit.prevent="save">
+  <RecordDrawer ref="drawer" :open="open" :title="editing ? 'Edit private extension' : 'Add your own extension'" :editing="dirty" :busy="saving" @close="emit('close')" @discard="emit('close')">
+    <form id="extension-form" class="form" @submit.prevent="save">
       <p class="muted">
         The address of an MCP server you run or trust (Streamable HTTP). Only you can see it and only your chats use it.
         Its tools always ask before they run.
@@ -159,12 +163,12 @@ async function save(): Promise<void> {
       </fieldset>
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <div class="buttons">
-        <button type="button" class="pill-btn ghost"  :disabled="saving" @click="emit('close')">Cancel</button>
-        <button type="submit" class="pill-btn primary" :disabled="saving" :aria-busy="saving">{{ saving ? "Saving ..." : editing ? "Save" : "Add" }}</button>
-      </div>
     </form>
-  </BaseModal>
+    <template #footer>
+      <button type="button" class="pill-btn ghost" :disabled="saving" @click="drawer?.requestCancel()">Cancel</button>
+      <button type="submit" form="extension-form" class="pill-btn primary" :disabled="saving" :aria-busy="saving">{{ saving ? "Saving ..." : editing ? "Save" : "Add" }}</button>
+    </template>
+  </RecordDrawer>
 </template>
 
 <style scoped>
@@ -218,11 +222,6 @@ input:focus {
 .error,
 .host-warning {
   color: var(--danger);
-}
-.buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }
 .remove-header {
   padding: 5px 12px;

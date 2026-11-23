@@ -103,6 +103,4 @@
   .back.secondary { display: inline-flex; margin-bottom: 18px; }
   .detail-footer { padding: 12px 16px; }
   .tool-list button { min-height: 48px; }
-  .capability-tool-modal, .capability-extension-modal { position: fixed; inset: auto 0 var(--rail-height); width: 100%; max-width: none; max-height: calc(100dvh - var(--rail-height) - 20px); margin: 0; box-sizing: border-box; border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
-  .capability-tool-modal :deep(.close), .capability-extension-modal :deep(.close) { width: 44px; height: 44px; }
 }

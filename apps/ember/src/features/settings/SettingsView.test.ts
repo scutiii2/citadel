@@ -116,7 +116,7 @@ describe("SettingsView", () => {
 
     expect(set).not.toHaveBeenCalled();
     expect(useAuthStore().promptSuggestions).toBe(true);
-    await w.get("button.save").trigger("click");
+    await w.get('.draft-actions [data-test="save"]').trigger("click");
     await flushPromises();
     expect(set).toHaveBeenCalledWith({ prompt_suggestions: false });
     expect(useAuthStore().promptSuggestions).toBe(false);
@@ -135,7 +135,7 @@ describe("SettingsView", () => {
     await flushPromises();
 
     expect(set).not.toHaveBeenCalled();
-    await w.get("button.save").trigger("click");
+    await w.get('.draft-actions [data-test="save"]').trigger("click");
     await flushPromises();
     expect(set).toHaveBeenCalledWith({ prompt_suggestions: true });
     expect(useAuthStore().promptSuggestions).toBe(true);
@@ -149,7 +149,7 @@ describe("SettingsView", () => {
     await row(w, "chat-suggestions").get("input").setValue(false);
     await flushPromises();
 
-    await w.get("button.save").trigger("click");
+    await w.get('.draft-actions [data-test="save"]').trigger("click");
     await flushPromises();
     expect(useAuthStore().promptSuggestions).toBe(true);
     expect(w.get('[role="alert"]').text()).toContain("down");
@@ -211,7 +211,7 @@ describe("SettingsView", () => {
     expect(chat.setPlan).toHaveBeenCalledWith(false);
     expect(w.get(".badge").text()).toBe("1 modified");
 
-    expect(w.find(".settings-save-bar").exists()).toBe(false);
+    expect(w.find('.draft-actions [data-test="save"]').exists()).toBe(false);
 
     expect(chat.setPlan).toHaveBeenCalledWith(false);
     expect(chat.planLean).toBe(true);
@@ -241,7 +241,7 @@ describe("SettingsView", () => {
     expect(chat.setLiveTokens).toHaveBeenCalled();
     expect(w.get(".badge").text()).toBe("3 modified");
 
-    expect(w.find(".settings-save-bar").exists()).toBe(false);
+    expect(w.find('.draft-actions [data-test="save"]').exists()).toBe(false);
 
     expect(chat.setLiveTokens).toHaveBeenCalledWith(false);
     expect(chat.setContextPanel).toHaveBeenCalledWith(false);
@@ -324,7 +324,7 @@ describe("SettingsView", () => {
       expect(chat.setApprovalMode).toHaveBeenCalledWith("auto");
       expect(row(w, "chat-ask-tools").text()).toContain("Tools that only read run on their own");
       expect(row(w, "chat-ask-tools").find(".dot").exists()).toBe(true);
-      expect(w.find(".settings-save-bar").exists()).toBe(false);
+      expect(w.find('.draft-actions [data-test="save"]').exists()).toBe(false);
 
       expect(chat.setApprovalMode).toHaveBeenCalledExactlyOnceWith("auto");
     });
@@ -474,8 +474,8 @@ it("reverts account drafts while retaining applied device preferences", async ()
   await w.get('button[aria-label="Pin Chat to the top"]').trigger("click");
   expect(vi.mocked(navPreferencesClient.save)).not.toHaveBeenCalled();
   expect(chat.caveman).toBe(true);
-  await w.get("button.revert").trigger("click");
-  expect(w.find(".settings-save-bar").exists()).toBe(false);
+  await w.get('.draft-actions [data-test="cancel"]').trigger("click");
+  expect(w.find('.draft-actions [data-test="save"]').exists()).toBe(false);
   expect((row(w, "chat-terse").get("input").element as HTMLInputElement).checked).toBe(true);
   expect(w.find(".tag").exists()).toBe(false);
 });
@@ -486,12 +486,12 @@ it("saves local preferences and sidebar edits together", async () => {
   await row(w, "chat-terse").get("input").setValue(true);
   await row(w, "appearance-theme").findAll("button").find(b => b.text() === "Dark")!.trigger("click");
   await w.get('button[aria-label="Pin Chat to the top"]').trigger("click");
-  await w.get("button.save").trigger("click");
+  await w.get('.draft-actions [data-test="save"]').trigger("click");
   await flushPromises();
   expect(chat.setCaveman).toHaveBeenCalledWith(true);
   expect(document.documentElement.style.colorScheme).toBe("dark");
   expect(navPreferencesClient.save).toHaveBeenCalledWith(expect.objectContaining({ pinned: ["/"] }));
-  expect(w.find(".settings-save-bar").exists()).toBe(false);
+  expect(w.find('.draft-actions [data-test="save"]').exists()).toBe(false);
 });
 
 it("keeps unsaved settings after a sidebar save fails, and supports retry", async () => {
@@ -499,13 +499,13 @@ it("keeps unsaved settings after a sidebar save fails, and supports retry", asyn
   vi.mocked(navPreferencesClient.save).mockRejectedValueOnce(new Error("Sidebar unavailable")).mockImplementation(async prefs => prefs);
   await w.get('button[aria-label="Pin Chat to the top"]').trigger("click");
   await row(w, "chat-terse").get("input").setValue(true);
-  await w.get("button.save").trigger("click");
+  await w.get('.draft-actions [data-test="save"]').trigger("click");
   await flushPromises();
   expect(w.get('[role="alert"]').text()).toBe("Sidebar unavailable");
   expect(chat.setCaveman).toHaveBeenCalled();
-  await w.get("button.save").trigger("click");
+  await w.get('.draft-actions [data-test="save"]').trigger("click");
   await flushPromises();
-  expect(w.find(".settings-save-bar").exists()).toBe(false);
+  expect(w.find('.draft-actions [data-test="save"]').exists()).toBe(false);
   expect(chat.setCaveman).toHaveBeenCalledWith(true);
 });
 
@@ -515,7 +515,7 @@ it("requests permission and immediately persists granted notifications", async (
   await flushPromises();
   expect(requestCompletionPermission).toHaveBeenCalledOnce();
   expect(chat.browserNotifications).toBe(true);
-  expect(w.find(".settings-save-bar").exists()).toBe(false);
+  expect(w.find('.draft-actions [data-test="save"]').exists()).toBe(false);
   expect(chat.setBrowserNotifications).toHaveBeenCalledWith(true);
 });
 it("explains blocked notifications and leaves the setting off", async () => {
@@ -553,10 +553,10 @@ it("protects a response-limit draft from page unload and saves it with account s
   window.dispatchEvent(event);
   expect(event.defaultPrevented).toBe(true);
   vi.mocked(tuningClient.save).mockResolvedValue({ limits: { max_output_tokens: null, max_tool_rounds: 4 }, ceiling: { max_output_tokens: 2048, max_tool_rounds: 15 } });
-  await w.get('.settings-save-bar button.save').trigger("click");
+  await w.get('.draft-actions [data-test="save"]').trigger("click");
   await flushPromises();
   expect(tuningClient.save).toHaveBeenCalledWith({ max_output_tokens: null, max_tool_rounds: 4 });
-  expect(w.find('.settings-save-bar').exists()).toBe(false);
+  expect(w.find('.draft-actions [data-test="save"]').exists()).toBe(false);
 });
 
 
@@ -567,5 +567,5 @@ it("does not block other settings or page unload while response limits initially
   window.dispatchEvent(event);
   expect(event.defaultPrevented).toBe(false);
   await row(w, "chat-suggestions").get("input").setValue(false);
-  expect(w.get('.settings-save-bar button.save').attributes("disabled")).toBeUndefined();
+  expect(w.get('.draft-actions [data-test="save"]').attributes("disabled")).toBeUndefined();
 });

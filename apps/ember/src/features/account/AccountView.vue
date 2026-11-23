@@ -5,6 +5,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { authClient, type KnownDevice } from "../../api/auth/AuthClient";
 import ActionButton from "../../components/ui/buttons/ActionButton.vue";
+import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import { THEME_LABELS, useTheme } from "../../composables/useTheme";
 import { visiblePages } from "../../router/pages";
@@ -141,11 +142,10 @@ async function changePassword(): Promise<void> {
   <PageLayout
     v-if="auth.account"
     title="Account"
-    description="Manage your identity, security, and devices."
     class="account-view"
   >
     <template #actions>
-      <p class="eyebrow">Your workspace, your account</p>
+      <PanelHelp title="Account">Manage your identity, security and devices. Each card saves on its own: change your email or password, sign out, or forget a remembered device.</PanelHelp>
     </template>
     <div class="column">
       <div v-if="!account.email_verified" class="banner" role="status">
