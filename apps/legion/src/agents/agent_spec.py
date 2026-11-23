@@ -40,7 +40,7 @@ TIERS = ("light", "standard", "heavy", "extreme")
 _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "decision": "laya"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "role", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "decision", "mode", "kind", "workers", "prefetch", "limits"}
+_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "role", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "decision", "kind", "workers", "prefetch", "limits"}
 _LLM_KEYS = {"strategy", "min_confidence", "provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort", "fallback_gateways"}
 _TOOLS_KEYS = {"allow", "deny"}
 
@@ -172,7 +172,6 @@ class AgentSpec:
     url: str | None = None
     source: Path | None = None
     decision: Any = None
-    mode: str = "legacy"
     kind: str | None = None
     workers: tuple[str, ...] = ()
     prefetch: tuple[str, ...] = ()
@@ -290,6 +289,8 @@ def upgrade_legacy(data: dict[str, Any]) -> dict[str, Any]:
     true` and `internal_role: "router"` become the role (unless one is already
     set), `false`/null are dropped. Other values are left for load_file to reject."""
     data = dict(data)
+    # `mode` went away: the orchestrator always plans and hands the work to architects.
+    data.pop("mode", None)
     for key, role in (("orchestrator", "orchestrator"), ("internal_role", "router")):
         if key in data:
             value = data.pop(key)
@@ -339,11 +340,6 @@ def load_file(path: Path) -> AgentSpec:
     role = data.get("role")
     if role not in ROLES:
         raise check.fail("role", f"is required and must be one of: {', '.join(ROLES)}")
-    mode = data.get("mode", "legacy")
-    if "mode" in data and role != "orchestrator":
-        raise check.fail("mode", "is only supported for role orchestrator")
-    if mode not in ("legacy", "plan"):
-        raise check.fail("mode", "must be legacy or plan")
     kind = None
     workers: tuple[str, ...] = ()
     prefetch: tuple[str, ...] = ()
@@ -528,7 +524,7 @@ def load_file(path: Path) -> AgentSpec:
         delegable=check.boolean(data, "delegable", True),
         source=path,
         decision=policy,
-        mode=mode, kind=kind, workers=workers, prefetch=prefetch, limits=limits,
+        kind=kind, workers=workers, prefetch=prefetch, limits=limits,
     )
 
 
@@ -554,9 +550,6 @@ def load_dir(directory: Path) -> list[AgentSpec]:
             if spec.kind in kinds:
                 raise check.fail("kind", f"{spec.kind!r} already has an enabled architect ({kinds[spec.kind]}.json)")
             kinds[spec.kind] = spec.id
-    if sum(s.internal_role == "router" for s in enabled) > 1:
-        raise AgentSpecError("at most one enabled internal router is allowed")
-
     by_port: dict[int, list[str]] = {}
     for spec in enabled:
         by_port.setdefault(spec.port, []).append(f"{spec.id}.json")
@@ -568,7 +561,26 @@ def load_dir(directory: Path) -> list[AgentSpec]:
     if len(entries) != 1:
         found = ", ".join(entries) if entries else "none"
         raise AgentSpecError(f"exactly one enabled agent must set entry: true (found: {found})")
+    if sum(s.internal_role == "router" for s in enabled) > 1:
+        raise AgentSpecError("at most one enabled internal router is allowed")
+    check_roster(specs)
     return specs
+
+
+def check_roster(specs: list[AgentSpec]) -> None:
+    """The one architecture: an orchestrator (the entry agent) plans, architects
+    run the plan, specialists do the work and a router stays on the roster.
+    Raises AgentSpecError unless the enabled agents hold exactly one orchestrator
+    and one router, and at least one architect and one specialist."""
+    enabled = [s for s in specs if s.enabled]
+    for role, exactly in (("orchestrator", True), ("router", True), ("architect", False), ("specialist", False)):
+        found = [s.id for s in enabled if s.role == role]
+        if exactly and len(found) != 1 or not found:
+            raise AgentSpecError(
+                f"the roster needs {'exactly one' if exactly else 'at least one'} enabled {role} (found: {', '.join(found) or 'none'})")
+    entry = next(s for s in enabled if s.entry)
+    if not entry.orchestrator:
+        raise AgentSpecError(f"the entry agent must be the orchestrator, not {entry.id}.json (role {entry.role})")
 
 
 _current: AgentSpec | None = None

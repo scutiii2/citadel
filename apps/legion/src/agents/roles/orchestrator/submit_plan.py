@@ -16,8 +16,7 @@ MAX_BRIEF = 16000
 
 
 def enabled() -> bool:
-    spec = agent_spec.current()
-    return getattr(spec, "mode", "legacy") == "plan" and spec.orchestrator
+    return agent_spec.current().orchestrator
 
 
 def tool_description() -> str:

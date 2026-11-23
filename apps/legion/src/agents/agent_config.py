@@ -179,7 +179,7 @@ async def run_chat(
     """
     history = validate_history(history)
     spec = agent_spec.current()
-    plan_mode = getattr(spec, "mode", "legacy") == "plan" and spec.orchestrator
+    plan_mode = spec.orchestrator  # the orchestrator always plans; it never answers or delegates directly
     requester = internal_auth.current_requester()
     private = private_turn.PrivateTurn.from_raw(private_extensions, requester.email or requester.username)
     # Validated before anything is registered: a bad mode must not start a turn.

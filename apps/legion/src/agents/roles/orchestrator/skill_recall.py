@@ -69,6 +69,6 @@ async def with_skills(question: str, prompt: str, on_event: OnEvent | None = Non
     # With no notes in front, the prompt is the bare question and needs the marker memory recall would add.
     body = f"[User message]\n{prompt}" if prompt == question else prompt
     label = LABEL
-    if agent_spec.current().orchestrator and agent_spec.current().mode == "plan":
+    if agent_spec.current().orchestrator:
         label = label.replace(" After following one, call stronghold__tool_skill_mark with its id.", "")
     return f"{label}\n{text}\n\n{body}"

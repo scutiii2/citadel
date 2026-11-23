@@ -256,6 +256,10 @@ def _validate_change(agent_id: str, data: dict[str, Any], directory: Path) -> Ag
             raise AgentStoreError(f"{entries[0]!r} is already the entry agent; unset it there first", 409)
     elif not entries:
         raise AgentStoreError("exactly one enabled agent must be the entry agent", 409)
+    try:
+        agent_spec.check_roster([*others, spec])
+    except AgentSpecError as error:
+        raise AgentStoreError(str(error), 409) from error
     return spec
 
 
