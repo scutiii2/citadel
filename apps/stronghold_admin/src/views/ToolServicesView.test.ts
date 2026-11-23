@@ -53,8 +53,8 @@ describe("ToolServicesView", () => {
   it("shows each service and leaves the saved token fields blank", async () => {
     const { wrapper } = await mounted(false);
     expect(wrapper.get('[data-test="row-bard"]').text()).toContain("Ready");
-    expect(wrapper.get('[data-test="row-scribe"]').text()).toContain("Configure Scribe in Stronghold Admin.");
-    expect(wrapper.get('[data-test="row-reader"]').text()).toContain("Reader is disabled in Stronghold Admin.");
+    await wrapper.get('[data-test="row-scribe"] button[aria-label="About Not ready"]').trigger("click");
+    expect(document.body.textContent).toContain("Configure Scribe in Stronghold Admin.");
     await wrapper.get('button[aria-label="Open Bard"]').trigger("click");
     const card = wrapper.get('[data-test="service-bard"]');
     expect(card.findAll("input[type=password]").map(({ element }) => (element as HTMLInputElement).value)).toEqual(["", ""]);

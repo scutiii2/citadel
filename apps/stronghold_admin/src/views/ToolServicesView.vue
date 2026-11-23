@@ -218,6 +218,18 @@ function closeDrawer() {
   selectedName.value = null;
 }
 
+/** What a status means and what to do about it; the table and the drawer show it in a helper popover. */
+function statusHelp(saved: { ready: boolean; reason?: string | null; name: string }): string {
+  if (saved.ready) return "Stronghold can reach this service. Nothing to do. Use Test to check the connection again.";
+  return `${saved.reason ?? "This service is not ready."} Open the service, turn it on, set its address and token, then save and run Test.`;
+}
+
+function enabledHelp(enabled: boolean): string {
+  return enabled
+    ? "Citadel services may call this service. Open it and turn Enabled off to stop calls without losing its addresses."
+    : "Citadel services do not call this service. Open it and turn Enabled on to start using it.";
+}
+
 function resultAddress(draft: Draft, originId: string): string {
   return draft.saved.origins.find((origin) => origin.origin_id === originId)?.origin ?? "Unavailable address";
 }
@@ -254,9 +266,10 @@ watch(selectedName, () => { tab.value = "general"; });
               </th>
               <td>
                 <div class="status-cell"><span class="pill" :class="{ ready: draft.saved.ready }"><span aria-hidden="true">{{ draft.saved.ready ? "✓" : "○" }}</span> {{ draft.saved.ready ? "Ready" : "Not ready" }}</span>
-                <span v-if="!draft.saved.ready && draft.saved.reason" class="reason">{{ draft.saved.reason }}</span></div>
+                <PanelHelp :title="draft.saved.ready ? 'Ready' : 'Not ready'"><p>{{ statusHelp(draft.saved) }}</p></PanelHelp></div>
               </td>
-              <td><span class="pill" :class="{ on: draft.saved.enabled }">{{ draft.saved.enabled ? "On" : "Off" }}</span></td>
+              <td><div class="status-cell"><span class="pill" :class="{ on: draft.saved.enabled }">{{ draft.saved.enabled ? "On" : "Off" }}</span>
+                <PanelHelp :title="draft.saved.enabled ? 'On' : 'Off'"><p>{{ enabledHelp(draft.saved.enabled) }}</p></PanelHelp></div></td>
               <td class="count">{{ draft.saved.origins.length }}</td>
               <TestResultCells :id="draft.saved.name" :label="draft.saved.label" :testing="draft.pending === 'test'" :busy="!!draft.pending"
                 :result="draft.result" @test="test(draft)" />
@@ -275,8 +288,8 @@ watch(selectedName, () => { tab.value = "general"; });
           <span class="admin-record-badge big" aria-hidden="true">{{ selected.saved.label.slice(0, 2).toUpperCase() }}</span>
           <div class="summary-copy"><span class="eyebrow">Tool service</span><code>{{ selected.saved.name }}</code></div>
           <span class="pill" :class="{ ready: selected.saved.ready }"><span aria-hidden="true">{{ selected.saved.ready ? "✓" : "○" }}</span> {{ selected.saved.ready ? "Ready" : "Not ready" }}</span>
+          <PanelHelp :title="selected.saved.ready ? 'Ready' : 'Not ready'"><p>{{ statusHelp(selected.saved) }}</p></PanelHelp>
         </div>
-        <p v-if="!selected.saved.ready && selected.saved.reason" class="help">{{ selected.saved.reason }}</p>
 
         <section class="group">
         <h4>Connection</h4>
@@ -406,8 +419,7 @@ watch(selectedName, () => { tab.value = "general"; });
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); font-size: 0.8em; color: var(--muted); white-space: nowrap; }
 .pill.ready { color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--bg)); }
 .pill.on { color: var(--text); }
-.status-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-.reason { font-size: 0.78em; color: var(--muted); }
+.status-cell { display: flex; align-items: center; gap: 4px; }
 .count { font-variant-numeric: tabular-nums; }
 .summary { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .summary-copy { flex: 1; min-width: 0; }
