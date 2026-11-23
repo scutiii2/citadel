@@ -91,6 +91,14 @@ const tierPreview = computed(() => {
 const providerIds = computed(() => Object.keys(props.providers));
 const hasGateways = computed(() => Object.entries(props.providers).some(([id, list]) => id !== "decision" && list.length));
 
+const modelType = computed({
+  get: () => isDecision.value ? "decision" : "chat",
+  set: (value: string) => {
+    if (value === "decision") provider.value = "decision";
+    else if (isDecision.value) provider.value = providerIds.value.find((id) => id !== "decision" && props.providers[id]?.length) ?? "anthropic";
+  },
+});
+
 /** The primary row chooses from every provider's gateways, so its choice also sets the provider. */
 function pickGateway(next: string, id: string): void {
   if (next !== provider.value) provider.value = next;
@@ -331,67 +339,90 @@ function previewPrompt(): void {
     <form id="agent-editor" class="agent-form" @submit.prevent="submit">
       <FormTabs v-model="tab" :items="tabItems" prefix="agent" label="Agent settings" />
       <section v-show="tab === 'general'" id="agent-panel-general" class="pane" role="tabpanel" aria-labelledby="agent-tab-general">
+      <div class="group">
+      <h3>Identity</h3>
       <label class="field">
         <span>Id</span>
         <input v-model="id" data-test="id" type="text" required maxlength="63" pattern="[a-z0-9][a-z0-9\-]*" autocomplete="off" :disabled="editing" placeholder="data-analyst" />
         <small>Lowercase letters, digits and dashes. It names the file and cannot change later.</small>
       </label>
-      <div class="row">
-        <label class="field grow"><span>Name</span><input v-model="label" data-test="label" type="text" maxlength="80" autocomplete="off" placeholder="Data analyst" /></label>
-        <label class="field port"><span>Port</span><input v-model="port" data-test="port" type="number" min="1" max="65535" required /></label>
+      <div class="grid">
+        <label class="field"><span>Name</span><input v-model="label" data-test="label" type="text" maxlength="80" autocomplete="off" placeholder="Data analyst" /></label>
+        <label class="field"><span>Port</span><input v-model="port" data-test="port" type="number" min="1" max="65535" required /></label>
+      </div>
       </div>
 
+      <div class="group">
+      <h3>Connection</h3>
       <label class="field">
         <span>URL</span>
         <input v-model="url" data-test="url" type="text" autocomplete="off" placeholder="http://127.0.0.1:29606/mcp" />
         <small>Where ember and the other agents reach this agent. Leave empty to use this machine and the port above; set it for an agent behind another host or a proxy.</small>
       </label>
 
+      </div>
+
+      <div class="group">
+      <h3>Role and switches</h3>
+      <label class="field"><span>Role</span>
+        <select v-model="role" data-test="role" :disabled="busy">
+          <option value="orchestrator" :disabled="isDecision">Orchestrator</option>
+          <option value="router">Router</option>
+          <option value="specialist">Specialist</option>
+        </select>
+      </label>
       <div class="switches">
         <ToggleSwitch :checked="enabled" data-test="enabled" @change="enabled = ($event.target as HTMLInputElement).checked">Enabled</ToggleSwitch>
-        <label class="field"><span>Role</span>
-          <select v-model="role" data-test="role" :disabled="busy">
-            <option value="orchestrator" :disabled="isDecision">Orchestrator</option>
-            <option value="router">Router</option>
-            <option value="specialist">Specialist</option>
-          </select>
-        </label>
         <ToggleSwitch v-if="!isRouter" :checked="planTool" :disabled="isDecision" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
         <ToggleSwitch v-if="!isRouter" :checked="entry" :disabled="isDecision" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
       </div>
       <p v-if="planTool && !isDecision" class="hint" data-test="plan-tool-cost">Task checklist costs about 200 input tokens on every model call of this agent, plus about 15-25 output tokens per item each time it updates the list. Turn it off for agents that only do short tasks.</p>
       <p v-if="entry" class="hint">Only one enabled agent can be the entry agent. To move it, unset it on the current one first.</p>
+      </div>
 
       </section>
 
       <section v-show="tab === 'model'" id="agent-panel-model" class="pane" role="tabpanel" aria-labelledby="agent-tab-model">
-      <fieldset v-if="!isRouter">
-        <legend>Model</legend>
-        <div v-if="isDecision" class="row">
-          <label class="field grow"><span>Decision strategy</span>
+      <template v-if="!isRouter">
+        <div class="group">
+        <h3>Model</h3>
+        <div class="grid">
+          <label class="field wide"><span>Model type</span>
+            <select v-model="modelType" data-test="model-type" :disabled="busy">
+              <option value="chat">Chat</option>
+              <option value="decision">Decision</option>
+            </select>
+            <small>Chat models write replies and use tools. Decision models only pick an answer.</small>
+          </label>
+        </div>
+        <div v-if="isDecision" class="grid">
+          <label class="field"><span>Decision strategy</span>
             <select v-model="decisionStrategy" data-test="decision-strategy" :disabled="busy">
               <option value="laya-only">Laya only</option>
               <option value="jev-only">Jev only</option>
               <option value="both">Laya, then Jev if needed</option>
             </select>
           </label>
-          <label class="field grow"><span>Minimum confidence</span>
+          <label class="field"><span>Minimum confidence</span>
             <input v-model="minConfidence" data-test="min-confidence" type="text" inputmode="decimal" autocomplete="off" placeholder="Each model's own" :disabled="busy" />
             <small>Leave blank to use each model's own thresholds (Laya per model, Jev 0.9). Or enter a number above 0 and at most 1.</small>
           </label>
         </div>
-        <p v-if="!hasGateways" class="muted" data-test="no-gateway">No gateway is set up yet. Add one under Connections, then pick it here.</p>
-        <AgentGatewayList v-model="gatewayRows" :gateways="gateways" :catalog="providers" :provider="provider" :single="isDecision"
+        <p v-if="!isDecision && !hasGateways" class="muted" data-test="no-gateway">No gateway is set up yet. Add one under Connections, then pick it here.</p>
+        <AgentGatewayList v-if="!isDecision" v-model="gatewayRows" :gateways="gateways" :catalog="providers" :provider="provider"
           :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" @pick="pickGateway" />
-        <label v-if="isDecision" class="field"><span>Model</span><input v-model="model" data-test="model" type="text" disabled placeholder="convaiinnovations/laya" /></label>
-        <div v-if="!isDecision" class="row">
-          <label class="field grow"><span>Reasoning effort</span>
+        <label v-else class="field"><span>Model</span><input v-model="model" data-test="model" type="text" disabled placeholder="convaiinnovations/laya" /></label>
+        </div>
+        <div v-if="!isDecision" class="group">
+        <h3>Effort and tiers</h3>
+        <div class="grid">
+          <label class="field"><span>Reasoning effort</span>
             <select v-model="effort" data-test="effort"><option v-for="e in EFFORTS" :key="e" :value="e">{{ e }}</option></select>
           </label>
-          <label class="field grow"><span>Weakest tier it may use</span>
+          <label class="field"><span>Weakest tier</span>
             <select v-model="minTier" data-test="min-tier"><option value="">No limit</option><option v-for="t in TIERS" :key="t" :value="t">{{ t }}</option></select>
           </label>
-          <label class="field grow"><span>Strongest tier it may use</span>
+          <label class="field"><span>Strongest tier</span>
             <select v-model="maxTier" data-test="max-tier"><option value="">No limit</option><option v-for="t in TIERS" :key="t" :value="t">{{ t }}</option></select>
           </label>
         </div>
@@ -400,14 +431,18 @@ function previewPrompt(): void {
             <span>{{ row.tier }}</span><code>{{ row.model }}</code><span class="where">{{ row.allowed ? "available" : "not available" }}</span>
           </li>
         </ul>
-        <div v-if="!isDecision" class="row">
-          <label class="field grow"><span>Temperature</span><input v-model="temperature" data-test="temperature" type="text" inputmode="decimal" autocomplete="off" placeholder="Model default" /></label>
+        <small>The orchestrator picks the lightest tier in this range that fits each task. Tier models are set per gateway in ai_agent's gateways directory.</small>
         </div>
-        <label v-if="!isDecision" class="field"><span>Highest effort a delegating agent may request</span>
-          <select v-model="maxEffort" data-test="max-effort"><option value="">No limit</option><option v-for="e in EFFORTS" :key="e" :value="e">{{ e }}</option></select>
-        </label>
-        <small v-if="!isDecision">The orchestrator picks the lightest tier in this range that fits each task. Tier models are set per gateway in ai_agent's gateways directory.</small>
-      </fieldset>
+        <div v-if="!isDecision" class="group">
+        <h3>Sampling and delegation</h3>
+        <div class="grid">
+          <label class="field"><span>Temperature</span><input v-model="temperature" data-test="temperature" type="text" inputmode="decimal" autocomplete="off" placeholder="Model default" /></label>
+          <label class="field"><span>Highest effort a delegating agent may request</span>
+            <select v-model="maxEffort" data-test="max-effort"><option value="">No limit</option><option v-for="e in EFFORTS" :key="e" :value="e">{{ e }}</option></select>
+          </label>
+        </div>
+        </div>
+      </template>
       </section>
 
       <section v-show="tab === 'limits'" id="agent-panel-limits" class="pane" role="tabpanel" aria-labelledby="agent-tab-limits">
@@ -439,18 +474,26 @@ function previewPrompt(): void {
 
       <section v-show="tab === 'behaviour'" id="agent-panel-behaviour" class="pane" role="tabpanel" aria-labelledby="agent-tab-behaviour">
       <RouterPolicyForm v-if="isRouter" v-model="decision" :busy="busy" />
-      <fieldset v-else>
-        <legend>Behaviour</legend>
+      <template v-else>
+        <div class="group">
+        <h3>Persona</h3>
         <label class="field"><span>Identity (replaces the shared identity line)</span><textarea v-model="identity" data-test="identity" rows="2" placeholder="Empty = the shared identity from Shared prompts" /></label>
         <label class="field"><span>Persona</span><textarea v-model="persona" data-test="persona" rows="3" /></label>
         <label class="field"><span>Instructions</span><textarea v-model="instructions" data-test="instructions" rows="8" placeholder="Empty = the shared default instructions" /></label>
-        <label class="field"><span>Focus</span><input v-model="focus" data-test="focus" type="text" autocomplete="off" placeholder="One line the entry agent uses to pick this specialist" /></label>
-        <ToolScopePicker v-model="allow" :capabilities="capabilities" />
-        <div class="row">
-          <label class="field grow"><span>Allowed tools</span><input v-model="allow" data-test="allow" type="text" autocomplete="off" placeholder="All tools, or e.g. calc_*, convert_*" /></label>
-          <label class="field grow"><span>Denied tools</span><input v-model="deny" data-test="deny" type="text" autocomplete="off" placeholder="None" /></label>
         </div>
-      </fieldset>
+        <div class="group">
+        <h3>Delegation</h3>
+        <label class="field"><span>Focus</span><input v-model="focus" data-test="focus" type="text" autocomplete="off" placeholder="One line the entry agent uses to pick this specialist" /></label>
+        </div>
+        <div class="group">
+        <h3>Tools</h3>
+        <ToolScopePicker v-model="allow" :capabilities="capabilities" />
+        <div class="grid">
+          <label class="field"><span>Allowed tools</span><input v-model="allow" data-test="allow" type="text" autocomplete="off" placeholder="All tools, or e.g. calc_*, convert_*" /></label>
+          <label class="field"><span>Denied tools</span><input v-model="deny" data-test="deny" type="text" autocomplete="off" placeholder="None" /></label>
+        </div>
+        </div>
+      </template>
 
       </section>
 
@@ -474,7 +517,12 @@ function previewPrompt(): void {
 
 <style scoped>
 .agent-form { display: grid; gap: 12px; }
-.pane { display: grid; gap: 12px; min-width: 0; }
+.pane { display: grid; gap: 20px; min-width: 0; }
+.group { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.group + .group { padding-top: 20px; border-top: 1px solid var(--border); }
+.group > h3, legend { margin: 0; padding: 0; color: var(--text); font-size: 0.95rem; font-weight: 650; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.grid > .wide { grid-column: 1 / -1; }
 .row { display: flex; flex-wrap: wrap; gap: 10px; }
 .grow { flex: 1 1 160px; }
 .port { flex: 0 0 110px; }
@@ -495,14 +543,17 @@ input:not([type="checkbox"]), select, textarea {
 textarea { resize: vertical; }
 input.limit-input { width: 160px; max-width: 100%; }
 input:disabled, select:disabled { opacity: 0.6; }
-fieldset { display: grid; gap: 10px; margin: 0; padding: 10px 12px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-legend { padding: 0 6px; color: var(--muted); font-size: 0.85em; }
-.tier-preview { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 0.85em; }
-.tier-preview li { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 10px; }
+fieldset { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+legend { margin-bottom: 10px; }
+.tier-preview { display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-md); list-style: none; font-size: 0.85em; }
+.tier-preview li { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 10px; padding: 7px 12px; }
+.tier-preview li + li { border-top: 1px solid var(--border); }
 .tier-preview li.off { color: var(--muted); text-decoration: line-through; }
 .tier-preview code { font-family: var(--mono); overflow-wrap: anywhere; }
 .tier-preview .where { color: var(--muted); text-decoration: none; }
-.switches { display: grid; gap: 8px; }
+.switches { display: grid; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.switches > * { padding: 10px 12px; }
+.switches > * + * { border-top: 1px solid var(--border); }
 .preview-bar { align-items: center; justify-content: space-between; }
 .prompt-text { max-height: 280px; margin: 0; padding: 10px 12px; overflow: auto; scrollbar-gutter: stable; border-radius: var(--radius-md); background: var(--code-bg); color: var(--text); font-family: var(--mono); font-size: 0.8em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .unsaved { margin-right: auto; color: var(--muted); font-size: 0.8em; }
