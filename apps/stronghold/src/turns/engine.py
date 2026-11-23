@@ -30,6 +30,7 @@ from src.agents.directory import AgentDirectory, AgentEntry
 from src.agents.gateway import AgentCallError, AgentGateway, Caller
 from src.brain.compaction import CompactionError, StackCompactor
 from src.chats.store import ChatNotFound, ChatStore, message_time
+from src.triage.questions import TriageQuestions, TriageRejected, TriageUnavailable
 from src.turns import question_answers, summarization
 from src.turns.logs import TurnLogs
 from src.turns.step_digest import is_private_memory_tool
@@ -569,10 +570,8 @@ class TurnRegistry:
         turn.question = question
         earlier = [] if turn.options.independent else messages[:-1]
 
-        if earlier and summarization.needs_summary(
-            earlier, self._usage.max_context_tokens_per_chat, self._usage.auto_summarize_ratio
-        ):
-            earlier = await self._auto_summarize(turn, earlier, messages[-1])
+        if earlier:
+            earlier = await self._maybe_summarize(turn, earlier, messages[-1])
 
         if turn.cancel_requested:
             await self._finish(turn, "⏹️ Cancelled.", status="cancelled", error=None, cancelled=True)
@@ -689,8 +688,34 @@ class TurnRegistry:
             for result in outcome.results:
                 await self._record_usage(turn, "compaction", result)
 
+    async def _maybe_summarize(
+        self, turn: Turn, earlier: list[dict[str, Any]], question: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        cap = self._usage.max_context_tokens_per_chat
+        ratio = self._usage.auto_summarize_ratio
+        due = summarization.needs_summary(earlier, cap, ratio)
+        cut = len(earlier) if due else None
+        if self._directory is not None and not turn.stack_tool_used and summarization.needs_summary(
+            earlier, cap, ratio * summarization.EARLY_COMPACTION_RATIO,
+        ):
+            try:
+                proposed, outcome = await summarization.choose_summary_cut(
+                    TriageQuestions(self._gateway, self._directory), turn.caller, earlier, question,
+                )
+                await self._record_usage(turn, "summary", outcome.result)
+                if proposed is not None:
+                    # At the existing trigger, don't keep most of the active transcript uncompressed.
+                    active = summarization.split_prior(earlier)[2]
+                    if not due or len(earlier) - proposed <= len(active) // 2:
+                        cut = proposed
+            except (TriageUnavailable, TriageRejected, TimeoutError):
+                pass
+        if cut is None or turn.cancel_requested:
+            return earlier
+        return await self._auto_summarize(turn, earlier, question, cut)
+
     async def _auto_summarize(
-        self, turn: Turn, earlier: list[dict[str, Any]], question: dict[str, Any]
+        self, turn: Turn, earlier: list[dict[str, Any]], question: dict[str, Any], cut: int,
     ) -> list[dict[str, Any]]:
         """Summarizes before sending, when the chat's context is nearly full.
         A failure never blocks the turn: the history is then sent as is."""
@@ -699,7 +724,7 @@ class TurnRegistry:
             agent = await self._directory.get(summarization.SUMMARIZER_AGENT_ID) if self._directory else None
             if agent is None:
                 raise summarization.SummarizeError("Context summarizer is not running")
-            outcome = await summarization.summarize(self._gateway, agent.url, turn.caller, earlier)
+            outcome = await summarization.summarize(self._gateway, agent.url, turn.caller, earlier[:cut])
         except summarization.SummarizeError as error:
             logger.info("auto-summarize of chat %s skipped: %s", turn.chat_id, error)
             return earlier
@@ -707,12 +732,13 @@ class TurnRegistry:
             return earlier
         for result in outcome.results:
             await self._record_usage(turn, "summary", result)
+        history = [*outcome.messages, *earlier[cut:]]
         try:
-            await self._chats.replace_messages(turn.owner, turn.chat_id, [*outcome.messages, question])
+            await self._chats.replace_messages(turn.owner, turn.chat_id, [*history, question])
         except ChatNotFound:
             return earlier
         await self._publish(turn, {"type": "summarized"})
-        return outcome.messages
+        return history
 
     async def _record_usage(self, turn: Turn, kind: str, result: dict[str, Any]) -> None:
         rows = stored_rows(result)

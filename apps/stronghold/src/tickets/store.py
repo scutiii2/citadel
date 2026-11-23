@@ -78,6 +78,7 @@ class TicketStore:
         self, *, owner: str, reporter: str, type: str, title: str, description: str, source: str, tags: list[str],
         context: dict[str, Any], fingerprint: str | None, group_id: int | None,
         possible_group_id: int | None, now: str, auto_cap: int | None = None, auto_since: str | None = None,
+        priority: str = "normal",
     ) -> tuple[int, bool, int]:
         async with self._lock:
             if source == "ai_auto":
@@ -101,7 +102,7 @@ class TicketStore:
             doc = dict(group_id=group_id, type=type, title=title, description=description, owner=owner,
                        reporter=reporter, source=source, tags=tags, context=context, fingerprint=fingerprint,
                        possible_group_id=possible_group_id, created_at=now, updated_at=now, status="open",
-                       priority="normal", assignee=None, closed_at=None, last_staff_activity_at=None, comments=[])
+                       priority=priority, assignee=None, closed_at=None, last_staff_activity_at=None, comments=[])
             if created_group:
                 doc["title_group_id"] = group_id
             return await self._allocate(TICKETS, doc), True, group_id
