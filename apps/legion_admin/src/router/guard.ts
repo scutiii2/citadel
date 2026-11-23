@@ -1,11 +1,11 @@
 import type { RouteLocationRaw } from "vue-router";
-import { LEGION_PAGES } from "./pages";
+import { canOpen, LEGION_PAGES } from "./pages";
 
 export interface GuardTarget {
   name?: string | symbol | null;
   fullPath: string;
   guestOnly?: boolean;
-  permission?: string;
+  permission?: string | string[];
 }
 
 export interface GuardAuth {
@@ -18,10 +18,10 @@ export function resolveGuard(to: GuardTarget, auth: GuardAuth): true | RouteLoca
   if (!auth.signedIn) {
     return to.guestOnly ? true : { name: "login", query: to.fullPath === "/" ? {} : { redirect: to.fullPath } };
   }
-  const home = LEGION_PAGES.find((p) => auth.hasPermission(p.permission));
+  const home = LEGION_PAGES.find((p) => canOpen(p.permission, auth.hasPermission));
   const away: RouteLocationRaw = { path: home?.to ?? "/no-access" };
   if (to.guestOnly) return away;
-  if (to.permission && !auth.hasPermission(to.permission)) return away;
+  if (to.permission && !canOpen(to.permission, auth.hasPermission)) return away;
   if (to.name === "no-access" && home) return away;
   return true;
 }

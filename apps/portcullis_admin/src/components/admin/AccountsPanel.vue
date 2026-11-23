@@ -11,6 +11,7 @@ import { useAuthStore } from "../../stores/auth";
 import { errorMessage } from "../../utils/errors";
 import AccountDrawer, { type AccountDraft } from "./AccountDrawer.vue";
 import AdminSearch from "./AdminSearch.vue";
+import PanelHelp from "./PanelHelp.vue";
 import ConfirmModal from "./ConfirmModal.vue";
 import RecordDrawer from "./RecordDrawer.vue";
 import StatusFilters from "./StatusFilters.vue";
@@ -285,7 +286,8 @@ async function confirm(): Promise<void> {
       <header class="admin-panel-head">
         <h2 id="account-roster">Account roster</h2>
         <div class="admin-panel-tools">
-          <RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">Invite member</RouterLink>
+          <PanelHelp title="Account roster">Everyone who can sign in. Search by name, email or role, open a row to see details, change roles and save, or invite someone new. Disabled and unverified accounts have their own filters above.</PanelHelp>
+          <RouterLink v-if="auth.hasPermission('invites.manage')" class="admin-icon accent" to="/admin/invites?create=1" aria-label="Invite member" title="Invite member"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19 8v6M16 11h6" /></svg></RouterLink>
           <AdminSearch ref="searchField" v-model="search" label="Search accounts" />
         </div>
       </header>

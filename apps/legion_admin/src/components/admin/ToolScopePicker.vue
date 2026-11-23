@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import ToggleSwitch from "../ToggleSwitch.vue";
 import type { CapabilityInfo } from "../../api/CommandsClient";
 
 /** Picks the built-in capabilities an agent may call. It edits the same comma-separated
@@ -42,11 +43,10 @@ function toggle(capability: CapabilityInfo, on: boolean): void {
     </p>
     <ul v-if="rows.length" class="list">
       <li v-for="c in rows" :key="c.name">
-        <label>
-          <input type="checkbox" :checked="!unrestricted && c.on" :data-test="`cap-${c.name}`" @change="toggle(c, ($event.target as HTMLInputElement).checked)" />
+        <ToggleSwitch small :checked="!unrestricted && c.on" :data-test="`cap-${c.name}`" @change="toggle(c, ($event.target as HTMLInputElement).checked)">
           <span class="name">{{ c.label || c.name }}</span>
           <span class="count">{{ c.count }} tool{{ c.count === 1 ? "" : "s" }}</span>
-        </label>
+        </ToggleSwitch>
       </li>
     </ul>
   </div>

@@ -23,7 +23,7 @@ describe("resolveGuard", () => {
     expect(resolveGuard({ name: "no-access", fullPath: "/no-access" }, plain)).toBe(true);
   });
   it("moves an admin off login and no-access to the first page", () => {
-    expect(resolveGuard({ name: "login", fullPath: "/login", guestOnly: true }, admin)).toEqual({ path: "/agents" });
-    expect(resolveGuard({ name: "no-access", fullPath: "/no-access" }, admin)).toEqual({ path: "/agents" });
+    expect(resolveGuard({ name: "login", fullPath: "/login", guestOnly: true }, admin)).toEqual({ path: "/overview" });
+    expect(resolveGuard({ name: "no-access", fullPath: "/no-access" }, admin)).toEqual({ path: "/overview" });
   });
 });

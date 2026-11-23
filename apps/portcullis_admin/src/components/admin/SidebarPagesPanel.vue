@@ -6,6 +6,7 @@ import { EMBER_WEB_PAGES } from "../../utils/emberWebPages";
 import { errorMessage } from "../../utils/errors";
 import ToggleSwitch from "../ToggleSwitch.vue";
 import AdminSearch from "./AdminSearch.vue";
+import PanelHelp from "./PanelHelp.vue";
 import ConfirmModal from "./ConfirmModal.vue";
 import DraftActions from "./DraftActions.vue";
 import "./admin.css";
@@ -94,6 +95,7 @@ onMounted(load);
     <header class="admin-panel-head">
       <h2 id="sidebar-pages-title"><span v-if="stored && stored.length > 0" class="dot" title="Changed from the default" aria-hidden="true" /> Sidebar pages</h2>
       <div class="admin-panel-tools tools">
+        <PanelHelp title="Sidebar pages"><p>Chooses which pages every account sees in its sidebar by default. Edit, then Save to apply it to everyone.</p><p>Turn a page off to remove its button from every account's sidebar, bottom bar and Overview. The page does not go away: it still opens from its address, and each account's permissions are unchanged. Chat and Settings always stay.</p></PanelHelp>
         <DraftActions :dirty="dirty" :saving="saving" label="sidebar page changes" @cancel="discardOpen = true" @save="save" />
         <AdminSearch ref="searchField" v-model="search" label="Search sidebar pages" />
       </div>
@@ -113,11 +115,6 @@ onMounted(load);
           </ToggleSwitch>
         </li>
       </ul>
-      <p class="muted">
-        Show in the sidebar for everyone: turn a page off to remove its button from every account's sidebar, bottom bar
-        and Overview. The page does not go away: it still opens from its address, and each account's permissions
-        are unchanged. Chat and Settings always stay.
-      </p>
       <p v-if="dirty" class="unsaved" role="status">You have an unsaved change. It applies to every account.</p>
       <p v-if="saveError" class="error" role="alert">{{ saveError }}</p>
     </div>

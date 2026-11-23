@@ -3,6 +3,7 @@ import { nextTick, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { agentsAdminClient } from "../api/AgentsAdminClient";
 import AdminSearch from "../components/admin/AdminSearch.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
 import GatewayConnectionCard from "../components/GatewayConnectionCard.vue";
 import PageLayout from "../components/PageLayout.vue";
 import ServersView from "./ServersView.vue";
@@ -31,7 +32,7 @@ watch(() => route.hash, async (hash) => {
     <section class="admin-panel-card" aria-labelledby="model-gateways">
       <header class="admin-panel-head">
         <h2 id="model-gateways">Model gateways</h2>
-        <div class="admin-panel-tools"><AdminSearch ref="searchField" v-model="search" label="Search model gateways" /></div>
+        <div class="admin-panel-tools"><PanelHelp title="Model gateways">The model gateways Legion sends requests to. Open one to edit its description and address.</PanelHelp><AdminSearch ref="searchField" v-model="search" label="Search model gateways" /></div>
       </header>
       <div class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="model-gateways">
         <table class="admin-records">

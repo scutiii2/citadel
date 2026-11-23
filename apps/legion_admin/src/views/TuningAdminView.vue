@@ -2,6 +2,7 @@
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
 import AdminSearch from "../components/admin/AdminSearch.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import DraftActions from "../components/admin/DraftActions.vue";
 import { useDraftPanel } from "../composables/useDraftPanel";
@@ -188,6 +189,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
       <header class="admin-panel-head">
         <h2 id="tuning-title">Runtime settings</h2>
         <div class="admin-panel-tools tuning-tools">
+          <PanelHelp title="Runtime settings">Response-limit ceilings that cap what any agent may ask for. Edit, then Save; the new limits apply at once.</PanelHelp>
           <DraftActions :dirty="dirty" :saving="saving" label="tuning changes" @cancel="discardOpen = true" @save="save" />
           <AdminSearch ref="searchField" v-model="search" label="Search settings" />
         </div>

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { agentsAdminClient, type McpServer } from "../api/AgentsAdminClient";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import AdminSearch from "../components/admin/AdminSearch.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
 import RecordDrawer from "../components/admin/RecordDrawer.vue";
 import PasswordInput from "../components/PasswordInput.vue";
 import { errorMessage } from "../utils/errors";
@@ -262,7 +263,8 @@ async function remove() {
     <header class="admin-panel-head">
       <h2 id="mcp-servers-title" ref="panelTitle" tabindex="-1">MCP servers</h2>
       <div class="admin-panel-tools">
-        <button type="button" class="primary" data-test="add" :disabled="loading || !!loadError" @click="open('')">Add server</button>
+        <PanelHelp title="MCP servers">The MCP servers whose tools agents can use. Add a server, or open one to edit its address and see its tools.</PanelHelp>
+        <button type="button" class="admin-icon accent" data-test="add" aria-label="Add server" title="Add server" :disabled="loading || !!loadError" @click="open('')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
         <AdminSearch ref="searchField" v-model="search" label="Search MCP servers" />
       </div>
     </header>

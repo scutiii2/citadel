@@ -45,7 +45,7 @@ it('shows counts only on the overview and refreshes when returning', async () =>
   const { wrapper, router } = await view();
   expect(wrapper.findAll('.stats .tile').map(t => t.text())).toEqual(['Accounts24', 'Unverified3', 'Disabled1', 'Open invites5']);
   expect(wrapper.findAll('.destination .live').map(t => t.text())).toContain('24 accounts · 3 unverified · 1 disabled');
-  expect(wrapper.get('.admin-info a').attributes('href')).toBe('/admin/accounts?status=unverified');
+  expect(wrapper.get('.attention a').attributes('href')).toBe('/admin/accounts?status=unverified');
   await router.push('/admin/roles');
   expect(wrapper.find('.stats').exists()).toBe(false);
   await router.push('/admin');
@@ -74,8 +74,8 @@ it('offers only overview and roles to a role viewer and hides unrelated counts',
 });
 it('opens invite creation from the overview header', async () => {
   const { wrapper } = await view();
-  expect(wrapper.get('.page-head a').attributes('href')).toBe('/admin/invites?create=1');
-  expect(wrapper.get('.page-head a').text()).toContain('Invite member');
+  expect(wrapper.get('.admin-panel-head a[aria-label="Invite member"]').attributes('href')).toBe('/admin/invites?create=1');
+  expect(wrapper.get('.admin-panel-head a[aria-label="Invite member"]').attributes('title')).toBe('Invite member');
 });
 
 it('keeps overview destinations in sync with available sidebar pages', async () => {
