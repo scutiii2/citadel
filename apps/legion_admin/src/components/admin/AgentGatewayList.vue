@@ -19,13 +19,11 @@ const props = defineProps<{
   catalog: ProviderCatalog;
   provider: string;
   defaultGateway: string;
-  /** Local decision models take no backups or model override: only the primary row shows. */
-  single?: boolean;
   busy: boolean;
 }>();
 const emit = defineEmits<{ "update:modelValue": [rows: GatewayRow[]]; pick: [provider: string, gateway: string] }>();
 const providers = computed(() => Object.keys(props.catalog).filter((id) => id !== "decision"));
-const primaryValue = (row: GatewayRow) => props.provider === "decision" ? "decision|" : `${props.provider}|${effective(row)}`;
+const primaryValue = (row: GatewayRow) => `${props.provider}|${effective(row)}`;
 
 function pickPrimary(event: Event): void {
   if (props.busy) return;
@@ -99,7 +97,7 @@ function drop(key: number): void {
 <template>
   <div ref="root" class="gateway-editor">
     <div class="heading">Gateways</div>
-    <p class="hint">{{ single ? 'Choose the gateway this agent uses.' : 'Tried in order. The first gateway is primary. Gateways come from Connections.' }}</p>
+    <p class="hint">Tried in order. The first gateway is primary. Gateways come from Connections.</p>
     <ol class="gateway-list" aria-label="Gateway priority">
       <li
         v-for="(row, index) in modelValue" :key="row.key" :data-row-key="row.key"
@@ -114,29 +112,28 @@ function drop(key: number): void {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01" /></svg>
           </button>
           <span class="position">{{ index + 1 }}</span>
-          <span v-if="!single" :class="['role', { first: index === 0 }]">{{ index === 0 ? 'Primary' : 'Backup' }}</span>
+          <span :class="['role', { first: index === 0 }]">{{ index === 0 ? 'Primary' : 'Backup' }}</span>
           <label class="gateway-field">
             <span class="sr-only">{{ index === 0 ? 'Primary gateway' : `Backup gateway ${index}` }}</span>
             <select v-if="index === 0" :value="primaryValue(row)" data-test="gateway" :disabled="busy" @change="pickPrimary">
-              <option v-if="provider !== 'decision' && effective(row) && !gateways.some((g) => g.id === effective(row))" :value="primaryValue(row)">{{ effective(row) }} (unavailable)</option>
+              <option v-if="effective(row) && !gateways.some((g) => g.id === effective(row))" :value="primaryValue(row)">{{ effective(row) }} (unavailable)</option>
               <optgroup v-for="id in providers" :key="id" :label="id">
                 <option v-for="gateway in catalog[id]" :key="gateway.id" :value="`${id}|${gateway.id}`">{{ gateway.label }}</option>
               </optgroup>
-              <optgroup v-if="catalog.decision" label="local"><option value="decision|">Local decision model (Laya, Jev)</option></optgroup>
             </select>
             <select v-else :value="row.gateway" data-test="backup-gateway" :disabled="busy" @change="update(row.key, 'gateway', $event)">
               <option v-if="row.gateway && !gateways.some((g) => g.id === row.gateway)" :value="row.gateway">{{ row.gateway }} (unavailable)</option>
               <option v-for="gateway in gateways" :key="gateway.id" :value="gateway.id" :disabled="usedElsewhere(gateway.id, row.key)">{{ gateway.label }}</option>
             </select>
           </label>
-          <button v-if="!single" type="button" class="icon-button" data-test="move-up" :data-label="`Move ${effective(row)} up`" :aria-label="`Move ${effective(row)} up`" :disabled="busy || index === 0" @click="move(index, index - 1, true)">
+          <button type="button" class="icon-button" data-test="move-up" :data-label="`Move ${effective(row)} up`" :aria-label="`Move ${effective(row)} up`" :disabled="busy || index === 0" @click="move(index, index - 1, true)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
           </button>
-          <button v-if="!single" type="button" class="icon-button" data-test="move-down" :data-label="`Move ${effective(row)} down`" :aria-label="`Move ${effective(row)} down`" :disabled="busy || index === modelValue.length - 1" @click="move(index, index + 1, true)">
+          <button type="button" class="icon-button" data-test="move-down" :data-label="`Move ${effective(row)} down`" :aria-label="`Move ${effective(row)} down`" :disabled="busy || index === modelValue.length - 1" @click="move(index, index + 1, true)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg>
           </button>
         </div>
-        <div v-if="!single" class="row-model">
+        <div class="row-model">
           <label class="model-field"><span>Model override <span class="optional">(optional)</span></span>
             <input :value="row.model" :data-test="index === 0 ? 'model' : 'backup-model'" type="text" placeholder="Automatic" :disabled="busy" autocomplete="off" @input="update(row.key, 'model', $event)" />
           </label>
@@ -144,7 +141,7 @@ function drop(key: number): void {
         </div>
       </li>
     </ol>
-    <div v-if="!single" class="list-footer">
+    <div class="list-footer">
       <button type="button" class="add-gateway" data-test="add-gateway" :disabled="busy || !available.length" @click="add">＋ Add gateway</button>
       <p class="hint">Drag or use arrows to reorder. Changes apply when you save.</p>
     </div>

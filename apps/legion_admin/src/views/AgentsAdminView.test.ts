@@ -166,7 +166,7 @@ describe("per-agent gateway order", () => {
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
     expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("openai|gpt");
     expect(wrapper.find<HTMLInputElement>("[data-test=model]").element.value).toBe("");
-    await wrapper.find("[data-test=gateway]").setValue("decision|");
+    await wrapper.find("[data-test=model-type]").setValue("decision");
     expect(wrapper.find("[data-test=add-gateway]").exists()).toBe(false);
     await wrapper.find("[data-test=decision-strategy]").setValue("jev-only");
     await wrapper.find("[data-test=min-confidence]").setValue("0.85");
@@ -474,7 +474,7 @@ describe("AgentsAdminView", () => {
     const wrapper = await mounted();
     await edit(wrapper, "calc");
     await wrapper.find("[data-test=max-turn-tokens]").setValue("invalid");
-    await wrapper.find("[data-test=gateway]").setValue("decision|");
+    await wrapper.find("[data-test=model-type]").setValue("decision");
     expect(wrapper.find("[data-test=run-limits]").exists()).toBe(false);
     await submit(wrapper);
     await flushPromises();
