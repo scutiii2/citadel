@@ -199,11 +199,15 @@ function onDragStart(event: DragEvent, id: string): void {
 .row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
+  gap: 12px;
+  padding: 2px 8px;
   border: 1px solid transparent;
+  border-bottom-color: var(--border);
   border-radius: var(--radius-md);
   cursor: grab;
+}
+.rows > .row:last-child {
+  border-bottom-color: transparent;
 }
 .row:hover {
   background: var(--bg);

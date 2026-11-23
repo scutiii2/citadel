@@ -85,11 +85,12 @@ const showSidebar = computed(() => matches("sidebar pages order pin hide navigat
         <p v-if="navPrefs.error" class="error" role="alert">{{ navPrefs.error }}</p>
         <section v-if="showTheme" aria-label="Appearance">
           <h3>Appearance</h3>
+          <p class="lede">Applies at once and is saved on this device.</p>
           <div class="card"><SettingRow setting-id="appearance-theme" label="Theme" description="Light, dark, or follow your system." :modified="themeModified" @reset="setTheme(DEFAULT_THEME)">
             <SegmentedControl :model-value="theme" @update:model-value="setTheme" :options="options" aria-label="Theme" />
           </SettingRow></div>
         </section>
-        <section v-if="showSidebar" aria-label="Sidebar"><h3>Sidebar</h3><div class="card"><SidebarEditor v-model="draft.sidebar" /></div></section>
+        <section v-if="showSidebar" aria-label="Sidebar"><h3>Sidebar</h3><p class="lede">Applies when you save. Separate for each account.</p><div class="card"><SidebarEditor v-model="draft.sidebar" /></div></section>
         <p v-if="!showTheme && !showSidebar" class="muted">No settings match your filters. <button type="button" class="chip" @click="query = ''; onlyModified = false; searchField?.focus()">Clear filters</button></p>
       </div>
     </section>
@@ -98,7 +99,8 @@ const showSidebar = computed(() => matches("sidebar pages order pin hide navigat
 </template>
 
 <style scoped>
-.settings-body { display: grid; gap: 16px; padding: 14px; }
+.settings-body { display: grid; gap: 24px; padding: 18px 16px 20px; }
+.lede { margin: -4px 0 10px; font-size: 0.85em; color: var(--muted); }
 .settings-body h3 { margin: 0 0 8px; font-size: 1em; }
 .card { padding: 4px 16px 6px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }

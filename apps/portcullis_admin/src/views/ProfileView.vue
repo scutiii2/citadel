@@ -6,7 +6,6 @@ import { useRouter } from "vue-router";
 import { authClient, type KnownDevice } from "../api/AuthClient";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import PanelHelp from "../components/admin/PanelHelp.vue";
-import ThemeSelect from "../components/ThemeSelect.vue";
 import "../components/admin/admin.css";
 import { useAuthStore } from "../stores/auth";
 import { errorMessage, formatUtc } from "../utils/errors";
@@ -112,41 +111,29 @@ async function changePassword(): Promise<void> {
         <button type="button" class="chip verify" @click="router.push('/verify-email')">Verify now</button>
       </div>
 
-      <section class="admin-panel-card" aria-labelledby="account-identity">
-        <header class="admin-panel-head">
-          <h2 id="account-identity">Account</h2>
-          <div class="admin-panel-tools"><PanelHelp title="Account"><p>Your identity in this workspace, how you sign in, and the devices you have used. Only you can change your email and password here.</p></PanelHelp></div>
-        </header>
+      <section class="admin-panel-card hero" aria-labelledby="account-identity">
+        <h2 id="account-identity" class="sr-only">Account</h2>
         <div class="profile">
           <div class="avatar" aria-hidden="true">{{ initial }}</div>
           <div class="who">
             <div class="name">{{ account.username }}</div>
             <div class="email">{{ account.email }}</div>
+            <div class="hero-tags">
+              <span class="status" :class="{ verified: account.email_verified }">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" /><path v-if="account.email_verified" d="m8.5 12 2.5 2.5 4.5-5" /><path v-else d="M12 8v5m0 3v.1" /></svg>
+                {{ account.email_verified ? 'Email verified' : 'Verification needed' }}
+              </span>
+              <span v-for="r in account.roles" :key="r" class="tag role">{{ r }}</span>
+            </div>
           </div>
-          <span class="status" :class="{ verified: account.email_verified }">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" /><path v-if="account.email_verified" d="m8.5 12 2.5 2.5 4.5-5" /><path v-else d="M12 8v5m0 3v.1" /></svg>
-            {{ account.email_verified ? 'Email verified' : 'Verification needed' }}
-          </span>
-        </div>
-      </section>
-
-      <section class="admin-panel-card" aria-labelledby="account-session">
-        <header class="admin-panel-head">
-          <h2 id="account-session">Session</h2>
-          <div class="admin-panel-tools"><PanelHelp title="Session"><p>Appearance on this device, and signing out of this session.</p></PanelHelp></div>
-        </header>
-        <div class="rows">
-          <div class="row">
-            <div class="row-copy"><div class="row-title">Theme</div><div class="muted small">Light, dark, or follow your system.</div></div>
-            <ThemeSelect />
-          </div>
-          <div class="row">
-            <div class="row-copy"><div class="row-title">Log out</div><div class="muted small">End your session on this device.</div></div>
+          <div class="hero-actions">
+            <PanelHelp title="Account"><p>Your identity in this workspace, how you sign in, and the devices you have used. Only you can change your email and password here.</p><p>Theme and sidebar choices are in Settings.</p></PanelHelp>
             <button type="button" class="chip logout" @click="logout">Log out</button>
           </div>
         </div>
       </section>
 
+      <div class="split">
       <section class="admin-panel-card security" aria-labelledby="account-security">
         <header class="admin-panel-head">
           <h2 id="account-security">Security</h2>
@@ -193,6 +180,7 @@ async function changePassword(): Promise<void> {
           </details>
         </div>
       </section>
+      </div>
 
       <section class="admin-panel-card" aria-labelledby="account-devices">
         <header class="admin-panel-head">
@@ -226,10 +214,14 @@ async function changePassword(): Promise<void> {
 svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .muted { color: var(--muted); }
 .small { font-size: 0.85em; }
-.profile { display: flex; align-items: center; gap: 16px; padding: 16px 14px; }
-.avatar { display: grid; flex: none; place-items: center; width: 52px; height: 52px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); font-size: 1.3em; font-weight: 650; }
+.profile { display: flex; align-items: center; gap: 18px; padding: 20px 18px; }
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start; }
+.hero-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.hero-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.avatar { display: grid; flex: none; place-items: center; width: 64px; height: 64px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); font-size: 1.6em; font-weight: 650; }
 .who { flex: 1; min-width: 0; }
-.name { font-size: 1.1em; font-weight: 650; overflow-wrap: anywhere; }
+.name { font-size: 1.3em; font-weight: 650; overflow-wrap: anywhere; }
 .email { margin-top: 2px; color: var(--muted); font-size: 0.9em; overflow-wrap: anywhere; }
 .status { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 0.85em; color: var(--warning); }
 .status.verified { color: var(--success); }
@@ -273,6 +265,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .device-message { margin: 0; padding: 14px; font-size: 0.9em; }
 @media (max-width: 767px) {
   .profile { flex-wrap: wrap; }
+  .split { grid-template-columns: minmax(0, 1fr); }
   .chip, .primary { min-height: 44px; }
   .row { flex-wrap: wrap; }
   .devices li { align-items: flex-start; }
