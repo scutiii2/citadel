@@ -89,6 +89,13 @@ const tierPreview = computed(() => {
   })).filter((row) => row.model);
 });
 const providerIds = computed(() => Object.keys(props.providers));
+const hasGateways = computed(() => Object.entries(props.providers).some(([id, list]) => id !== "decision" && list.length));
+
+/** The primary row chooses from every provider's gateways, so its choice also sets the provider. */
+function pickGateway(next: string, id: string): void {
+  if (next !== provider.value) provider.value = next;
+  gateway.value = id;
+}
 
 type TabId = "general" | "model" | "limits" | "behaviour" | "prompt";
 const tab = ref<TabId>("general");
@@ -360,11 +367,6 @@ function previewPrompt(): void {
       <section v-show="tab === 'model'" id="agent-panel-model" class="pane" role="tabpanel" aria-labelledby="agent-tab-model">
       <fieldset v-if="!isRouter">
         <legend>Model</legend>
-        <div class="row">
-          <label class="field grow"><span>Provider</span>
-            <select v-model="provider" :disabled="isRouter" data-test="provider"><option v-for="p in providerIds" :key="p" :value="p">{{ p }}</option></select>
-          </label>
-        </div>
         <div v-if="isDecision" class="row">
           <label class="field grow"><span>Decision strategy</span>
             <select v-model="decisionStrategy" data-test="decision-strategy" :disabled="busy">
@@ -378,12 +380,10 @@ function previewPrompt(): void {
             <small>Leave blank to use each model's own thresholds (Laya per model, Jev 0.9). Or enter a number above 0 and at most 1.</small>
           </label>
         </div>
-        <p v-if="!isDecision && !gateways.length" class="muted" data-test="no-gateway">No {{ provider }} gateway is set up yet. Add one under Connections, then pick it here.</p>
-        <AgentGatewayList v-if="!isDecision" v-model="gatewayRows" :gateways="gateways" :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" />
-        <template v-else>
-          <label class="field"><span>Gateway</span><select v-model="gateway" data-test="gateway" disabled><option value="">Local</option><option value="local">Local</option></select></label>
-          <label class="field"><span>Model</span><input v-model="model" data-test="model" type="text" disabled placeholder="convaiinnovations/laya" /></label>
-        </template>
+        <p v-if="!hasGateways" class="muted" data-test="no-gateway">No gateway is set up yet. Add one under Connections, then pick it here.</p>
+        <AgentGatewayList v-model="gatewayRows" :gateways="gateways" :catalog="providers" :provider="provider" :single="isDecision"
+          :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" @pick="pickGateway" />
+        <label v-if="isDecision" class="field"><span>Model</span><input v-model="model" data-test="model" type="text" disabled placeholder="convaiinnovations/laya" /></label>
         <div v-if="!isDecision" class="row">
           <label class="field grow"><span>Reasoning effort</span>
             <select v-model="effort" data-test="effort"><option v-for="e in EFFORTS" :key="e" :value="e">{{ e }}</option></select>
