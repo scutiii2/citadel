@@ -149,6 +149,17 @@ class TicketService:
                 existing = await self._store.find_open_auto(owner, fingerprint)
                 if existing:
                     return await self._outcome(existing, duplicate=True)
+                if self._classifier is not None and caller is not None:
+                    tool = reported.get("tool_name")
+                    error = reported.get("error_text")
+                    if not tool or not error:
+                        raise TicketError("Automatic reports need the tool name and error text.")
+                    try:
+                        reportable = await self._classifier.reportable_failure(caller, tool, error)
+                    except ClassifierUnavailable:
+                        raise TicketError("Automatic report could not be classified. Report it manually if needed.") from None
+                    if not reportable:
+                        raise TicketError("Automatic reports require evidence of a tool bug or configuration issue.")
 
             draft = {"type": type, "title": title, "description": description}
             try:
@@ -156,7 +167,12 @@ class TicketService:
             except ValueError as error:
                 raise TicketError(str(error)) from None
             group_id = possible = None
+            priority = "normal"
             if self._classifier is not None and caller is not None:
+                try:
+                    priority = await self._classifier.pick_priority(caller, draft)
+                except ClassifierUnavailable:
+                    pass
                 try:
                     tagged = tag_list or await self._classifier_tag(caller, draft)
                     if tagged:
@@ -169,7 +185,7 @@ class TicketService:
             now = self._now()
             try:
                 ticket_id, created, group_id = await self._store.insert_ticket(owner=owner, reporter=reporter, type=type, title=title, description=description,
-                    source=source, tags=tag_list,
+                    source=source, tags=tag_list, priority=priority,
                     context={"reported": reported, "verified": _verified_context(verified_context)},
                     fingerprint=fingerprint, group_id=group_id, possible_group_id=possible, now=now.isoformat(),
                     auto_cap=self._config.auto_hourly_cap if source == "ai_auto" else None,

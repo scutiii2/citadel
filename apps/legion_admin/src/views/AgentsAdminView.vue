@@ -69,15 +69,27 @@ function setFilter(next: Filter) {
   }
 }
 
-function role(agent: AgentFile) {
-  return agent.role === "orchestrator" ? "Orchestrator" : agent.role === "router" ? "Internal router" : "Specialist";
+const roles = {
+  orchestrator: "Orchestrator",
+  architect: "Architect",
+  router: "Internal router",
+  specialist: "Specialist",
+} as const;
+type RoleKey = keyof typeof roles;
+const roleOrder = Object.keys(roles) as RoleKey[];
+const roleFilter = ref<RoleKey | "all">("all");
+
+function roleKey(agent: AgentFile): RoleKey {
+  return agent.role && agent.role in roles ? agent.role as RoleKey : "specialist";
 }
 
 const roster = computed(() => agents.value.map((agent) => ({
   agent,
   status: (agent.enabled === false ? "disabled" : live.value[agent.id]?.status ?? "unknown") as Status,
-  role: role(agent),
-})));
+  roleKey: roleKey(agent),
+  role: roles[roleKey(agent)],
+})).sort((a, b) => roleOrder.indexOf(a.roleKey) - roleOrder.indexOf(b.roleKey) ||
+  (a.agent.label || a.agent.id).localeCompare(b.agent.label || b.agent.id)));
 const totals = computed(() => {
   const counts = { all: roster.value.length, running: 0, offline: 0, disabled: 0, unknown: 0 };
   for (const row of roster.value) counts[row.status]++;
@@ -86,8 +98,9 @@ const totals = computed(() => {
 const filterOptions = computed(() => filters.map((item) => ({ ...item, count: totals.value[item.id] })));
 const visible = computed(() => {
   const query = search.value.trim().toLowerCase();
-  return roster.value.filter(({ agent, status, role }) =>
+  return roster.value.filter(({ agent, status, role, roleKey }) =>
     (filter.value === "all" || status === filter.value) &&
+    (roleFilter.value === "all" || roleKey === roleFilter.value) &&
     [agent.label, agent.id, agent.focus, role, statuses[status]].some((value) => value?.toLowerCase().includes(query)));
 });
 const saving = ref(false);
@@ -260,9 +273,16 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
     <p v-if="notice" class="notice" role="status" data-test="notice">{{ notice }}</p>
     <section class="admin-panel-card" aria-labelledby="agent-roster">
       <header class="admin-panel-head">
-        <h2 id="agent-roster">Agent roster</h2>
+        <h2 id="agent-roster">Agents</h2>
         <div class="admin-panel-tools">
-          <PanelHelp title="Agent roster">Every agent Legion can run, with its status. Open an agent to edit its model, tools and prompts. Shared prompts apply to all agents and restart them.</PanelHelp>
+          <label class="role-filter">
+            <span class="sr-only">Filter by role</span>
+            <select v-model="roleFilter" data-test="role-filter">
+              <option value="all">All roles</option>
+              <option v-for="(name, key) in roles" :key="key" :value="key">{{ name }}</option>
+            </select>
+          </label>
+          <PanelHelp title="Agents">Every agent Legion can run, with its status. Open an agent to edit its model, tools and prompts. Shared prompts apply to all agents and restart them.</PanelHelp>
           <button type="button" class="admin-icon" data-test="shared-prompts" aria-label="Shared prompts" title="Shared prompts" @click="promptsOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7" /></svg></button>
           <button type="button" class="admin-icon accent" data-test="new" aria-label="New agent" title="New agent" :disabled="loading || !!error" @click="openCreate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
           <AdminSearch ref="searchField" v-model="search" label="Search agents" />
@@ -338,5 +358,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 .agent-state.offline span { color: var(--warning); }
 .count { border-top: 1px solid var(--border); font-size: 0.8rem; }
 .notice { color: var(--muted); }
+.role-filter select { min-height: 36px; padding: 4px 28px 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); font: inherit; font-size: 0.85rem; }
+.role-filter select:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 400px) { .admin-record-badge { display: none; } }
 </style>
