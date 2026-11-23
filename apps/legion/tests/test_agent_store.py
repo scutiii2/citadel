@@ -155,8 +155,9 @@ def test_saved_only_catalog_lists_just_the_gateways_that_are_set_up(tmp_path, mo
     gateway.chat_store().put("claude", {"provider": "anthropic", "model": "m", "api_key": "sekret-value"})
     gateway.chat_store().put("mine", {"provider": "openai", "base_url": "http://host.docker.internal:1/v1", "model": "x", "label": "Mine"})
     gateway.decision_store().put("laya", {"kind": "scuti", "url": "http://host.docker.internal:29220"})
+    gateway.decision_store().put("freellmapi", {"kind": "freellmapi", "url": "http://host.docker.internal:29652", "api_key": "k"})  # no template file
     catalog = agent_store.gateway_catalog(saved_only=True)
     assert [g["id"] for g in catalog["anthropic"]] == ["claude"] and catalog["anthropic"][0]["tiers"]
     assert catalog["openai"] == [{"id": "mine", "label": "Mine", "model": "x", "tiers": []}]
-    assert [g["id"] for g in catalog["decision"]] == ["laya"]
+    assert sorted(g["id"] for g in catalog["decision"]) == ["freellmapi", "laya"]
     assert "sekret-value" not in json.dumps(catalog)

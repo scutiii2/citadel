@@ -82,9 +82,10 @@ def _saved(catalog: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str,
         listed = {entry["id"] for entry in kept}
         for gid in sorted(ids - listed):
             saved = chat.get(gid, {})
+            tiers = {} if provider == "decision" else llm_config.tiers(provider, gid)  # decision gateways have no tiers
             kept.append({"id": gid, "label": saved.get("label") or gid,
                          "model": saved.get("model") if isinstance(saved.get("model"), str) else "",
-                         "tiers": [{"tier": name, "id": tier.id} for name, tier in llm_config.tiers(provider, gid).items()]})
+                         "tiers": [{"tier": name, "id": tier.id} for name, tier in tiers.items()]})
         result[provider] = kept
     return result
 
