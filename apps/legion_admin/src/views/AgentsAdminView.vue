@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import PageLayout from "../components/PageLayout.vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import AdminSearch from "../components/admin/AdminSearch.vue";
+import RecordDrawer from "../components/admin/RecordDrawer.vue";
 import {
   agentsAdminClient,
   type AgentConfig,
   type AgentFile,
+  type AgentStatus,
   type LiveAgent,
   type ProviderCatalog,
 } from "../api/AgentsAdminClient";
@@ -15,7 +19,6 @@ import AgentForm from "../components/admin/AgentForm.vue";
 import SharedPromptsModal from "../components/admin/SharedPromptsModal.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
 
 // ai_agent's supervisor rescans its agents folder about every 2 seconds.
 const SETTLE_MS = 3000;
@@ -28,8 +31,62 @@ const loading = ref(true);
 const error = ref("");
 const notice = ref("");
 
-const formOpen = ref(false);
-const editing = ref<AgentFile | null>(null);
+const route = useRoute();
+const router = useRouter();
+const search = ref("");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
+const selectedId = ref<string>();
+const creating = ref(false);
+const editing = ref(false);
+const drawer = ref<InstanceType<typeof RecordDrawer>>();
+const pending = ref<{ id: string; config: AgentConfig }>();
+const selected = computed(() => agents.value.find((agent) => agent.id === selectedId.value));
+const drawerOpen = computed(() => !!selected.value || creating.value);
+const statuses = {
+  running: "Running",
+  offline: "Offline",
+  disabled: "Disabled",
+  unknown: "Unknown",
+} satisfies Record<AgentStatus | "unknown", string>;
+type Status = keyof typeof statuses;
+type Filter = Status | "all";
+const localFilter = ref<Filter>("all");
+const filter = computed(() => route.query.status === "offline" ? "offline" : localFilter.value);
+const filters = [
+  { id: "all", label: "All agents" },
+  { id: "running", label: "Running" },
+  { id: "offline", label: "Offline" },
+  { id: "disabled", label: "Disabled" },
+  { id: "unknown", label: "Unknown" },
+] as const;
+
+function setFilter(next: Filter) {
+  localFilter.value = next;
+  if (next === "offline" || route.query.status === "offline") {
+    void router.replace({ query: { ...route.query, status: next === "offline" ? next : undefined } });
+  }
+}
+
+function role(agent: AgentFile) {
+  return agent.role === "orchestrator" ? "Orchestrator" : agent.role === "router" ? "Internal router" : "Specialist";
+}
+
+const roster = computed(() => agents.value.map((agent) => ({
+  agent,
+  status: (agent.enabled === false ? "disabled" : live.value[agent.id]?.status ?? "unknown") as Status,
+  role: role(agent),
+})));
+const totals = computed(() => {
+  const counts = { all: roster.value.length, running: 0, offline: 0, disabled: 0, unknown: 0 };
+  for (const row of roster.value) counts[row.status]++;
+  return counts;
+});
+const visible = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  return roster.value.filter(({ agent, status, role }) =>
+    (filter.value === "all" || status === filter.value) &&
+    [agent.label, agent.id, agent.focus, role, statuses[status]].some((value) => value?.toLowerCase().includes(query)));
+});
 const saving = ref(false);
 const formError = ref("");
 
@@ -47,14 +104,17 @@ const resetBusy = ref(false);
 const resetError = ref("");
 
 let settleTimer: ReturnType<typeof setTimeout> | undefined;
+let statusRequest = 0;
 
 const suggestedPort = computed(() => Math.max(29603, ...agents.value.map((a) => a.port ?? 0)) + 1);
 
 async function loadStatuses(): Promise<void> {
+  const request = ++statusRequest;
   try {
-    live.value = await agentsAdminClient.live();
+    const current = await agentsAdminClient.live();
+    if (request === statusRequest) live.value = current;
   } catch {
-    live.value = {}; // needs chat.use; without it the status and tiers are simply left out
+    if (request === statusRequest) live.value = {};
   }
 }
 
@@ -103,28 +163,48 @@ function resetPreview(): void {
 
 function openCreate(): void {
   resetPreview();
-  editing.value = null;
+  selectedId.value = undefined;
+  creating.value = editing.value = true;
   formError.value = "";
-  formOpen.value = true;
 }
 
-function openEdit(agent: AgentFile): void {
+function openEdit(): void {
   resetPreview();
-  editing.value = agent;
   formError.value = "";
-  formOpen.value = true;
+  editing.value = true;
 }
 
-async function save(id: string, config: AgentConfig): Promise<void> {
+function closeDetails(): void {
+  selectedId.value = undefined;
+  creating.value = editing.value = false;
+  pending.value = undefined;
+}
+
+function discard(): void {
+  pending.value = undefined;
+  if (creating.value) closeDetails();
+  else editing.value = false;
+}
+
+function requestSave(id: string, config: AgentConfig): void {
+  pending.value = { id, config };
+  drawer.value?.requestSave();
+}
+
+async function save(): Promise<void> {
+  if (!pending.value || saving.value) return;
+  const { id, config } = pending.value;
   saving.value = true;
   formError.value = "";
-  const creating = editing.value === null;
+  const isNew = creating.value;
   try {
-    if (creating) await agentsAdminClient.create(id, config);
-    else await agentsAdminClient.update(id, config);
-    formOpen.value = false;
-    agents.value = await agentsAdminClient.list();
-    settleSoon(creating ? `Created ${id}. It starts in a few seconds.` : `Saved ${id}. It restarts in a few seconds.`);
+    const saved = await (isNew ? agentsAdminClient.create(id, config) : agentsAdminClient.update(id, config));
+    agents.value = [...agents.value.filter((agent) => agent.id !== id), saved].sort((a, b) => a.id.localeCompare(b.id));
+    agents.value = await agentsAdminClient.list().catch(() => agents.value);
+    selectedId.value = id;
+    creating.value = editing.value = false;
+    pending.value = undefined;
+    settleSoon(isNew ? `Created ${id}. It starts in a few seconds.` : `Saved ${id}. It restarts in a few seconds.`);
   } catch (err) {
     formError.value = errorMessage(err);
   } finally {
@@ -141,6 +221,7 @@ async function confirmRemove(): Promise<void> {
     await agentsAdminClient.remove(target.id);
     agents.value = agents.value.filter((a) => a.id !== target.id);
     removing.value = null;
+    closeDetails();
     settleSoon(`Removed ${target.id}. It stops in a few seconds.`);
   } catch (err) {
     removeError.value = errorMessage(err);
@@ -155,8 +236,8 @@ async function confirmReset(): Promise<void> {
   resetBusy.value = true;
   resetError.value = "";
   try {
-    await agentsAdminClient.reset(target.id);
-    agents.value = await agentsAdminClient.list();
+    const saved = await agentsAdminClient.reset(target.id);
+    agents.value = agents.value.map((agent) => agent.id === target.id ? saved : agent);
     resetting.value = null;
     settleSoon(`Reset ${target.id} to its defaults. It restarts in a few seconds.`);
   } catch (err) {
@@ -171,47 +252,59 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 </script>
 
 <template>
-  <PageLayout class="info-content agents-admin" title="Agents" description="Each agent is a file ai_agent runs as its own process. Changes apply within a few seconds, no restart.">
-    <template #actions><div class="head-actions">
+  <PageLayout class="agents-admin" title="Agents" wide>
+    <div class="filters" aria-label="Filter agents">
+      <button v-for="item in filters" :key="item.id" type="button" class="chip" :aria-pressed="filter === item.id" @click="setFilter(item.id)">
+        {{ item.label }} <span>{{ totals[item.id] }}</span>
+      </button>
+    </div>
+    <p v-if="notice" class="notice" role="status" data-test="notice">{{ notice }}</p>
+    <section class="admin-panel-card" aria-labelledby="agent-roster">
+      <header class="admin-panel-head">
+        <h2 id="agent-roster">Agent roster</h2>
+        <div class="admin-panel-tools">
           <button type="button" class="chip" data-test="shared-prompts" @click="promptsOpen = true">Shared prompts</button>
-          <button type="button" class="primary" data-test="new" @click="openCreate">＋ New agent</button>
-        </div></template>
-
-
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p v-if="notice" class="notice" role="status" data-test="notice">{{ notice }}</p>
-      <p v-if="loading" class="muted">Loading…</p>
-      <p v-else-if="!agents.length && !error" class="muted">No agents are defined.</p>
-      <div class="grid">
-        <AgentAdminCard
-          v-for="a in agents"
-          :key="a.id"
-          :agent="a"
-          :status="live[a.id]?.status"
-          :tiers="live[a.id]?.tiers"
-          :decision="live[a.id]?.decision"
-          @edit="openEdit(a)"
-          @remove="removing = a; removeError = ''"
-          @reset="resetting = a; resetError = ''"
-        />
+          <button type="button" class="primary" data-test="new" :disabled="loading || !!error" @click="openCreate">New agent</button>
+          <AdminSearch ref="searchField" v-model="search" label="Search agents" />
+        </div>
+      </header>
+      <p v-if="error" class="admin-panel-text error" role="alert">{{ error }}</p>
+      <p v-else-if="loading" class="admin-panel-text muted" role="status">Loading agents…</p>
+      <p v-else-if="!visible.length" class="admin-panel-text muted">{{ agents.length ? 'No agents match these filters.' : 'No agents are defined.' }}
+        <button v-if="search" type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button>
+      </p>
+      <div v-else class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="agent-roster">
+        <table class="admin-records">
+          <thead><tr><th scope="col">Agent</th><th scope="col">Role</th><th scope="col">State</th></tr></thead>
+          <tbody>
+            <tr v-for="{ agent, status, role } in visible" :key="agent.id" :data-id="agent.id" data-test="agent">
+              <th scope="row">
+                <div class="admin-record-name">
+                  <span class="admin-record-badge" aria-hidden="true">{{ (agent.label || agent.id).slice(0, 2).toUpperCase() }}</span>
+                  <div><button type="button" class="admin-row-button" aria-haspopup="dialog" @click="selectedId = agent.id">{{ agent.label || agent.id }}</button><code>{{ agent.id }}</code></div>
+                </div>
+              </th>
+              <td>{{ role }}</td>
+              <td><span class="agent-state" :class="status" data-test="status"><span aria-hidden="true">●</span> {{ statuses[status] }}</span></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-
-
-    <AgentForm
-      :open="formOpen"
-      :initial="editing"
-      :providers="providers"
-      :capabilities="capabilities"
-      :suggested-port="suggestedPort"
-      :busy="saving"
-      :error="formError"
-      :preview-text="previewText"
-      :previewing="previewing"
-      :preview-error="previewError"
-      @save="save"
-      @preview="preview"
-      @close="formOpen = false"
-    />
+      <p v-if="!loading && !error" class="admin-panel-text muted count" role="status">{{ visible.length }} of {{ agents.length }} agents</p>
+    </section>
+    <RecordDrawer ref="drawer" :open="drawerOpen" :title="creating ? 'New agent' : 'Agent details'"
+      :editable="!!selected && !selected.error" :editing="editing" :busy="saving" :fallback-focus="() => searchField?.focus()" :save-label="creating ? 'Create agent' : undefined"
+      @edit="openEdit" @close="closeDetails" @discard="discard" @save="save">
+      <AgentForm v-if="editing" :open="true" :initial="selected ?? null" :providers="providers" :capabilities="capabilities"
+        :suggested-port="suggestedPort" :busy="saving" :error="formError" :preview-text="previewText" :previewing="previewing"
+        :preview-error="previewError" @save="requestSave" @preview="preview" />
+      <AgentAdminCard v-else-if="selected" :agent="selected" :status="live[selected.id]?.status" :tiers="live[selected.id]?.tiers"
+        :decision="live[selected.id]?.decision" @remove="removing = selected; removeError = ''" @reset="resetting = selected; resetError = ''" />
+      <template v-if="editing" #footer>
+        <button type="button" class="chip" :disabled="saving" data-test="cancel-edit" @click="drawer?.requestCancel()">Cancel</button>
+        <button type="submit" form="agent-editor" class="primary" :disabled="saving" :aria-busy="saving">{{ creating ? 'Create agent' : 'Save changes' }}</button>
+      </template>
+    </RecordDrawer>
     <SharedPromptsModal :open="promptsOpen" @close="promptsOpen = false" @saved="settleSoon('Shared prompts saved. Every agent restarts in a few seconds.')" />
     <ConfirmModal
       :open="resetting !== null"
@@ -238,19 +331,17 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 </template>
 
 <style scoped>
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  grid-auto-rows: 1fr;
-  gap: 12px;
-  margin: 0 0 20px;
-}
-.head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.chip { padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-full); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
-.muted { color: var(--muted); }
-.primary { flex-shrink: 0; padding: 6px 16px; border: none; border-radius: var(--radius-full); cursor: pointer; font: inherit; font-weight: 600; color: var(--accent-contrast); background: var(--accent); }
-.error { color: var(--danger); }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.filters .chip { min-height: 36px; padding: 3px 12px; border: 1px solid var(--border); border-radius: var(--radius-full); color: var(--muted); background: transparent; font: inherit; font-size: 0.84rem; cursor: pointer; }
+.filters span { margin-inline-start: 4px; }
+.filters [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.agent-state { display: inline-flex; gap: 5px; align-items: center; padding: 3px 8px; border-radius: var(--radius-full); color: var(--muted); background: var(--surface); font-size: 0.8rem; }
+.agent-state.running { color: var(--text); background: color-mix(in srgb, var(--success) 12%, var(--bg)); }
+.agent-state.offline { color: var(--text); background: color-mix(in srgb, var(--warning) 14%, var(--bg)); }
+.agent-state.running span { color: var(--success); }
+.agent-state.offline span { color: var(--warning); }
+.count { border-top: 1px solid var(--border); font-size: 0.8rem; }
 .notice { color: var(--muted); }
-:is(button, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 767px) { .filters .chip { min-height: 44px; } }
+@media (max-width: 400px) { .admin-record-badge { display: none; } }
 </style>

@@ -286,8 +286,9 @@ def create_app(
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError):
         path = request.url.path
-        if path.startswith("/api/outside/") or path == "/api/auth/register":
-            # Validation details can contain the complete request, including the invite code.
+        if (path.startswith(("/api/outside/", "/api/admin/servers/"))
+                or path in {"/api/auth/register", "/api/admin/gateway-settings", "/api/admin/decision-gateway-settings"}):
+            # Validation details can echo invite codes or write-only connection credentials.
             return JSONResponse(status_code=422, content={"detail": [
                 {"loc": e["loc"], "msg": e["msg"], "type": e["type"]} for e in error.errors()]})
         return await request_validation_exception_handler(request, error)

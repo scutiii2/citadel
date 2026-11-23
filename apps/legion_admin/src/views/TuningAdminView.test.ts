@@ -1,6 +1,7 @@
 // apps/Ember/ember_admin/src/views/TuningAdminView.test.ts
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { createMemoryHistory, createRouter, RouterView } from "vue-router";
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { tuningClient, type TuningView } from "../api/TuningClient";
 import TuningAdminView from "./TuningAdminView.vue";
 
@@ -19,6 +20,10 @@ const view = (overrides: TuningView["overrides"] = {}): TuningView => {
   return { defaults, overrides, effective: defaults };
 };
 
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) { this.removeAttribute("open"); };
+});
 beforeEach(() => vi.clearAllMocks());
 
 const mounted: ReturnType<typeof mount>[] = [];
@@ -69,18 +74,21 @@ it("selects a decision strategy and saves it", async () => {
 
 it("shows the refusal and keeps the draft", async () => {
   const wrapper = await show(view());
-  vi.mocked(tuningClient.save).mockRejectedValue(new Error("token_limits.default.max_tool_rounds must be from 1 and up to 100"));
+  vi.mocked(tuningClient.save).mockRejectedValue(new Error("Tuning service unavailable"));
   const rounds = wrapper.get('[data-path="token_limits.default.max_tool_rounds"]');
-  await rounds.setValue("500");
+  await rounds.setValue("40");
   await wrapper.get('[data-test="save"]').trigger("click");
   await flushPromises();
-  expect(wrapper.text()).toContain("must be from 1 and up to 100");
-  expect((rounds.element as HTMLInputElement).value).toBe("500");
+  expect(wrapper.text()).toContain("Tuning service unavailable");
+  expect((rounds.element as HTMLInputElement).value).toBe("40");
 });
 
-it("disables Save until something changed", async () => {
+it("reserves space and only shows Save when dirty", async () => {
   const wrapper = await show(view());
-  expect(wrapper.get('[data-test="save"]').attributes("disabled")).toBeDefined();
+  const slot = wrapper.get(".tuning-actions").element;
+  expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
+  await wrapper.get('[data-path="token_limits.default.max_tool_rounds"]').setValue("4");
+  expect(wrapper.get('[data-test="save"]').element.parentElement).toBe(slot);
 });
 
 
@@ -91,7 +99,60 @@ it("protects an unsaved admin draft from page unload until cancelled", async () 
   window.dispatchEvent(dirtyEvent);
   expect(dirtyEvent.defaultPrevented).toBe(true);
   await wrapper.get('[data-test="cancel"]').trigger("click");
+  await wrapper.get('dialog[open] button.confirm').trigger("click");
   const cleanEvent = new Event("beforeunload", { cancelable: true });
   window.dispatchEvent(cleanEvent);
   expect(cleanEvent.defaultPrevented).toBe(false);
+});
+
+
+it("saves edits hidden by search with visible edits", async () => {
+  const wrapper = await show(view());
+  const path = "token_limits.default.max_tool_rounds";
+  await wrapper.get(`[data-path="${path}"]`).setValue("20");
+  await wrapper.get('input[type="search"]').setValue("after an outage");
+  expect(wrapper.find(`[data-path="${path}"]`).exists()).toBe(false);
+  await wrapper.get('[data-path="gateway_failover.unavailable_cooldown_seconds"]').setValue("14");
+  vi.mocked(tuningClient.save).mockResolvedValue(view());
+  await wrapper.get('[data-test="save"]').trigger("click");
+  expect(tuningClient.save).toHaveBeenCalledWith({ [path]: 20, "gateway_failover.unavailable_cooldown_seconds": 14 });
+});
+
+it("reveals a hidden invalid draft and refuses to save it", async () => {
+  const wrapper = await show(view());
+  const path = "token_limits.default.max_tool_rounds";
+  await wrapper.get(`[data-path="${path}"]`).setValue("500");
+  await wrapper.get('input[type="search"]').setValue("after an outage");
+  await wrapper.get('[data-test="save"]').trigger("click");
+  expect(tuningClient.save).not.toHaveBeenCalled();
+  expect(wrapper.get(`[data-path="${path}"]`).attributes("aria-invalid")).toBe("true");
+  expect(wrapper.get('[role="alert"]').text()).toContain("from 1 to 100");
+});
+
+
+it("keeps the draft after cancelling navigation and discards it after confirmation", async () => {
+  vi.mocked(tuningClient.get).mockResolvedValue(view());
+  const router = createRouter({ history: createMemoryHistory(), routes: [
+    { path: "/tuning", component: TuningAdminView },
+    { path: "/elsewhere", component: { template: "<div>Elsewhere</div>" } },
+  ] });
+  await router.push("/tuning");
+  const wrapper = mount(RouterView, { global: { plugins: [router] } });
+  mounted.push(wrapper);
+  await flushPromises();
+
+  await wrapper.get('[data-path="token_limits.default.max_tool_rounds"]').setValue("20");
+  const first = router.push("/elsewhere");
+  await flushPromises();
+  await wrapper.get("dialog[open] .cancel").trigger("click");
+  await first;
+  expect(router.currentRoute.value.path).toBe("/tuning");
+  expect(wrapper.get<HTMLInputElement>('[data-path="token_limits.default.max_tool_rounds"]').element.value).toBe("20");
+
+  const second = router.push("/elsewhere");
+  await flushPromises();
+  await wrapper.get("dialog[open] .confirm").trigger("click");
+  await second;
+  expect(router.currentRoute.value.path).toBe("/elsewhere");
+  expect(tuningClient.save).not.toHaveBeenCalled();
 });

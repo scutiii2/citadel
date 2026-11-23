@@ -457,13 +457,13 @@ def _tuning_overlay() -> Path:
 
 @mcp.custom_route("/agents/gateway-settings", methods=["GET"])
 async def gateway_settings_get(_request: Request) -> JSONResponse:
-    """Where ConversationGateway is and whether a token is set. The token itself is never returned."""
+    """ConversationGateway address, description, and token presence. The token itself is never returned."""
     return JSONResponse(gateway_settings.view(await gateway_settings.current()))
 
 
 @mcp.custom_route("/agents/gateway-settings", methods=["PUT"])
 async def gateway_settings_put(request: Request) -> JSONResponse:
-    """Body: {"url"?, "token"?}; a missing key keeps the stored value, an empty token clears it.
+    """Body: {"url"?, "description"?, "token"?}; omitted values stay saved. Empty description or token clears it.
     Saved in Treasury; other agent processes pick the edit up within half a minute."""
     changes = await _json_object(request)
     if changes is None:
