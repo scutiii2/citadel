@@ -25,7 +25,7 @@ Use with [Citadel frontend design](SKILL.md) and `ember-design-system` for Ember
 
 ## Virtual keyboard, viewport and sheets
 
-- Reuse the shell's viewport handling. `ember_web/src/App.vue` maintains `--app-viewport-height` and `--app-viewport-top` from `visualViewport`; the global stylesheet uses them with a `100dvh` fallback. The admin shell currently uses `100dvh` without that bridge. Inspect the affected app before assuming identical keyboard behavior.
+- Reuse the shell's viewport handling. `ember/src/App.vue` maintains `--app-viewport-height` and `--app-viewport-top` from `visualViewport`; the global stylesheet uses them with a `100dvh` fallback. The admin shell currently uses `100dvh` without that bridge. Inspect the affected app before assuming identical keyboard behavior.
 - Keep the focused input, validation message and relevant Save/Send action reachable when the keyboard opens. Prefer scrolling the owning content pane; avoid fixed full-screen overlays and page-level scrolling that fight the shell. Do not add another independent viewport listener to each page.
 - On shells with a bottom rail, anchor ordinary sheets above `--rail-height`, which already includes the bottom safe-area inset. Count the inset once.
 - Keep record drawers full-height on the right, matching the admin reference. Let the body scroll independently and keep the drawer header and Save/Cancel footer reachable. Count safe-area padding once and verify the last field and footer with the keyboard open.

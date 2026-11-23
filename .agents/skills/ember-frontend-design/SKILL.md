@@ -5,7 +5,7 @@ description: Use when designing, building, restyling, or reviewing Citadel's Emb
 
 # Citadel frontend design
 
-Use `ember-design-system` for tokens, radius, focus, and interaction rules. Use the target app's `AGENTS.md` for routing, permissions, and API conventions. Treat `apps/ember_web` as reference material for Ember patterns.
+Use `ember-design-system` for tokens, radius, focus, and interaction rules. Use the target app's `AGENTS.md` for routing, permissions, and API conventions.
 
 Reuse the target app's components and tokens before adding styles.
 
@@ -63,7 +63,7 @@ Before writing a component, grep both `components/` folders for an existing one.
 
 ## Shared pieces: always use these, never re-style them per page
 
-These live in `ember_web` only (not copied to admin). A page that needs one of these patterns uses the component; it does not write its own markup or CSS for it. If the component lacks something, extend the component (a prop or slot) rather than forking it in the page. Pages add only layout tweaks through their own class (spacing, alignment).
+These live in `apps/ember` only (not copied to admin). A page that needs one of these patterns uses the component; it does not write its own markup or CSS for it. If the component lacks something, extend the component (a prop or slot) rather than forking it in the page. Pages add only layout tweaks through their own class (spacing, alignment).
 
 | Pattern | Use | Where |
 |---|---|---|
@@ -117,17 +117,16 @@ These are the user's preferred Ember patterns. Choose the shape that fits the ta
 
 Use these existing pages as implementation references:
 
-| Task | Reference under `apps/ember_web/src/` |
+| Task | Reference under `apps/ember/src/` |
 |---|---|
 | Writing with secondary tools | `features/notes/NotesView.vue`: draft-safe sidebar search, growing document editor, individual tool disclosures and persistent Save |
-| Reviewing short facts | `features/memory/MemoryView.vue`: searchable list/editor workspace, mobile Back, guarded drafts and management disclosure |
 | Reviewing proposed how-tos | `features/skills/SkillsView.vue`: grouped list/editor workspace, approval inside the selected row, document fields, visible pane scrollbars |
-| Reading durable documents | `features/brains/BrainsView.vue`: sidebar-owned scope/search, persistent reader, visible pane scrollbars, collapsed source settings |
+| Reading shared documents | `features/global/GlobalView.vue`: reader with review queue, drawers for files and skills |
 | Downloading and collecting media | `features/mediaDownloader/MediaDownloaderView.vue`, `features/mediaDownloader/components/`: single-link flow, ZIP groups, temporary files |
 
 ## 3. Navigation placement
 
-- **ember_web rail** (`NavRail.vue`): header = Overview (wordmark) + Chat. Main list = only pages backed by a dedicated mcp_server capability (Notes, Memory, Generator, Tickets). Every other page (Capabilities, Agents, Usage, Settings, Profile) goes in `AccountMenu.vue`.
+- **Ember rail** (`NavRail.vue`): header = Overview (wordmark) + Chat. Main list = only pages backed by a dedicated mcp_server capability (Notes, Memory, Generator, Tickets). Every other page (Capabilities, Agents, Usage, Settings, Profile) goes in `AccountMenu.vue`.
 - **Admin navigation:** use the target app's page registry, permission filtering, and navigation preferences where supported. Use the approved admin shell as the design reference.
 - On existing shells with a mobile bottom rail, use `bottom: var(--rail-height)` for sheets above that rail.
 

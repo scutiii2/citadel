@@ -60,14 +60,14 @@ A nested corner is `calc(outer - padding)`. An element flush to an edge is squar
 - **Controls:** primary action = accent-filled pill (`--radius-full`, weight 600, `--accent-contrast` text). Secondary = outlined pill. Inputs = `--radius-md`, `--border`, `--bg` fill, accent border on focus. On/off = `ToggleSwitch` pill (real checkbox, `role="switch"`), never a bare checkbox. A handful of exclusive choices = segmented pill (accent track, white sliding thumb). Both in [components.md](components.md).
 - **Confirmations:** never the browser's `confirm()`. Use an in-app modal; friction scales with severity. Severe actions (delete account, delete something in use, delete all) require typing the name or phrase (`requireText`) before the confirm button enables. Destructive buttons are red-outlined pills and sit in a red-tinted **Danger zone** block, last in the form.
 - **Settings:** browser-only preferences apply instantly. Server settings stay in a draft until Save. In admin panels, follow the shared dirty-only Save slot or drawer footer pattern. A setting that differs from its default shows an accent dot and its own reset button.
-- **Busy state:** disable the control, set `aria-busy`, show progress on the control itself (spinner ring, drawn globally for `button[aria-busy="true"]` in ember_web, so no per-component copy); ignore clicks while busy.
+- **Busy state:** disable the control, set `aria-busy`, show progress on the control itself (spinner ring, drawn globally for `button[aria-busy="true"]` in ember, so no per-component copy); ignore clicks while busy.
 - **Icons:** stroked 24x24 SVG path data, `stroke: currentColor; stroke-width: 1.8; fill: none; round caps and joins`. Icon-only controls get a name on hover and keyboard focus (`data-label` tooltip) and an `aria-label`.
 - **Bottom sheets:** on shells with mobile bottom navigation, place sheets above `--rail-height`.
 - **Persistence:** theme and local preferences in `localStorage`, every read and write in try/catch (storage may be blocked); a failed read means the default.
 
 ## Theme
 
-`color-scheme: light dark` on `:root` follows the system. A user override sets `document.documentElement.style.colorScheme` to `light` or `dark`; "system" restores `light dark`. The toggle cycles system, light, dark and persists the choice per browser. Because every token is `light-dark()`, no per-theme stylesheet exists. Apply the saved theme before the app mounts to avoid a flash. See `apps/ember_web/src/composables/useTheme.ts`.
+`color-scheme: light dark` on `:root` follows the system. A user override sets `document.documentElement.style.colorScheme` to `light` or `dark`; "system" restores `light dark`. The toggle cycles system, light, dark and persists the choice per browser. Because every token is `light-dark()`, no per-theme stylesheet exists. Apply the saved theme before the app mounts to avoid a flash. See `apps/ember/src/composables/useTheme.ts`.
 
 ## Review checklist
 

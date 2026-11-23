@@ -115,7 +115,7 @@ to TypeSafe; `laya-only` keeps it local.
 Specialist work streams to the caller as
 `agent_start` / `agent_end` / `agent_token` plus `step_*` events stamped with
 `agent_id`; a specialist's step ids can collide with the orchestrator's, so
-consumers key on `(agent_id, id)` - portcullis and ember_web already do.
+consumers key on `(agent_id, id)` - portcullis and ember already do.
 
 ## Decision agents
 
@@ -189,7 +189,7 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
        (`parsed_arguments`) or the next request 400s. `on_event` may be
        `None` (e.g. `run_interpret`'s non-streaming callers) — guard
        every emit with `if on_event is not None:`. This is what
-       ultimately reaches portcullis (and from there ember_web) as events - see
+       ultimately reaches portcullis (and from there ember) as events - see
        `server.py`'s `ask()` tool (`ctx.report_progress(0, None, json.dumps(event))`)
        and `apps/portcullis/src/services/agent_gateway.py` on the other end.
    - `run_interpret(text, model) -> ChatResult` — one non-agentic
@@ -268,7 +268,7 @@ portcullis owns usage limits and the usage reports.
   `GET /api/agent` on portcullis names the entry agent. Stop with Ctrl+C and
   confirm no child is left running and the entry leaves the registry.
 - **Orchestrator**: ask the entry agent something that fits a
-  specialist's `focus`; ember_web shows "Ember -> <Specialist>" while it works
+  specialist's `focus`; ember shows "Ember -> <Specialist>" while it works
   and the usage chip lists both agents. Tests: `legion`
   `uv run pytest` (the registry is isolated per
   test, keep it that way).
@@ -276,7 +276,7 @@ portcullis owns usage limits and the usage reports.
   API key should fail loudly at import time (`AgentConfigError`), not on the
   first request. Then run one real turn that triggers a tool call, to exercise
   the dispatch loop, and one that doesn't. If written async with `on_event`,
-  drive it from ember_web's chat (not a bare script) and confirm
+  drive it from ember's chat (not a bare script) and confirm
   `step_start`/`step_end`/`token` events arrive live - a `run_chat` that never
   calls `on_event` still returns a fine final `ChatResult`, so this only
   surfaces by watching the steps update mid-turn.
