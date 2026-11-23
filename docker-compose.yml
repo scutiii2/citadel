@@ -1,4 +1,4 @@
-# Stack: portcullis_admin / legion_admin / armory_admin / stronghold_admin / treasury_admin -> portcullis -> armory / legion / treasury / stronghold; legion -> conversation-gateway / decision-gateway (private llm_net); legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
+# Stack: portcullis_admin / legion_admin / armory_admin / stronghold_admin / treasury_admin -> portcullis -> armory / legion / treasury / stronghold; legion runs the model gateways itself; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
 # Start:  docker compose up -d --build
 # Per-service Ed25519 identities are created on first start. Public trust is shared read-only
 # with peers; private identities remain in their own volumes. Per-app secrets load when present.
@@ -45,53 +45,14 @@ services:
     depends_on: [treasury]
     networks: [core]
 
-  # Stack gateways (their own repos). Legion is their only caller: no host port, and they join llm_net only.
-  # Provider keys come from .env.gateways (see .env.gateways.example), never from the root .env.
-  conversation-gateway:
-    build: ${CONVERSATION_GATEWAY_DIR:-../../AI/ModelProviders/ConversationGateway}
-    restart: unless-stopped
-    env_file:
-      - path: ./.env.gateways
-        required: false
-    environment:
-      SERVICE_ADMIN_PASSWORD: ${CONVERSATION_GATEWAY_ADMIN_PASSWORD:?set CONVERSATION_GATEWAY_ADMIN_PASSWORD in the root .env}
-    volumes:
-      - ${CITADEL_DATA_DIR:-./.data}/conversationgateway:/data
-    # Lets a saved gateway reach a service published on the host (OmniRoute, Ollama, vLLM) as host.docker.internal.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29407/health')"]
-      interval: 15s
-      timeout: 5s
-      start_period: 30s
-    networks: [llm_net]
-
-  decision-gateway:
-    build: ${DECISION_GATEWAY_DIR:-../../AI/ModelProviders/DecisionGateway}
-    restart: unless-stopped
-    env_file:
-      - path: ./.env.gateways
-        required: false
-    environment:
-      SERVICE_ADMIN_PASSWORD: ${DECISION_GATEWAY_ADMIN_PASSWORD:?set DECISION_GATEWAY_ADMIN_PASSWORD in the root .env}
-    volumes:
-      - ${CITADEL_DATA_DIR:-./.data}/decisiongateway:/data
-    # Lets a saved gateway reach a host-published model service (LayaModel) as host.docker.internal.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29406/health')"]
-      interval: 15s
-      timeout: 5s
-      start_period: 30s
-    networks: [llm_net]
-
   legion:
     build: ./apps/legion
     restart: unless-stopped
     env_file:
       - path: ./apps/legion/.env
+        required: false
+      # Provider keys for the model gateways inside Legion (see .env.gateways.example); only Legion loads it.
+      - path: ./.env.gateways
         required: false
     environment:
       TREASURY_URL: http://treasury:29602
@@ -102,7 +63,6 @@ services:
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
       AI_AGENT_ADVERTISE_URL: http://legion
-      # Legion keeps each gateway's address (http://conversation-gateway:29407, http://decision-gateway:29406) and token, set by an admin, in Treasury.
     # Lets legion reach host-published stacks as host.docker.internal.
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -266,7 +226,7 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/16
-  # Legion and the two stack gateways only. Not internal: the gateways must reach their providers.
+  # Legion only. Not internal: its model gateways must reach their providers.
   llm_net:
     name: citadel_llm
 

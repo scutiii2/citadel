@@ -124,72 +124,64 @@ class PreviewIn(BaseModel):
     caveman: bool = False
 
 
-class GatewaySettingsIn(BaseModel):
-    """Only the fields sent are changed. An empty token clears the stored one."""
-
-    model_config = {"extra": "forbid"}
-
-    url: str | None = Field(default=None, max_length=300)
-    token: str | None = Field(default=None, max_length=512, repr=False)
-    description: str | None = Field(default=None, max_length=500)
+KIND_PATTERN = r"^(conversation|decision)$"
+GATEWAY_ID_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,47}$"
 
 
-@prompts_router.get("/gateway-settings")
-async def get_gateway_settings(
-    account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)
+@prompts_router.get("/model-gateways/{kind}")
+async def list_model_gateways(
+    kind: str = Path(pattern=KIND_PATTERN),
+    account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin),
 ) -> Any:
-    """Where legion reaches ConversationGateway: `{url, description, has_token}`."""
-    return await _call(admin.gateway_settings(account))
+    """The saved entries of the chat or decision gateway, with the form and presets for the page."""
+    return await _call(admin.model_gateways(account, kind))
 
 
-@prompts_router.put("/gateway-settings")
-async def set_gateway_settings(
-    body: GatewaySettingsIn,
+@prompts_router.put("/model-gateways/{kind}/{gateway_id}")
+async def save_model_gateway(
+    entry: dict[str, Any],
+    kind: str = Path(pattern=KIND_PATTERN),
+    gateway_id: str = Path(pattern=GATEWAY_ID_PATTERN),
     account: Account = Depends(require_agents_manage),
     admin: AgentAdmin = Depends(get_agent_admin),
     logs: LogWriter = Depends(get_log_writer),
 ) -> Any:
-    """legion validates and stores the change. The log names the fields, never the token."""
-    changes = body.model_dump(exclude_unset=True, exclude_none=True)
-    result = await _call(admin.set_gateway_settings(account, changes))
-    await logs.action(account, "agents.gateway_settings",
-                      f"Changed ConversationGateway settings ({', '.join(sorted(changes)) or 'none'})")
+    """legion validates and stores the entry. The log names the entry, never its secrets."""
+    result = await _call(admin.save_model_gateway(account, kind, gateway_id, entry))
+    await logs.action(account, "agents.model_gateway", f"Saved {kind} gateway {gateway_id}")
     return result
 
 
-@prompts_router.get("/decision-gateway-settings")
-async def get_decision_gateway_settings(
-    account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)
-) -> Any:
-    """Where legion reaches DecisionGateway: `{url, description, has_token}`."""
-    return await _call(admin.decision_gateway_settings(account))
-
-
-@prompts_router.put("/decision-gateway-settings")
-async def set_decision_gateway_settings(
-    body: GatewaySettingsIn,
+@prompts_router.delete("/model-gateways/{kind}/{gateway_id}")
+async def delete_model_gateway(
+    kind: str = Path(pattern=KIND_PATTERN),
+    gateway_id: str = Path(pattern=GATEWAY_ID_PATTERN),
     account: Account = Depends(require_agents_manage),
     admin: AgentAdmin = Depends(get_agent_admin),
     logs: LogWriter = Depends(get_log_writer),
 ) -> Any:
-    """legion validates and stores the change. The log names the fields, never the token."""
-    changes = body.model_dump(exclude_unset=True, exclude_none=True)
-    result = await _call(admin.set_decision_gateway_settings(account, changes))
-    await logs.action(account, "agents.decision_gateway_settings",
-                      f"Changed DecisionGateway settings ({', '.join(sorted(changes)) or 'none'})")
+    result = await _call(admin.delete_model_gateway(account, kind, gateway_id))
+    await logs.action(account, "agents.model_gateway", f"Deleted {kind} gateway {gateway_id}")
     return result
 
 
-@prompts_router.post("/gateway-settings/test")
-async def test_gateway(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
-    """Whether ConversationGateway answers at the saved address and token: `{ok, message}`."""
-    return await _call(admin.test_gateway(account, False))
+@prompts_router.post("/model-gateways/{kind}/{gateway_id}/test")
+async def test_model_gateway(
+    kind: str = Path(pattern=KIND_PATTERN),
+    gateway_id: str = Path(pattern=GATEWAY_ID_PATTERN),
+    account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin),
+) -> Any:
+    """Whether this saved gateway answers: `{ok, message}`."""
+    return await _call(admin.test_model_gateway(account, kind, gateway_id))
 
 
-@prompts_router.post("/decision-gateway-settings/test")
-async def test_decision_gateway(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
-    """Whether DecisionGateway answers at the saved address and token: `{ok, message}`."""
-    return await _call(admin.test_gateway(account, True))
+@prompts_router.get("/model-gateways/conversation/{gateway_id}/models")
+async def model_gateway_models(
+    gateway_id: str = Path(pattern=GATEWAY_ID_PATTERN),
+    account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin),
+) -> Any:
+    """The model names the saved chat gateway offers: `{ok, models}`."""
+    return await _call(admin.model_gateway_models(account, gateway_id))
 
 
 SERVER_ID_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,62}$"

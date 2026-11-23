@@ -53,6 +53,6 @@ legacy file; copy any subsequent gateway changes back into that file first.
 ## decision
 
 Provider folder `decision/` holds `laya.json` and `jev.json`, each with only a `label`. The two
-ids name entries saved in DecisionGateway (`AI/ModelProviders/DecisionGateway`): `laya` is the
+ids name entries saved in DecisionGateway (built into Legion, `src/gateway/decision`): `laya` is the
 local Laya model service, `jev` is TypeSafe's cloud API. Address, key, model, strategy and window
 are set there. Agents choose `laya-only`, `jev-only` or `both`; that arrangement stays in Legion.

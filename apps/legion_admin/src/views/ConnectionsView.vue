@@ -1,24 +1,21 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { agentsAdminClient } from "../api/AgentsAdminClient";
 import AdminSearch from "../components/admin/AdminSearch.vue";
 import PanelHelp from "../components/admin/PanelHelp.vue";
-import GatewayConnectionCard from "../components/GatewayConnectionCard.vue";
+import ModelGatewayTable from "../components/ModelGatewayTable.vue";
 import PageLayout from "../components/PageLayout.vue";
 import ServersView from "./ServersView.vue";
 
 const route = useRoute();
 const search = ref("");
 const searchField = ref<InstanceType<typeof AdminSearch>>();
-const matches = ref<Record<string, boolean>>({});
 const servers = ref<InstanceType<typeof ServersView>>();
 const gateways = [
-  { id: "conversation-gateway", title: "ConversationGateway", example: "http://conversation-gateway:29407",
-    load: agentsAdminClient.gatewaySettings, store: agentsAdminClient.setGatewaySettings, test: agentsAdminClient.testGateway },
-  { id: "decision-gateway", title: "DecisionGateway", example: "http://decision-gateway:29406",
-    load: agentsAdminClient.decisionGatewaySettings, store: agentsAdminClient.setDecisionGatewaySettings, test: agentsAdminClient.testDecisionGateway },
-];
+  { kind: "conversation", title: "Chat models" },
+  { kind: "decision", title: "Decision models" },
+] as const;
+const shown = ref<Record<string, boolean>>({});
 
 watch(() => route.hash, async (hash) => {
   if (hash !== "#mcp-servers") return;
@@ -32,20 +29,11 @@ watch(() => route.hash, async (hash) => {
     <section class="admin-panel-card" aria-labelledby="model-gateways">
       <header class="admin-panel-head">
         <h2 id="model-gateways">Model gateways</h2>
-        <div class="admin-panel-tools"><PanelHelp title="Model gateways">The model gateways Legion sends requests to. Open one to edit its description and address.</PanelHelp><AdminSearch ref="searchField" v-model="search" label="Search model gateways" /></div>
+        <div class="admin-panel-tools"><PanelHelp title="Model gateways">The models Legion sends requests to, built into Legion. Add a gateway, give it the provider key (or env:NAME to read it from Legion's environment), and test it. Chat models serve the agents' conversations; decision models answer routing and classification questions.</PanelHelp><AdminSearch ref="searchField" v-model="search" label="Search model gateways" /></div>
       </header>
-      <div class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="model-gateways">
-        <table class="admin-records">
-          <thead><tr><th scope="col">Name</th><th scope="col">Connection URL</th><th scope="col">Test</th></tr></thead>
-          <tbody>
-            <GatewayConnectionCard v-for="gateway in gateways" :key="gateway.id" v-bind="gateway"
-              :search="search" :fallback-focus="() => searchField?.focus()" @visible="matches[gateway.id] = $event" />
-            <tr v-if="gateways.every(({ id }) => matches[id] === false)">
-              <td colspan="3">No gateways match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <ModelGatewayTable v-for="gateway in gateways" :key="gateway.kind" :kind="gateway.kind" :title="gateway.title"
+        :search="search" :fallback-focus="() => searchField?.focus()" @visible="shown[gateway.kind] = $event" />
+      <p v-if="gateways.every(({ kind }) => shown[kind] === false)">No gateways match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
     </section>
     <ServersView ref="servers" />
   </PageLayout>
