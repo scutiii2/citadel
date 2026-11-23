@@ -6,7 +6,7 @@ import AdminSearch from "./admin/AdminSearch.vue";
 import ConfirmModal from "./admin/ConfirmModal.vue";
 import PanelHelp from "./admin/PanelHelp.vue";
 import RecordDrawer from "./admin/RecordDrawer.vue";
-import ConnectionTest from "./ConnectionTest.vue";
+import ConnectionTestCells from "./ConnectionTestCells.vue";
 import PasswordInput from "./PasswordInput.vue";
 import { errorMessage } from "../utils/errors";
 
@@ -231,7 +231,7 @@ onMounted(load);
     </p>
     <div v-else-if="list" class="admin-table-scroll" tabindex="0" role="region" :aria-labelledby="`${kind}-gateways-title`">
       <table class="admin-records">
-        <thead><tr><th scope="col">Name</th><th scope="col">{{ chat ? "Provider and model" : "Kind and address" }}</th><th scope="col">Test</th></tr></thead>
+        <thead><tr><th scope="col">Name</th><th scope="col">{{ chat ? "Provider and model" : "Kind and address" }}</th><th scope="col">Test</th><th scope="col">Result</th></tr></thead>
         <tbody>
           <tr v-for="row in rows" :key="row.id">
             <th scope="row">
@@ -244,7 +244,7 @@ onMounted(load);
               </div>
             </th>
             <td><code>{{ summary(row) || "—" }}</code><p class="kind">{{ row.provider ?? row.kind }}</p></td>
-            <td><ConnectionTest :label="row.id" :run="() => agentsAdminClient.testModelGateway(kind, row.id)" /></td>
+            <ConnectionTestCells :label="row.id" :run="() => agentsAdminClient.testModelGateway(kind, row.id)" />
           </tr>
         </tbody>
       </table>

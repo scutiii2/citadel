@@ -40,4 +40,11 @@ def test_the_decision_list_has_its_kinds(client):
 def test_unknown_kind_and_unknown_entry(client):
     assert client.get("/agents/model-gateways/other").status_code == 404
     answer = client.post("/agents/model-gateways/decision/nope/test").json()
-    assert answer["ok"] is False and "nope" in answer["message"]
+    assert answer["ok"] is False and "nope" in answer["message"] and answer["code"] == "404"
+
+
+def test_chat_presets_carry_their_template_tiers_and_descriptions(client):
+    presets = client.get("/agents/model-gateways/conversation").json()["presets"]
+    assert presets["claude"]["models"]["light"] == "claude-haiku-5-5"
+    assert presets["claude"]["descriptions"]["standard"] == "most tasks"
+    assert "models" not in presets["minicpm"]

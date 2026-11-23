@@ -23,5 +23,7 @@ def test_server_checks_each_address_and_stdio_is_not_testable():
 
     result = _probe(answer, connection_probe.probe_server(entry))
     assert result["ok"] is True and seen["key"] == "k"
-    assert _probe(lambda r: httpx.Response(503), connection_probe.probe_server(entry))["ok"] is False
+    down = _probe(lambda r: httpx.Response(503), connection_probe.probe_server(entry))
+    assert down["ok"] is False and down["code"] == "503" and down["origins"][0]["code"] == "503"
+    assert _probe(lambda r: httpx.Response(401), connection_probe.probe_server(entry))["code"] == "401"
     assert asyncio.run(connection_probe.probe_server({"transport": "stdio", "command": "x"}))["ok"] is False

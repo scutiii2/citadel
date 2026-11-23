@@ -148,11 +148,13 @@ export interface McpServer {
 }
 
 /** portcullis's /api/admin/agents (needs agents.manage), which ai_agent validates and applies. */
-/** What a connection test found: one line for the whole connection, and one per address when it has several. */
+/** What a connection test found: one line (and a code, when it failed) for the whole connection, and one per address when it has several. */
 export interface ConnectionTestResult {
   ok: boolean;
   message: string;
-  origins?: { ok: boolean; message: string }[];
+  /** Why a failed test failed: an HTTP status (401, 503, ...) or NET, TIME, GONE, STDIO. */
+  code?: string;
+  origins?: { ok: boolean; message: string; code?: string }[];
 }
 
 export const agentsAdminClient = {
