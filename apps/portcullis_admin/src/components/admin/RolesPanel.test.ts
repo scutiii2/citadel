@@ -70,7 +70,8 @@ describe("RolesPanel", () => {
     const wrapper = await panel();
     expect(rowFor(wrapper, "Administrator").text()).toContain("protected");
     expect(rowFor(wrapper, "Member").text()).toContain("Default role");
-    expect(rowFor(wrapper, "Member").findAll("td")[1]!.text()).toBe("3");
+    expect(rowFor(wrapper, "Member").findAll("td")[0]!.text()).toBe("3");
+    expect(wrapper.get("thead").text()).toContain("Users");
     await wrapper.get('input[type="search"]').setValue("default");
     expect(wrapper.findAll("tbody tr")).toHaveLength(1);
     await wrapper.get('input[type="search"]').setValue("zzz");

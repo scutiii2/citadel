@@ -216,12 +216,12 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
       </p>
       <div v-else class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="role-roster">
         <table class="admin-records">
-          <thead><tr><th scope="col">Role</th><th scope="col">Description</th><th scope="col">Accounts</th></tr></thead>
+          <thead><tr><th scope="col">Role</th><th scope="col" class="users-col">Users</th></tr></thead>
           <tbody>
             <tr v-for="r in visible" :key="r.id" :data-id="r.id" data-test="role" :class="{ selected: r.id === selectedId }">
-              <th scope="row"><button type="button" class="admin-row-button" aria-haspopup="dialog" @click="select(r)">{{ r.name }}</button><span v-if="r.is_protected" class="badge">protected</span></th>
-              <td class="description-cell">{{ r.description ?? "" }}</td>
-              <td>{{ r.account_count }}</td>
+              <th scope="row"><button type="button" class="admin-row-button" aria-haspopup="dialog" @click="select(r)">{{ r.name }}</button><span v-if="r.is_protected" class="badge">protected</span>
+                <p v-if="r.description" class="description">{{ r.description }}</p></th>
+              <td class="users-col" :title="`${r.account_count} users`">{{ r.account_count > 999 ? "+999" : r.account_count }}</td>
             </tr>
           </tbody>
         </table>
@@ -270,11 +270,11 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
 
 <style scoped>
 .roles-panel { min-width: 0; }
-.description-cell { color: var(--muted); }
+.description { margin: 2px 0 0; color: var(--muted); font-size: 0.8em; font-style: italic; font-weight: 400; }
+.users-col { width: 5.5rem; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .badge { margin-inline-start: 6px; }
 .admin-records tbody tr.selected { background: var(--surface); }
 .create { max-width: none; }
 .create label { display: grid; gap: 4px; font-size: 0.85em; }
 .count { border-top: 1px solid var(--border); font-size: 0.8rem; }
-@media (max-width: 767px) { .description-cell, thead th:nth-child(2) { display: none; } }
 </style>

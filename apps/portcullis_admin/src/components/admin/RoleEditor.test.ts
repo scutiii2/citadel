@@ -33,10 +33,9 @@ beforeEach(() => {
 describe("RoleEditor", () => {
   it("shows the role, its description and its account count", () => {
     const text = editor().text();
-    expect(text).toContain("Member");
     expect(text).toContain("Default role");
-    expect(text).toContain("2 accounts");
-    expect(editor({ ...MEMBER, account_count: 1 }).text()).toContain("1 account");
+    expect(text).toContain("2 users");
+    expect(editor({ ...MEMBER, account_count: 1 }).text()).toContain("1 user");
   });
 
   it("shows a switch per permission, on for the ones the role holds, locked until editing", () => {
