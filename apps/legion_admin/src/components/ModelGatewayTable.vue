@@ -41,6 +41,7 @@ const secrets = ref<Record<string, string>>({});
 // Preset keys the form has no input for (label, capabilities, token limits) travel along unchanged.
 const extra = ref<Record<string, unknown>>({});
 const preset = ref("");
+const tab = ref<"connection" | "models">("connection");
 
 const chat = computed(() => props.kind === "conversation");
 const types = computed(() => Object.keys(chat.value ? list.value?.form?.providers ?? {} : list.value?.kinds ?? {}));
@@ -52,6 +53,7 @@ const fields = computed<ModelGatewayField[]>(() => {
 // Chat gateways other than Scuti services name their model outside the variant fields; decision kinds list it among them.
 const needsModel = computed(() => chat.value && type.value !== "" && type.value !== "scuti");
 const presets = computed(() => Object.entries(list.value?.presets ?? {}).map(([key, value]) => ({ key, label: String(value.label ?? key) })));
+const tabItems = [{ id: "connection", label: "Connection" }, { id: "models", label: "Models" }] as const;
 const typeKey = computed(() => (chat.value ? "provider" : "kind"));
 
 const rows = computed(() => (list.value?.gateways ?? []).filter((row) => {
@@ -90,6 +92,7 @@ function fill(source: Record<string, unknown>) {
 }
 
 function add() {
+  tab.value = "connection";
   creating.value = true;
   selected.value = undefined;
   id.value = "";
@@ -116,6 +119,7 @@ function show(row: ModelGatewayRow) {
 
 function edit() {
   if (!selected.value) return;
+  tab.value = "connection";
   error.value = notice.value = "";
   id.value = selected.value.id;
   fill(selected.value);
@@ -151,7 +155,14 @@ const entry = computed(() => {
 function submit() {
   if (saving.value) return;
   if (!/^[a-z0-9][a-z0-9_-]{0,47}$/.test(id.value)) {
+    tab.value = "connection";
     error.value = "The name needs lowercase letters, digits, - or _, up to 48 characters.";
+    return;
+  }
+  const missing = fields.value.find(([name, , secret, required]) => required && !secret && !(values.value[name] ?? "").trim());
+  if (missing) {
+    tab.value = "connection";
+    error.value = `${missing[1]} is required.`;
     return;
   }
   error.value = "";
@@ -242,56 +253,66 @@ onMounted(load);
   <Teleport to="body">
     <RecordDrawer ref="drawer" :open="open" :title="drawerTitle" editable :editing="editing" :busy="saving" :fallback-focus="() => searchField?.focus()"
       @edit="edit" @close="close" @discard="discard" @save="save">
-      <form v-if="editing" :id="`${kind}-editor`" class="admin-editor" @submit.prevent="submit">
-        <template v-if="creating && presets.length">
-          <label :for="`${kind}-preset`">Start from</label>
-          <select :id="`${kind}-preset`" v-model="preset" data-test="preset" :disabled="saving" @change="startFrom">
-            <option value="">Nothing</option>
-            <option v-for="item in presets" :key="item.key" :value="item.key">{{ item.label }}</option>
-          </select>
-        </template>
-        <label :for="`${kind}-id`">Name</label>
-        <input :id="`${kind}-id`" v-model="id" maxlength="48" autocomplete="off" spellcheck="false" required data-test="id" :disabled="saving || !creating" />
-        <label :for="`${kind}-type`">{{ chat ? "Provider" : "Kind" }}</label>
-        <select :id="`${kind}-type`" v-model="type" data-test="type" :disabled="saving || !creating" @change="fill({ [typeKey]: type })">
-          <option v-for="name in types" :key="name" :value="name">{{ name }}</option>
-        </select>
-        <template v-if="chat && variants.length">
-          <label :for="`${kind}-auth`">Sign-in</label>
-          <select :id="`${kind}-auth`" v-model="auth" data-test="auth" :disabled="saving">
-            <option v-for="name in variants" :key="name" :value="name">{{ name }}</option>
-          </select>
-        </template>
-        <template v-if="needsModel">
-          <label :for="`${kind}-model`">Model</label>
-          <input :id="`${kind}-model`" v-model="model" maxlength="200" autocomplete="off" spellcheck="false" data-test="model" :disabled="saving" />
-        </template>
-        <fieldset v-if="needsModel" class="tiers">
-          <legend>Model for each tier</legend>
-          <p class="muted">Optional. The orchestrator picks the lightest tier whose description fits a task, and every agent that delegates reads these descriptions. An empty model uses the one above; an empty description keeps the default.</p>
-          <div v-for="tier in TIERS" :key="tier" class="tier">
-            <label :for="`${kind}-tier-${tier}`">{{ tier[0]?.toUpperCase() }}{{ tier.slice(1) }} model</label>
-            <input :id="`${kind}-tier-${tier}`" v-model="tiers[tier]" maxlength="200" autocomplete="off" spellcheck="false" :data-test="`tier-${tier}`" :disabled="saving" />
-            <label :for="`${kind}-note-${tier}`">When to use {{ tier }}</label>
-            <input :id="`${kind}-note-${tier}`" v-model="notes[tier]" maxlength="300" autocomplete="off" :data-test="`note-${tier}`" :disabled="saving" placeholder="Default description" />
-          </div>
-        </fieldset>
-        <template v-if="chat && type === 'openai'">
-          <label :for="`${kind}-api`">API style</label>
-          <select :id="`${kind}-api`" v-model="api" :disabled="saving">
-            <option v-for="name in list?.form?.choices.api ?? []" :key="name" :value="name">{{ name }}</option>
-          </select>
-        </template>
-        <template v-for="[name, label, secret, required] in fields" :key="name">
-          <PasswordInput v-if="secret" v-model="secrets[name]" :label="label" autocomplete="off" :data-test="name" :disabled="saving"
-            :placeholder="hasSecret(name) ? 'Leave empty to keep the saved value' : 'Paste it here; it is kept in Legion’s database and never shown again'" />
-          <template v-else>
-            <label :for="`${kind}-${name}`">{{ label }}</label>
-            <input :id="`${kind}-${name}`" v-model="values[name]" autocomplete="off" spellcheck="false" :required="required" :data-test="name" :disabled="saving" />
+      <form v-if="editing" :id="`${kind}-editor`" class="admin-editor" novalidate @submit.prevent="submit">
+        <div v-if="needsModel" class="tabs" role="tablist" :aria-label="`${title} settings`">
+          <button v-for="item in tabItems" :key="item.id" type="button" role="tab"
+            :id="`${kind}-tab-${item.id}`" :aria-selected="tab === item.id" :aria-controls="`${kind}-panel-${item.id}`" :tabindex="tab === item.id ? 0 : -1"
+            :data-test="`tab-${item.id}`" @click="tab = item.id" @keydown.right.prevent="tab = 'models'" @keydown.left.prevent="tab = 'connection'">{{ item.label }}</button>
+        </div>
+        <section v-show="!needsModel || tab === 'connection'" :id="`${kind}-panel-connection`" class="pane" role="tabpanel" :aria-labelledby="`${kind}-tab-connection`">
+          <template v-if="creating && presets.length">
+            <label :for="`${kind}-preset`">Start from</label>
+            <select :id="`${kind}-preset`" v-model="preset" data-test="preset" :disabled="saving" @change="startFrom">
+              <option value="">Nothing</option>
+              <option v-for="item in presets" :key="item.key" :value="item.key">{{ item.label }}</option>
+            </select>
           </template>
-        </template>
-        <label :for="`${kind}-timeout`">Time allowed (seconds)</label>
-        <input :id="`${kind}-timeout`" v-model.number="timeout" type="number" min="0" max="1800" :disabled="saving" />
+          <label :for="`${kind}-id`">Name</label>
+          <input :id="`${kind}-id`" v-model="id" maxlength="48" autocomplete="off" spellcheck="false" data-test="id" :disabled="saving || !creating" />
+          <div class="pair">
+            <div>
+              <label :for="`${kind}-type`">{{ chat ? "Provider" : "Kind" }}</label>
+              <select :id="`${kind}-type`" v-model="type" data-test="type" :disabled="saving || !creating" @change="fill({ [typeKey]: type })">
+                <option v-for="name in types" :key="name" :value="name">{{ name }}</option>
+              </select>
+            </div>
+            <div v-if="chat && variants.length">
+              <label :for="`${kind}-auth`">Sign-in</label>
+              <select :id="`${kind}-auth`" v-model="auth" data-test="auth" :disabled="saving">
+                <option v-for="name in variants" :key="name" :value="name">{{ name }}</option>
+              </select>
+            </div>
+            <div v-if="chat && type === 'openai'">
+              <label :for="`${kind}-api`">API style</label>
+              <select :id="`${kind}-api`" v-model="api" :disabled="saving">
+                <option v-for="name in list?.form?.choices.api ?? []" :key="name" :value="name">{{ name }}</option>
+              </select>
+            </div>
+          </div>
+          <template v-for="[name, label, secret, required] in fields" :key="name">
+            <PasswordInput v-if="secret" v-model="secrets[name]" :label="label" autocomplete="off" :data-test="name" :disabled="saving"
+              :placeholder="hasSecret(name) ? 'Leave empty to keep the saved value' : 'Paste it here; kept in Legion’s database, never shown again'" />
+            <template v-else>
+              <label :for="`${kind}-${name}`">{{ label }}<span v-if="required" class="req" aria-hidden="true"> *</span></label>
+              <input :id="`${kind}-${name}`" v-model="values[name]" autocomplete="off" spellcheck="false" :aria-required="required" :data-test="name" :disabled="saving" />
+            </template>
+          </template>
+          <label :for="`${kind}-timeout`">Time allowed (seconds)</label>
+          <input :id="`${kind}-timeout`" v-model.number="timeout" type="number" min="0" max="1800" :disabled="saving" :aria-describedby="`${kind}-timeout-help`" />
+          <p :id="`${kind}-timeout-help`" class="hint">0 uses the gateway's default.</p>
+        </section>
+        <section v-if="needsModel" v-show="tab === 'models'" :id="`${kind}-panel-models`" class="pane" role="tabpanel" :aria-labelledby="`${kind}-tab-models`">
+          <label :for="`${kind}-model`">Default model</label>
+          <input :id="`${kind}-model`" v-model="model" maxlength="200" autocomplete="off" spellcheck="false" data-test="model" :disabled="saving" />
+          <p class="hint">Used when an agent names no tier. The tiers below are optional: an empty model uses the default, an empty description keeps the built-in one. Agents that delegate read the descriptions to pick the lightest tier that fits a task.</p>
+          <div v-for="tier in TIERS" :key="tier" class="tier">
+            <h4>{{ tier[0]?.toUpperCase() }}{{ tier.slice(1) }}</h4>
+            <label :for="`${kind}-tier-${tier}`">Model<span class="sr-only"> for {{ tier }}</span></label>
+            <input :id="`${kind}-tier-${tier}`" v-model="tiers[tier]" maxlength="200" autocomplete="off" spellcheck="false" :data-test="`tier-${tier}`" :disabled="saving" />
+            <label :for="`${kind}-note-${tier}`">When to use<span class="sr-only"> {{ tier }}</span></label>
+            <input :id="`${kind}-note-${tier}`" v-model="notes[tier]" maxlength="300" autocomplete="off" :data-test="`note-${tier}`" :disabled="saving" placeholder="Built-in description" />
+          </div>
+        </section>
         <p v-if="error" class="error" role="alert" data-test="error">{{ error }}</p>
       </form>
       <div v-else-if="open && selected" class="admin-details">
@@ -318,9 +339,17 @@ onMounted(load);
 
 <style scoped>
 .admin-panel-card { margin-bottom: 14px; }
-.tiers { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
-.tiers legend { padding: 0; margin-bottom: 4px; font-weight: 600; }
-.tiers p { margin: 0 0 4px; font-size: 0.85rem; }
-.tier { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
 .kind { margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
+.tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); }
+.tabs button { flex: 1; min-height: 36px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
+.tabs button:hover:not([aria-selected="true"]) { color: var(--text); }
+.pane { display: grid; gap: 6px; min-width: 0; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.pair > div { display: grid; gap: 6px; min-width: 0; }
+.tier { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.tier h4 { margin: 0; font-size: 0.9rem; }
+.hint { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.req { color: var(--accent); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>
