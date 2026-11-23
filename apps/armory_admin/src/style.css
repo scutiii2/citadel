@@ -170,6 +170,7 @@ table.admin-records thead th { overflow-wrap: normal; white-space: nowrap; }
   .admin-icon { width: 44px; height: 44px; }
   .admin-panel-tools { justify-content: flex-start; flex-grow: 1; }
   table.admin-records :is(th, td) { padding-inline: 8px; }
+  .admin-table-scroll > table.admin-records { min-width: 34rem; }
 }
 
 /* Connection forms and actions, including drawers teleported outside PageLayout. */
