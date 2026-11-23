@@ -2,12 +2,15 @@
 import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { logsClient, type AnalyticsRange, type AnalyticsReport, type LogActor, type LogKind } from "../api/LogsClient";
+import AdminSearch from "../components/admin/AdminSearch.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
 import ActivityChart from "../components/analytics/ActivityChart.vue";
 import BarList from "../components/analytics/BarList.vue";
 import HourHeatmap from "../components/analytics/HourHeatmap.vue";
 import KindStatTile from "../components/analytics/KindStatTile.vue";
 import TrafficPanel from "../components/analytics/TrafficPanel.vue";
 import "../components/infoPage.css";
+import "../components/admin/admin.css";
 import LogEntries from "../components/LogEntries.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
 import { LOG_PERMISSIONS } from "../router/pages";
@@ -34,6 +37,7 @@ const TAB_OPTIONS = computed<{ value: Tab; label: string }[]>(() => [
   ...(canLogs.value ? [{ value: "entries" as const, label: "Entries" }] : []),
 ]);
 
+const search = ref("");
 const tab = ref<Tab>(canLogs.value ? "overview" : "traffic");
 const range = ref<AnalyticsRange>("7d");
 const report = ref<AnalyticsReport | null>(null);
@@ -102,19 +106,26 @@ watch(range, load);
 </script>
 
 <template>
-  <PageLayout class="info-content" title="Analytics" description="Review workspace activity, errors, and network traffic.">
-    <template #toolbar><div class="toolbar">
-        <SegmentedControl :model-value="tab" :options="TAB_OPTIONS" label="View" aria-label="View" @update:model-value="showTab" />
-        <template v-if="tab !== 'entries'">
-          <SegmentedControl v-model="range" :options="RANGE_OPTIONS" label="Period" aria-label="Range" />
-          <button type="button" class="chip" :disabled="busy" @click="refresh">Refresh</button>
-          <span class="note">Times in UTC</span>
-        </template>
-      </div></template>
-
-
-
-
+  <PageLayout class="admin-panel" title="Analytics" wide>
+    <section class="admin-panel-card" aria-labelledby="analytics-title">
+      <header class="admin-panel-head">
+        <h2 id="analytics-title">Analytics</h2>
+        <div class="admin-panel-tools">
+          <PanelHelp title="Analytics">
+            <p>Review workspace activity, errors, and network traffic. Times are in UTC.</p>
+            <p>Overview and Entries need a log permission; Traffic needs traffic.view. Open a ranked account to see its entries.</p>
+          </PanelHelp>
+          <div class="toolbar">
+            <SegmentedControl :model-value="tab" :options="TAB_OPTIONS" label="View" aria-label="View" @update:model-value="showTab" />
+            <SegmentedControl v-if="tab !== 'entries'" v-model="range" :options="RANGE_OPTIONS" label="Period" aria-label="Range" />
+          </div>
+          <button v-if="tab !== 'entries'" type="button" class="admin-icon" title="Refresh" aria-label="Refresh" :disabled="busy" :aria-busy="busy" @click="refresh">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" /></svg>
+          </button>
+          <AdminSearch v-else v-model="search" label="Search entries" />
+        </div>
+      </header>
+      <div class="analytics-body">
       <template v-if="tab === 'overview'">
         <p v-if="error" class="error">{{ error }}</p>
         <p v-else-if="!report" class="muted">loading ...</p>
@@ -166,24 +177,16 @@ watch(range, load);
 
       <TrafficPanel v-else-if="tab === 'traffic'" v-model:loading="trafficLoading" :range="range" :refresh="trafficRefresh" />
 
-      <LogEntries v-else :kind="jump?.kind" :actor="jump?.actor" />
+      <LogEntries v-else :kind="jump?.kind" :actor="jump?.actor" :search="search" />
 
 
+      </div>
+    </section>
   </PageLayout>
 </template>
 
 <style scoped src="../components/analytics/overview.css"></style>
 <style scoped>
-.toolbar {
-  align-items: last baseline;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  margin: 12px 0 16px;
-}
-.note {
-  margin-left: auto;
-  font-size: 0.8em;
-  color: var(--muted);
-}
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.analytics-body { padding: 14px 16px; }
 </style>

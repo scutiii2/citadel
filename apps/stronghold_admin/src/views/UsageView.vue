@@ -3,7 +3,9 @@ import PageLayout from "../components/PageLayout.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { usageClient, type AccountUsage, type MyUsage, type UsageGroupBy, type UsageRecordRow } from "../api/UsageClient";
 import { ApiError } from "../api/http";
-import ActionButton from "../components/ActionButton.vue";
+import AdminSearch from "../components/admin/AdminSearch.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
+import RecordDrawer from "../components/admin/RecordDrawer.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
 import UsageDetails from "../components/usage/UsageDetails.vue";
 import { useAuthStore } from "../stores/auth";
@@ -11,6 +13,7 @@ import { downloadText, exportFileName } from "../utils/downloadText";
 import { errorMessage, formatUtc } from "../utils/errors";
 import { usageToMarkdown } from "../utils/usageExport";
 import { monthStart, utcDay } from "../utils/usageStats";
+import "../components/admin/admin.css";
 
 const auth = useAuthStore();
 const RANGES = [
@@ -26,6 +29,12 @@ const groupBy = ref<UsageGroupBy>("agent");
 const currentRange = computed(() => RANGES.find(r => r.value === range.value)!);
 function period() { return { days: currentRange.value.days, since: range.value === "month" ? monthStart(new Date()) : undefined }; }
 const accounts = ref<AccountUsage[]>([]);
+const search = ref("");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
+const visible = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  return accounts.value.filter((user) => user.username.toLowerCase().includes(query));
+});
 const selected = ref<AccountUsage | null>(null);
 const summaryLoading = ref(false);
 const summaryError = ref("");
@@ -154,52 +163,56 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
 </script>
 
 <template>
-  <PageLayout class="usage-view" title="Usage" description="Review each user's token usage and account limits.">
-    <template #actions><div class="ranges">
-          <SegmentedControl v-model="range" :options="RANGES" label="Period" aria-label="Period" />
-          <ActionButton icon="export" class="export" :disabled="!loaded" title="Download the selected user's usage as Markdown" @click="exportReport">Export .md</ActionButton>
-        </div></template>
-
-
-      <section class="panel accounts" aria-label="User usage summary" :aria-busy="summaryLoading">
-        <h3>All users</h3>
-        <p v-if="summaryError" class="error" role="alert">Could not load user usage: {{ summaryError }} <button class="summary-retry" @click="loadSummary">Retry</button></p>
-        <p v-else-if="summaryLoading" class="muted" role="status">Loading user usage…</p>
-        <p v-else-if="accounts.length === 0" class="muted">No accounts.</p>
-        <table v-else>
-          <thead><tr><th>User</th><th class="num">Tokens</th><th class="num">Answers</th><th>Last used in period</th></tr></thead>
-          <tbody><tr v-for="user in accounts" :key="user.account_id" :class="{ selected: selected?.account_id === user.account_id }">
-            <td><button type="button" :aria-label="`View usage for ${user.username}`" :aria-pressed="selected?.account_id === user.account_id" @click="selected = user">{{ user.username }}</button></td>
-            <td class="num">{{ user.tokens.toLocaleString() }}</td><td class="num">{{ user.turns.toLocaleString() }}</td>
-            <td>{{ user.last_used_at ? formatUtc(user.last_used_at) : 'No usage' }}</td>
-          </tr></tbody>
+  <PageLayout class="usage-view admin-panel" title="Usage" wide>
+    <section class="admin-panel-card" aria-labelledby="usage-title" :aria-busy="summaryLoading">
+      <header class="admin-panel-head">
+        <h2 id="usage-title">All users</h2>
+        <div class="admin-panel-tools">
+          <PanelHelp title="Usage">
+            <p>Review each user's token usage and account limits for the chosen period.</p>
+            <p>Open a user to see their usage by agent, provider, gateway or model, and to export it as Markdown.</p>
+          </PanelHelp>
+          <div class="ranges"><SegmentedControl v-model="range" :options="RANGES" label="Period" aria-label="Period" /></div>
+          <AdminSearch ref="searchField" v-model="search" label="Search users" />
+        </div>
+      </header>
+      <p v-if="summaryError" class="admin-panel-text error" role="alert">Could not load user usage: {{ summaryError }} <button type="button" class="chip summary-retry" @click="loadSummary">Retry</button></p>
+      <p v-else-if="summaryLoading" class="admin-panel-text muted" role="status">Loading user usage…</p>
+      <p v-else-if="accounts.length === 0" class="admin-panel-text muted">No accounts.</p>
+      <p v-else-if="visible.length === 0" class="admin-panel-text muted">No users match. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
+      <div v-else class="admin-table-scroll" role="region" aria-labelledby="usage-title" tabindex="0">
+        <table class="admin-records">
+          <thead><tr><th scope="col">User</th><th scope="col" class="num">Tokens</th><th scope="col" class="num">Answers</th><th scope="col">Last used in period</th></tr></thead>
+          <tbody>
+            <tr v-for="user in visible" :key="user.account_id">
+              <th scope="row"><button type="button" class="admin-row-button" aria-haspopup="dialog" :aria-label="`View usage for ${user.username}`" @click="selected = user">{{ user.username }}</button></th>
+              <td class="num">{{ user.tokens.toLocaleString() }}</td>
+              <td class="num">{{ user.turns.toLocaleString() }}</td>
+              <td>{{ user.last_used_at ? formatUtc(user.last_used_at) : "No usage" }}</td>
+            </tr>
+          </tbody>
         </table>
-      </section>
-      <p v-if="!selected" class="muted">Select a user to view their usage.</p>
-      <p v-else-if="detailLoading" class="muted" role="status">Loading usage for {{ selected.username }}…</p>
-      <p v-else-if="detailError" class="error" role="alert">Could not load usage for {{ selected.username }}: {{ detailError }} <button class="detail-retry" @click="loadDetails">Retry</button></p>
+      </div>
+    </section>
+
+    <RecordDrawer :open="selected !== null" :title="selected ? `Usage for ${selected.username}` : 'Usage'" :fallback-focus="() => searchField?.focus()" @close="selected = null">
+      <div class="drawer-actions">
+        <button type="button" class="admin-icon export" aria-label="Export .md" title="Download the selected user's usage as Markdown" :disabled="!loaded" @click="exportReport">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 19h16" /></svg>
+        </button>
+      </div>
+      <p v-if="detailLoading" class="muted" role="status">Loading usage for {{ selected?.username }}…</p>
+      <p v-else-if="detailError" class="error" role="alert">Could not load usage for {{ selected?.username }}: {{ detailError }} <button type="button" class="chip detail-retry" @click="loadDetails">Retry</button></p>
       <UsageDetails v-if="loaded" :username="loaded.username" :usage="loaded.usage" :year="year" :records="records" :records-failed="recordsFailed" :year-failed="yearFailed" :loading="detailLoading" :group-by="groupBy" @group="groupBy = $event" />
-
-
+    </RecordDrawer>
   </PageLayout>
 </template>
 
 <style scoped>
-.usage-view { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
-.ranges { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .ranges { min-width: 0; max-width: 100%; }
 .ranges > .segmented-control { flex: 1 1 auto; }
-
-.panel { padding: 14px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
-h3 { margin: 0 0 12px; font-size: 1em; }
-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .num { text-align: right; }
-button { padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); cursor: pointer; }
-button:hover, button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.selected { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.drawer-actions { display: flex; justify-content: flex-end; padding-top: 8px; }
 .muted { color: var(--muted); }
 .error { color: var(--danger); }
-@media (max-width: 767px) { table { table-layout: fixed; font-size: 0.8em; } th, td { padding: 8px 3px; } td button { max-width: 100%; overflow-wrap: anywhere; } }
 </style>

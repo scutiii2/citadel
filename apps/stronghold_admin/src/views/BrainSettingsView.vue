@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { brainSettingsClient, type BrainSettings, type BrainSettingsChanges, type Part } from "../api/BrainSettingsClient";
-import PageLayout from "../components/PageLayout.vue";
+import SettingsPanel from "../components/admin/SettingsPanel.vue";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
 
 /** The Brain's run-time limits. Stronghold owns them: it checks every value against its own ranges (sent in the
  * answer, used here for the input limits), saves them in its settings database and uses a change at once. */
@@ -49,6 +48,8 @@ const saving = ref(false);
 const loadError = ref("");
 const error = ref("");
 const notice = ref("");
+const search = ref("");
+const panel = ref<InstanceType<typeof SettingsPanel>>();
 
 const id = (part: Part, key: string) => `${part}.${key}`;
 const parts = computed(() => PARTS.filter((spec) => saved.value?.[spec.part]));
@@ -106,7 +107,7 @@ const changes = computed<BrainSettingsChanges>(() => {
   return found as BrainSettingsChanges;
 });
 const anyProblem = computed(() => parts.value.some((spec) => spec.fields.some((field) => problemOf(spec.part, field.key) !== "")));
-const canSave = computed(() => Object.keys(changes.value).length > 0 && !anyProblem.value && !saving.value);
+const dirty = computed(() => Object.keys(changes.value).length > 0);
 
 function formatBytes(bytes: number): string {
   if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} KB`;
@@ -119,43 +120,53 @@ const bytesHint = (part: Part, key: string): string => {
 };
 
 async function save(): Promise<void> {
-  if (!canSave.value) return;
-  saving.value = true;
+  if (!dirty.value || saving.value) return;
   error.value = notice.value = "";
-  try {
-    apply(await brainSettingsClient.save(changes.value));
-    notice.value = "Saved. Stronghold uses it now.";
-  } catch (err) {
-    error.value = errorMessage(err);
-  } finally {
-    saving.value = false;
-  }
+  if (anyProblem.value) { error.value = "Fix the highlighted values first."; return; }
+  saving.value = true;
+  await panel.value?.keepFocus(async () => {
+    try {
+      apply(await brainSettingsClient.save(changes.value));
+      notice.value = "Saved. Stronghold uses it now.";
+    } catch (err) {
+      error.value = errorMessage(err);
+    } finally {
+      saving.value = false;
+    }
+  });
+}
+
+function discard(): void {
+  if (saved.value) apply(saved.value);
+  error.value = notice.value = "";
 }
 </script>
 
 <template>
-  <PageLayout
-    class="info-content brain-settings"
-    title="Brain settings"
-    description="Manage how much short-term memory, long-term memory and sharing Stronghold allows."
-  >
-    <p v-if="loading" class="muted">Loading…</p>
-    <div v-else-if="loadError" class="load-error" role="alert">
+  <SettingsPanel ref="panel" v-model:search="search" title="Brain settings" heading="Memory and sharing limits" label="brain settings" :dirty="dirty" :saving="saving" @save="save" @discard="discard">
+    <template #help>
+      <p>Manage how much short-term memory, long-term memory and sharing Stronghold allows. Stronghold checks every value against its own ranges and uses a change at once.</p>
+      <p>{{ NOTICE }}</p>
+      <p v-if="saved">Files are kept in <code>{{ saved.root }}</code>, set by STRONGHOLD_BRAIN_ROOT or the brain/root setting. Moving the folder requires copying its contents and restarting Stronghold.</p>
+    </template>
+    <p v-if="loading" class="note muted" role="status">Loading…</p>
+    <div v-else-if="loadError" class="note load-error" role="alert">
       <p class="error">{{ loadError }}</p>
       <button type="button" class="chip" data-test="retry" @click="load">Try again</button>
     </div>
     <form v-else-if="saved" class="form" data-test="form" novalidate @submit.prevent="save">
-      <section class="card" aria-labelledby="root-title">
-        <h2 id="root-title" class="title">Where the files are kept</h2>
+      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
+      <section v-show="panel?.matches('Where the files are kept', saved.root)" class="group" aria-labelledby="root-title">
+        <h3 id="root-title">Where the files are kept</h3>
         <p class="path" data-test="root">{{ saved.root }}</p>
-        <p class="help">Set by STRONGHOLD_BRAIN_ROOT or the brain/root setting. Moving the folder requires copying its contents and restarting Stronghold.</p>
       </section>
 
-      <section v-for="spec in parts" :key="spec.part" class="card" :aria-labelledby="`${spec.part}-title`">
-        <h2 :id="`${spec.part}-title`" class="title">{{ spec.title }}</h2>
+      <section v-for="spec in parts" v-show="panel?.matches(spec.title, spec.intro, ...spec.fields.map((field) => field.label))" :key="spec.part" class="group" :aria-labelledby="`${spec.part}-title`">
+        <h3 :id="`${spec.part}-title`">{{ spec.title }}</h3>
         <p class="help">{{ spec.intro }}</p>
         <p class="help" :data-test="`state-${spec.part}`">{{ saved.stored[spec.part] ? "Stronghold marks this part as changed from the defaults." : "Using the defaults." }}</p>
-        <div v-for="field in spec.fields" :key="field.key" class="field">
+        <div v-for="field in spec.fields" v-show="panel?.matches(spec.title, field.label)" :key="field.key" class="field">
           <label :for="`f-${id(spec.part, field.key)}`">{{ field.label }}</label>
           <input
             :id="`f-${id(spec.part, field.key)}`" :value="values[id(spec.part, field.key)]" type="number"
@@ -170,29 +181,24 @@ async function save(): Promise<void> {
           <p v-if="bytesHint(spec.part, field.key)" class="help" :data-test="`hint-${id(spec.part, field.key)}`">{{ bytesHint(spec.part, field.key) }}</p>
         </div>
       </section>
-
-      <p class="help">{{ NOTICE }}</p>
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
-      <div class="actions">
-        <button type="submit" class="primary" data-test="save" :disabled="!canSave" :aria-busy="saving">{{ saving ? "Saving…" : "Save" }}</button>
-      </div>
     </form>
-  </PageLayout>
+  </SettingsPanel>
 </template>
 
 <style scoped>
-.form { display: grid; gap: 16px; max-width: 720px; }
-.card { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.title { margin: 0; font-size: 1em; font-weight: 600; }
+.note { margin: 0; padding: 12px 16px 0; }
+.error { color: var(--danger); }
+.muted { color: var(--muted); }
+.form { display: grid; }
+.group { display: grid; gap: 12px; max-width: 720px; padding: 16px; }
+.group + .group { border-top: 1px solid var(--border); }
+.group h3 { margin: 0; font-size: 1em; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }
-.field > input { min-width: 0; min-height: 44px; width: 100%; }
+.field > input { min-width: 0; min-height: 44px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
 .help, .path, .problem { margin: 0; font-size: 0.85em; }
 .help { color: var(--muted); }
 .path { font-family: var(--mono); overflow-wrap: anywhere; }
 .problem { color: var(--text); font-weight: 600; }
 .load-error { display: grid; gap: 8px; justify-items: start; }
-.actions { display: flex; justify-content: flex-end; }
-.actions > button, .load-error > button { min-height: 44px; }
 </style>

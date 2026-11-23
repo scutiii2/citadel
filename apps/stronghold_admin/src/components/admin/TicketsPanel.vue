@@ -18,6 +18,8 @@ import {
   type TicketFilterState,
 } from "../../utils/ticketFormat";
 import SegmentedControl from "../SegmentedControl.vue";
+import AdminSearch from "./AdminSearch.vue";
+import PanelHelp from "./PanelHelp.vue";
 import ToggleSwitch from "../ToggleSwitch.vue";
 import TicketDrawer from "./TicketDrawer.vue";
 import TicketBoard from "./TicketBoard.vue";
@@ -254,13 +256,15 @@ function setPinned(group: TicketGroup, event: Event): void {
 
 <template>
   <div class="admin-panel tickets-panel" :aria-busy="loading || busy">
-    <div class="toolbar">
-      <SegmentedControl v-model="mode" :options="MODE_OPTIONS" aria-label="Ticket view" />
-      <div class="ticket-filters">
-        <label class="ticket-search">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg>
-          <input v-model="search" type="search" aria-label="Search tickets" placeholder="Search tickets…" />
-        </label>
+   <section class="admin-panel-card tickets-card" aria-labelledby="tickets-title">
+    <header class="admin-panel-head">
+      <h2 id="tickets-title">Tickets</h2>
+      <div class="admin-panel-tools">
+        <PanelHelp title="Tickets">
+          <p>A clear view of what needs attention and what is moving forward.</p>
+          <p>Board shows tickets by status, Groups gathers similar reports, and Review lists tickets that may belong to another group. Open a ticket to read it, change it and reply.</p>
+        </PanelHelp>
+        <SegmentedControl v-model="mode" :options="MODE_OPTIONS" aria-label="Ticket view" />
         <template v-if="mode === 'groups'">
           <SegmentedControl v-model="status" :options="STATUS_OPTIONS" label="Status" aria-label="Ticket status" />
         </template>
@@ -276,11 +280,13 @@ function setPinned(group: TicketGroup, event: Event): void {
             <option v-for="t in tagOptions" :key="t" :value="t">{{ t }}</option>
           </select>
         </label>
-        <button type="button" class="small refresh" :disabled="loading || busy" :aria-busy="loading" @click="load">
-          <svg :class="{ spinning: loading }" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 3M18 18a8 8 0 0 1-13-3" /></svg>Refresh
+        <button type="button" class="admin-icon refresh" title="Refresh" aria-label="Refresh" :disabled="loading || busy" :aria-busy="loading" @click="load">
+          <svg :class="{ spinning: loading }" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 3M18 18a8 8 0 0 1-13-3" /></svg>
         </button>
+        <AdminSearch v-model="search" label="Search tickets" />
       </div>
-    </div>
+    </header>
+    <div class="tickets-body">
 
     <div class="ticket-summary">
       <span v-if="mode === 'groups'"><strong>{{ visibleGroups.length }}</strong> groups</span>
@@ -374,6 +380,9 @@ function setPinned(group: TicketGroup, event: Event): void {
 
     </div>
 
+    </div>
+   </section>
+
     <BaseModal :open="selected !== null" :title="`Ticket #${selected?.id ?? ''}`" side class="ticket-dialog" @close="dismiss">
       <TicketDrawer
         v-if="selected"
@@ -393,21 +402,9 @@ function setPinned(group: TicketGroup, event: Event): void {
 
 <style scoped>
 .tickets-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 16px;
-  margin-bottom: 16px;
-}
-.ticket-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
-.ticket-search { display: flex; align-items: center; gap: 7px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 7px 10px; color: var(--muted); }
-.ticket-search svg { width: 17px; height: 17px; }
-.tickets-panel .ticket-search input[type="search"] { width: 150px; min-width: 0; padding: 0; border: none; border-radius: 0; color: var(--text); background: transparent; font: inherit; font-size: 0.85em; }
-.ticket-search:focus-within { border-color: var(--accent); }
-.ticket-filters .field select { border-radius: var(--radius-full); }
-button.refresh { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; }
+.admin-panel-tools .field select { min-height: 36px; border-radius: var(--radius-md); }
+.tickets-card { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.tickets-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 14px 16px; overflow: auto; }
 .refresh svg { width: 16px; height: 16px; }
 .spinning { animation: ticket-refresh 0.8s linear infinite; }
 @keyframes ticket-refresh { to { transform: rotate(360deg); } }
@@ -524,10 +521,6 @@ button.refresh { display: inline-flex; align-items: center; gap: 6px; padding: 7
   margin: 16px 0;
 }
 @media (max-width: 767px) {
-  .toolbar { gap: 14px; }
-  .ticket-filters { width: 100%; }
-  .ticket-search { width: 100%; }
-  .ticket-search input { flex: 1; }
   .field { flex: 1; }
   .ticket-summary { gap: 12px; margin-bottom: 16px; font-size: 0.75em; }
   .summary-groups { display: none; }

@@ -38,7 +38,7 @@ describe("TicketSettingsView", () => {
     const rows = wrapper.findAll('[data-test="tag"]');
     await rows[2].get('[data-test="tag-name"]').setValue(" Billing ");
     await rows[2].get('[data-test="tag-description"]').setValue("Payments");
-    await wrapper.get('[data-test="form"]').trigger("submit");
+    await wrapper.get('[data-test="save"]').trigger("click");
     await flushPromises();
     expect(save).toHaveBeenCalledWith({
       tags: { email: "Mail problems", other: "Anything else", billing: "Payments" },
@@ -51,10 +51,13 @@ describe("TicketSettingsView", () => {
   });
 
   it("blocks a blank or repeated tag and keeps two tags", async () => {
+    const save = vi.spyOn(ticketSettingsClient, "save").mockResolvedValue(SETTINGS);
     const wrapper = await mounted();
     await wrapper.get('[data-test="tag-add"]').trigger("click");
-    expect(wrapper.get('[data-test="save"]').attributes("disabled")).toBeDefined();
     expect(wrapper.get('[data-test="problem"]').text()).toContain("name and a description");
+    await wrapper.get('[data-test="save"]').trigger("click");
+    expect(save).not.toHaveBeenCalled();
+    expect(wrapper.get('[role="alert"]').text()).toContain("name and a description");
     await wrapper.findAll('[data-test="tag"]')[2].get('[data-test="tag-name"]').setValue("EMAIL");
     await wrapper.findAll('[data-test="tag"]')[2].get('[data-test="tag-description"]').setValue("x");
     expect(wrapper.get('[data-test="problem"]').text()).toContain("different");
@@ -66,9 +69,11 @@ describe("TicketSettingsView", () => {
   it("shows the refusal of the server", async () => {
     vi.spyOn(ticketSettingsClient, "save").mockRejectedValue(new Error("laya.candidates must be at most 10."));
     const wrapper = await mounted();
-    await wrapper.get('[data-test="form"]').trigger("submit");
+    await wrapper.get('[data-test="candidates"]').setValue("11");
+    await wrapper.get('[data-test="save"]').trigger("click");
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain("at most 10");
+    expect((wrapper.get('[data-test="candidates"]').element as HTMLInputElement).value).toBe("11");
     wrapper.unmount();
   });
 });

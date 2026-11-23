@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { ticketSettingsClient } from "../api/TicketSettingsClient";
-import PageLayout from "../components/PageLayout.vue";
+import SettingsPanel from "../components/admin/SettingsPanel.vue";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
 
 /** The ticket settings Armory keeps in its database: the tags tickets get, how often Laya may file,
  * and Laya's limits. A saved change is used by the next ticket. The elevation rules are not edited here. */
@@ -23,6 +22,12 @@ const loading = ref(true);
 const saving = ref(false);
 const error = ref("");
 const notice = ref("");
+const search = ref("");
+const panel = ref<InstanceType<typeof SettingsPanel>>();
+const baseline = ref("");
+
+const snapshot = () => JSON.stringify([tags.value.map((row) => [row.name, row.description]), autoHourlyCap.value, recentHours.value, minConfidence.value, candidates.value, timeoutSeconds.value]);
+const dirty = computed(() => !loading.value && snapshot() !== baseline.value);
 
 const names = computed(() => tags.value.map((row) => row.name.trim().toLowerCase()));
 const problem = computed(() => {
@@ -40,6 +45,7 @@ function apply(document: Awaited<ReturnType<typeof ticketSettingsClient.get>>) {
   minConfidence.value = document.laya.min_confidence;
   candidates.value = document.laya.candidates;
   timeoutSeconds.value = document.laya.timeout_seconds;
+  baseline.value = snapshot();
 }
 
 onMounted(async () => {
@@ -61,49 +67,66 @@ function removeTag(key: number) {
 }
 
 async function save() {
-  saving.value = true;
+  if (!dirty.value || saving.value) return;
   error.value = notice.value = "";
-  try {
-    apply(
-      await ticketSettingsClient.save({
-        tags: Object.fromEntries(tags.value.map((row) => [row.name.trim().toLowerCase(), row.description.trim()])),
-        auto_hourly_cap: autoHourlyCap.value,
-        recent_hours: recentHours.value,
-        laya: { min_confidence: minConfidence.value, candidates: candidates.value, timeout_seconds: timeoutSeconds.value },
-      }),
-    );
-    notice.value = "Saved. The next ticket uses it.";
-  } catch (err) {
-    error.value = errorMessage(err);
-  } finally {
-    saving.value = false;
-  }
+  if (problem.value) { error.value = problem.value; return; }
+  saving.value = true;
+  await panel.value?.keepFocus(async () => {
+    try {
+      apply(
+        await ticketSettingsClient.save({
+          tags: Object.fromEntries(tags.value.map((row) => [row.name.trim().toLowerCase(), row.description.trim()])),
+          auto_hourly_cap: autoHourlyCap.value,
+          recent_hours: recentHours.value,
+          laya: { min_confidence: minConfidence.value, candidates: candidates.value, timeout_seconds: timeoutSeconds.value },
+        }),
+      );
+      notice.value = "Saved. The next ticket uses it.";
+    } catch (err) {
+      error.value = errorMessage(err);
+    } finally {
+      saving.value = false;
+    }
+  });
+}
+
+function discard() {
+  const saved = JSON.parse(baseline.value) as [string[][], number, number, number, number, number];
+  tags.value = saved[0].map(([name, description]) => ({ key: nextKey++, name, description }));
+  [autoHourlyCap.value, recentHours.value, minConfidence.value, candidates.value, timeoutSeconds.value] = saved.slice(1) as [number, number, number, number, number];
+  error.value = notice.value = "";
 }
 </script>
 
 <template>
-  <PageLayout
-    class="info-content ticket-settings"
-    title="Ticket settings"
-    description="The tags tickets can get and the limits for tickets Laya files. Saved in Armory's database."
-  >
-    <p v-if="loading" class="muted">Loading…</p>
+  <SettingsPanel ref="panel" v-model:search="search" title="Ticket settings" heading="Ticket rules" label="ticket settings" :dirty="dirty" :saving="saving" @save="save" @discard="discard">
+    <template #help>
+      <p>The tags tickets can get and the limits for tickets Laya files. Saved in Armory's database, and the next ticket uses a saved change.</p>
+      <p>Laya picks from the tags when it sorts a ticket, so write each description as a plain rule. Keep {{ MIN_TAGS }} to {{ MAX_TAGS }} tags. The elevation rules are not edited here.</p>
+    </template>
+    <p v-if="loading" class="note muted" role="status">Loading…</p>
     <form v-else class="form" data-test="form" @submit.prevent="save">
-      <section class="card" aria-labelledby="tags-title">
-        <h2 id="tags-title" class="title">Tags</h2>
-        <p class="help">Laya picks from these when it sorts a ticket, so write each description as a plain rule. {{ MIN_TAGS }} to {{ MAX_TAGS }} tags.</p>
+      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
+      <p v-if="problem && dirty" class="note muted" data-test="problem">{{ problem }}</p>
+      <section v-show="panel?.matches('Tags', ...tags.map((row) => row.name + ' ' + row.description))" class="group" aria-labelledby="tags-title">
+        <h3 id="tags-title">Tags</h3>
         <div v-for="row in tags" :key="row.key" class="tag" data-test="tag">
           <input v-model="row.name" aria-label="Tag name" class="name" autocomplete="off" spellcheck="false" :disabled="saving" data-test="tag-name" />
           <input v-model="row.description" aria-label="Tag description" class="desc" autocomplete="off" :disabled="saving" data-test="tag-description" />
-          <button type="button" class="chip" :disabled="saving || tags.length <= MIN_TAGS" data-test="tag-remove" @click="removeTag(row.key)">Remove</button>
+          <button type="button" class="admin-icon" title="Remove tag" aria-label="Remove tag" :disabled="saving || tags.length <= MIN_TAGS" data-test="tag-remove" @click="removeTag(row.key)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" /></svg>
+          </button>
         </div>
         <div>
-          <button type="button" class="chip" :disabled="saving || tags.length >= MAX_TAGS" data-test="tag-add" @click="addTag">Add tag</button>
+          <button type="button" class="admin-icon" title="Add tag" aria-label="Add tag" :disabled="saving || tags.length >= MAX_TAGS" data-test="tag-add" @click="addTag">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
         </div>
       </section>
 
-      <section class="card" aria-labelledby="limits-title">
-        <h2 id="limits-title" class="title">Limits</h2>
+      <section v-show="panel?.matches('Limits', 'Tickets Laya may file per hour', 'Hours a ticket counts as recent')" class="group" aria-labelledby="limits-title">
+        <h3 id="limits-title">Limits</h3>
         <div class="field">
           <label for="cap">Tickets Laya may file per hour</label>
           <input id="cap" v-model.number="autoHourlyCap" type="number" min="1" step="1" :disabled="saving" data-test="cap" />
@@ -114,8 +137,8 @@ async function save() {
         </div>
       </section>
 
-      <section class="card" aria-labelledby="laya-title">
-        <h2 id="laya-title" class="title">Laya</h2>
+      <section v-show="panel?.matches('Laya', 'Least confidence to act', 'Similar tickets to compare', 'Seconds to wait for Laya')" class="group" aria-labelledby="laya-title">
+        <h3 id="laya-title">Laya</h3>
         <div class="field">
           <label for="confidence">Least confidence to act (0 to 1)</label>
           <input id="confidence" v-model.number="minConfidence" type="number" min="0.01" max="1" step="0.01" :disabled="saving" data-test="confidence" />
@@ -129,28 +152,24 @@ async function save() {
           <input id="timeout" v-model.number="timeoutSeconds" type="number" min="1" step="1" :disabled="saving" data-test="timeout" />
         </div>
       </section>
-
-      <p v-if="problem" class="help" data-test="problem">{{ problem }}</p>
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
-      <div class="actions">
-        <button type="submit" class="primary" data-test="save" :disabled="saving || !!problem">{{ saving ? "Saving…" : "Save" }}</button>
-      </div>
     </form>
-  </PageLayout>
+  </SettingsPanel>
 </template>
 
 <style scoped>
-.form { display: grid; gap: 16px; max-width: 720px; }
-.card { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.title { margin: 0; font-size: 1em; font-weight: 600; }
-.help { margin: 0; font-size: 0.85em; color: var(--muted); }
+.note { margin: 0; padding: 12px 16px 0; }
+.error { color: var(--danger); }
+.muted { color: var(--muted); }
+.form { display: grid; }
+.group { display: grid; gap: 12px; max-width: 720px; padding: 16px; }
+.group + .group { border-top: 1px solid var(--border); }
+.group h3 { margin: 0; font-size: 1em; }
 .tag { display: grid; grid-template-columns: minmax(80px, 160px) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .field { display: grid; gap: 4px; }
 .field > label { font-size: 0.9em; font-weight: 600; }
-.tag input, .field input { min-width: 0; min-height: 44px; }
-.actions { display: flex; justify-content: flex-end; }
+.tag input, .field input { min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
 @media (max-width: 560px) {
-  .tag { grid-template-columns: minmax(0, 1fr); }
+  .tag { grid-template-columns: minmax(0, 1fr) auto; }
+  .tag .desc { grid-column: 1 / -1; grid-row: 2; }
 }
 </style>

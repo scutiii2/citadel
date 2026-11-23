@@ -14,7 +14,8 @@ declare module "vue-router" {
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/", redirect: "/capabilities" },
+    { path: "/", redirect: "/overview" },
+    { path: "/overview", name: "overview", component: () => import("../views/OverviewView.vue"), meta: { permission: ["capabilities.manage", "tickets.manage"] } },
     { path: "/capabilities", name: "capabilities", component: () => import("../views/CapabilitiesAdminView.vue"), meta: { permission: "capabilities.manage" } },
     { path: "/tickets", name: "tickets", component: () => import("../views/TicketSettingsView.vue"), meta: { permission: "tickets.manage" } },
     { path: "/settings", name: "settings", component: () => import("../views/EnvironmentSettingsView.vue"), meta: { permission: "capabilities.manage" } },

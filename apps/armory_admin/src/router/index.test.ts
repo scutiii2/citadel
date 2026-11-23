@@ -16,6 +16,11 @@ async function freshRouter(permissions: string[]) {
 beforeEach(() => vi.restoreAllMocks());
 
 describe("router", () => {
+  it("lands on Overview", async () => {
+    const router = await freshRouter(["tickets.manage"]);
+    await router.push("/");
+    expect(router.currentRoute.value.name).toBe("overview");
+  });
   it("opens /capabilities for an account with capabilities.manage", async () => {
     const router = await freshRouter(["capabilities.manage"]);
     await router.push("/capabilities");

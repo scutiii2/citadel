@@ -66,7 +66,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
-.panel-help { position: fixed; z-index: 60; width: min(300px, calc(100vw - 16px)); max-height: 70dvh; overflow: auto; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 18%, transparent); overflow-wrap: anywhere; }
+.panel-help { position: fixed; z-index: 60; width: min(300px, calc(100vw - 16px)); max-height: 70dvh; overflow: auto; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); overflow-wrap: anywhere; }
 .panel-help h3 { margin: 0 0 6px; font-size: 0.9rem; }
 .panel-help-body { display: grid; gap: 8px; color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
 .panel-help-body p { margin: 0; }

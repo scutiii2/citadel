@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { limitsClient, type CapabilityLimits, type LimitsCapability, type LimitsChanges, type LimitsView } from "../api/LimitsClient";
-import PageLayout from "../components/PageLayout.vue";
+import SettingsPanel from "../components/admin/SettingsPanel.vue";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
 
 /** How much one caller may use and how long files and links last, for the PDF and video capabilities. Saved in
  * Armory's database. Each capability reads these once when its engine starts, so a change is used from Armory's next start. */
@@ -52,6 +51,8 @@ const loading = ref(true);
 const busy = ref("");
 const error = ref("");
 const notice = ref("");
+const search = ref("");
+const panel = ref<InstanceType<typeof SettingsPanel>>();
 
 function current(card: Card, field: Field): number {
   const document: CapabilityLimits = view.value![card.name];
@@ -68,6 +69,7 @@ function type(card: Card, field: Field, value: string) {
 }
 
 const changed = (card: Card) => Object.keys(edits.value[card.name]).length > 0;
+const dirty = computed(() => CARDS.some(changed));
 
 function apply(next: LimitsView) {
   view.value = next;
@@ -84,27 +86,42 @@ onMounted(async () => {
   }
 });
 
-async function save(card: Card) {
-  const changes: LimitsChanges = {};
-  const limits: Record<string, number> = {};
-  for (const field of card.fields) {
-    const text = edits.value[card.name][field.key];
-    if (text === undefined) continue;
-    const number = text.trim() === "" ? NaN : Number(text);
-    if (field.limit) limits[field.key] = number;
-    else changes[field.key] = number;
-  }
-  if (Object.keys(limits).length) changes.limits = limits;
-  busy.value = card.name;
+/** Saves each capability that has edits, one request each; a refusal stops there and keeps the rest of the draft. */
+async function save() {
+  if (!dirty.value || busy.value) return;
+  busy.value = "all";
   error.value = notice.value = "";
-  try {
-    apply(await limitsClient.save(card.name, changes));
-    notice.value = `${card.title}: saved. It is used from Armory's next start.`;
-  } catch (err) {
-    error.value = errorMessage(err);
-  } finally {
-    busy.value = "";
-  }
+  await panel.value?.keepFocus(async () => {
+    const saved: string[] = [];
+    try {
+      for (const card of CARDS.filter(changed)) {
+        const changes: LimitsChanges = {};
+        const limits: Record<string, number> = {};
+        for (const field of card.fields) {
+          const text = edits.value[card.name][field.key];
+          if (text === undefined) continue;
+          const number = text.trim() === "" ? NaN : Number(text);
+          if (field.limit) limits[field.key] = number;
+          else changes[field.key] = number;
+        }
+        if (Object.keys(limits).length) changes.limits = limits;
+        const next = await limitsClient.save(card.name, changes);
+        view.value = next;
+        edits.value = { ...edits.value, [card.name]: {} };
+        saved.push(card.title);
+      }
+      notice.value = `${saved.join(" and ")}: saved. It is used from Armory's next start.`;
+    } catch (err) {
+      error.value = errorMessage(err);
+    } finally {
+      busy.value = "";
+    }
+  });
+}
+
+function discard() {
+  edits.value = { pdf_merger: {}, media_downloader: {} };
+  error.value = notice.value = "";
 }
 
 async function reset(card: Card) {
@@ -122,16 +139,18 @@ async function reset(card: Card) {
 </script>
 
 <template>
-  <PageLayout
-    class="info-content limits"
-    title="Limits"
-    description="How much one account may use and how long files and links last, for PDF merging and video downloads. They are saved in Armory's database and used from Armory's next start."
-  >
-    <p v-if="loading" class="muted">Loading…</p>
+  <SettingsPanel ref="panel" v-model:search="search" title="Limits" heading="Capability limits" label="limits" :dirty="dirty" :saving="busy !== ''" @save="save" @discard="discard">
+    <template #help>
+      <p>How much one account may use and how long files and links last, for PDF merging and video downloads.</p>
+      <p>They are saved in Armory's database and used from Armory's next start.</p>
+    </template>
+    <p v-if="loading" class="note muted" role="status">Loading…</p>
     <div v-else-if="view" class="cards">
-      <form v-for="card in CARDS" :key="card.name" class="card" :data-test="`card-${card.name}`" @submit.prevent="save(card)">
-        <h2 class="title">{{ card.title }} <span v-if="view[card.name].stored" class="tag">changed</span></h2>
-        <div v-for="field in card.fields" :key="field.key" class="field">
+      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
+      <section v-for="card in CARDS" v-show="panel?.matches(card.title, ...card.fields.map((field) => field.label))" :key="card.name" class="group" :data-test="`card-${card.name}`" :aria-labelledby="`${card.name}-title`">
+        <h3 :id="`${card.name}-title`">{{ card.title }} <span v-if="view[card.name].stored" class="tag">changed</span></h3>
+        <div v-for="field in card.fields" v-show="panel?.matches(card.title, field.label)" :key="field.key" class="field">
           <label :for="`${card.name}-${field.key}`">{{ field.label }}<span v-if="field.unit" class="unit"> ({{ field.unit }})</span></label>
           <input
             :id="`${card.name}-${field.key}`"
@@ -144,25 +163,27 @@ async function reset(card: Card) {
             @input="type(card, field, ($event.target as HTMLInputElement).value)"
           />
         </div>
-        <div class="actions">
-          <button v-if="view[card.name].stored" type="button" class="chip" data-test="reset" :disabled="busy !== ''" @click="reset(card)">Use the defaults</button>
-          <button type="submit" class="primary" data-test="save" :disabled="busy !== '' || !changed(card)">{{ busy === card.name ? "Saving…" : "Save" }}</button>
+        <div v-if="view[card.name].stored" class="actions">
+          <button type="button" class="chip" data-test="reset" :disabled="busy !== ''" @click="reset(card)">Use the defaults</button>
         </div>
-      </form>
+      </section>
     </div>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
-  </PageLayout>
+    <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
+  </SettingsPanel>
 </template>
 
 <style scoped>
-.cards { display: grid; gap: 16px; max-width: 720px; }
-.card { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.title { margin: 0; font-size: 1em; font-weight: 600; }
+.note { margin: 0; padding: 12px 16px 0; }
+.error { color: var(--danger); }
+.muted { color: var(--muted); }
+.cards { display: grid; }
+.group { display: grid; gap: 12px; max-width: 720px; padding: 16px; }
+.group + .group { border-top: 1px solid var(--border); }
+.group h3 { margin: 0; font-size: 1em; }
 .tag { margin-left: 8px; padding: 1px 8px; border: 1px solid var(--accent); border-radius: var(--radius-full); font-size: 0.8em; font-weight: 400; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }
 .unit { font-weight: 400; color: var(--muted); }
-.field > input { min-width: 0; min-height: 44px; width: 100%; }
-.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.field > input { min-width: 0; min-height: 44px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
+.actions { display: flex; }
 </style>

@@ -31,7 +31,7 @@ describe("LimitsView", () => {
     const wrapper = await mounted();
     expect((field(wrapper, "pdf_merger", "max_file_mb").element as HTMLInputElement).value).toBe("100");
     expect((field(wrapper, "media_downloader", "max_file_mb").element as HTMLInputElement).value).toBe("500");
-    expect(wrapper.get('[data-test="card-pdf_merger"] [data-test="save"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="card-media_downloader"] [data-test="reset"]').exists()).toBe(false);
     wrapper.unmount();
   });
@@ -41,7 +41,7 @@ describe("LimitsView", () => {
     const wrapper = await mounted();
     await field(wrapper, "media_downloader", "file_ttl_hours").setValue("12");
     await field(wrapper, "media_downloader", "max_file_mb").setValue("250");
-    await wrapper.get('[data-test="card-media_downloader"]').trigger("submit");
+    await wrapper.get('[data-test="save"]').trigger("click");
     await flushPromises();
     expect(save).toHaveBeenCalledWith("media_downloader", { file_ttl_hours: 12, limits: { max_file_mb: 250 } });
     expect(wrapper.get('[data-test="notice"]').text()).toContain("next start");
@@ -52,7 +52,7 @@ describe("LimitsView", () => {
     const wrapper = await mounted();
     await field(wrapper, "pdf_merger", "max_segments").setValue("9");
     await field(wrapper, "pdf_merger", "max_segments").setValue("50");
-    expect(wrapper.get('[data-test="card-pdf_merger"] [data-test="save"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -69,7 +69,7 @@ describe("LimitsView", () => {
     vi.spyOn(limitsClient, "save").mockRejectedValue(new Error("mcp_wait_seconds must be between 0 and 100"));
     const wrapper = await mounted();
     await field(wrapper, "pdf_merger", "mcp_wait_seconds").setValue("500");
-    await wrapper.get('[data-test="card-pdf_merger"]').trigger("submit");
+    await wrapper.get('[data-test="save"]').trigger("click");
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain("between 0 and 100");
     wrapper.unmount();

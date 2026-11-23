@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { resolveGuard } from "./guard";
-import { ANALYTICS_PERMISSIONS } from "./pages";
+import { ANALYTICS_PERMISSIONS, OVERVIEW_PERMISSIONS } from "./pages";
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -15,7 +15,8 @@ declare module "vue-router" {
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/", redirect: "/usage" },
+    { path: "/", redirect: "/overview" },
+    { path: "/overview", name: "overview", component: () => import("../views/OverviewView.vue"), meta: { permission: OVERVIEW_PERMISSIONS } },
     { path: "/usage", name: "usage", component: () => import("../views/UsageView.vue"), meta: { permission: "usage.all.view" } },
     { path: "/analytics", name: "analytics", component: () => import("../views/AnalyticsView.vue"), meta: { permission: ANALYTICS_PERMISSIONS } },
     { path: "/tickets", name: "tickets", component: () => import("../views/TicketsAdminView.vue"), meta: { permission: "tickets.manage" } },

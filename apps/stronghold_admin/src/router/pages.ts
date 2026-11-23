@@ -14,7 +14,11 @@ export const LOG_PERMISSIONS = ["logs.view", "logs.errors.view", "logs.chat.view
 // ...and its Traffic tab needs traffic.view; any one of these opens the page.
 export const ANALYTICS_PERMISSIONS = [...LOG_PERMISSIONS, "traffic.view"];
 
+/** Any page permission opens Overview, which then shows only the tiles its account may see. */
+export const OVERVIEW_PERMISSIONS = ["usage.all.view", ...ANALYTICS_PERMISSIONS, "tickets.manage", "settings.manage", "tool_services.manage"];
+
 export const STRONGHOLD_PAGES: StrongholdPage[] = [
+  { to: "/overview", label: "Overview", icon: ["m3 10 9-7 9 7v11h-7v-7h-4v7H3z"], permission: OVERVIEW_PERMISSIONS },
   {
     to: "/usage",
     label: "Usage",
@@ -25,7 +29,7 @@ export const STRONGHOLD_PAGES: StrongholdPage[] = [
     to: "/analytics",
     label: "Analytics",
     icon: ["M22 12h-4l-3 9L9 3l-3 9H2"],
-    permission: "ANALYTICS_PERMISSIONS",
+    permission: ANALYTICS_PERMISSIONS,
   },
   {
     to: "/tickets",
@@ -52,3 +56,6 @@ export const STRONGHOLD_PAGES: StrongholdPage[] = [
     permission: "tool_services.manage",
   },
 ];
+
+/** The heading the header shows for a route path. */
+export const pageTitle = (path: string): string => STRONGHOLD_PAGES.find((page) => page.to === path)?.label ?? "";

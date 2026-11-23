@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { commandsClient } from "../api/CommandsClient";
 import { McpServerClient } from "../api/McpServerClient";
 import { useAuthStore } from "../stores/auth";
-import IntegrationToolsModal from "./IntegrationToolsModal.vue";
+import CapabilityDrawer from "./CapabilityDrawer.vue";
 
 const TOOL = { name: "notes__add", title: "Add note", description: "Create a note", inputSchema: { type: "object", properties: { text: { type: "string", title: "Text" } }, required: ["text"] } };
 beforeAll(() => {
@@ -17,11 +17,11 @@ beforeEach(() => {
   vi.spyOn(McpServerClient.prototype, "listTools").mockResolvedValue([TOOL, { ...TOOL, name: "another__add" }]);
 });
 async function setup(available = true) {
-  const wrapper = mount(IntegrationToolsModal, { props: { open: true, title: "Notes", identity: "notes", names: [TOOL.name], available } });
+  const wrapper = mount(CapabilityDrawer, { props: { open: true, title: "Notes", identity: "notes", names: [TOOL.name], available } });
   await flushPromises();
   return wrapper;
 }
-describe("IntegrationToolsModal", () => {
+describe("CapabilityDrawer", () => {
   it("lists only this integration's tools and runs the selected tool with form arguments", async () => {
     const run = vi.spyOn(McpServerClient.prototype, "runTool").mockResolvedValue({ text: "Created", isError: false });
     const wrapper = await setup();
@@ -91,7 +91,7 @@ it("filters tools by name, title, and description", async () => {
   expect(wrapper.text()).toContain("No tools match your search.");
 });
 
-describe("IntegrationToolsModal slash commands", () => {
+describe("CapabilityDrawer slash commands", () => {
   it("marks a tool that has a slash command and shows the command", async () => {
     vi.spyOn(commandsClient, "list").mockResolvedValue([{ capability: "notes", name: "add", description: "", tool_name: TOOL.name }]);
     const wrapper = await setup();
