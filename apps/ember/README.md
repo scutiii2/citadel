@@ -1,6 +1,6 @@
 # ember
 
-Ember Windows app: the `ember_web` UI (Vue 3, TypeScript, Vite) in a Tauri 2 shell. It replaces `ember_web`, which is disabled and kept only as reference.
+Ember Windows app: the Vue 3, TypeScript and Vite UI in a Tauri 2 shell. It replaced the old `ember_web` browser app, which was removed.
 
 ## How it talks to the server
 
@@ -8,14 +8,14 @@ Ember Windows app: the `ember_web` UI (Vue 3, TypeScript, Vite) in a Tauri 2 she
 - Login sends `X-Ember-Client: desktop`; Portcullis then adds `session_token` to the login answer. The app sends it as `Authorization: Bearer ...` on every call (REST, the turn event stream, the MCP client). No cookie is used: the SameSite=Strict cookie does not cross origins.
 - Portcullis allows the desktop origins (`tauri://localhost`, `http://tauri.localhost`, `https://tauri.localhost`) through CORS, without credentials. Set `desktop_origins` in its `config_app.json` to change the list.
 - `<img>` and `<audio>` cannot send a header, so image attachments and Bard audio are fetched and shown as `blob:` URLs (`mediaUrl`).
-- In a plain browser (`pnpm dev`, port 26506, `/api` proxied to Portcullis) it behaves like `ember_web` (cookie, same origin).
+- In a plain browser (`pnpm dev`, port 26506, `/api` proxied to Portcullis) it uses the session cookie on the same origin.
 
 - **Global** follows **Shares** in navigation. Signed-in accounts can browse and search global files and active skills. Accounts with `brain.global.write` can also manage files and skills and review shares sent to the global brain.
 
 ## Run and build
 
 - `pnpm install`, then `pnpm dev` (browser) or `pnpm tauri dev` (window). Needs Rust (<https://rustup.rs>) for `tauri`.
-- `pnpm tauri build` makes the NSIS installer (per-user) under `src-tauri/target/release/bundle/nsis`.
+- `pnpm release` builds the NSIS installer (per-user) and copies it to `dist/` in the Citadel root. `pnpm tauri build` alone leaves it under `src-tauri/target/release/bundle/nsis`.
 - Checks: `pnpm exec vue-tsc -b`, `pnpm test`.
 
 ## Windows app specifics

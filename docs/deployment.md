@@ -4,7 +4,6 @@ Citadel runs as containers from one `docker-compose.yml`:
 
 | Service | Role | Port |
 |---|---|---|
-| `ember_web` | user web app, disabled (reference only; the Ember Windows app replaces it) | 26502, unused |
 | `portcullis_admin` | admin web app: accounts, roles, invites, settings | 26501 |
 | `legion_admin` | admin web app: agents, connections | 26500 |
 | `armory_admin` | admin web app: capabilities, connections | 26503 |
@@ -168,7 +167,7 @@ The box needs only what the stack builds from, not the whole repo. `tools/publis
 - `apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `apps/portcullis_admin`, `apps/legion_admin`, `apps/armory_admin`, `apps/stronghold_admin`, `apps/treasury_admin`
 - `docs/deployment.md`
 
-It leaves out other docs, skills, the rest of `tools/`, the Python `tests/` folders and `apps/ember_cli`. `e2e/` and the
+It leaves out other docs, skills, the rest of `tools/` and the Python `tests/` folders. `e2e/` and the
 `src/*.test.ts` files stay because the web apps' tsconfig includes them. The path lists are at the top of the script;
 add a path there when you add a compose service.
 
@@ -203,7 +202,7 @@ link option, use a browser bookmark.
 ### Public access with Tailscale Funnel
 
 Funnel publishes a web app on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. No user web
-app runs while `ember_web` is disabled (Plan 8), so this section applies again only when one is back (port 26502); keep the admin apps (26500 to 26505) on the LAN. Public signup must stay off, because anyone with
+app runs and there is no browser app, so this section applies again only when one is back (port 26502); keep the admin apps (26500 to 26505) on the LAN. Public signup must stay off, because anyone with
 the URL can reach the login page.
 
 1. In the Tailscale admin console, give the box the `funnel` attribute (`nodeAttrs` in the access controls) and turn on

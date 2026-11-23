@@ -115,7 +115,7 @@ Ember Admin imports `components/layout/PwaStatus.vue` and
 when moving either file. Other shared components have copies in Admin; keep
 behavior and design fixes consistent between the apps.
 
-Run `pnpm run build`, `pnpm test`, and `pnpm run test:e2e` from `ember_web` after
+Run `pnpm run build`, `pnpm test`, and `pnpm run test:e2e` from `apps/ember` after
 restructuring. Check Admin too when changing its shared imports.
 
 The Laya strategy is no longer a per-account setting: it comes from
