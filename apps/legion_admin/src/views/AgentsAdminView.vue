@@ -76,6 +76,19 @@ const roles = {
   specialist: "Specialist",
 } as const;
 type RoleKey = keyof typeof roles;
+/** What each role does, shown in the helper popover beside the role. */
+const roleHelp: Record<RoleKey, string> = {
+  orchestrator: "Takes the user's message, plans the work and picks architects. The entry agent is the orchestrator. Change it by making another agent the entry.",
+  architect: "Plans one kind of work (code, task, review, writing or operations) and runs specialists to do it. Open it to see which specialists it uses.",
+  router: "Internal. Decides which agent and model tier handle a message. Users never talk to it. Set its strategy in Edit.",
+  specialist: "Does one job with its own persona and tools, when an architect calls it. Open it to change its model, limits and tools.",
+};
+const statusHelp: Record<Status, string> = {
+  running: "The agent answers. Nothing to do.",
+  offline: "The agent is enabled but not answering. Wait a few seconds after a change. If it stays offline, check its port and URL in Edit and the Legion logs.",
+  disabled: "The agent is switched off and is not started. Open it, choose Edit and turn Enabled on to use it again.",
+  unknown: "Legion cannot report this agent's status. Reload the page. If it stays unknown, check that Legion is running.",
+};
 const roleOrder = Object.keys(roles) as RoleKey[];
 const roleFilter = ref<RoleKey | "all">("all");
 
@@ -302,8 +315,9 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
                   <div><button type="button" class="admin-row-button" aria-haspopup="dialog" @click="selectedId = agent.id">{{ agent.label || agent.id }}</button><code>{{ agent.id }}</code></div>
                 </div>
               </th>
-              <td>{{ role }}</td>
-              <td><span class="agent-state" :class="status" data-test="status"><span aria-hidden="true">●</span> {{ statuses[status] }}</span></td>
+              <td><div class="state-cell">{{ role }}<PanelHelp :title="role"><p>{{ roleHelp[roleKey(agent)] }}</p></PanelHelp></div></td>
+              <td><div class="state-cell"><span class="agent-state" :class="status" data-test="status"><span aria-hidden="true">●</span> {{ statuses[status] }}</span>
+                <PanelHelp :title="statuses[status]"><p>{{ statusHelp[status] }}</p></PanelHelp></div></td>
             </tr>
           </tbody>
         </table>
@@ -349,6 +363,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 </template>
 
 <style scoped>
+.state-cell { display: flex; align-items: center; gap: 4px; }
 .agent-state { display: inline-flex; gap: 5px; align-items: center; padding: 3px 8px; border-radius: var(--radius-full); color: var(--muted); background: var(--surface); font-size: 0.8rem; }
 .agent-state.running { color: var(--text); background: color-mix(in srgb, var(--success) 12%, var(--bg)); }
 .agent-state.offline { color: var(--text); background: color-mix(in srgb, var(--warning) 14%, var(--bg)); }
