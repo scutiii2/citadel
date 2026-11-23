@@ -15,8 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.deps import get_db_session, get_log_writer, get_settings
-from src.config import Settings
+from src.deps import get_db_session, get_log_writer
 from src.models import Account
 from src.services.log_service import LogWriter
 from src.services.service_auth import identity_headers
@@ -27,13 +26,13 @@ Uid = Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 _USERNAME = re.compile(r"[A-Za-z0-9_.-]{3,80}")
 
 
-def _is_usable(account: Account | None, settings: Settings) -> bool:
-    return account is not None and account.is_active and (not settings.require_email_verification or account.email_verified)
+def _is_usable(account: Account | None) -> bool:
+    return account is not None and account.is_active and account.email_verified
 
 
 @router.get("/accounts/by-username/{username}")
 async def account_by_username(
-    username: str, session: AsyncSession = Depends(get_db_session), settings: Settings = Depends(get_settings),
+    username: str, session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, str]:
     """Resolve a usable recipient with the same username comparison as sign-in."""
     if _USERNAME.fullmatch(username) is None:
@@ -42,25 +41,25 @@ async def account_by_username(
         account = await session.scalar(select(Account).where(Account.username == username))
     except SQLAlchemyError:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Storage is unavailable") from None
-    if account is None or not _is_usable(account, settings):
+    if account is None or not _is_usable(account):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipient")
     return {"uid": account.uid, "username": account.username}
 
 
-async def _usable_account(session: AsyncSession, settings: Settings, uid: str) -> Account:
-    """An account that may be contacted: active, and verified when verification is required."""
+async def _usable_account(session: AsyncSession, uid: str) -> Account:
+    """An account that may be contacted: active and verified."""
     account = await session.scalar(select(Account).where(Account.uid == uid))
-    if account is None or not _is_usable(account, settings):
+    if account is None or not _is_usable(account):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipient")
     return account
 
 
 @router.get("/accounts/{uid}/permissions")
 async def permissions(
-    uid: Uid, session: AsyncSession = Depends(get_db_session), settings: Settings = Depends(get_settings),
+    uid: Uid, session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, list[str]]:
     """What a usable account may do right now; 404 for an unknown, inactive or unverified one."""
-    account = await _usable_account(session, settings, uid)
+    account = await _usable_account(session, uid)
     return {"permissions": sorted(account.permission_names)}
 
 
@@ -122,10 +121,9 @@ class RequesterTokenIn(BaseModel):
 
 @router.post("/requester-token")
 async def renew_requester(body: RequesterTokenIn, request: Request,
-                          session: AsyncSession = Depends(get_db_session),
-                          settings: Settings = Depends(get_settings)) -> dict[str, str]:
+                          session: AsyncSession = Depends(get_db_session)) -> dict[str, str]:
     """Renew only active accounts with an existing running Stronghold turn."""
-    account = await _usable_account(session, settings, body.uid)
+    account = await _usable_account(session, body.uid)
     response = await request.app.state.stronghold.forward("GET", "/turns/running", account)
     import json
     try:

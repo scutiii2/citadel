@@ -8,6 +8,7 @@ from src.utils.env_file import load_env_file
 
 load_env_file()
 
+from src.capabilities.email.health_tool import register_health_tool  # noqa: E402
 from src.config import settings  # noqa: E402
 from src.services import capability_registry  # noqa: E402
 from src.services.capability_loader import CapabilityLoader  # noqa: E402
@@ -27,6 +28,7 @@ configure_logging(settings.log_dir)
 # so a new folder appears on POST /capabilities/refresh. One with a config entry loads now; one without stays offline until an admin enables it.
 capability_loader = CapabilityLoader(mcp, "src.capabilities", settings.settings_db_path)
 capability_loader.startup()
+register_health_tool(mcp)
 
 
 async def _serve() -> None:

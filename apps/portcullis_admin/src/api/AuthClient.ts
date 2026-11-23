@@ -6,8 +6,6 @@ export interface Account {
   username: string;
   email: string;
   email_verified: boolean;
-  /** False when portcullis lets unverified accounts work. Absent counts as true. */
-  email_verification_required?: boolean;
   /** The chat suggests the next prompt after each answer. Absent counts as true. */
   prompt_suggestions?: boolean;
   roles: string[];
@@ -16,9 +14,6 @@ export interface Account {
 
 export interface RegisterResult {
   account: Account;
-  /** False when SMTP failed; the account exists and resend can retry. */
-  verification_email_sent: boolean;
-  email_error: string | null;
 }
 
 export interface RegisterInput {

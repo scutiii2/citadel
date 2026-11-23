@@ -289,8 +289,8 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 |---|---|---|---|
 | `POST` | `/api/auth/login` | - | `{username, password}` -> the account; sets the session cookie. `401` with one generic message on any failure; `429` + `Retry-After` after too many failures (`security.rate_limit`). |
 | `POST` | `/api/auth/logout` | cookie | `204`; deletes the session server-side and clears the cookie. |
-| `GET` | `/api/auth/me` | cookie | `{id, username, email, email_verified, email_verification_required, prompt_suggestions, roles, permissions}` or `401`. `email_verification_required` mirrors `require_email_verification` in config. |
-| `POST` | `/api/auth/register` | - | `{username, email, password, invite_code}` -> `201 {account, verification_email_sent, email_error}`; logs in. `400` bad/expired/used invite, `409` taken username/email, `422` invalid fields. |
+| `GET` | `/api/auth/me` | cookie | `{id, username, email, email_verified, prompt_suggestions, roles, permissions}` or `401`. |
+| `POST` | `/api/auth/register` | - | `{username, email, password, invite_code}` -> `201 {account}`; signs in the verified account. `400` bad/expired/used invite, `409` email mismatch or taken username/email, `422` invalid fields. |
 | `POST` | `/api/auth/verify-email` | cookie | `{code}` -> the account, now verified. `400` wrong/expired code. |
 | `POST` | `/api/auth/verify-email/resend` | cookie | `{sent: true}`; `503` if SMTP failed, `409` if already verified. |
 | `POST` | `/api/account/email` | cookie | `{current_password, email}` -> `{account, verification_email_sent, email_error}`. The new email is unverified (permissions off) until its emailed code is entered. `400` wrong password, `409` email taken or bootstrap admin. |
@@ -298,7 +298,7 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `PATCH` | `/api/account/preferences` | logged in | `{prompt_suggestions: bool}`: whether chat suggests the next prompt. Returns the account. |
 | `GET` | `/api/account/devices` | cookie | Devices this account logged in from, most recent first: `[{id, label, user_agent, ip_subnet, first_seen_at, last_seen_at, current}]`. |
 | `DELETE` | `/api/account/devices/{id}` | cookie | `204`; its next login counts as a new device again. `404` unknown or another account's. |
-| `POST` | `/api/admin/invites` | `invites.manage` | `{invitee_email?, delivery_method: "manual"\|"email"}` -> `201 {invite, code, email_sent, email_error}`. The code is shown only here. |
+| `POST` | `/api/admin/invites` | `invites.manage` | `{invitee_email}` -> `201 {id, invitee_email, delivery_method, created_at, expires_at}`. The code is delivered by email. `503` if email is unavailable or delivery fails. |
 | `PUT` | `/api/admin/settings/{name}` | `settings.manage` | `{value: true\|false}` -> `{name: value}`. Switches a setting everyone is held to; the only one is `force_tool_approval`. `404` unknown name, `422` for a non-boolean value. Logged as `admin.setting` with the old and new value. |
 | `GET` | `/api/settings` | any logged-in account | `{force_tool_approval}`: what the administrator requires of everyone. |
 | `GET` | `/api/settings/pages` | any logged-in account | `{hidden: ["/usage", ...]}`: pages the administrator hid from every sidebar. |
@@ -309,6 +309,7 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `PATCH` | `/api/admin/treasury/outside/{service_id}` | `settings.manage` | `{name}` renames a group and returns it with the same ID. |
 | `DELETE` | `/api/admin/treasury/outside/origins/{origin_id}` | `settings.manage` | Removes one origin and returns the catalog. An origin in use requires `?confirm=true`. |
 | `DELETE` | `/api/admin/treasury/outside/{service_id}` | `settings.manage` | Removes a group and its origins and returns the catalog. A group in use requires `?confirm=true`. |
+| `GET` | `/api/admin/invites/email-status` | `invites.manage` | `{ready, reason}` from the Armory SMTP readiness check. `reason` is null when ready. |
 | `GET` | `/api/admin/invites` | `invites.manage` | Open (unused, unexpired) invites, without codes. |
 | `DELETE` | `/api/admin/invites/{id}` | `invites.manage` | `204`; the code stops working. `409` if already used. |
 | `GET` | `/api/admin/summary` | `any administrative permission; unrelated counts are null` | `{accounts, unverified, disabled, open_invites, roles}`: counts for the Admin overview tiles. |
@@ -590,11 +591,8 @@ allowed in account usernames, so it can never equal an account) and an empty ema
   of them (new ones are added to it on startup). New registrations get `default_role` (config, default `Member`:
   `chat.use`, `chat.share`, `tools.view`, `tools.execute`,
   `extensions.personal.manage`, `files.upload`, `files.download`, `tickets.create`) - unlike chat_app, where new accounts get no
-  role. An account with an unverified email holds no permissions at all, unless
-  `require_email_verification` is `false` in config. Even then it never holds a staff permission
-  (`STAFF_PERMISSIONS` in `permissions.py`: `accounts.*`, `roles.*`, `invites.manage`, `settings.manage`,
-  `capabilities.manage`, `tool_services.manage`, `agents.manage`, `logs.*`, `config.issues.view`, `traffic.view`,
-  `usage.all.view`, `tickets.manage`), and a role holding one cannot be assigned to it (`409`).
+  role. An unverified account cannot use permission-gated routes. A role holding
+  any of the `STAFF_PERMISSIONS` in `permissions.py` cannot be assigned to it (`409`).
 - **Starter roles:** migration `0019` creates `Viewer`, `Support`, `Moderator`, `Auditor`, `Tool Services Manager` (renamed from `Power User` by `0030`) and `Operator` once,
   with preset permissions (none holds `roles.manage`, `roles.assign`, `accounts.delete` or any `logs.chat.*`). An existing
   role of the same name is left alone, and edits or deletions later stick.
@@ -603,21 +601,16 @@ allowed in account usernames, so it can never equal an account) and an empty ema
   Migration `0012` grants `tickets.create` once to existing roles holding `chat.use`;
   later revocations stick. Staff access does not grant reporter access.
 - **Invites and verification codes:** 10 random characters, stored as
-  SHA-256, single use. Invites expire after 7 days, verification codes after
-  15 minutes. Registration
-  checks the invite before revealing whether a username is taken, and a
-  failed registration leaves the invite unused.
-- **Email:** invite and verification templates are delivered through MCP Server's
-  Email capability at `mcp_server_url`, with the existing internal token and service
-  identity `ember`. Configure SMTP only in MCP's `configs/config_email.json` and
-  enable **Email** in capability controls (refresh first on existing deployments).
-  Ember's old `SMTP_*` / `MAIL_FROM_ADDRESS` variables are no longer used.
-  Original subjects and template wording are preserved; MCP adds the notice once.
-  If MCP is unreachable, Email is disabled, or sending fails, registration still succeeds and
-  `/verify-email/resend` retries; an invite's code is still returned to the
-  admin. Sends are not automatically retried because a lost response can follow
-  SMTP acceptance. Check delivery status before manually retrying. Config issues
-  no longer asks for local SMTP settings; it does not assert upstream mail readiness.
+  SHA-256, single use. Invites expire after 7 days and are delivered only to the
+  invited address. Registration checks the invite and email before revealing
+  whether a username is taken. Successful registration verifies the address
+  automatically. A failed registration leaves the invite unused. Users who
+  need to verify can request a 15-minute code from the verify screen.
+- **Email:** Armory's Email capability sends invite and verification templates.
+  Configure SMTP on the Email page of Armory Admin and enable **Email** in
+  capability controls. Portcullis checks SMTP readiness before creating an
+  invite and discards the invite if delivery fails. A lost response can follow
+  SMTP acceptance. Check delivery status before manually retrying.
 
 - **MCP proxy:** the browser only ever talks to portcullis. Upstream URLs come
   from server-side config (`mcp_server_url`) and ai_agent's own registry file

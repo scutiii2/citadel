@@ -4,7 +4,7 @@ import { appConfigClient, type AppConfig } from "../api/AppConfigClient";
 import AppConfigCard from "./AppConfigCard.vue";
 
 const VIEW: AppConfig = {
-  session_hours: 12, default_role: "Member", require_email_verification: true,
+  session_hours: 12, default_role: "Member",
   rate_limit: { enabled: true, scope: "both", max_attempts: 5, window_seconds: 900, lockout_seconds: 900 },
   ip_filter: { allow_list: [], deny_list: ["10.0.0.0/8"] },
   headers: { enabled: true, hsts_max_age: 0 },
@@ -31,6 +31,7 @@ describe("AppConfigCard", () => {
     expect((field(wrapper, "session_hours").element as HTMLInputElement).value).toBe("12");
     expect((field(wrapper, "deny").element as HTMLTextAreaElement).value).toBe("10.0.0.0/8");
     expect(field(wrapper, "save").attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).not.toContain("Accounts must verify their email");
     wrapper.unmount();
   });
 

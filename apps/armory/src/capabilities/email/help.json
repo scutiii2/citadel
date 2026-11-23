@@ -3,7 +3,8 @@
   "tools": [
     {"name": "tool_email_sendEmail", "purpose": "Send an email and return its Message-ID", "connection": "SMTP", "commands": ["send"]},
     {"name": "tool_email_replyEmail", "purpose": "Send a threaded reply", "connection": "SMTP", "commands": ["reply"]},
-    {"name": "tool_email_getAuditLog", "purpose": "MCP-only owner-scoped delivery metadata", "connection": "Local SQLite", "commands": []}
+    {"name": "tool_email_getAuditLog", "purpose": "MCP-only owner-scoped delivery metadata", "connection": "Local SQLite", "commands": []},
+    {"name": "tool_email_checkHealth", "purpose": "MCP-only SMTP readiness for Portcullis invites, no mail sent", "connection": "SMTP", "commands": []}
   ],
   "commands": [
     {"name": "send", "tool": "tool_email_sendEmail", "params": [

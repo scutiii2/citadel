@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StrictBool
@@ -25,7 +24,9 @@ from src.config import Settings
 from src.models import Account, InviteCode, Permission, Role
 from src.services.stronghold_forwarder import StrongholdUnavailable
 from src.services.admin_service import AccountStatus, AdminError, AdminService, DelegationError, NotFoundError
-from src.services.email_service import EmailDeliveryError, EmailSender
+from src.services.email_service import (
+    ARMORY_UNREACHABLE, EMAIL_DELIVERY_FAILURE, EmailDeliveryError, EmailHealth, EmailSender,
+)
 from src.services.log_service import LogWriter
 from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.nav_preference_service import purge_owner as purge_nav_preferences
@@ -155,17 +156,6 @@ class InviteOut(BaseModel):
         )
 
 
-class CreatedInviteOut(BaseModel):
-    invite: InviteOut
-    # Shown exactly once: only its hash is stored.
-    code: str
-    email_sent: bool
-    email_error: str | None = None
-
-
-# --- request models ----------------------------------------------------------
-
-
 class UpdateAccountRequest(BaseModel):
     """Every field optional: only the ones sent change."""
 
@@ -188,8 +178,7 @@ class UpdateRoleRequest(BaseModel):
 
 
 class CreateInviteRequest(BaseModel):
-    invitee_email: EmailStr | None = None
-    delivery_method: Literal["manual", "email"] = "manual"
+    invitee_email: EmailStr
 
 
 # --- accounts ----------------------------------------------------------------
@@ -506,6 +495,27 @@ async def list_permissions(
 # --- invites -----------------------------------------------------------------
 
 
+class InviteEmailStatusOut(BaseModel):
+    ready: bool
+    reason: str | None
+
+
+async def _invite_email_health(email: EmailSender) -> EmailHealth:
+    try:
+        return await email.health()
+    except Exception:
+        return EmailHealth(False, ARMORY_UNREACHABLE)
+
+
+@router.get("/invites/email-status")
+async def invite_email_status(
+    _admin: Account = Depends(require_invites_manage),
+    email: EmailSender = Depends(get_email_sender),
+) -> InviteEmailStatusOut:
+    health = await _invite_email_health(email)
+    return InviteEmailStatusOut(ready=health.ready, reason=None if health.ready else health.reason)
+
+
 @router.post("/invites", status_code=status.HTTP_201_CREATED)
 async def create_invite(
     body: CreateInviteRequest,
@@ -515,10 +525,7 @@ async def create_invite(
     logs: LogWriter = Depends(get_log_writer),
     settings: Settings = Depends(get_settings),
     admin_service: AdminService = Depends(get_admin_service),
-) -> CreatedInviteOut:
-    if body.delivery_method == "email" and body.invitee_email is None:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invitee_email is required for email delivery")
-
+) -> InviteOut:
     default = next((r for r in await admin_service.roles() if r.name == settings.default_role), None)
     if default is not None:
         try:
@@ -526,25 +533,20 @@ async def create_invite(
         except AdminError as error:
             raise _http_error(error) from error
 
-    invitee = str(body.invitee_email) if body.invitee_email else None
-    invite, code = await otp.create_invite(admin, invitee, body.delivery_method)
+    health = await _invite_email_health(email)
+    if not health.ready:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, health.reason)
 
-    error = None
-    if body.delivery_method == "email" and invitee:
-        try:
-            await email.send_invite(invitee, code, invite.expires_at)
-        except EmailDeliveryError as delivery_error:
-            # The code is still returned, so the admin can pass it on by hand.
-            logger.warning("invite email failed: %s", delivery_error)
-            error = str(delivery_error)
-    target = f" for {invitee}" if invitee else ""
-    await logs.action(admin, "admin.create_invite", f"Created invite #{invite.id}{target}")
-    return CreatedInviteOut(
-        invite=InviteOut.of(invite),
-        code=code,
-        email_sent=body.delivery_method == "email" and error is None,
-        email_error=error,
-    )
+    invitee = str(body.invitee_email)
+    invite, code = await otp.create_invite(admin, invitee, "email")
+    try:
+        await email.send_invite(invitee, code, invite.expires_at)
+    except EmailDeliveryError:
+        await otp.discard_invite(invite)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, EMAIL_DELIVERY_FAILURE) from None
+
+    await logs.action(admin, "admin.create_invite", f"Created invite #{invite.id} for {invitee}")
+    return InviteOut.of(invite)
 
 
 @router.get("/invites")

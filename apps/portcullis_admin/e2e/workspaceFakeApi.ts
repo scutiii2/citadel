@@ -124,11 +124,12 @@ export async function installFakeApi(page: Page, permissions?: string[]) {
     }
     if (method === "GET" && path === "/api/admin/permissions") return json(route, ADMIN_PERMISSIONS);
     if (method === "GET" && path === "/api/admin/invites") return json(route, []);
+    if (method === "GET" && path === "/api/admin/invites/email-status") return json(route, { ready: true, reason: null });
     if (method === "POST" && path === "/api/admin/invites") {
-      const body = request.postDataJSON() as { invitee_email: string | null; delivery_method: string };
+      const body = request.postDataJSON() as { invitee_email: string };
       return json(route, {
-        invite: { id: 1, invitee_email: body.invitee_email, delivery_method: body.delivery_method, created_at: '2026-10-08T10:00:00', expires_at: '2026-10-15T10:00:00' },
-        code: 'TEST-INVITE-123', email_sent: body.delivery_method === 'email', email_error: null,
+        id: 1, invitee_email: body.invitee_email, delivery_method: 'email',
+        created_at: '2026-10-08T10:00:00', expires_at: '2026-10-15T10:00:00',
       }, 201);
     }
     api.unexpected.push(method + " " + path);

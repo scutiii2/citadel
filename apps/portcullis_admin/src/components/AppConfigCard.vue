@@ -9,7 +9,7 @@ import { errorMessage } from "../utils/errors";
 const SIGNALS = ["user_agent", "accept_language", "ip_subnet"];
 
 type Form = {
-  session_hours: string; default_role: string; require_email_verification: boolean;
+  session_hours: string; default_role: string;
   rl_enabled: boolean; rl_scope: string; rl_max: string; rl_window: string; rl_lockout: string;
   allow: string; deny: string;
   hd_enabled: boolean; hsts: string;
@@ -29,7 +29,7 @@ const num = (value: string | number) => (String(value).trim() === "" ? NaN : Num
 
 function toForm(view: AppConfig): Form {
   return {
-    session_hours: String(view.session_hours), default_role: view.default_role, require_email_verification: view.require_email_verification,
+    session_hours: String(view.session_hours), default_role: view.default_role,
     rl_enabled: view.rate_limit.enabled, rl_scope: view.rate_limit.scope, rl_max: String(view.rate_limit.max_attempts),
     rl_window: String(view.rate_limit.window_seconds), rl_lockout: String(view.rate_limit.lockout_seconds),
     allow: view.ip_filter.allow_list.join("\n"), deny: view.ip_filter.deny_list.join("\n"),
@@ -62,7 +62,6 @@ const changes = computed<AppConfigChanges>(() => {
   const now = form.value;
   if (String(now.session_hours).trim() !== was.session_hours) out.session_hours = num(now.session_hours);
   if (now.default_role.trim() !== was.default_role) out.default_role = now.default_role.trim();
-  if (now.require_email_verification !== was.require_email_verification) out.require_email_verification = now.require_email_verification;
   const rate: Record<string, unknown> = {};
   if (now.rl_enabled !== was.rl_enabled) rate.enabled = now.rl_enabled;
   if (now.rl_scope !== was.rl_scope) rate.scope = now.rl_scope;
@@ -129,7 +128,6 @@ async function useDefaults() {
         <legend>Accounts</legend>
         <div class="field"><label for="ac-hours">Session length (hours)</label><input id="ac-hours" v-model="form.session_hours" type="number" min="1" :disabled="saving" data-test="session_hours" /></div>
         <div class="field"><label for="ac-role">Role of a new account</label><input id="ac-role" v-model="form.default_role" autocomplete="off" :disabled="saving" data-test="default_role" /></div>
-        <label class="check"><input v-model="form.require_email_verification" type="checkbox" :disabled="saving" data-test="require_email_verification" /> Accounts must verify their email</label>
       </fieldset>
 
       <fieldset class="group">

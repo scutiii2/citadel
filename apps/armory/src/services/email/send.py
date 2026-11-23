@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import re
 import smtplib
+from collections.abc import Iterator
+from contextlib import contextmanager
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
@@ -37,6 +39,7 @@ _LINE_BREAK = "\x00"
 AUTO_GENERATED_NOTICE = "This is an auto-generated message. Do not reply."
 
 SUBJECT_PREFIX = "EMBER"
+SMTP_SECURITY_MODES = ("ssl", "starttls", "none")
 
 _MESSAGE_ID = re.compile(r"<[^<>\s@]+@[^<>\s@]+>")
 
@@ -84,6 +87,35 @@ def _html_to_text(body_html: str) -> str:
     return "\n".join(line for line in lines if line)
 
 
+def _validate_security(config: EmailConfig) -> None:
+    if config.security not in SMTP_SECURITY_MODES:
+        # Checked before opening a socket: never offer a password on a config that can't say how to protect the connection.
+        raise ValueError(
+            f"Unknown email security mode {config.security!r}; expected one of ssl, starttls, none."
+        )
+
+
+@contextmanager
+def open_smtp(config: EmailConfig) -> Iterator[smtplib.SMTP]:
+    """Open the configured SMTP connection and authenticate when required."""
+    _validate_security(config)
+    # smtplib exposes implicit TLS as a separate class: the socket is wrapped before the greeting,
+    # so starttls() has no plain session to run on.
+    if config.security == "ssl":
+        client = smtplib.SMTP_SSL(config.smtp_server, config.smtp_port, timeout=15)
+    else:
+        client = smtplib.SMTP(config.smtp_server, config.smtp_port, timeout=15)
+
+    with client as server:
+        if config.security == "starttls":
+            server.starttls()
+        if config.password:
+            # An empty password means the relay doesn't want AUTH; offering it anyway fails the send
+            # on servers without the AUTH extension.
+            server.login(config.from_address, config.password)
+        yield server
+
+
 def send_email(
     config: EmailConfig,
     capability_alias: str,
@@ -115,11 +147,7 @@ def send_email(
     if body_html is None and body_text is None:
         raise ValueError("Provide a plain text or HTML email body.")
 
-    if config.security not in ("ssl", "starttls", "none"):
-        # Checked before opening a socket: never offer a password on a config that can't say how to protect the connection.
-        raise ValueError(
-            f"Unknown email security mode {config.security!r}; expected one of ssl, starttls, none."
-        )
+    _validate_security(config)
 
     text_part = body_text if body_text is not None else _html_to_text(body_html or "")
     plain = MIMEText(f"{text_part}\n\n{AUTO_GENERATED_NOTICE}", "plain")
@@ -143,20 +171,7 @@ def send_email(
         message.attach(MIMEText(f'{body_html}\n<p style="color:#888;font-size:12px;font-style:italic;">{AUTO_GENERATED_NOTICE}</p>', "html"))
     raw_message = message.as_string()
 
-    # smtplib exposes implicit TLS as a separate class: the socket is wrapped before the greeting,
-    # so starttls() has no plain session to run on.
-    if config.security == "ssl":
-        client = smtplib.SMTP_SSL(config.smtp_server, config.smtp_port, timeout=15)
-    else:
-        client = smtplib.SMTP(config.smtp_server, config.smtp_port, timeout=15)
-
-    with client as server:
-        if config.security == "starttls":
-            server.starttls()
-        if config.password:
-            # An empty password means the relay doesn't want AUTH; offering it anyway fails the send
-            # on servers without the AUTH extension.
-            server.login(config.from_address, config.password)
+    with open_smtp(config) as server:
         refused = server.sendmail(config.from_address, recipients, raw_message)
         if refused:
             raise RuntimeError("Email delivery was incomplete: one or more recipients were refused.")

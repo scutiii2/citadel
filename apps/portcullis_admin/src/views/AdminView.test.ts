@@ -68,6 +68,7 @@ it('offers only overview and roles to a role viewer and hides unrelated counts',
 it('opens invite creation from the overview header', async () => {
   const { wrapper } = await view();
   expect(wrapper.get('.page-head a').attributes('href')).toBe('/admin/invites?create=1');
+  expect(wrapper.get('.page-head a').text()).toContain('Invite member');
 });
 
 it('keeps overview destinations in sync with available sidebar pages', async () => {

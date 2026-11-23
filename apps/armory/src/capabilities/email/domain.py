@@ -1,8 +1,9 @@
 """Typed email operations; shared services own transport, config and audit."""
-from src.capabilities.email.contract import AuditResult, AuditRow, SendResult
+from src.capabilities.email.contract import AuditResult, AuditRow, HealthResult, SendResult
 from src.services import identity_context
 from src.services.email import audit as email_audit
 from src.services.email import delivery as email_delivery
+from src.services.email.health import check_email_health
 from src.services.email.recipients import parse_recipients
 
 
@@ -30,6 +31,10 @@ class EmailDesk:
             raise ValueError("A parent Message-ID is required for a reply.")
         return self.send(to, subject, body_text, body_html, capability_alias, prefix_subject,
                     in_reply_to=in_reply_to, references=references)
+
+    def health(self) -> HealthResult:
+        ready, message = check_email_health()
+        return HealthResult(ready=ready, message=message)
 
     def audit(self, limit: int = 50) -> AuditResult:
         rows = email_audit.read_audit(email_delivery.settings.email_audit_path,

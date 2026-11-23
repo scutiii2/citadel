@@ -17,3 +17,8 @@ class AuditRow(BaseModel):
 class AuditResult(BaseModel):
     deliveries: list[AuditRow]
     message: str
+
+
+class HealthResult(BaseModel):
+    ready: bool
+    message: str

@@ -4,7 +4,7 @@
 `.example` twin. Nothing secret is kept here: secrets and private values are in `../.env` (see `../.env.example`).
 Restart Portcullis after editing; the Config issues page checks the file.
 
-**The policy settings are not here.** Session length, the role of a new account, email verification, the login rate
+**The policy settings are not here.** Session length, the role of a new account, the login rate
 limit, the IP filter, security headers, device fingerprinting and database backups are set in Portcullis Admin >
 Workspace settings and kept in `.data/portcullis/settings.db` (table `app_config`, see `src/services/app_policy.py`).
 A saved value wins over the built-in default shown below; Portcullis reads them when it starts, so a change is used
@@ -22,7 +22,6 @@ refreshed at most once a minute) to price the chat messages it reads from its ow
 | `session_hours` *(Admin)* | How long a login lasts. |
 | `cookie_secure` | `true` once served over HTTPS (the cookie is then never sent over plain HTTP). |
 | `default_role` *(Admin)* | Role every newly registered account gets (created with `chat.use` + `tools.use` if missing). |
-| `require_email_verification` *(Admin)* | `true` (default): an account holds no permissions until its email is verified. `false`: unverified accounts work, registration sends no code, and `/api/auth/me` reports `email_verification_required: false`. |
 | `agents_registry_path` | ai_agent's `.data/agent_registry.json` (relative to the portcullis folder). portcullis only proxies to agents listed there. |
 | `agents_registry_url` | Optional. ai_agent's `GET /registry`, e.g. `http://10.0.0.5:29603/registry`, for an ai_agent in another directory or on another machine. Wins over `agents_registry_path`; authenticated with a short-lived Portcullis service assertion for Legion. Fetched with a 3 s timeout and cached 5 s; if it stops answering, the last good list is used for 60 s, then there are no agents. Leave it out for a same-machine setup. |
 | `treasury_url` | Treasury bootstrap base address; `TREASURY_URL` overrides it. |

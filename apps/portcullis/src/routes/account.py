@@ -135,7 +135,7 @@ async def change_email(
         await logs.action(account, "account.email", f"Changed email to {account.email}")
     error = await send_verification_code(account, otp, email) if changed else None
     return EmailChangedOut(
-        account=AccountOut.of(account, settings),
+        account=AccountOut.of(account),
         verification_email_sent=changed and error is None,
         email_error=error,
     )
@@ -164,14 +164,13 @@ async def change_password(
     # current_account already proved the cookie is there and valid.
     await sessions.revoke_others(account.id, session_token(request, settings))
     await logs.action(account, "account.password", "Changed password; other sessions logged out")
-    return AccountOut.of(account, settings)
+    return AccountOut.of(account)
 
 
 @router.patch("/preferences")
 async def set_preferences(
     body: PreferencesRequest,
     db: AsyncSession = Depends(get_db_session),
-    settings: Settings = Depends(get_settings),
     account: Account = Depends(current_account),
     logs: LogWriter = Depends(get_log_writer),
 ) -> AccountOut:
@@ -183,7 +182,7 @@ async def set_preferences(
         await logs.action(
             account, "account.preferences", f"Prompt suggestions {'on' if body.prompt_suggestions else 'off'}"
         )
-    return AccountOut.of(account, settings)
+    return AccountOut.of(account)
 
 
 @router.get("/devices")

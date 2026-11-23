@@ -18,7 +18,7 @@ from src.config import BackupSettings, SecuritySettings
 
 TABLE = "app_config"
 SECURITY_PARTS = ("rate_limit", "ip_filter", "outside_ip_filter", "headers", "fingerprint")
-KEYS = ("session_hours", "default_role", "require_email_verification", *SECURITY_PARTS, "backup")
+KEYS = ("session_hours", "default_role", *SECURITY_PARTS, "backup")
 SIGNALS = ("user_agent", "accept_language", "ip_subnet")
 
 
@@ -57,7 +57,6 @@ def _in_use(settings: Any) -> dict[str, Any]:
     return {
         "session_hours": settings.session_hours,
         "default_role": settings.default_role,
-        "require_email_verification": settings.require_email_verification,
         "rate_limit": {"enabled": security.rate_limit_enabled, "scope": security.rate_limit_scope,
                        "max_attempts": security.max_attempts, "window_seconds": security.window_seconds,
                        "lockout_seconds": security.lockout_seconds},
@@ -101,8 +100,6 @@ def _checked(key: str, value: Any, current: dict[str, Any]) -> Any:
         if not isinstance(value, str) or not value.strip():
             raise PolicyError("The role of a new account must be a name.")
         return value.strip()
-    if key == "require_email_verification":
-        return _flag(value, "Email verification")
     if not isinstance(value, dict) or not value:
         raise PolicyError(f"{key} must be an object with at least one value.")
     group = {**current[key], **value}

@@ -65,8 +65,7 @@ ALL_PERMISSIONS = MappingProxyType({
     TICKETS_MANAGE: "See every ticket, triage them and set status, priority and assignee",
 })
 
-# Staff permissions: an account whose email is not verified does not hold them, even when
-# config_app.json sets require_email_verification to false (see Account.permission_names).
+# Staff permissions cannot be delegated to accounts with an unverified email.
 STAFF_PERMISSIONS = frozenset({
     ACCOUNTS_VIEW, ACCOUNTS_MANAGE, ACCOUNTS_DELETE, ROLES_VIEW, ROLES_MANAGE, ROLES_ASSIGN,
     INVITES_MANAGE, SETTINGS_MANAGE, CAPABILITIES_MANAGE, TOOL_SERVICES_MANAGE, AGENTS_MANAGE, TUNING_MANAGE,

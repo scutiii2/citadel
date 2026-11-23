@@ -21,18 +21,12 @@ export const useAuthStore = defineStore("auth", () => {
 
   const permissions = computed(() => new Set(account.value?.permissions ?? []));
 
-  /** True while the account must verify its email before it can do anything
-   * (portcullis's require_email_verification, on unless it says otherwise). */
-  const needsVerification = computed(
-    () => account.value !== null && !account.value.email_verified && account.value.email_verification_required !== false,
-  );
+  const needsVerification = computed(() => account.value !== null && !account.value.email_verified);
 
   /** The chat suggests the next prompt (an account switch kept on the server). */
   const promptSuggestions = computed(() => account.value?.prompt_suggestions !== false);
 
   function hasPermission(name: string): boolean {
-    // Mirrors portcullis: an unverified email holds no permissions, unless
-    // verification is switched off there.
     return account.value !== null && !needsVerification.value && permissions.value.has(name);
   }
 

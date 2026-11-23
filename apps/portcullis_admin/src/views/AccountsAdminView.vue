@@ -19,6 +19,6 @@ function updateFilters(next: { q: string; status: AccountStatus }): void {
 </script>
 <template>
   <PageLayout class="admin-panel" title="Accounts" description="Manage people and their workspace access.">
-    <template #actions><RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">＋ Create invite</RouterLink></template><AccountsPanel :show-heading="false" :filters="filters" @filter="updateFilters" />
+    <template #actions><RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">Invite member</RouterLink></template><AccountsPanel :show-heading="false" :filters="filters" @filter="updateFilters" />
   </PageLayout>
 </template>
