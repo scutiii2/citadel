@@ -95,15 +95,19 @@ function close(): void { emit("close"); }
         <span class="availability" :class="{ online: available }"><span aria-hidden="true">{{ available ? '●' : '○' }}</span> {{ status ?? (available ? 'Available' : 'Unavailable') }}</span>
       </div>
       <div class="workspace">
-        <section class="tool-browser" aria-label="Tool browser">
+        <section v-if="!selected" class="tool-browser" aria-label="Tool browser">
           <div class="section-heading"><h4>Tools</h4><span class="tool-count">{{ names.length }}</span></div>
+          <p v-if="!available || !canBrowse" class="notice" role="status">
+            <template v-if="!available">Tools are unavailable. Bring this capability online or connect this extension to test its tools.</template>
+            <template v-else>Tool access required. Tool details require Browse tools or Run tools access.</template>
+          </p>
           <label class="tool-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="search" type="search" placeholder="Find a tool" aria-label="Find a tool" :disabled="running" /></label>
           <p v-if="loading" class="browser-note" role="status">Loading tools…</p>
           <div v-else-if="error" class="browser-note"><p class="error" role="alert">{{ error }}</p><button type="button" class="small" @click="load">Retry</button></div>
           <p v-else-if="!names.length" class="browser-note">No tools are available.</p>
           <ul v-else class="tool-list" :aria-busy="loading || running">
             <li v-for="{ name, tool } in visibleTools" :key="name">
-              <button type="button" :disabled="running || !tool" :aria-pressed="selected?.name === name" @click="choose(tool!)">
+              <button type="button" :disabled="running || !tool" @click="choose(tool!)">
                 <span class="tool-label"><strong>{{ tool?.title ?? name }}</strong><span v-if="commands.has(name)" class="cmd-badge" title="Has a slash command" aria-label="Has a slash command">/</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></span><code>{{ name }}</code>
                 <span v-if="tool?.description" class="tool-preview">{{ tool.description }}</span>
               </button>
@@ -111,7 +115,8 @@ function close(): void { emit("close"); }
           </ul>
           <p v-if="names.length && !visibleTools.length" class="browser-note">No tools match your search.</p>
         </section>
-        <section v-if="selected" class="tester" :aria-label="`Test ${selected.title}`" :aria-busy="running">
+        <section v-else class="tester" :aria-label="`Test ${selected.title}`" :aria-busy="running">
+          <button type="button" class="back" :disabled="running" data-test="back" @click="selected = null; result = null"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>All tools</button>
           <div class="tool-heading"><span class="eyebrow">Tool details</span><h4>{{ selected.title }}</h4><code>{{ selected.name }}</code><p v-if="commands.get(selected.name)" class="tool-command"><span class="muted">Slash command</span><code>{{ commands.get(selected.name) }}</code><CopyButton :text="commands.get(selected.name)!" label="Copy command" /></p><p v-if="selected.description" class="tool-description">{{ selected.description }}</p></div>
           <section class="parameters" aria-label="Parameters"><div class="section-heading"><h5>Parameters</h5><span class="muted">{{ running ? 'Running…' : canRun ? 'Ready to test' : 'Read-only' }}</span></div>
             <ToolRunForm v-if="canRun" :key="`${identity}:${selected.name}`" :schema="selected.inputSchema" :running="running" submit-label="Run tool" @run="run" />
@@ -122,13 +127,6 @@ function close(): void { emit("close"); }
             <p v-else class="output-placeholder" role="status">{{ running ? 'Waiting for the tool to finish…' : 'Run this tool to see its result here.' }}</p>
           </section>
         </section>
-        <div v-else class="empty-selection">
-          <span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m8 5 12 7-12 7z" /></svg></span>
-          <h4>{{ !available ? 'Tools are unavailable' : !canBrowse ? 'Tool access required' : 'Choose a tool' }}</h4>
-          <p v-if="!available">Bring this capability online or connect this extension to test its tools.</p>
-          <p v-else-if="!canBrowse">Tool details require Browse tools or Run tools access.</p>
-          <p v-else>Explore a tool’s details, enter its parameters, and view the result here.</p>
-        </div>
       </div>
     </div>
   </RecordDrawer>
@@ -137,7 +135,7 @@ function close(): void { emit("close"); }
 <style scoped>
 .tools-modal { display: flex; flex-direction: column; }
 .integration-summary { flex-shrink: 0; display: flex; align-items: flex-start; gap: 14px; padding: 4px 0 16px; border-bottom: 1px solid var(--border); }
-.integration-icon, .empty-icon { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: var(--radius-lg); color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.integration-icon { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: var(--radius-lg); color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
 svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .summary-copy { flex: 1; min-width: 0; }
 .metadata { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
@@ -148,7 +146,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .availability { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); font-size: 0.8em; color: var(--muted); white-space: nowrap; }
 .availability.online { color: var(--success); background: color-mix(in srgb, var(--success) 6%, var(--bg)); }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr); }
-.tool-browser { display: flex; flex-direction: column; min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.tool-browser { display: flex; flex-direction: column; min-width: 0; padding: 16px 0; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
 h4, h5, p { margin: 0; }
 .section-heading h4, h5 { font-size: 0.9em; font-weight: 600; }
@@ -160,23 +158,29 @@ h4, h5, p { margin: 0; }
 .tool-search svg { width: 16px; height: 16px; color: var(--muted); flex-shrink: 0; }
 .tools-modal .tool-search input[type="search"] { width: 100%; min-width: 0; padding: 0; border: none; background: transparent; border-radius: 0; font-size: 0.85em; }
 .browser-note { font-size: 0.85em; color: var(--muted); padding: 10px 4px; }
-.tool-list { max-height: 40dvh; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
-.tool-list button { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 12px; border: 1px solid transparent; border-radius: var(--radius-lg); background: transparent; text-align: left; transition: background 0.15s ease, border-color 0.15s ease; }
-.tool-list button:hover { background: var(--surface); }
-.tool-list button[aria-pressed=true] { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
-.tool-label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.9em; }
-.tool-label strong { font-weight: 500; overflow-wrap: anywhere; }
-.tool-label svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--muted); }
+.tool-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.tool-list li + li { border-top: 1px solid var(--border); }
+.tool-list button { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 12px 14px; border: none; border-radius: 0; background: transparent; text-align: left; transition: background 0.15s ease; }
+.tool-list button:hover:not(:disabled) { background: var(--surface); }
+.tool-list button:disabled { opacity: 0.6; }
+.tool-list :focus-visible { outline-offset: -2px; }
+.tool-label { display: flex; justify-content: flex-start; align-items: center; gap: 8px; font-size: 0.9em; }
+.tool-label strong { font-weight: 600; overflow-wrap: anywhere; }
+.tool-label svg { width: 15px; height: 15px; flex-shrink: 0; margin-left: auto; color: var(--muted); }
 .tool-list code { font-size: 0.75em; color: var(--muted); overflow-wrap: anywhere; }
 .tool-preview { font-size: 0.8em; line-height: 1.5; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.tester { min-width: 0; padding: 20px 0; display: flex; flex-direction: column; gap: 22px; }
+.notice { margin-bottom: 12px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: var(--radius-lg); background: var(--surface); font-size: 0.85em; color: var(--muted); }
+.back { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px 4px 6px; border: 1px solid var(--border); border-radius: var(--radius-full); background: transparent; color: var(--text); font: inherit; font-size: 0.85em; cursor: pointer; }
+.back svg { width: 15px; height: 15px; }
+.back:hover:not(:disabled) { background: var(--surface); }
+.tester { min-width: 0; padding: 16px 0 20px; display: flex; flex-direction: column; gap: 20px; }
 .eyebrow { display: block; font-size: 0.7em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
 .tool-heading h4 { font-size: 1.15em; font-weight: 600; margin-bottom: 3px; overflow-wrap: anywhere; }
 .cmd-badge { flex-shrink: 0; padding: 0 6px; border-radius: var(--radius-sm); font: 0.75em var(--mono); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
 .tool-command { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.85em; }
 .tool-command code { color: var(--text); background: var(--code-bg); padding: 1px 6px; border-radius: var(--radius-sm); }
 .tool-description { margin-top: 12px; font-size: 0.9em; white-space: pre-wrap; color: var(--muted); overflow-wrap: anywhere; }
-.parameters, .output-panel { border-top: 1px solid var(--border); padding-top: 18px; }
+.parameters, .output-panel { padding: 14px 16px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .outcome { color: var(--success); font-size: 0.75em; }
 .outcome.failed { color: var(--danger); }
 .result { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
@@ -184,13 +188,9 @@ h4, h5, p { margin: 0; }
 .result.failed { border-color: var(--danger); }
 .result pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 280px; overflow-y: auto; scrollbar-gutter: stable; margin: 8px 0 0; font: 0.85em/1.55 var(--mono); }
 .output-placeholder { font-size: 0.85em; color: var(--muted); padding: 18px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-lg); }
-.empty-selection { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px 32px; text-align: center; }
-.empty-selection h4 { font-size: 1em; font-weight: 600; }
-.empty-selection p { max-width: 330px; color: var(--muted); font-size: 0.9em; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 767px) {
   .integration-summary { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 10px; }
   .availability { grid-column: 2; margin-left: 0; justify-self: start; }
-  .empty-selection { padding: 32px 0; }
-}
+  }
 </style>

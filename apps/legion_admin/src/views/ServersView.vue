@@ -392,6 +392,24 @@ watch(editing, () => { tab.value = "general"; });
         <dt>ID</dt><dd><code>{{ selected }}</code></dd>
         <dt>{{ selectedServer.transport === "stdio" ? "Command" : "Connection URL" }}</dt><dd><code>{{ endpoint(selectedServer) }}</code></dd>
         <dt>Transport</dt><dd>{{ selectedServer.transport }}</dd>
+        <template v-if="selectedServer.service_id"><dt>Catalog service</dt><dd><code>{{ selectedServer.service_id }}</code></dd></template>
+        <template v-if="selectedServer.path"><dt>Path</dt><dd><code>{{ selectedServer.path }}</code></dd></template>
+        <template v-if="selectedServer.origins?.length">
+          <dt>Addresses tried in order</dt>
+          <dd>
+            <ol class="origins">
+              <li v-for="origin in selectedServer.origins" :key="origin.origin_id">
+                <code>{{ origin.origin || origin.origin_id }}</code>
+                <span v-if="origin.has_override" class="muted"> (overridden here)</span>
+              </li>
+            </ol>
+          </dd>
+        </template>
+        <dt>Authentication</dt>
+        <dd>{{ selectedServer.auth?.type === "header"
+          ? `Header ${selectedServer.auth.header_name ?? ""}, token ${selectedServer.auth.has_value ? "saved" : "not saved"}`
+          : selectedServer.auth?.type === "env" ? `Environment variable ${selectedServer.auth.env_var ?? ""}`
+          : "None" }}</dd>
       </dl>
       <p class="muted">{{ notice || "Changes take effect at Legion’s next start." }}</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -424,4 +442,5 @@ watch(editing, () => { tab.value = "general"; });
 .origin { gap: 8px; margin: 0; padding: 0; border: 0; }
 .origin legend { font-size: 0.9em; font-weight: 600; padding: 0; }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
+.origins { margin: 0; padding: 0; list-style: none; }
 </style>
