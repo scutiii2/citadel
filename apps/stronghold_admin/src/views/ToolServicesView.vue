@@ -58,6 +58,26 @@ const visible = computed(() => {
     && `${draft.saved.label} ${draft.saved.name} ${draft.saved.origins.map((o) => o.origin ?? "").join(" ")}`.toLowerCase().includes(query));
 });
 
+const PORTS: Record<ToolService["name"], number> = { bard: 29400, scribe: 29401, reader: 29402 };
+/** Where each tool service usually runs: on the shared Docker network, or on the computer that hosts Docker. */
+function presetGroups(name: ToolService["name"]) {
+  return [
+    { title: "Shared Docker network", items: [{ label: `${name}:${PORTS[name]}`, address: `http://${name}:${PORTS[name]}` }] },
+    { title: "This computer", items: [{ label: `host.docker.internal:${PORTS[name]}`, address: `http://host.docker.internal:${PORTS[name]}` }] },
+  ];
+}
+const preset = ref("");
+
+function usePreset(draft: Draft) {
+  const row = draft.addresses[0];
+  const address = preset.value;
+  preset.value = "";
+  if (!row || !address) return;
+  row.address = address;
+  addressChanged(row);
+  void check(draft, row);
+}
+
 function addressRow(): AddressRow {
   return { key: nextKey++, address: "", name: "", found: null, hasOverride: false,
     token: "", lookup: 0, checking: false, error: "" };
@@ -261,6 +281,17 @@ function resultAddress(draft: Draft, originId: string): string {
           :disabled="!!selected.pending"
         />
 
+        <div class="field">
+          <label for="tool-preset">Preset</label>
+          <select id="tool-preset" v-model="preset" data-test="preset" :disabled="!!selected.pending" @change="usePreset(selected)">
+            <option value="">None</option>
+            <optgroup v-for="group in presetGroups(selected.saved.name)" :key="group.title" :label="group.title">
+              <option v-for="item in group.items" :key="item.address" :value="item.address">{{ item.label }}</option>
+            </optgroup>
+          </select>
+          <p class="help">Fills the primary address. Edit it if yours differs.</p>
+        </div>
+
         <fieldset v-for="(row, index) in selected.addresses" :key="row.key" class="address-row" :disabled="!!selected.pending">
           <legend>{{ index === 0 ? "Primary address" : "Backup address " + index }}</legend>
           <div class="field">
@@ -354,6 +385,7 @@ function resultAddress(draft: Draft, originId: string): string {
 .address-row legend { padding: 0 4px; font-size: 0.9em; font-weight: 600; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field label { font-size: 0.9em; font-weight: 600; }
+.field select { min-height: 44px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
 .field input { min-width: 0; min-height: 44px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
 .error { color: var(--danger); }
 .muted { color: var(--muted); }

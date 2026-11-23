@@ -60,6 +60,16 @@ describe("ToolServicesView", () => {
     expect(card.findAll("input[type=password]").map(({ element }) => (element as HTMLInputElement).value)).toEqual(["", ""]);
   });
 
+  it("fills the primary address from a grouped preset and looks it up", async () => {
+    const { card } = await mounted();
+    expect(card.findAll("optgroup").map((group) => group.attributes("label"))).toEqual(["Shared Docker network", "This computer"]);
+    await card.get('[data-test="preset"]').setValue("http://host.docker.internal:29400");
+    await flushPromises();
+    expect(card.get<HTMLInputElement>('[data-test="address-0"]').element.value).toBe("http://host.docker.internal:29400");
+    expect(toolServicesClient.lookup).toHaveBeenCalledWith("http://host.docker.internal:29400");
+    expect(card.get<HTMLSelectElement>('[data-test="preset"]').element.value).toBe("");
+  });
+
   it("locks a known name and requires a name before saving a new address", async () => {
     const { wrapper, card } = await mounted();
     await card.get('[data-test="address-0"]').trigger("blur");
