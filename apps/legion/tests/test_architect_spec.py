@@ -37,7 +37,7 @@ def test_architect_defaults_and_supervisor_startup(tmp_path):
     ({"workers": [3]}, "workers"), ({"workers": [""]}, "workers"),
     ({"prefetch": "worker"}, "prefetch"), ({"prefetch": [None]}, "prefetch"),
     ({"limits": []}, "limits"), ({"limits": {"extra": 1}}, "limits.extra"),
-    ({"extra": 1}, "extra"), ({"mode": "legacy"}, "mode"),
+    ({"extra": 1}, "extra"),
     *[({"limits": {field: value}}, f"limits.{field}") for field, value in (
         ("max_units", 0), ("max_parallel", True), ("unit_timeout_seconds", 0),
         ("unit_timeout_seconds", float("nan")), ("max_retries", -1), ("max_retries", None))],
@@ -68,6 +68,8 @@ def setup_directory(tmp_path):
                      "llm": {"provider": "anthropic"}}, "entry")
     write(tmp_path, {"role": "specialist", "port": 9101, "llm": {"provider": "openai"}}, "worker")
     write(tmp_path, BASE)
+    write(tmp_path, {"role": "router", "port": 9102, "llm": {"provider": "decision"}, "delegable": False,
+                     "plan_tool": False, "tools": {"deny": ["*"]}}, "router")
 
 
 @pytest.mark.parametrize("field", ["workers", "prefetch"])
@@ -81,12 +83,12 @@ def test_references_must_exist_and_be_specialists(tmp_path, field, target):
 
 def test_kind_uniqueness_and_enabled_entry_port_rules(tmp_path):
     setup_directory(tmp_path)
-    assert len(agent_spec.load_dir(tmp_path)) == 3
+    assert len(agent_spec.load_dir(tmp_path)) == 4
     write(tmp_path, {**BASE, "port": 9131}, "second")
     with pytest.raises(agent_spec.AgentSpecError, match=r"second.json: kind"):
         agent_spec.load_dir(tmp_path)
     write(tmp_path, {**BASE, "port": 9131, "enabled": False}, "second")
-    assert len(agent_spec.load_dir(tmp_path)) == 4
+    assert len(agent_spec.load_dir(tmp_path)) == 5
     write(tmp_path, {**BASE, "port": 9101})
     with pytest.raises(agent_spec.AgentSpecError, match="port"):
         agent_spec.load_dir(tmp_path)
@@ -96,16 +98,10 @@ def test_kind_uniqueness_and_enabled_entry_port_rules(tmp_path):
         agent_spec.load_dir(tmp_path)
 
 
-def test_mode_is_orchestrator_only_and_defaults_to_legacy(tmp_path):
+def test_the_retired_mode_key_is_ignored(tmp_path):
     body = {"role": "orchestrator", "port": 9100, "llm": {"provider": "anthropic"}}
-    assert agent_spec.load_file(write(tmp_path, body)).mode == "legacy"
-    assert agent_spec.load_file(write(tmp_path, {**body, "mode": "plan"})).mode == "plan"
-    for mode in (None, "other", [], True):
-        with pytest.raises(agent_spec.AgentSpecError, match="architect.json: mode"):
-            agent_spec.load_file(write(tmp_path, {**body, "mode": mode}))
-    for role in ("specialist", "router", "architect"):
-        with pytest.raises(agent_spec.AgentSpecError, match="architect.json: mode"):
-            agent_spec.load_file(write(tmp_path, {**body, "role": role, "mode": "legacy"}))
+    assert agent_spec.load_file(write(tmp_path, {**body, "mode": "plan"})).orchestrator
+    assert agent_spec.load_file(write(tmp_path, {**body, "mode": "legacy"})).orchestrator
 
 
 def test_architect_optional_flags_and_explicit_limits(tmp_path):

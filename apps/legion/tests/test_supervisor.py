@@ -209,8 +209,13 @@ def test_start_prunes_registry_entries_for_agents_no_longer_defined(tmp_path):
     assert "[supervisor] dropped dead registry entries: planner" in lines
 
 
-def test_watching_supervisor_starts_restarts_and_stops_children(tmp_path):
+def test_watching_supervisor_starts_restarts_and_stops_children(tmp_path, monkeypatch):
     import json
+
+    from src.agents import agent_spec
+
+    # These tests are about processes, not the roster rules.
+    monkeypatch.setattr(agent_spec, "check_roster", lambda specs: None)
 
     lines = []
 
@@ -256,10 +261,12 @@ def test_watching_supervisor_starts_restarts_and_stops_children(tmp_path):
     asyncio.run(scenario())
 
 
-def test_changing_a_shared_file_restarts_every_agent(tmp_path):
+def test_changing_a_shared_file_restarts_every_agent(tmp_path, monkeypatch):
     import json
 
     from src.agents import agent_spec
+
+    monkeypatch.setattr(agent_spec, "check_roster", lambda specs: None)
 
     (tmp_path / "ember.json").write_text(json.dumps({"role": "specialist", "port": 9401, "entry": True, "llm": {"provider": "anthropic"}}), encoding="utf-8")
     shared = tmp_path / "shared.txt"

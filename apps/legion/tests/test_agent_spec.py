@@ -12,6 +12,7 @@ import pytest
 
 from src.agents import agent_spec
 from src.agents.agent_spec import AgentSpecError, ToolScope
+from tests.roster import write_extras
 
 
 def _write(directory, name, data):
@@ -172,12 +173,13 @@ def test_load_dir_requires_exactly_one_entry(tmp_path):
 
 
 def test_load_dir_ignores_disabled_files_for_set_checks(tmp_path):
-    _write(tmp_path, "a", {"role": "specialist", "port": 9100, "entry": True, "llm": {"provider": "anthropic"}})
+    _write(tmp_path, "a", {"role": "orchestrator", "port": 9100, "entry": True, "llm": {"provider": "anthropic"}})
     _write(tmp_path, "b", {"role": "specialist", "port": 9100, "entry": True, "enabled": False, "llm": {"provider": "anthropic"}})
+    write_extras(tmp_path)
 
     specs = agent_spec.load_dir(tmp_path)
 
-    assert [s.id for s in specs] == ["a", "b"]
+    assert [s.id for s in specs] == ["a", "architect", "b", "router", "worker"]
 
 
 def test_load_dir_rejects_duplicate_ports(tmp_path):
@@ -405,11 +407,12 @@ def test_only_the_entry_agent_has_memory_recall_on():
 
 def test_an_override_replaces_the_tracked_file_and_can_add_an_agent(tmp_path):
     (tmp_path / "ember.json").write_text(json.dumps(
-        {"role": "specialist", "port": 9100, "entry": True, "llm": {"provider": "anthropic"}}), encoding="utf-8")
+        {"role": "orchestrator", "port": 9100, "entry": True, "llm": {"provider": "anthropic"}}), encoding="utf-8")
+    write_extras(tmp_path)
     overrides = tmp_path / ".overrides"
     overrides.mkdir()
     (overrides / "agent_overrides.json").write_text(json.dumps({
-        "ember": {"role": "specialist", "port": 9100, "entry": True, "llm": {"provider": "anthropic", "max_tier": "light"}},
+        "ember": {"role": "orchestrator", "port": 9100, "entry": True, "llm": {"provider": "anthropic", "max_tier": "light"}},
         "calc": {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}},
     }), encoding="utf-8")
     specs = {spec.id: spec for spec in agent_spec.load_dir(tmp_path)}

@@ -134,7 +134,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `tools.allow` | no | `[]` | fnmatch globs on tool names with the `main__` prefix removed. Outside MCP connection tools require a matching allow glob. |
 | `tools.deny` | no | `[]` | Globs removed after `allow`. Deny wins. |
 | `role` | yes | none | `orchestrator`, `router`, `specialist` or `architect`. Architects use a language provider, never entry, and require `tools.deny: ["*"]`; recall, learning and the plan tool must be off. The code pipeline is implemented; operations is reserved for a later phase. |
-| `mode` | orchestrator only | `legacy` | `legacy` preserves delegation and direct tools; `plan` offers only `ask_user` and `submit_plan`, with a live architect catalog. Automatic memory and skill recall remain runtime calls. |
+| (roster) | whole folder | none | One architecture only. The enabled agents must hold exactly one orchestrator (the entry agent), exactly one router, at least one architect and at least one specialist; a save or an agent file that breaks this is refused. The retired `mode` key is ignored. |
 | `kind` | architect only, required | none | Registered kind: `code` or `operations`. At most one enabled architect per kind. |
 | `workers` | architect only, required | none | Non-empty list of existing specialist ids. |
 | `prefetch` | architect only | `[]` | Specialist ids allowed for pre-planning reads. Code uses the first only when a brief names a code file or conservative path. |
@@ -340,8 +340,8 @@ checks. Live diagnostics require a prepared deployment:
 
 ## Orchestrator
 
-In the default `mode: "legacy"`, an agent with `role: "orchestrator"` gets the `delegate_to_agent` tool;
-specialists never do. Each turn the orchestrator's roster is built from the
+The orchestrator always plans: it is offered only `ask_user` and `submit_plan`, never direct tools or `delegate_to_agent`, and its plan runs through the architects in its catalog.
+The roster text below describes specialists that other agents may call. Each turn the orchestrator's roster is built from the
 registry: eligible registered specialists (never the agent itself or an internal Router), as lines of `<id> - <label>: <focus>`. Because it is per turn,
 a specialist that starts or stops shows up without a restart. A specialist with
 tools of its own (`tools.allow`, apart from the ticket tools) is left out when
@@ -365,10 +365,11 @@ steps are read and may retry; operations and unknown kinds remain write. Unit-le
 escalate light to standard to heavy; writes are never retried automatically.
 
 Automatic memory and skill searches still run before the model. Skill recall
-omits its `stronghold__tool_skill_mark` instruction only in plan mode; the runtime does not
+omits its `stronghold__tool_skill_mark` instruction for the orchestrator; the runtime does not
 mark skills. The runtime fills the existing checklist when its agent/chat
-toggles allow it. Plan mode bypasses legacy entry routing. The code architect
-ships disabled; Ember remains in legacy mode. Operations has no pipeline yet.
+toggles allow it. The orchestrator bypasses entry routing; the router stays on the roster but is not
+called for now. The code architect ships enabled and Ember plans through it.
+Operations has no pipeline yet.
 
 Specialist activity streams to the orchestrator's caller as `agent_start`,
 `agent_end` and `agent_token` events, and a specialist's own `step_*`

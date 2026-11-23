@@ -21,7 +21,7 @@ from tests.test_submit_plan import step
 
 @pytest.fixture
 def plan_spec(monkeypatch):
-    spec = replace(agent_spec.current(), mode="plan", memory_recall=False, skill_recall=False, skill_learning=False)
+    spec = replace(agent_spec.current(), role="orchestrator", memory_recall=False, skill_recall=False, skill_learning=False)
     monkeypatch.setattr(agent_spec, "_current", spec)
     return spec
 
@@ -125,11 +125,11 @@ def test_hallucinated_capabilities_and_second_plan_never_execute(monkeypatch, pl
     assert "not offered" in result.tool_calls[2].result
 
 
-def test_skill_recall_plan_text_and_legacy_bytes(monkeypatch, plan_spec):
+def test_skill_recall_orchestrator_text_drops_the_mark_instruction_and_specialists_keep_it(monkeypatch, plan_spec):
     monkeypatch.setattr(skill_recall, "_search", lambda _: "1 approved skill(s):\nSkill text")
     output = asyncio.run(skill_recall.with_skills("q", "q"))
     assert "stronghold__tool_skill_mark" not in output and "Skill text" in output
-    monkeypatch.setattr(agent_spec, "_current", replace(plan_spec, mode="legacy"))
+    monkeypatch.setattr(agent_spec, "_current", replace(plan_spec, role="specialist"))
     output = asyncio.run(skill_recall.with_skills("q", "q"))
     assert output == skill_recall.LABEL + "\n1 approved skill(s):\nSkill text\n\n[User message]\nq"
     assert "After following one, call stronghold__tool_skill_mark with its id." in output

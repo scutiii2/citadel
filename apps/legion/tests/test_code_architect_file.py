@@ -6,10 +6,10 @@ from src.agents import agent_spec
 from src.providers import model_tiers
 
 
-def test_real_agents_include_disabled_code_architect():
+def test_real_agents_include_the_enabled_code_architect():
     specs = agent_spec.load_dir(agent_spec.AGENTS_DIR)
     spec = next(spec for spec in specs if spec.id == "code-architect")
-    assert not spec.enabled and not spec.entry and not spec.plan_tool
+    assert spec.enabled and not spec.entry and not spec.plan_tool
     assert spec.role == "architect" and spec.kind == "code"
     assert spec.workers == ("code-writer",) and spec.prefetch == ("repo-helper",)
     assert spec.limits == agent_spec.ArchitectLimits()
@@ -22,4 +22,4 @@ def test_real_agents_include_disabled_code_architect():
     assert resolved.model == next(t.id for t in tiers if t.tier == "heavy")
     assert not any(other.port == spec.port for other in specs if other.id != spec.id)
     raw = json.loads((agent_spec.AGENTS_DIR / "code-architect.json").read_text(encoding="utf-8"))
-    assert raw["enabled"] is False
+    assert raw["enabled"] is True

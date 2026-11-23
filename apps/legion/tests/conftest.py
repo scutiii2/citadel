@@ -17,10 +17,10 @@ import os
 import tempfile
 from pathlib import Path
 
-# An anthropic orchestrator on port 9100, id "claude-agent".
+# An anthropic entry specialist (it keeps the generic tool loop; orchestrators always plan) on port 9100, id "claude-agent".
 _AGENT_FILE = Path(tempfile.mkdtemp(prefix="ai_agent_spec_")) / "claude-agent.json"
 _AGENT_FILE.write_text(
-    json.dumps({"port": 9100, "entry": True, "llm": {"provider": "anthropic"}, "role": "orchestrator"}),
+    json.dumps({"port": 9100, "entry": True, "llm": {"provider": "anthropic"}, "role": "specialist"}),
     encoding="utf-8",
 )
 os.environ.setdefault("AI_AGENT_FILE", str(_AGENT_FILE))

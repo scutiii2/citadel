@@ -8,6 +8,7 @@ import pytest
 
 from src.agents import agent_spec, agent_store
 from src.agents.agent_store import AgentStoreError
+from tests.roster import write_roster
 
 
 def _cfg(port, **extra):
@@ -16,7 +17,7 @@ def _cfg(port, **extra):
 
 @pytest.fixture
 def folder(tmp_path):
-    (tmp_path / "ember.json").write_text(json.dumps(_cfg(9100, entry=True)), encoding="utf-8")
+    write_roster(tmp_path)
     return tmp_path
 
 
@@ -28,7 +29,7 @@ def test_create_writes_an_override_and_lists_it(folder):
     agent_store.create_agent("calc", _cfg(9103), folder)
     assert _overrides(folder)["calc"]["port"] == 9103
     assert not (folder / "calc.json").exists()
-    assert [row["id"] for row in agent_store.list_agents(folder)] == ["calc", "ember"]
+    assert [row["id"] for row in agent_store.list_agents(folder)] == ["architect", "calc", "ember", "router", "worker"]
     assert not list(folder.rglob("*.tmp"))
 
 
@@ -80,7 +81,7 @@ def test_second_entry_agent_is_refused(folder):
 
 def test_update_never_touches_the_tracked_file(folder):
     tracked = (folder / "ember.json").read_text()
-    agent_store.update_agent("ember", _cfg(9100, entry=True, persona="local"), folder)
+    agent_store.update_agent("ember", _cfg(9100, role="orchestrator", entry=True, persona="local"), folder)
     assert (folder / "ember.json").read_text() == tracked
     assert agent_store.get_agent("ember", folder)["persona"] == "local"
     assert agent_spec.load_file(folder / "ember.json").persona == "local"
@@ -97,7 +98,7 @@ def test_update_replaces_agent_and_keeps_own_port(folder):
 
 def test_cannot_unset_the_only_entry_agent(folder):
     with pytest.raises(AgentStoreError, match="entry"):
-        agent_store.update_agent("ember", _cfg(9100, entry=False), folder)
+        agent_store.update_agent("ember", _cfg(9100, role="orchestrator", entry=False), folder)
 
 
 def test_delete_removes_file_and_override_but_not_the_entry_agent(folder):
@@ -114,7 +115,7 @@ def test_delete_removes_file_and_override_but_not_the_entry_agent(folder):
 
 
 def test_reset_drops_the_override_and_restores_the_tracked_file(folder):
-    agent_store.update_agent("ember", _cfg(9100, entry=True, persona="local"), folder)
+    agent_store.update_agent("ember", _cfg(9100, role="orchestrator", entry=True, persona="local"), folder)
     listed = {row["id"]: row for row in agent_store.list_agents(folder)}
     assert listed["ember"]["overridden"] is True
     reset = agent_store.reset_agent("ember", folder)
