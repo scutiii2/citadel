@@ -35,7 +35,7 @@ class SDKTransport(httpx2.AsyncBaseTransport):
         except httpx.TimeoutException as error:
             raise httpx2.ReadTimeout("Upstream timeout", request=request) from error
         except httpx.HTTPError as error:
-            raise httpx2.ConnectError("Upstream transport failure", request=request) from error
+            raise httpx2.ConnectError(f"Upstream transport failure: {type(error).__name__} {error}".strip(), request=request) from error
         if response.is_stream_consumed:
             return httpx2.Response(response.status_code, headers=response.headers.raw, content=response.content)
         return httpx2.Response(response.status_code, headers=response.headers.raw, stream=ResponseStream(response))
