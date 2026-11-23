@@ -95,3 +95,6 @@ _*/
 !.claude/
 !.codex/
 !_fixtures/
+
+# Ember installer releases (pnpm release in apps/Ember).
+/releases/

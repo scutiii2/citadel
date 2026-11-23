@@ -68,9 +68,6 @@ const statusText: Record<AgentStatus, string> = { running: "Running", offline: "
 const previewPages = LEGION_PAGES.filter(({ to }) => to !== "/servers");
 const page = ref(previewPages[0]!);
 const theme = ref<Theme>("dark");
-const themeNames: Record<Theme, string> = { dark: "Dark", system: "System", light: "Light" };
-const nextThemes: Record<Theme, Theme> = { dark: "system", system: "light", light: "dark" };
-const themeLabel = computed(() => `Theme: ${themeNames[theme.value]}. Switch to ${themeNames[nextThemes[theme.value]]}`);
 const shortcutBase = location.protocol === "file:" ? "http://127.0.0.1/" : location.href;
 const shortcuts = ADMIN_APPS.filter((app) => app.letter !== "L");
 const sidebarExpanded = ref(window.matchMedia("(min-width: 768px)").matches);
@@ -81,7 +78,7 @@ const selected = ref<Agent | null>(null);
 const selectedConnection = ref<Connection | null>(null);
 const connectionDraft = ref({ description: "", url: "" });
 const editing = ref(false);
-const confirmation = ref<"save" | "discard" | "close" | null>(null);
+const confirmation = ref<"save" | "discard" | "close" | "limits" | null>(null);
 const drawerTitle = computed(() => {
   if (selectedConnection.value) return editing.value ? "Edit connection" : "Connection details";
   return editing.value ? "Edit agent" : "Agent details";
@@ -205,6 +202,13 @@ async function confirmEdit(): Promise<void> {
   confirmation.value = null;
   if (!action) return;
   await nextTick();
+  if (action === "limits") {
+    for (const limit of limits.value) limit.value = limit.saved;
+    notice.value = "";
+    await nextTick();
+    limitSearch.value?.focus();
+    return;
+  }
   if (action === "close") {
     closeDrawer();
     return;
@@ -259,12 +263,17 @@ async function confirmEdit(): Promise<void> {
         <button type="button" class="header-tool profile" aria-label="Profile" title="Profile" popovertarget="preview-profile">PA</button>
         <section id="preview-profile" class="header-popover" popover aria-label="Profile">
           <h2>Preview account</h2>
-          <button type="button" class="popover-action" :aria-label="themeLabel" @click="theme = nextThemes[theme]">
-            <svg v-if="theme === 'dark'" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" /></svg>
-            <svg v-else-if="theme === 'light'" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-            <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
-            <span>Theme · {{ themeNames[theme] }}</span>
-          </button>
+          <div class="theme-field">
+            <label for="preview-theme">Theme</label>
+            <span class="theme-select">
+              <select id="preview-theme" v-model="theme">
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+                <option value="system">System</option>
+              </select>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </span>
+          </div>
           <button type="button" class="popover-action" @click="logoutRequested = true">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
             <span>Log out</span>
@@ -334,7 +343,10 @@ async function confirmEdit(): Promise<void> {
           <header class="panel-header">
             <h3 id="settings-title">Token limits</h3>
             <div class="panel-tools">
-              <span class="save-slot">
+              <span class="edit-slot">
+                <button v-if="limitsDirty" type="button" class="header-tool" aria-label="Cancel changes" title="Cancel changes" @click="confirmation = 'limits'">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                </button>
                 <button v-if="limitsDirty" type="submit" form="preview-limits" class="header-tool panel-save" aria-label="Save token limits" title="Save token limits">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2ZM7 3v6h9V3M7 21v-8h10v8" /></svg>
                 </button>

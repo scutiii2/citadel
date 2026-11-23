@@ -17,9 +17,10 @@ defineExpose({ focus: () => field.value?.focus() });
 
 <style scoped>
 .search { display: flex; flex: 1; align-items: center; gap: 6px; min-width: 0; padding-inline: 9px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--muted); }
-.search:focus-within { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 2px; }
+.search:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
 .search svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .search input { width: 100%; min-width: 0; min-height: 34px; padding: 4px 0; border: 0; outline: none; background: transparent; color: var(--text); font-size: 0.83rem; }
+.search input:focus-visible { outline: none; }
 .search input::placeholder { color: var(--muted); }
 @media (max-width: 767px) {
   .search input { min-height: 44px; }
