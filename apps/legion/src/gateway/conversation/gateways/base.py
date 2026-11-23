@@ -8,7 +8,7 @@ import httpx
 
 from src.gateway.conversation.contract import ChatRequest, ChatResult
 from src.gateway.conversation.errors import GatewayError
-from src.gateway.conversation.failure import SECRET_KEYS, upstream_error
+from src.gateway.conversation.failure import SECRET_KEYS, scrub, upstream_error
 
 CAPABILITIES = ("streams", "images", "tools", "reasoning", "schema")
 
@@ -45,8 +45,9 @@ class BaseGateway:
             if "Timeout" in type(error).__name__:
                 return GatewayError(504, "gateway_timeout", "The model service took too long to answer.", kind="unavailable")
             if isinstance(error, (httpx.HTTPError, ConnectionError)) or "Connection" in type(error).__name__:
-                return GatewayError(502, "gateway_unreachable", "The model service could not be reached.", kind="unavailable")
-            return GatewayError(502, "gateway_bad_reply", "The model service sent an unusable reply.", kind="unavailable")
+                reason = scrub(str(error.__cause__ or ""), self.secrets, 160)
+                return GatewayError(502, "gateway_unreachable", f"The model service could not be reached{f' ({reason})' if reason else ''}. Check the address and port.", kind="unavailable")
+            return GatewayError(502, "gateway_bad_reply", f"The model service sent an unusable reply ({type(error).__name__}). The address may not be an API.", kind="unavailable")
         headers = getattr(getattr(error, "response", None), "headers", None) or {}
         return upstream_error(status, getattr(error, "message", None) or str(error), headers.get("retry-after"), self.secrets)
 

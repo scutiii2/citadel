@@ -56,3 +56,10 @@ def test_a_body_tests_the_unsaved_form_and_saves_nothing(client):
     refused = client.post("/agents/model-gateways/decision/new/test", json={"kind": "ollama", "url": "http://127.0.0.1:9", "model": "m"}).json()
     assert refused["ok"] is False and refused["code"]
     assert client.get("/agents/model-gateways/decision").json()["gateways"] == []
+
+
+def test_a_failed_test_names_the_real_cause_not_502(client):
+    entry = {"provider": "anthropic", "auth": "key", "api_key": "k", "base_url": "http://127.0.0.1:9", "model": "m"}
+    answer = client.post("/agents/model-gateways/conversation/new/test", json=entry).json()
+    assert answer["ok"] is False and answer["code"] == "NET"
+    assert "could not be reached" in answer["message"]
