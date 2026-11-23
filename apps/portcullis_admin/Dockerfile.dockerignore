@@ -3,14 +3,4 @@ portcullis_admin/dist
 portcullis_admin/e2e
 portcullis_admin/test-results
 portcullis
-ember_cli
-ember_web/*
-!ember_web/src
-ember_web/src/*
-!ember_web/src/components
-ember_web/src/components/*
-!ember_web/src/components/layout
-ember_web/src/components/layout/*
-!ember_web/src/components/layout/PwaStatus.vue
-!ember_web/src/components/layout/pageLayout.css
 scripts

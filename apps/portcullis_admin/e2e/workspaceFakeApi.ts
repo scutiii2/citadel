@@ -36,7 +36,7 @@ const ADMIN_ACCOUNTS: StoredAccount[] = [
   { id: 2, username: "maria", email: "maria@example.com", email_verified: true, is_active: true, is_protected: false, created_at: "2026-09-12T10:00:00", roles: [{ id: 2, name: "Member" }] },
   { id: 3, username: "joe", email: "joe@example.com", email_verified: false, is_active: true, is_protected: false, created_at: "2026-09-20T10:00:00", roles: [] },
 ];
-const ADMIN_ROLES = [
+const ADMIN_ROLES: { id: number; name: string; description: string | null; is_protected: boolean; permissions: string[]; account_count: number }[] = [
   { id: 1, name: "Administrator", description: "Everything", is_protected: true, permissions: [...ACCOUNT.permissions, "tools.view", "tools.execute", "files.upload", "files.download", "accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "usage.all.view"], account_count: 1 },
   { id: 2, name: "Member", description: "Default role", is_protected: false, permissions: ["chat.use", "chat.share", "files.upload", "extensions.personal.manage"], account_count: 1 },
   { id: 3, name: "Ops", description: null, is_protected: false, permissions: [], account_count: 0 },
