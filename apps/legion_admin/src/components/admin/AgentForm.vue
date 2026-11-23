@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import type { AgentConfig, AgentFile, ProviderCatalog } from "../../api/AgentsAdminClient";
 import ToggleSwitch from "../ToggleSwitch.vue";
+import FormTabs from "./FormTabs.vue";
 import SettingRow from "../SettingRow.vue";
 import AgentGatewayList, { type GatewayRow } from "./AgentGatewayList.vue";
 import RouterPolicyForm from "./RouterPolicyForm.vue";
@@ -106,12 +107,6 @@ function showErrorTab(): void {
   if (/^Port/.test(message)) tab.value = "general";
   else if (/tier|gateway|confidence|Temperature|effort/i.test(message)) tab.value = "model";
   else if (message) tab.value = isRouter.value ? "behaviour" : "limits";
-}
-function moveTab(step: number): void {
-  const items = tabItems.value;
-  const next = items[(items.findIndex((item) => item.id === tab.value) + step + items.length) % items.length];
-  tab.value = next.id;
-  document.getElementById(`agent-tab-${next.id}`)?.focus();
 }
 
 function joined(globs: string[] | undefined): string {
@@ -327,11 +322,7 @@ function previewPrompt(): void {
 
 <template>
     <form id="agent-editor" class="agent-form" @submit.prevent="submit">
-      <div class="tabs" role="tablist" aria-label="Agent settings">
-        <button v-for="item in tabItems" :key="item.id" type="button" role="tab" :id="`agent-tab-${item.id}`"
-          :aria-selected="tab === item.id" :aria-controls="`agent-panel-${item.id}`" :tabindex="tab === item.id ? 0 : -1" :data-test="`tab-${item.id}`"
-          @click="tab = item.id" @keydown.right.prevent="moveTab(1)" @keydown.left.prevent="moveTab(-1)">{{ item.label }}</button>
-      </div>
+      <FormTabs v-model="tab" :items="tabItems" prefix="agent" label="Agent settings" />
       <section v-show="tab === 'general'" id="agent-panel-general" class="pane" role="tabpanel" aria-labelledby="agent-tab-general">
       <label class="field">
         <span>Id</span>
@@ -483,10 +474,6 @@ function previewPrompt(): void {
 
 <style scoped>
 .agent-form { display: grid; gap: 12px; }
-.tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); overflow-x: auto; }
-.tabs button { flex: 1 0 auto; min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.tabs button[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
-.tabs button:hover:not([aria-selected="true"]) { color: var(--text); }
 .pane { display: grid; gap: 12px; min-width: 0; }
 .row { display: flex; flex-wrap: wrap; gap: 10px; }
 .grow { flex: 1 1 160px; }
