@@ -69,3 +69,21 @@ it("splits a chat gateway into Connection and Models tabs and returns to Connect
   expect(wrapper.get('[data-test="error"]').text()).toContain("lowercase");
   wrapper.unmount();
 });
+
+it("offers the presets in groups under the label Preset", async () => {
+  vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue({
+    ...list,
+    presets: {
+      gpt: { provider: "openai", label: "GPT" }, claude: { provider: "anthropic", label: "Claude" },
+      bedrock: { provider: "anthropic", label: "AWS Bedrock" }, mini: { provider: "scuti", label: "CNV_Mini" },
+    },
+  } as never);
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
+  await flushPromises();
+  await wrapper.get('[data-test="add-conversation"]').trigger("click");
+  expect(wrapper.get('label[for="conversation-preset"]').text()).toBe("Preset");
+  const groups = wrapper.findAll("optgroup");
+  expect(groups.map((group) => group.attributes("label"))).toEqual(["Anthropic protocol", "OpenAI protocol", "Model services"]);
+  expect(groups[0]!.findAll("option").map((option) => option.text())).toEqual(["AWS Bedrock", "Claude"]);
+  wrapper.unmount();
+});
