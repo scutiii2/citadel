@@ -1,77 +1,134 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { treasuryAdminClient, type ServicesView } from "../api/TreasuryAdminClient";
+import { computed, onMounted, ref } from "vue";
+import { treasuryAdminClient, type ServiceRow, type ServicesView } from "../api/TreasuryAdminClient";
+import AdminSearch from "../components/admin/AdminSearch.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
+import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import StatusFilters from "../components/admin/StatusFilters.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
+import "../components/admin/admin.css";
 
+/** Where Citadel services reach each other. A pinned address takes precedence over registration. Editing happens
+ * in the row's drawer; the displayed address changes only once Treasury has answered. */
 const { getServices, putService, deleteService } = treasuryAdminClient;
 const view = ref<ServicesView | null>(null);
-const drafts = ref<Record<string, string>>({});
 const loading = ref(true);
 const busy = ref(false);
 const error = ref("");
-const labels = { pinned: "Pinned", registered: "Registered", default: "Default" };
+const search = ref("");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
+const drawer = ref<InstanceType<typeof RecordDrawer>>();
+const selectedName = ref<string | null>(null);
+const editing = ref(false);
+const draft = ref("");
+type Filter = "all" | ServiceRow["source"];
+const filter = ref<Filter>("all");
+const labels = { pinned: "Pinned", registered: "Registered", default: "Default" } as const;
 
-function applyView(next: ServicesView) {
-  view.value = next;
-  for (const row of next.services) drafts.value[row.name] ??= row.pinned ?? row.url;
-}
+const rows = computed(() => view.value?.services ?? []);
+const options = computed(() => [
+  { id: "all", label: "All", count: rows.value.length, tone: "accent" },
+  ...(["pinned", "registered", "default"] as const).map((id) => ({ id, label: labels[id], count: rows.value.filter((r) => r.source === id).length, tone: (id === "pinned" ? "warning" : "muted") as "warning" | "muted", disabled: !rows.value.some((r) => r.source === id) })),
+] as const);
+const visible = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  return rows.value.filter((r) => (filter.value === "all" || r.source === filter.value) && [r.name, r.url, labels[r.source]].some((text) => text.toLowerCase().includes(query)));
+});
+const selected = computed(() => rows.value.find((r) => r.name === selectedName.value) ?? null);
 
 onMounted(async () => {
-  try { applyView(await getServices()); }
+  try { view.value = await getServices(); }
   catch (err) { error.value = errorMessage(err); }
   finally { loading.value = false; }
 });
 
-/** Wait for Treasury confirmation before changing the displayed address. */
-async function save(name: string, unpin = false) {
-  if (busy.value) return;
+function select(row: ServiceRow) {
+  selectedName.value = row.name;
+  editing.value = false;
+  error.value = "";
+}
+
+function close() {
+  selectedName.value = null;
+  editing.value = false;
+}
+
+function edit() {
+  draft.value = selected.value?.pinned ?? selected.value?.url ?? "";
+  error.value = "";
+  editing.value = true;
+}
+
+/** Waits for Treasury to confirm before changing the displayed address. */
+async function save(unpin = false) {
+  const row = selected.value;
+  if (!row || busy.value) return;
   busy.value = true;
   error.value = "";
   try {
-    const next = unpin ? await deleteService(name) : await putService(name, String(drafts.value[name]).trim());
-    applyView(next);
-    const row = next.services.find((service) => service.name === name);
-    if (row) drafts.value[name] = row.pinned ?? row.url;
-  } catch (err) { error.value = errorMessage(err); }
-  finally { busy.value = false; }
+    view.value = unpin ? await deleteService(row.name) : await putService(row.name, draft.value.trim());
+    editing.value = false;
+  } catch (err) {
+    error.value = errorMessage(err);
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 
 <template>
-  <PageLayout class="info-content services" title="Services" description="Where Citadel services can reach each other. A pinned address takes precedence over registration.">
-    <p v-if="error" class="error" role="alert" id="service-error">{{ error }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
-    <div v-else-if="view" class="table-scroll" role="region" aria-label="Service addresses" tabindex="0">
-      <table>
-        <thead><tr><th>Name</th><th>Address in use</th><th>Source</th><th>Pin an address</th></tr></thead>
-        <tbody>
-          <tr v-for="row in view.services" :key="row.name" :data-test="'row-' + row.name">
-            <td><code>{{ row.name }}</code></td>
-            <td>{{ row.url }}</td>
-            <td>{{ labels[row.source] }}</td>
-            <td>
-              <form class="pin-form" @submit.prevent="save(row.name)">
-                <label :for="'pin-' + row.name">Address for {{ row.name }}</label>
-                <input :id="'pin-' + row.name" v-model="drafts[row.name]" :disabled="busy" :aria-describedby="error ? 'service-error' : undefined" autocomplete="off" spellcheck="false" />
-                <div class="actions">
-                  <button type="submit" class="primary" :disabled="busy || !String(drafts[row.name] ?? '').trim()" :aria-busy="busy">Pin</button>
-                  <button v-if="row.pinned" type="button" class="chip" data-test="unpin" :disabled="busy" :aria-busy="busy" @click="save(row.name, true)">Use the registered address</button>
-                </div>
-              </form>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+  <PageLayout class="admin-panel" title="Services" wide>
+    <StatusFilters v-model="filter" label="Filter services" :options="options" />
+    <section class="admin-panel-card" aria-labelledby="service-roster">
+      <header class="admin-panel-head">
+        <h2 id="service-roster">Service addresses</h2>
+        <div class="admin-panel-tools">
+          <PanelHelp title="Service addresses"><p>Where Citadel services can reach each other. A pinned address takes precedence over registration.</p><p>Open a service to pin an address, or to go back to the address it registered.</p></PanelHelp>
+          <AdminSearch ref="searchField" v-model="search" label="Search services" />
+        </div>
+      </header>
+      <p v-if="error && !selected" class="admin-panel-text error" role="alert">{{ error }}</p>
+      <p v-if="loading" class="admin-panel-text muted" role="status">Loading…</p>
+      <p v-else-if="view && !visible.length" class="admin-panel-text muted">No services match. <button v-if="search || filter !== 'all'" type="button" class="chip" @click="search = ''; filter = 'all'; searchField?.focus()">Clear filters</button></p>
+      <div v-else-if="view" class="admin-table-scroll" role="region" aria-labelledby="service-roster" tabindex="0">
+        <table class="admin-records">
+          <thead><tr><th scope="col">Name</th><th scope="col">Address in use</th><th scope="col">Source</th></tr></thead>
+          <tbody>
+            <tr v-for="row in visible" :key="row.name" :data-test="'row-' + row.name">
+              <th scope="row"><button type="button" class="admin-row-button" aria-haspopup="dialog" @click="select(row)">{{ row.name }}</button></th>
+              <td><code>{{ row.url }}</code></td>
+              <td>{{ labels[row.source] }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected ? `Service ${selected.name}` : 'Service details'" editable :editing="editing" :busy="busy"
+      save-label="Pin address" :fallback-focus="() => searchField?.focus()" @edit="edit" @discard="editing = false" @save="save()" @close="close">
+      <div v-if="selected" class="admin-details">
+        <dl>
+          <dt>Address in use</dt><dd><code>{{ selected.url }}</code></dd>
+          <dt>Source</dt><dd>{{ labels[selected.source] }}</dd>
+          <dt>Registered</dt><dd>{{ selected.registered ?? "None" }}</dd>
+          <dt>Pinned</dt><dd>{{ selected.pinned ?? "None" }}</dd>
+        </dl>
+        <form v-if="editing" id="service-pin" class="admin-editor" @submit.prevent="drawer?.requestSave()">
+          <label :for="'pin-' + selected.name">Address for {{ selected.name }}</label>
+          <input :id="'pin-' + selected.name" v-model="draft" :disabled="busy" autocomplete="off" spellcheck="false" :aria-describedby="error ? 'service-error' : undefined" />
+        </form>
+        <p v-if="error" id="service-error" class="error" role="alert">{{ error }}</p>
+        <button v-if="selected.pinned && !editing" type="button" class="chip" data-test="unpin" :disabled="busy" :aria-busy="busy" @click="save(true)">Use the registered address</button>
+      </div>
+      <template v-if="editing" #footer>
+        <button type="button" class="chip" :disabled="busy" data-test="cancel-edit" @click="drawer?.requestCancel()">Cancel</button>
+        <button type="button" class="primary" :disabled="busy || !draft.trim()" :aria-busy="busy" data-test="pin" @click="drawer?.requestSave()">Pin address</button>
+      </template>
+    </RecordDrawer>
   </PageLayout>
 </template>
 
 <style scoped>
-.table-scroll { overflow-x: auto; }
-.pin-form { display: grid; gap: 8px; min-width: 220px; }
-.pin-form label { font-size: 0.85em; color: var(--muted); }
-.pin-form input { min-height: 44px; width: 100%; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.error { margin: 8px 0 0; }
 </style>

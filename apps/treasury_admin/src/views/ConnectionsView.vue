@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { treasuryAdminClient, type CacheDefaults, type ConnectionRow, type ConnectionSpec, type ConnectionsView } from "../api/TreasuryAdminClient";
+import AdminSearch from "../components/admin/AdminSearch.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
+import DraftActions from "../components/admin/DraftActions.vue";
+import PanelHelp from "../components/admin/PanelHelp.vue";
+import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import StatusFilters from "../components/admin/StatusFilters.vue";
 import PageLayout from "../components/PageLayout.vue";
+import ToggleSwitch from "../components/ToggleSwitch.vue";
+import { useDraftPanel } from "../composables/useDraftPanel";
 import { errorMessage } from "../utils/errors";
-import "../components/infoPage.css";
+import "../components/admin/admin.css";
 
 /** The databases Treasury keeps data in. Four local SQLite files are built in so the stack works on a new install;
  * what is saved here replaces or adds to them. A new connection is offered to the instances at once, a changed or
@@ -16,7 +23,17 @@ const error = ref("");
 const notice = ref("");
 const busy = ref(false);
 
-const editing = ref<string | null>(null); // the name being edited; "" while adding
+const search = ref("");
+const searchField = ref<InstanceType<typeof AdminSearch>>();
+type Filter = "all" | ConnectionRow["source"];
+const filter = ref<Filter>("all");
+const drawer = ref<InstanceType<typeof RecordDrawer>>();
+const formEl = ref<HTMLFormElement>();
+const selectedName = ref<string | null>(null);
+const creating = ref(false);
+const editing = ref(false);
+const formError = ref("");
+
 const name = ref("");
 const type = ref<ConnectionSpec["type"]>("sqlite");
 const path = ref("");
@@ -32,15 +49,34 @@ const removing = ref<ConnectionRow | null>(null);
 const cacheTtlDefault = ref("");
 const cacheEntries = ref("");
 const cacheNegative = ref("");
+const cacheSearch = ref("");
+const cacheSearchField = ref<InstanceType<typeof AdminSearch>>();
 
-const isNew = computed(() => editing.value === "");
-const formError = ref("");
+const rows = computed(() => view.value?.connections ?? []);
+const selected = computed(() => rows.value.find((r) => r.name === selectedName.value) ?? null);
+const drawerOpen = computed(() => selected.value !== null || creating.value);
+const sources = { "built-in": "Built-in", saved: "Saved", changed: "Changed" } as const;
+const options = computed(() => [
+  { id: "all", label: "All", count: rows.value.length, tone: "accent" },
+  ...(["built-in", "saved", "changed"] as const).map((id) => ({ id, label: sources[id], count: rows.value.filter((r) => r.source === id).length, tone: (id === "changed" ? "warning" : "muted") as "warning" | "muted", disabled: !rows.value.some((r) => r.source === id) })),
+] as const);
+const visible = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  return rows.value.filter((r) => (filter.value === "all" || r.source === filter.value)
+    && [r.name, r.spec.type, where(r), ...r.used_by].some((text) => text.toLowerCase().includes(query)));
+});
 
 function applyView(next: ConnectionsView) {
   view.value = next;
-  cacheTtlDefault.value = String(next.default_cache.ttl_seconds);
-  cacheEntries.value = String(next.default_cache.max_entries);
-  cacheNegative.value = String(next.default_cache.negative_ttl_seconds);
+  resetCache();
+}
+
+function resetCache() {
+  const saved = view.value?.default_cache;
+  if (!saved) return;
+  cacheTtlDefault.value = String(saved.ttl_seconds);
+  cacheEntries.value = String(saved.max_entries);
+  cacheNegative.value = String(saved.negative_ttl_seconds);
 }
 
 async function load() {
@@ -54,8 +90,7 @@ async function load() {
 }
 onMounted(load);
 
-function open(row: ConnectionRow | null) {
-  editing.value = row ? row.name : "";
+function fill(row: ConnectionRow | null) {
   const spec = row?.spec;
   name.value = row?.name ?? "";
   type.value = spec?.type ?? "sqlite";
@@ -67,11 +102,34 @@ function open(row: ConnectionRow | null) {
   database.value = spec?.database ?? "";
   rawSql.value = spec?.allow_raw_sql ?? false;
   cacheTtl.value = spec?.cache?.ttl_seconds !== undefined ? String(spec.cache.ttl_seconds) : "";
-  formError.value = error.value = notice.value = "";
+  formError.value = "";
+}
+
+function openRow(row: ConnectionRow) {
+  fill(row);
+  creating.value = false;
+  editing.value = false;
+  selectedName.value = row.name;
+  error.value = notice.value = "";
+}
+
+function openCreate() {
+  fill(null);
+  selectedName.value = null;
+  creating.value = true;
+  editing.value = true;
+  error.value = notice.value = "";
 }
 
 function close() {
-  editing.value = null;
+  selectedName.value = null;
+  creating.value = false;
+  editing.value = false;
+}
+
+function discard() {
+  if (creating.value) close();
+  else { fill(selected.value); editing.value = false; }
 }
 
 function spec(): ConnectionSpec {
@@ -89,6 +147,12 @@ function spec(): ConnectionSpec {
   if (rawSql.value) out.allow_raw_sql = true;
   if (String(cacheTtl.value).trim() !== "") out.cache = { ttl_seconds: Number(cacheTtl.value) };
   return out;
+}
+
+/** Validates before the drawer asks for confirmation. */
+function requestSave() {
+  if (formEl.value && !formEl.value.reportValidity()) return;
+  drawer.value?.requestSave();
 }
 
 async function save() {
@@ -113,6 +177,7 @@ async function remove() {
   try {
     applyView(await treasuryAdminClient.removeConnection(removing.value.name));
     notice.value = "Removed. Treasury uses the change from its next start.";
+    close();
   } catch (err) {
     error.value = errorMessage(err);
   } finally {
@@ -139,9 +204,16 @@ const cacheChanged = computed(() => {
   if (!saved) return false;
   return String(cacheTtlDefault.value) !== String(saved.ttl_seconds) || String(cacheEntries.value) !== String(saved.max_entries) || String(cacheNegative.value) !== String(saved.negative_ttl_seconds);
 });
+const { discardOpen, keepFocus, answerDiscard } = useDraftPanel(cacheChanged, cacheSearchField);
+const cacheFields = [
+  { id: "default-ttl", label: "Keep an entry for (seconds)", words: "keep entry seconds ttl" },
+  { id: "default-entries", label: "Most entries", words: "most entries maximum" },
+  { id: "default-negative", label: "Remember a missing record for (seconds)", words: "remember missing record negative seconds" },
+] as const;
+const showField = (words: string) => words.includes(cacheSearch.value.trim().toLowerCase());
 
 function submitCache() {
-  void saveCache({ ttl_seconds: Number(cacheTtlDefault.value), max_entries: Number(cacheEntries.value), negative_ttl_seconds: Number(cacheNegative.value) });
+  void keepFocus(() => saveCache({ ttl_seconds: Number(cacheTtlDefault.value), max_entries: Number(cacheEntries.value), negative_ttl_seconds: Number(cacheNegative.value) }));
 }
 
 function where(row: ConnectionRow): string {
@@ -153,41 +225,67 @@ function where(row: ConnectionRow): string {
 </script>
 
 <template>
-  <PageLayout
-    class="info-content connections"
-    title="Connections"
-    description="The databases Treasury keeps data in. Four local ones are built in. What you save here replaces or adds to them."
-  >
-    <template #actions>
-      <button type="button" class="primary" data-test="add" @click="open(null)">Add connection</button>
-    </template>
-
+  <PageLayout class="admin-panel" title="Connections" wide>
+    <StatusFilters v-model="filter" label="Filter connections" :options="options" />
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
 
-    <template v-else-if="view">
-      <table>
-        <thead><tr><th>Name</th><th>Type</th><th>Where</th><th>Used by</th><th></th></tr></thead>
-        <tbody>
-          <tr v-for="row in view.connections" :key="row.name" :data-test="`row-${row.name}`">
-            <td><code>{{ row.name }}</code> <span v-if="row.source !== 'saved'" class="tag">{{ row.source }}</span><span v-else class="tag">saved</span></td>
-            <td>{{ row.spec.type }}<span v-if="row.spec.allow_raw_sql" class="muted"> · raw SQL</span></td>
-            <td>{{ where(row) }}</td>
-            <td>{{ row.used_by.length ? row.used_by.join(", ") : "—" }}</td>
-            <td class="row-actions">
-              <button type="button" class="chip" data-test="edit" @click="open(row)">Edit</button>
-              <button v-if="row.source !== 'built-in'" type="button" class="danger" data-test="remove" @click="removing = row">{{ row.source === "changed" ? "Use the built-in" : "Remove" }}</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <section class="admin-panel-card" aria-labelledby="connection-roster">
+      <header class="admin-panel-head">
+        <h2 id="connection-roster">Connections</h2>
+        <div class="admin-panel-tools">
+          <PanelHelp title="Connections">
+            <p>The databases Treasury keeps data in. Four local ones are built in. What you save here replaces or adds to them.</p>
+            <p>A new connection is offered to the instances at once. A changed or removed one is used from Treasury's next start.</p>
+            <p>A Postgres address is a <code>${NAME}</code> placeholder: put the real address in Treasury's .env under that name. No secret is saved here.</p>
+          </PanelHelp>
+          <button type="button" class="admin-icon accent" data-test="add" aria-label="Add connection" title="Add connection" :disabled="loading || !view" @click="openCreate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+          <AdminSearch ref="searchField" v-model="search" label="Search connections" />
+        </div>
+      </header>
+      <p v-if="loading" class="admin-panel-text muted" role="status">Loading…</p>
+      <p v-else-if="view && !visible.length" class="admin-panel-text muted">No connections match. <button v-if="search || filter !== 'all'" type="button" class="chip" @click="search = ''; filter = 'all'; searchField?.focus()">Clear filters</button></p>
+      <div v-else-if="view" class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="connection-roster">
+        <table class="admin-records">
+          <thead><tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Where</th><th scope="col">Used by</th></tr></thead>
+          <tbody>
+            <tr v-for="row in visible" :key="row.name" :data-test="`row-${row.name}`">
+              <th scope="row"><button type="button" class="admin-row-button" data-test="open" aria-haspopup="dialog" @click="openRow(row)">{{ row.name }}</button> <span class="tag">{{ row.source === "saved" ? "saved" : row.source }}</span></th>
+              <td>{{ row.spec.type }}<span v-if="row.spec.allow_raw_sql" class="muted"> · raw SQL</span></td>
+              <td>{{ where(row) }}</td>
+              <td>{{ row.used_by.length ? row.used_by.join(", ") : "—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-      <form v-if="editing !== null" class="card" data-test="form" @submit.prevent="save">
-        <h2 class="title">{{ isNew ? "Add connection" : `Edit ${editing}` }}</h2>
+    <section v-if="view" class="admin-panel-card cache" aria-labelledby="cache-title" data-test="cache-form">
+      <header class="admin-panel-head">
+        <h2 id="cache-title">Cache defaults <span v-if="view.default_cache_stored" class="tag">changed</span></h2>
+        <div class="admin-panel-tools">
+          <PanelHelp title="Cache defaults"><p>What a connection uses when it sets no cache of its own. Used from Treasury's next start.</p></PanelHelp>
+          <DraftActions :dirty="cacheChanged" :saving="busy" label="cache default changes" @cancel="discardOpen = true" @save="submitCache" />
+          <AdminSearch ref="cacheSearchField" v-model="cacheSearch" label="Search cache defaults" />
+        </div>
+      </header>
+      <div class="cache-body">
+        <div v-for="field in cacheFields" v-show="showField(field.words)" :key="field.id" class="field">
+          <label :for="field.id">{{ field.label }}</label>
+          <input v-if="field.id === 'default-ttl'" :id="field.id" v-model="cacheTtlDefault" type="number" min="0" :disabled="busy" :data-test="field.id" />
+          <input v-else-if="field.id === 'default-entries'" :id="field.id" v-model="cacheEntries" type="number" min="0" :disabled="busy" :data-test="field.id" />
+          <input v-else :id="field.id" v-model="cacheNegative" type="number" min="0" :disabled="busy" :data-test="field.id" />
+        </div>
+        <button v-if="view.default_cache_stored" type="button" class="chip reset" :disabled="busy" data-test="cache-reset" @click="saveCache(null)">Use the built-in defaults</button>
+      </div>
+    </section>
+
+    <RecordDrawer ref="drawer" :open="drawerOpen" :title="creating ? 'Add connection' : selected ? `Connection ${selected.name}` : 'Connection'" :editable="!creating" :editing="editing" :busy="busy"
+      :save-label="creating ? 'Add connection' : 'Save connection'" :fallback-focus="() => searchField?.focus()" @edit="editing = true" @discard="discard" @save="save" @close="close">
+      <form v-if="editing" ref="formEl" class="admin-editor" data-test="form" @submit.prevent="requestSave">
         <div class="field">
           <label for="c-name">Name</label>
-          <input id="c-name" v-model="name" :disabled="!isNew || busy" autocomplete="off" spellcheck="false" data-test="name" />
+          <input id="c-name" v-model="name" required :disabled="!creating || busy" autocomplete="off" spellcheck="false" data-test="name" />
           <p class="help">Lowercase letters, digits and _. Saving a built-in name replaces that connection.</p>
         </div>
         <div class="field">
@@ -219,32 +317,44 @@ function where(row: ConnectionRow): string {
           <div class="field"><label for="c-cred">Credentials file (optional)</label><input id="c-cred" v-model="credentials" :disabled="busy" autocomplete="off" data-test="credentials" /></div>
           <div class="field"><label for="c-db">Database (optional)</label><input id="c-db" v-model="database" :disabled="busy" autocomplete="off" data-test="database" /></div>
         </template>
-        <label class="check"><input v-model="rawSql" type="checkbox" :disabled="busy" data-test="raw-sql" /> Allow raw SQL on this connection</label>
+        <ToggleSwitch :checked="rawSql" :disabled="busy" data-test="raw-sql" @change="rawSql = ($event.target as HTMLInputElement).checked">Allow raw SQL on this connection</ToggleSwitch>
         <div class="field">
           <label for="c-cache">Cache for this connection (seconds, optional)</label>
           <input id="c-cache" v-model="cacheTtl" type="number" min="0" :disabled="busy" data-test="cache" />
-          <p class="help">Empty uses the cache defaults below. 0 turns the cache off for this connection.</p>
-        </div>
-        <p v-if="formError" class="error" role="alert">{{ formError }}</p>
-        <div class="actions">
-          <button type="button" class="chip" :disabled="busy" @click="close">Cancel</button>
-          <button type="submit" class="primary" data-test="save" :disabled="busy || !name.trim()">{{ busy ? "Saving…" : "Save" }}</button>
+          <p class="help">Empty uses the cache defaults. 0 turns the cache off for this connection.</p>
         </div>
       </form>
+      <div v-else-if="selected" class="admin-details">
+        <dl>
+          <dt>Name</dt><dd>{{ selected.name }}</dd>
+          <dt>Type</dt><dd>{{ selected.spec.type }}</dd>
+          <dt>Where</dt><dd>{{ where(selected) }}</dd>
+          <dt>Source</dt><dd>{{ sources[selected.source] }}</dd>
+          <dt>Raw SQL</dt><dd>{{ selected.spec.allow_raw_sql ? "Allowed" : "Not allowed" }}</dd>
+          <dt>Cache</dt><dd>{{ selected.spec.cache?.ttl_seconds !== undefined ? `${selected.spec.cache.ttl_seconds} seconds` : "Cache defaults" }}</dd>
+          <dt>Used by</dt><dd>{{ selected.used_by.length ? selected.used_by.join(", ") : "—" }}</dd>
+        </dl>
+        <section v-if="selected.source !== 'built-in'" class="danger-zone">
+          <h4>Danger zone</h4>
+          <p class="muted">{{ selected.source === "changed" ? "Your saved version is dropped from Treasury's next start." : "Treasury stops offering it from its next start." }}</p>
+          <button type="button" class="danger" data-test="remove" @click="removing = selected">{{ selected.source === "changed" ? "Use the built-in" : "Remove" }}</button>
+        </section>
+      </div>
+      <p v-if="formError" class="error" role="alert">{{ formError }}</p>
+      <template v-if="editing" #footer>
+        <button type="button" class="chip" :disabled="busy" data-test="cancel-edit" @click="drawer?.requestCancel()">Cancel</button>
+        <button type="button" class="primary" :disabled="busy || !name.trim()" :aria-busy="busy" data-test="save" @click="requestSave">{{ creating ? "Add connection" : "Save changes" }}</button>
+      </template>
+    </RecordDrawer>
 
-      <form class="card" data-test="cache-form" @submit.prevent="submitCache">
-        <h2 class="title">Cache defaults <span v-if="view.default_cache_stored" class="tag">changed</span></h2>
-        <p class="help">What a connection uses when it sets no cache of its own. Used from Treasury's next start.</p>
-        <div class="field"><label for="d-ttl">Keep an entry for (seconds)</label><input id="d-ttl" v-model="cacheTtlDefault" type="number" min="0" :disabled="busy" data-test="default-ttl" /></div>
-        <div class="field"><label for="d-max">Most entries</label><input id="d-max" v-model="cacheEntries" type="number" min="0" :disabled="busy" data-test="default-entries" /></div>
-        <div class="field"><label for="d-neg">Remember a missing record for (seconds)</label><input id="d-neg" v-model="cacheNegative" type="number" min="0" :disabled="busy" data-test="default-negative" /></div>
-        <div class="actions">
-          <button v-if="view.default_cache_stored" type="button" class="chip" :disabled="busy" data-test="cache-reset" @click="saveCache(null)">Use the built-in defaults</button>
-          <button type="submit" class="primary" data-test="cache-save" :disabled="busy || !cacheChanged">Save</button>
-        </div>
-      </form>
-    </template>
-
+    <ConfirmModal
+      :open="discardOpen"
+      title="Discard unsaved changes?"
+      message="Your cache default changes have not been saved."
+      confirm-label="Discard changes"
+      @confirm="answerDiscard(true, resetCache)"
+      @close="answerDiscard(false, resetCache)"
+    />
     <ConfirmModal
       :open="removing !== null"
       :title="removing?.source === 'changed' ? 'Use the built-in connection' : 'Remove connection'"
@@ -259,14 +369,16 @@ function where(row: ConnectionRow): string {
 </template>
 
 <style scoped>
-.card { display: grid; gap: 12px; max-width: 560px; margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.title { margin: 0; font-size: 1em; font-weight: 600; }
-.tag { margin-left: 6px; padding: 1px 8px; border: 1px solid var(--border); border-radius: var(--radius-full); font-size: 0.8em; font-weight: 400; color: var(--muted); }
+.error { margin: 0 0 12px; color: var(--danger); }
+.cache { margin-top: 14px; }
+.cache-body { display: grid; gap: 12px; padding: 14px; max-width: 560px; }
+.tag { margin-left: 6px; padding: 1px 8px; border: 1px solid var(--border); border-radius: var(--radius-full); font-size: 0.75em; font-weight: 400; color: var(--muted); }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }
 .field > input, .field > select { width: 100%; min-width: 0; min-height: 44px; }
-.check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
-.actions, .row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.actions { justify-content: flex-end; }
+.reset { justify-self: start; }
+.danger-zone { display: grid; gap: 8px; margin-top: 16px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-md); justify-items: start; }
+.danger-zone h4 { margin: 0; color: var(--danger); }
+.danger-zone p { margin: 0; }
 </style>
