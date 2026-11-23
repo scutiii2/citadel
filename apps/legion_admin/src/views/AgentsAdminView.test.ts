@@ -91,7 +91,7 @@ describe("per-agent gateway order", () => {
     expect(rows).toHaveLength(3);
     await rows[1]!.find("[data-test=move-up]").trigger("click");
     expect(wrapper.find("[data-test=gateway-row]").text()).toContain("Primary");
-    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("openrouter");
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("anthropic|openrouter");
     expect(wrapper.find<HTMLInputElement>("[data-test=model]").element.value).toBe("router-custom");
     expect(update).not.toHaveBeenCalled();
     await submit(wrapper);
@@ -128,7 +128,7 @@ describe("per-agent gateway order", () => {
     const rows = wrapper.findAll("[data-test=gateway-row]");
     await rows[2]!.find("[data-test=drag-handle]").trigger("dragstart", { dataTransfer: { setData: vi.fn() } });
     await rows[0]!.trigger("drop");
-    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("bedrock");
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("anthropic|bedrock");
     expect(update).not.toHaveBeenCalled();
     await submit(wrapper);
     await flushPromises();
@@ -147,13 +147,13 @@ describe("per-agent gateway order", () => {
     await wrapper.get('dialog[open] button[aria-label="Close"]').trigger("click");
     await edit(wrapper, "ember");
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
-    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("openrouter");
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("anthropic|openrouter");
     await wrapper.get("[data-test=cancel-edit]").trigger("click");
     await confirmDrawer(wrapper, "Discard changes?");
     await wrapper.get('dialog[open] button[aria-label="Close"]').trigger("click");
     await edit(wrapper, "calc");
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
-    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("claude");
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("anthropic|claude");
     wrapper.unmount();
   });
 
@@ -162,11 +162,11 @@ describe("per-agent gateway order", () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();
     await edit(wrapper, "calc");
-    await wrapper.find("[data-test=provider]").setValue("openai");
+    await wrapper.find("[data-test=gateway]").setValue("openai|gpt");
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
-    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("");
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("openai|gpt");
     expect(wrapper.find<HTMLInputElement>("[data-test=model]").element.value).toBe("");
-    await wrapper.find("[data-test=provider]").setValue("decision");
+    await wrapper.find("[data-test=gateway]").setValue("decision|");
     expect(wrapper.find("[data-test=add-gateway]").exists()).toBe(false);
     await wrapper.find("[data-test=decision-strategy]").setValue("jev-only");
     await wrapper.find("[data-test=min-confidence]").setValue("0.85");
@@ -242,8 +242,7 @@ describe("AgentsAdminView", () => {
     await wrapper.find("[data-test=new]").trigger("click");
     await wrapper.find("[data-test=id]").setValue("docs");
     await wrapper.find("[data-test=label]").setValue("Docs");
-    await wrapper.find("[data-test=provider]").setValue("openai");
-    await wrapper.find("[data-test=gateway]").setValue("gpt");
+    await wrapper.find("[data-test=gateway]").setValue("openai|gpt");
     await wrapper.find("[data-test=url]").setValue("http://10.0.0.5:29606/mcp");
     await wrapper.find("[data-test=persona]").setValue("Be brief.");
     await wrapper.find("[data-test=allow]").setValue("docs_*, wiki_*");
@@ -265,9 +264,9 @@ describe("AgentsAdminView", () => {
     const wrapper = await mounted();
     await edit(wrapper, "calc");
     const gateway = wrapper.find<HTMLSelectElement>("[data-test=gateway]");
-    expect(gateway.element.value).toBe("claude");
-    await wrapper.find("[data-test=provider]").setValue("openai");
-    expect(gateway.element.value).toBe("");
+    expect(gateway.element.value).toBe("anthropic|claude");
+    await wrapper.find("[data-test=gateway]").setValue("openai|gpt");
+    expect(gateway.element.value).toBe("openai|gpt");
   });
 
   it("keeps fields the form does not show when saving an edit", async () => {
@@ -475,7 +474,7 @@ describe("AgentsAdminView", () => {
     const wrapper = await mounted();
     await edit(wrapper, "calc");
     await wrapper.find("[data-test=max-turn-tokens]").setValue("invalid");
-    await wrapper.find("[data-test=provider]").setValue("decision");
+    await wrapper.find("[data-test=gateway]").setValue("decision|");
     expect(wrapper.find("[data-test=run-limits]").exists()).toBe(false);
     await submit(wrapper);
     await flushPromises();
