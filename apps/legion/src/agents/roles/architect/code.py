@@ -108,7 +108,7 @@ class CodeArchitect:
     def prefetch_requested(self, brief: str) -> bool:
         return bool(_CODE_PATH.search(brief))
 
-    def plan_prompt(self, brief: str, prefetch: str) -> str:
+    def plan_prompt(self, brief: str, prefetch: str, spec: AgentSpec | None = None) -> str:
         return (
             "Plan code functions or methods. Return ONLY a JSON object with language and units. "
             "Each unit needs id, name, spec, signature, depends_on, effect, needs_body_of, tier_hint. "

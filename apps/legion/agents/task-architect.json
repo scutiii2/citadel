@@ -1,0 +1,34 @@
+{
+  "label": "Task Architect",
+  "role": "architect",
+  "kind": "task",
+  "port": 29622,
+  "enabled": true,
+  "entry": false,
+  "plan_tool": false,
+  "llm": {
+    "provider": "anthropic",
+    "gateway": "omniroute"
+  },
+  "workers": [
+    "mathematician",
+    "researcher",
+    "data-analyst",
+    "pdf-assistant",
+    "email-assistant",
+    "log-analyst",
+    "server-ops",
+    "repo-helper",
+    "reviewer",
+    "triage-assistant",
+    "shared-extensions"
+  ],
+  "limits": {
+    "max_units": 6,
+    "max_parallel": 3,
+    "unit_timeout_seconds": 180,
+    "max_retries": 1
+  },
+  "focus": "Everything that is not new multi-function code: math, web research, files and tables, email, logs, containers, repositories, reviews and any request that a listed specialist covers. Picks the right specialist, or chains several, and returns their answer.",
+  "tools": {"allow": [], "deny": ["*"]}
+}
