@@ -1,6 +1,6 @@
 # ember
 
-Ember Windows app: the Vue 3, TypeScript and Vite UI in a Tauri 2 shell. It replaced the old `ember_web` browser app, which was removed.
+Ember Windows app: the Vue 3, TypeScript and Vite UI in a Tauri 2 shell. The same source also builds the browser app, which runs as the `ember` container of the Citadel stack (nginx on port 26502, `/api` proxied to Portcullis, `GET /health` for ServiceHub). See `Dockerfile` and `nginx.conf`; deploy it with `docker compose up -d --build ember`. The Windows app and the browser app are two ways in to the same server.
 
 ## How it talks to the server
 

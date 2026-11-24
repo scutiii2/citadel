@@ -29,7 +29,7 @@ from the separate `LayaModel` project (see "Laya" below) and legion reaches it t
    docker compose up -d --build
    ```
 
-4. Open http://localhost:26501 (portcullis_admin; the other admin apps are on 26500 and 26503 to 26505). All bind to `127.0.0.1`.
+4. Open http://localhost:26502 for Ember, the browser app (the Windows app is another way in to the same server). Open http://localhost:26501 for portcullis_admin; the other admin apps are on 26500 and 26503 to 26505. The admin apps bind to `127.0.0.1`; Ember binds to `0.0.0.0` so ServiceHub and other devices on your network reach it (set `EMBER_BIND=127.0.0.1` in `.env` to keep it local, which hides it from ServiceHub).
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
 service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `portcullis_admin`, `legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`).
@@ -140,7 +140,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    docker compose up -d --build
    ```
 
-6. Open `http://<zima-ip>:26501` (and the other admin apps, 26500 and 26503 to 26505) from any device on your network.
+6. Open `http://<zima-ip>:26502` (Ember) and `http://<zima-ip>:26501` (and the other admin apps, 26500 and 26503 to 26505) from any device on your network.
 
 ### Updating
 
@@ -198,8 +198,7 @@ link option, use a browser bookmark.
 
 ### Public access with Tailscale Funnel
 
-Funnel publishes a web app on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. No user web
-app runs and there is no browser app, so this section applies again only when one is back (port 26502); keep the admin apps (26500 to 26505) on the LAN. Public signup must stay off, because anyone with
+Funnel publishes a web app on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. Only Ember (port 26502) is meant to be published; keep the admin apps (26500, 26501, 26503 to 26505) on the LAN. Public signup must stay off, because anyone with
 the URL can reach the login page.
 
 1. In the Tailscale admin console, give the box the `funnel` attribute (`nodeAttrs` in the access controls) and turn on

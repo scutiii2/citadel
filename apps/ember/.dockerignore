@@ -3,3 +3,9 @@ dist/
 e2e/
 test-results/
 .git
+src-tauri/
+.output/
+.vscode/
+playwright.config.ts
+Dockerfile
+nginx.conf
