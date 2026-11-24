@@ -2,8 +2,9 @@
 // The compact full-width header of the wide layout, as in the admin apps: the sidebar
 // toggle, the Ember mark, the current page's name, and the account menu on the right.
 // Narrow screens use the bottom bar instead, so this is hidden there.
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useHeaderHelp } from "../../composables/useHeaderHelp";
 import AccountMenu from "./AccountMenu.vue";
 import EmberLogo from "./EmberLogo.vue";
 import { useSidebar } from "../../composables/useSidebar";
@@ -18,6 +19,18 @@ const route = useRoute();
 const pageVisibility = usePageVisibilityStore();
 const logout = useLogout();
 const { expanded, toggle } = useSidebar();
+
+// The header is on screen from 768px up (CSS hides it below); pages hand their help to its Help button then.
+const help = useHeaderHelp();
+const wide = typeof window.matchMedia === "function" ? window.matchMedia("(min-width: 768px)") : null;
+const syncWide = (): void => { help.ready.value = wide?.matches ?? false; };
+onMounted(() => { syncWide(); wide?.addEventListener("change", syncWide); });
+onBeforeUnmount(() => {
+  wide?.removeEventListener("change", syncWide);
+  help.ready.value = false;
+  help.open.value = false;
+});
+watch(() => route.fullPath, () => { help.open.value = false; });
 
 const adminUrl = emberAdminUrl();
 const canAdmin = computed(() => ADMIN_ACCESS_PERMISSIONS.some(auth.hasPermission));
@@ -55,6 +68,19 @@ const title = computed(() => {
     <span class="brand"><EmberLogo class="mark" aria-hidden="true" />Ember</span>
     <p v-if="title" class="page-name">{{ title }}</p>
     <div v-if="auth.account" class="header-controls">
+      <button
+        v-if="help.count.value > 0"
+        :ref="(el) => { help.trigger.value = el as HTMLElement | null; }"
+        type="button"
+        class="header-icon help"
+        title="Help"
+        aria-label="Help"
+        aria-haspopup="true"
+        :aria-expanded="help.open.value"
+        @click="help.open.value = !help.open.value"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M9.5 9.2a2.6 2.6 0 1 1 3.7 2.4c-.8.4-1.2 1-1.2 1.9M12 17h.01" /></svg>
+      </button>
       <AccountMenu
         placement="below"
         :username="auth.account.username"
@@ -71,6 +97,7 @@ const title = computed(() => {
 .app-header { position: relative; z-index: 31; display: flex; align-items: center; gap: 10px; flex-shrink: 0; min-height: 46px; padding: 4px 10px; border-bottom: 1px solid var(--border); background: var(--bg); }
 .header-icon { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: none; border-radius: var(--radius-md); background: var(--surface); color: var(--muted); cursor: pointer; }
 .header-icon:hover { color: var(--text); }
+.header-icon.help { background: transparent; }
 .header-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .brand { display: flex; align-items: center; gap: 8px; flex: none; color: var(--accent); font-weight: 700; font-size: 0.88rem; }
 .mark { width: 22px; height: 22px; }
