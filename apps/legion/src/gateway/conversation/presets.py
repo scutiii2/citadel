@@ -19,7 +19,7 @@ PRESETS: dict[str, dict] = {
     "lfm3": {"provider": "scuti", "label": "CNV_LFM3_Model", "url": "http://host.docker.internal:29202", "model": "lfm3", "max_tokens_limit": 4096},
     "sparkx": {"provider": "scuti", "label": "CNV_SparkX26_Model", "url": "http://host.docker.internal:29203", "model": "sparkx", "max_tokens_limit": 4096},
     # Same shape as claude / gpt with their own base_url, taken from the Legion gateway files:
-    # anthropic: helicone, litellm, openrouter, portkey, omniroute.  openai: deepinfra, fireworks, groq, opencode, perplexity, together, vllm.
+    # anthropic: helicone, litellm, openrouter, portkey, omniroute.  openai: deepinfra, fireworks, groq, nvidia, opencode, perplexity, together, vllm.
 }
 
 # Literal metadata from Legion templates; placeholder addresses remain unset.
@@ -116,6 +116,15 @@ PRESETS.update({
     "model": "",
     "api": "chat"
   },
+  # NVIDIA's hosted NIM API speaks the OpenAI chat protocol; the key starts with nvapi-.
+  "nvidia": {
+    "provider": "openai",
+    "auth": "key",
+    "label": "NVIDIA",
+    "base_url": "https://integrate.api.nvidia.com/v1",
+    "model": "meta/llama-3.3-70b-instruct",
+    "api": "chat"
+  },
   # Self-hosted router over free provider tiers (AI/ModelEngines/FreeLLMApiService, host port 29652). No public model list.
   "freellmapi": {
     "provider": "openai",
@@ -146,6 +155,7 @@ MODEL_LISTS = {
     "fireworks": "https://fireworks.ai/models",
     "groq": "https://console.groq.com/docs/models",
     "opencode": "https://opencode.ai/docs/console/models/",
+    "nvidia": "https://build.nvidia.com/models",
     "perplexity": "https://docs.perplexity.ai/docs/agent-api/models",
     "together": "https://docs.together.ai/docs/serverless/models",
     "vllm": "https://docs.vllm.ai/en/latest/models/supported_models/",

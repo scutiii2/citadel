@@ -472,7 +472,7 @@ Operations, approvals, runtime skill marking and the Ember rollout remain deferr
 ## Trusted gateways and confidential data
 
 Each model gateway has a **Trusted** switch on its setup (Model gateways page, chat and decision lists). A gateway
-without a saved choice defaults by what it is: the hosted models `claude`, `gpt`, `gemini` and Jev, and every gateway
+without a saved choice defaults by what it is: the hosted models `claude`, `gpt`, `gemini`, `nvidia` and Jev, and every gateway
 that runs on this machine (Ollama, the Scuti model services, Laya). Others, such as OmniRoute, OpenRouter,
 FreeLLMAPI, Bedrock and Vertex, start untrusted until an admin marks them. Code: `src/gateway/trust.py`.
 
