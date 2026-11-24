@@ -135,9 +135,9 @@ def test_skill_recall_orchestrator_text_drops_the_mark_instruction_and_specialis
     assert "After following one, call stronghold__tool_skill_mark with its id." in output
 
 
-def test_plan_mode_keeps_runtime_recall_and_bypasses_entry_routing(monkeypatch, plan_spec):
+def test_plan_mode_keeps_runtime_recall_and_asks_the_router_for_a_tier_only(monkeypatch, plan_spec):
     monkeypatch.setattr(agent_spec, "_current", replace(plan_spec, memory_recall=True, skill_recall=True))
-    monkeypatch.setattr(agent_config.router_routing, "route_turn", AsyncMock(side_effect=AssertionError("plan routed")))
+    monkeypatch.setattr(agent_config.router_routing, "route_turn", AsyncMock(return_value=(None, None, "")))
     memory = AsyncMock(return_value="memory question")
     skills = AsyncMock(return_value="skills and memory question")
     monkeypatch.setattr(memory_recall, "with_recall", memory)
@@ -149,6 +149,7 @@ def test_plan_mode_keeps_runtime_recall_and_bypasses_entry_routing(monkeypatch, 
     memory.assert_awaited_once()
     skills.assert_awaited_once()
     assert provider.run_chat.call_args.args[0] == "skills and memory question"
+    assert agent_config.router_routing.route_turn.call_args.kwargs == {"agent": False}
 
 
 def test_architect_does_not_enter_generic_provider_loop(monkeypatch, plan_spec):

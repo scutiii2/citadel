@@ -221,8 +221,9 @@ async def run_chat(
             await mcp_upstream.prefetch_private(private)
         # A confident classifier pick sends the question straight to a specialist, and this
         # agent's own model never runs (agents/auto_route.py; off unless configured).
-        routed, routed_tier, auto_note = (None, None, "") if plan_mode else await router_routing.route_turn(
-            question, history, on_event, request_id, depth, model_tier)
+        # In plan mode the Router only picks the planner's model tier; the plan runner hands work to specialists.
+        routed, routed_tier, auto_note = await router_routing.route_turn(
+            question, history, on_event, request_id, depth, model_tier, agent=not plan_mode)
         if routed is not None:
             routed.delegated_usage = delegated_usage
             return routed
