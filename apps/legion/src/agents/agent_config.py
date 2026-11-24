@@ -244,6 +244,8 @@ async def run_chat(
         if auto_note:
             resolution = dataclasses.replace(resolution, note="; ".join(n for n in (auto_note, resolution.note) if n))
         provider_question = question
+        if private and confidentiality.has_untrusted_gateway():
+            confidentiality.mark()  # the user's own MCP servers hold private data: trusted gateways only
         if depth == 0 and agent_spec.current().memory_recall:
             if cancellation.is_cancelled(request_id):
                 raise ChatCancelled()
@@ -253,6 +255,8 @@ async def run_chat(
             if cancellation.is_cancelled(request_id):
                 raise ChatCancelled()
             provider_question = await skill_recall.with_skills(question, provider_question, on_event)
+        if provider_question != question and confidentiality.has_untrusted_gateway():
+            confidentiality.mark()  # recalled notes and skills are the user's own: trusted gateways only
         if inspect.iscoroutinefunction(_PROVIDER_MODULE.run_chat):
             result = await _PROVIDER_MODULE.run_chat(
                 provider_question, history, resolution.model, request_id, depth,

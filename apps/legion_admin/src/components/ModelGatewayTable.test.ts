@@ -165,3 +165,21 @@ it("shows which gateways are trusted, takes the preset's default and sends the s
   expect(save).toHaveBeenCalledWith("conversation", "ollama", expect.objectContaining({ trusted: false }));
   wrapper.unmount();
 });
+
+it("shows a chat gateway's health: cooling down, recent failures, or none", async () => {
+  const health = (cooldown_seconds: number, failures_24h: number) => ({ cooldown_seconds, failures_24h, last_kind: failures_24h ? "quota" : null });
+  vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue({
+    ...list,
+    gateways: [
+      { id: "a", provider: "openai", health: health(300, 2) },
+      { id: "b", provider: "openai", health: health(0, 1) },
+      { id: "c", provider: "openai", health: health(0, 0) },
+    ],
+  } as never);
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
+  await flushPromises();
+  expect(wrapper.get('[data-test="health-a"]').text()).toContain("Cooling down for 5 min");
+  expect(wrapper.get('[data-test="health-b"]').text()).toBe("1 failure in 24 hours");
+  expect(wrapper.get('[data-test="health-c"]').text()).toBe("No failures in 24 hours");
+  wrapper.unmount();
+});

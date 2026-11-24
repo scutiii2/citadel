@@ -3,6 +3,8 @@ Find the caller's registry and name, call the domain function."""
 
 from __future__ import annotations
 
+from mcp.types import ToolAnnotations
+
 from typing import Annotated
 
 from pydantic import Field
@@ -36,7 +38,7 @@ def _caller() -> tuple[tables.TableRegistry, str]:
 
 
 @command(name="list", description="List your attached tables")
-@mcp.tool(meta={"keywords": ["table", "tables", "csv", "excel", "xlsx", "spreadsheet", "attached", "data", "list"], "display_label": "Listing tables"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False), meta={"keywords": ["table", "tables", "csv", "excel", "xlsx", "spreadsheet", "attached", "data", "list"], "display_label": "Listing tables"})
 @offload
 def tool_tables_listTables() -> TableListResult:
     """List the tables the user attached in chat (CSV or Excel files), with
@@ -45,7 +47,7 @@ def tool_tables_listTables() -> TableListResult:
 
 
 @command(name="describe", description="Describe a table's columns")
-@mcp.tool(meta={"keywords": ["table", "csv", "excel", "xlsx", "spreadsheet", "describe", "columns", "summary", "statistics", "data"], "display_label": "Describing the table"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False), meta={"keywords": ["table", "csv", "excel", "xlsx", "spreadsheet", "describe", "columns", "summary", "statistics", "data"], "display_label": "Describing the table"})
 @offload
 def tool_tables_describe(table_id: TableId) -> DescribeResult:
     """Describe every column of an attached table: type, empty cells, distinct
@@ -59,7 +61,7 @@ def tool_tables_describe(table_id: TableId) -> DescribeResult:
 # cannot be filled from the command form; the agent can.
 @command(name="head", description="Show the first rows of a table")
 @command(name="top", description="Highest or lowest rows of a column")
-@mcp.tool(meta={"keywords": ["table", "csv", "excel", "xlsx", "spreadsheet", "rows", "head", "preview", "first", "filter", "where", "search", "find", "top", "bottom", "highest", "lowest", "largest", "smallest", "rank", "data"], "display_label": "Reading table rows"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False), meta={"keywords": ["table", "csv", "excel", "xlsx", "spreadsheet", "rows", "head", "preview", "first", "filter", "where", "search", "find", "top", "bottom", "highest", "lowest", "largest", "smallest", "rank", "data"], "display_label": "Reading table rows"})
 @offload
 def tool_tables_rows(
     table_id: TableId,
@@ -76,7 +78,7 @@ def tool_tables_rows(
     return domain.TableDesk(*_caller()).rows(table_id, conditions, sort_by, descending, limit)
 
 
-@mcp.tool(meta={"keywords": ["table", "csv", "excel", "xlsx", "spreadsheet", "aggregate", "group by", "sum", "average", "mean", "total", "count", "min", "max", "pivot", "data"], "display_label": "Aggregating the table"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False), meta={"keywords": ["table", "csv", "excel", "xlsx", "spreadsheet", "aggregate", "group by", "sum", "average", "mean", "total", "count", "min", "max", "pivot", "data"], "display_label": "Aggregating the table"})
 @offload
 def tool_tables_aggregate(
     table_id: TableId,
@@ -95,7 +97,7 @@ def tool_tables_aggregate(
 
 
 @command(name="counts", description="Count the values in a column")
-@mcp.tool(meta={"keywords": ["table", "csv", "excel", "xlsx", "spreadsheet", "counts", "frequency", "distinct", "unique", "most common", "data"], "display_label": "Counting column values"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False), meta={"keywords": ["table", "csv", "excel", "xlsx", "spreadsheet", "counts", "frequency", "distinct", "unique", "most common", "data"], "display_label": "Counting column values"})
 @offload
 def tool_tables_valueCounts(
     table_id: TableId,

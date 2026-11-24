@@ -3,6 +3,8 @@ Start, stop and restart also manage the app's ServerWatcher."""
 
 from __future__ import annotations
 
+from mcp.types import ToolAnnotations
+
 from typing import Annotated
 
 from pydantic import Field
@@ -21,7 +23,7 @@ AppName = Annotated[
 
 
 @command(name="start", description="Start an app")
-@mcp.tool(meta={"keywords": ["server", "app", "container", "docker", "start"], "display_label": "Starting app"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=False), meta={"keywords": ["server", "app", "container", "docker", "start"], "display_label": "Starting app"})
 @offload
 def tool_srv_startApp(name: AppName) -> AppActionResult:
     """Start a stopped Docker app hosted on this box. If `name` matches no
@@ -34,7 +36,7 @@ def tool_srv_startApp(name: AppName) -> AppActionResult:
     return result
 
 @command(name="stop", description="Stop an app")
-@mcp.tool(meta={"keywords": ["server", "app", "container", "docker", "stop"], "display_label": "Stopping app"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False), meta={"keywords": ["server", "app", "container", "docker", "stop"], "display_label": "Stopping app"})
 @offload
 def tool_srv_stopApp(name: AppName) -> AppActionResult:
     """Stop a running Docker app hosted on this box. The app stays stopped
@@ -43,7 +45,7 @@ def tool_srv_stopApp(name: AppName) -> AppActionResult:
     return pause_watch(name, lambda: domain.desk.stop_app(name))
 
 @command(name="restart", description="Restart an app")
-@mcp.tool(meta={"keywords": ["server", "app", "container", "docker", "restart"], "display_label": "Restarting app"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False), meta={"keywords": ["server", "app", "container", "docker", "restart"], "display_label": "Restarting app"})
 @offload
 def tool_srv_restartApp(name: AppName) -> AppActionResult:
     """Restart a Docker app hosted on this box - stop, then start. Works
@@ -54,7 +56,7 @@ def tool_srv_restartApp(name: AppName) -> AppActionResult:
     return result
 
 @command(name="logs", description="Download an app's recent log")
-@mcp.tool(meta={"keywords": ["server", "app", "container", "docker", "logs", "log", "download"], "display_label": "Collecting app log"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=False), meta={"keywords": ["server", "app", "container", "docker", "logs", "log", "download"], "display_label": "Collecting app log"})
 @offload
 def tool_srv_getAppLogs(
     name: AppName,
@@ -72,7 +74,7 @@ def tool_srv_getAppLogs(
 
 # MCP-only (no @command): the log text is meant for the assistant to analyse.
 # People download a log with `/server logs`.
-@mcp.tool(meta={"keywords": ["server", "app", "container", "docker", "logs", "log", "read", "errors", "why", "down"], "display_label": "Reading app log"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False), meta={"keywords": ["server", "app", "container", "docker", "logs", "log", "read", "errors", "why", "down"], "display_label": "Reading app log"})
 @offload
 def tool_srv_readAppLogs(
     name: AppName,
@@ -94,7 +96,7 @@ def tool_srv_readAppLogs(
 
 
 @command(name="list", description="List apps")
-@mcp.tool(meta={"keywords": ["server", "app", "apps", "container", "docker", "list", "status"], "display_label": "Listing apps"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False), meta={"keywords": ["server", "app", "apps", "container", "docker", "list", "status"], "display_label": "Listing apps"})
 @offload
 def tool_srv_listApps() -> AppListResult:
     """List every Docker app on this box, running or not, with the exact

@@ -86,11 +86,25 @@ async def is_confidential(text: str, request_id: str | None = None) -> bool:
         return True
 
 
+def _untrusted_decision_gateway() -> bool:
+    """Whether a decision gateway this agent asks (as the Router's helper, or as a decision agent) is not trusted."""
+    from src.providers.decision import gateway_client as decision_client, strategy
+
+    spec = agent_spec.current()
+    if spec.llm.provider == "decision":
+        names = strategy._ORDER.get(spec.llm.strategy or "both", ())
+    else:
+        names = strategy._ORDER["both"] if spec.orchestrator else ()
+    return any(not decision_client.is_trusted(name) for name in names)
+
+
 def has_untrusted_gateway() -> bool:
-    """Whether this agent could send a request to a gateway that is not trusted. A decision agent has no chat gateway."""
+    """Whether this agent could send a request to a gateway that is not trusted: a chat gateway, or a decision one."""
     llm = agent_spec.current().llm
     if llm.provider == "decision":
-        return False
+        return agent_spec.current().id != AGENT_ID and _untrusted_decision_gateway()
+    if _untrusted_decision_gateway():
+        return True
     names = [llm.gateway or agent_spec.default_gateway(llm.provider), *(choice.gateway for choice in llm.fallback_gateways)]
     return any(name is not None and not gateway_client.is_trusted(name) for name in names)
 

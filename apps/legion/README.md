@@ -470,8 +470,21 @@ FreeLLMAPI, Bedrock and Vertex, start untrusted until an admin marks them. Code:
 - **It fails closed.** A checker that is missing, disabled, unreachable, slow or unsure counts as confidential. When
   no trusted gateway can take a confidential turn (credentials missing, in cooldown), the turn ends with an error and
   nothing is sent to an untrusted one.
-- **Not covered:** decision agents (Router, auto-tier) and text that only appears after the last tool result of a
-  turn; the check reads at most 4,000 characters (start and end) of what it is given.
+- **Marked without a check:** a turn that recalls memory notes or skills, or carries the user's own MCP servers
+  (private extensions), is confidential at once when the agent has an untrusted gateway, because those are the
+  user's own data. A confidential turn also skips untrusted decision gateways (Laya, Jev) for the Router and other
+  decision agents, and ends with an error when none is left.
+- **Not covered:** text that only appears after the last tool result of a turn; the check reads at most 4,000
+  characters (start and end) of what it is given. FreeLLMAPI's decision gateway is listed on the page but no strategy
+  asks it.
+
+## Gateway health
+
+A failed gateway call starts a cooldown (`gateway_failover` in Tuning sets how long). Cooldowns and the last 50
+failures per gateway are kept in `settings.db` (tables `cooldowns` and `gateway_health`), so every agent process and a
+restart see them; a process re-reads them every 2 seconds, and an unreadable database never stops a turn. The chat list
+on the Model gateways page shows each gateway as cooling down (with the time left), its failures in 24 hours, or healthy.
+
 
 ## Internal Router agent
 

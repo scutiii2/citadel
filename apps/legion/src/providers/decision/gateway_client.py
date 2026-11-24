@@ -12,6 +12,7 @@ import time
 from typing import Any
 
 from src import gateway
+from src.gateway import trust
 from src.gateway.decision.contract import parse_request
 from src.gateway.decision.errors import GatewayError
 from src.gateway.decision.settings import Settings
@@ -55,6 +56,12 @@ def saved_gateways() -> dict[str, bool | None]:
     _listed = {str(entry["id"]): entry.get("reachable") for entry in entries if entry.get("id")}
     _listed_until = time.monotonic() + _LIST_TTL_SECONDS
     return _listed
+
+
+def is_trusted(gateway_id: str) -> bool:
+    """Whether confidential data may go to this decision gateway (src/gateway/trust.py)."""
+    saved = gateway.decision_store().all().get(gateway_id)
+    return trust.decision(gateway_id, saved if isinstance(saved, dict) else None)
 
 
 def is_usable(gateway_id: str) -> bool:
