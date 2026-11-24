@@ -251,10 +251,12 @@ def _check_gateway(spec: AgentSpec) -> None:
     gateway = spec.llm.gateway
     if gateway is None and not spec.llm.fallback_gateways:
         return
+    # Template files plus gateways saved on the Model gateways page (a saved one may have no template file).
     catalog = gateway_catalog()
-    known = {entry["id"] for entry in catalog.get(spec.llm.provider, [])}
+    saved = gateway_catalog(saved_only=True)
+    known = {entry["id"] for source in (catalog, saved) for entry in source.get(spec.llm.provider, [])}
     # A backup may speak the other chat protocol: the agent then moves a turn to it when the first protocol has none left.
-    any_chat = {entry["id"] for provider in ("anthropic", "openai") for entry in catalog.get(provider, [])}
+    any_chat = {entry["id"] for source in (catalog, saved) for provider in ("anthropic", "openai") for entry in source.get(provider, [])}
     gateway = gateway or agent_spec.default_gateway(spec.llm.provider)
     if gateway not in known:
         raise AgentStoreError(f"llm.gateway {gateway!r} is not a {spec.llm.provider} gateway in gateways/")
