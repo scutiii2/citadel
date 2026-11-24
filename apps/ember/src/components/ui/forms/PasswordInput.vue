@@ -48,9 +48,9 @@ const visible = ref(false);
 }
 .password-control button {
   position: absolute;
-  top: 0;
+  top: 4px;
   right: 4px;
-  bottom: 0;
+  bottom: 4px;
   min-width: 56px;
   padding: 0 8px;
   border: none;
