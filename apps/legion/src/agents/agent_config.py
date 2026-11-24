@@ -22,9 +22,9 @@ from src.agents.roles.orchestrator import auto_route, delegation, memory_recall,
 from src.agents.roles.router import router_routing
 from src.agents.roles.orchestrator import plan as plan_policy
 
-from src.runtime import approvals, confidentiality, internal_auth, questions, tool_filter, tuning_overrides
+from src.runtime import approvals, confidentiality, internal_auth, questions, tool_filter, tuning_overrides, turn_effects
 from src.tools.private_extensions import turn as private_turn
-from src.agents import auto_tier
+from src.agents import auto_tier, protocol_chain
 from src.providers import context_breakdown, llm_config, llm_options, model_tiers, token_limits
 from src.providers import reasoning_effort as effort_limits
 from src.citadel_auth import apply_root_env
@@ -50,7 +50,7 @@ def _load_secrets_into_environ() -> None:
 # module is imported; .env only fills in what is still unset (setdefault).
 _load_secrets_into_environ()
 
-from src.providers import cancellation, cooldown
+from src.providers import cancellation, cooldown, gateway_protocols
 from src.providers.base_provider import ChatCancelled, ChatResult  # noqa: E402
 from src.providers.model_limits import context_window_for  # noqa: E402
 
@@ -86,7 +86,7 @@ def _resolve() -> tuple[str, Any]:
     for index, choice in enumerate(spec.llm.fallback_gateways):
         where = f"{spec.source or spec.id}: llm.fallback_gateways[{index}].gateway"
         try:
-            llm_config.gateway(provider_id, choice.gateway)
+            llm_config.gateway(gateway_protocols.protocol_of(choice.gateway, provider_id), choice.gateway)
         except KeyError:
             raise AgentConfigError(f"{where}: gateway {choice.gateway!r} has no file") from None
         if not module.has_api_key(choice.gateway):
@@ -244,6 +244,7 @@ async def run_chat(
         if auto_note:
             resolution = dataclasses.replace(resolution, note="; ".join(n for n in (auto_note, resolution.note) if n))
         provider_question = question
+        switches: list[dict[str, str]] = []
         if private and confidentiality.has_untrusted_gateway():
             confidentiality.mark("private")  # the user's own MCP servers hold private data: trusted gateways only
         if depth == 0 and agent_spec.current().memory_recall:
@@ -257,24 +258,40 @@ async def run_chat(
             provider_question = await skill_recall.with_skills(question, provider_question, on_event)
         if provider_question != question and confidentiality.has_untrusted_gateway():
             confidentiality.mark("recall")  # recalled notes and skills are the user's own: trusted gateways only
-        if inspect.iscoroutinefunction(_PROVIDER_MODULE.run_chat):
-            result = await _PROVIDER_MODULE.run_chat(
-                provider_question, history, resolution.model, request_id, depth,
-                on_event=on_event, caveman=caveman,
-            )
-            result.delegated_usage = delegated_usage
-        else:
+        async def call(module: Any, model: str | None) -> ChatResult:
+            if inspect.iscoroutinefunction(module.run_chat):
+                return await module.run_chat(provider_question, history, model, request_id, depth, on_event=on_event, caveman=caveman)
             # Phase 1: openai_provider is still sync - run it off the event
             # loop thread so a slow completion doesn't block other requests
             # this ai_agent process is serving. on_event is dropped here on
             # purpose: a sync provider has nowhere to await it from (Phase 3
             # converts openai_provider the same way Task 3 did anthropic_provider).
-            result = await anyio.to_thread.run_sync(
-                lambda: _PROVIDER_MODULE.run_chat(
-                    provider_question, history, resolution.model, request_id, depth,
-                    caveman=caveman,
-                )
-            )
+            return await anyio.to_thread.run_sync(
+                lambda: module.run_chat(provider_question, history, model, request_id, depth, caveman=caveman))
+
+        protocols = protocol_chain.protocols_for(PROVIDER_ID)
+        position = protocol_chain.first(protocols) if len(protocols) > 1 else 0
+        effects_token = turn_effects.bind()
+        try:
+            while True:
+                protocol = protocols[position]
+                own = protocol == PROVIDER_ID
+                try:
+                    result = await call(_PROVIDER_MODULE if own else protocol_chain.module_for(protocol),
+                                        resolution.model if own else protocol_chain.model_for(
+                                            protocol, model_tier, spec.llm.min_tier, spec.llm.max_tier, spec.id))
+                    break
+                except Exception as error:
+                    if position + 1 >= len(protocols) or not protocol_chain.can_move_on(error):
+                        raise
+                    switch = await protocol_chain.announce(on_event, protocol, protocols[position + 1])
+                    switches.append(switch.as_dict())
+                    position += 1
+        finally:
+            turn_effects.reset(effects_token)
+        result.delegated_usage = delegated_usage
+        if switches:
+            result.gateway_switches = [*switches, *result.gateway_switches]
         result.model_tier = resolution.tier
         result.model_note = resolution.note
         result.reasoning_effort = effort.effort
@@ -328,7 +345,7 @@ def status() -> dict[str, Any]:
     primary = spec.llm.gateway or agent_spec.default_gateway(PROVIDER_ID)
     gateways = []
     for name in (primary, *(choice.gateway for choice in spec.llm.fallback_gateways)):
-        key = cooldown.gateway_key(PROVIDER_ID, name)
+        key = cooldown.gateway_key(gateway_protocols.protocol_of(name, PROVIDER_ID) if name != primary else PROVIDER_ID, name)
         remaining = cooldown.seconds_remaining(key)
         credentials = _PROVIDER_MODULE.has_api_key() if name == primary else _PROVIDER_MODULE.has_api_key(name)
         gateways.append({"gateway": name, "available": credentials and remaining <= 0,

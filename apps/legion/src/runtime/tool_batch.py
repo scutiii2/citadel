@@ -18,7 +18,7 @@ from typing import Any
 
 from src.providers.base_provider import OnEvent, ToolCallRecord, dispatch_with_progress, step_event
 from src.providers.turn_guard import TurnGuard
-from src.runtime import approvals, counters, questions, run_tools, tool_batch_settings
+from src.runtime import approvals, counters, questions, run_tools, tool_batch_settings, turn_effects
 from src.tools.mcp_client.mcp_upstream import NumberedFailureText, is_read_only_builtin
 
 
@@ -94,6 +94,8 @@ class ToolRound:
         await self._emit("step_start", id=call.id, tool=call.name, label=self.labels.get(call.name), arguments=call.arguments)
 
     async def _run_tool(self, call: Call) -> Outcome:
+        if not is_read_only_builtin(call.name):
+            turn_effects.mark()  # this turn can no longer be rerun from the start on another protocol
         try:
             text = await dispatch_with_progress(self.dispatch, self.on_event, call.id, call.name, call.arguments, self.depth)
             return Outcome(text, True)
