@@ -135,7 +135,7 @@ def test_skill_recall_orchestrator_text_drops_the_mark_instruction_and_specialis
     assert "After following one, call stronghold__tool_skill_mark with its id." in output
 
 
-def test_plan_mode_keeps_runtime_recall_and_asks_the_router_for_a_tier_only(monkeypatch, plan_spec):
+def test_plan_mode_keeps_runtime_recall_and_asks_the_router_first(monkeypatch, plan_spec):
     monkeypatch.setattr(agent_spec, "_current", replace(plan_spec, memory_recall=True, skill_recall=True))
     monkeypatch.setattr(agent_config.router_routing, "route_turn", AsyncMock(return_value=(None, None, "")))
     memory = AsyncMock(return_value="memory question")
@@ -149,7 +149,6 @@ def test_plan_mode_keeps_runtime_recall_and_asks_the_router_for_a_tier_only(monk
     memory.assert_awaited_once()
     skills.assert_awaited_once()
     assert provider.run_chat.call_args.args[0] == "skills and memory question"
-    assert agent_config.router_routing.route_turn.call_args.kwargs == {"agent": False}
 
 
 def test_architect_does_not_enter_generic_provider_loop(monkeypatch, plan_spec):
@@ -206,3 +205,12 @@ def test_architect_server_registers_kind_and_workers_from_temp_file(monkeypatch,
     monkeypatch.setattr(server.uvicorn, "run", lambda *args, **kwargs: None)
     server.main()
     assert registrations[0]["kind"] == "code" and registrations[0]["workers"] == ["worker"]
+
+
+def test_plan_mode_sends_a_settled_router_pick_to_the_specialist_without_planning(monkeypatch, plan_spec):
+    routed = ChatResult(response="by specialist", model_executed=False)
+    monkeypatch.setattr(agent_config.router_routing, "route_turn", AsyncMock(return_value=(routed, None, "")))
+    provider = SimpleNamespace(run_chat=AsyncMock(), DEFAULT_MODEL="model")
+    monkeypatch.setattr(agent_config, "_PROVIDER_MODULE", provider)
+    assert asyncio.run(agent_config.run_chat("q", [])).response == "by specialist"
+    provider.run_chat.assert_not_awaited()
