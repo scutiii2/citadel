@@ -103,17 +103,25 @@ onMounted(() => void refresh());
 
 <template>
   <PageLayout class="agents-view" title="Agents">
-    <template #actions>
-      <PanelHelp title="Agents">Meet the team behind your conversations. The entry agent brings in the right help. Switches apply only to your chats; service status is separate.</PanelHelp>
-      <button type="button" class="admin-icon" aria-label="Refresh" title="Refresh" :disabled="refreshing" :aria-busy="refreshing" @click="refresh">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
-      </button>
-    </template>
-    <StateMessage v-if="error" kind="error" @retry="refresh">Could not update the agents: {{ error }}</StateMessage>
-    <StateMessage v-if="loading" kind="loading">Loading agents…</StateMessage>
-    <StateMessage v-else-if="!agents.length && !error" kind="empty">No agents are running or defined.</StateMessage>
-    <template v-if="!loading && agents.length">
-      <div class="overview-line"><p class="summary">{{ summary }}</p><span>Auto-refresh every 15 s</span></div>
+    <section class="roster" aria-label="Agent roster">
+      <header class="roster-head">
+        <div class="roster-title">
+          <h3>Agent roster</h3>
+          <p v-if="!loading && agents.length"><span class="summary">{{ summary }}</span> · {{ plural(visible.length, 'agent') }} shown · auto-refresh every 15 s</p>
+        </div>
+        <div class="roster-tools">
+          <PanelHelp title="Agents">Meet the team behind your conversations. The entry agent brings in the right help. Switches apply only to your chats; service status is separate.</PanelHelp>
+          <button type="button" class="admin-icon" aria-label="Refresh" title="Refresh" :disabled="refreshing" :aria-busy="refreshing" @click="refresh">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
+          </button>
+          <SearchField v-if="!loading && agents.length" v-model="query" class="roster-search" label="Search agents" placeholder="Search agent or model" />
+        </div>
+      </header>
+      <div class="roster-body">
+      <StateMessage v-if="error" kind="error" @retry="refresh">Could not update the agents: {{ error }}</StateMessage>
+      <StateMessage v-if="loading" kind="loading">Loading agents…</StateMessage>
+      <StateMessage v-else-if="!agents.length && !error" kind="empty">No agents are running or defined.</StateMessage>
+      <template v-if="!loading && agents.length">
       <div class="handoff" aria-label="How work is handed off">
         <span class="call-chip">You</span><span aria-hidden="true">→</span>
         <strong>{{ entryLabels || 'Entry agent' }} <span class="muted">/ Entry</span></strong>
@@ -122,10 +130,8 @@ onMounted(() => void refresh());
       </div>
       <p class="account-note">New chats always start with the entry agent. Specialist switches apply only to your chats; service status is separate.</p>
       <div class="filters">
-        <SearchField v-model="query" label="Search agents" placeholder="Search agent or model" />
         <SegmentedControl v-model="status" :options="statusOptions" aria-label="Filter by service status" />
       </div>
-      <p class="result-count">{{ plural(visible.length, 'agent') }}</p>
       <StateMessage v-if="!visible.length" kind="empty" title="No matching agents">
         Try another name, model or service status.
         <template #action><button type="button" class="pill-btn ghost" @click="query = ''; status = 'all'">Clear filters</button></template>
@@ -144,7 +150,9 @@ onMounted(() => void refresh());
           />
         </div>
       </section>
-    </template>
+      </template>
+      </div>
+    </section>
   </PageLayout>
   <RecordDrawer :open="!!opened" :title="opened?.label ?? 'Agent description'" @close="openedId = null">
     <template v-if="opened">
@@ -163,16 +171,20 @@ onMounted(() => void refresh());
 </template>
 
 <style scoped>
-.overview-line, .handoff, .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.overview-line { justify-content: space-between; margin-bottom: 16px; font-size: .85em; }
-.summary { margin: 0; font-weight: 600; }
-.overview-line > span, .muted, .account-note, .group-note, .result-count { color: var(--muted); }
-.handoff { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); font-size: .85em; }
+.handoff, .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.muted, .account-note, .group-note { color: var(--muted); }
+/* One roster panel, as in the admin apps: a header with the title and search, then the body. */
+.roster { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.roster-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.roster-title h3 { margin: 0; font-size: 1em; font-weight: 600; }
+.roster-title p { margin: 2px 0 0; font-size: .8em; color: var(--muted); }
+.roster-tools { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.roster-search { flex: 0 1 260px; min-width: 160px; }
+.roster-body { padding: 16px; }
+.handoff { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); font-size: .85em; }
 .handoff strong { color: var(--accent); }
 .account-note { font-size: .85em; margin: 8px 0 16px; }
-.filters { margin-bottom: 12px; }
-.filters > :first-child { flex: 1 1 240px; }
-.result-count { font-size: .8em; margin: 0 0 16px; }
+.filters { margin-bottom: 16px; }
 .agent-group + .agent-group { margin-top: 32px; }
 .agent-group h3 { margin: 0; font-size: 1em; font-weight: 600; }
 .group-note { margin: 4px 0 12px; font-size: .85em; }
@@ -189,8 +201,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (min-width: 768px) and (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 767px) {
   .grid { grid-template-columns: minmax(0, 1fr); }
-  .filters { align-items: stretch; }
-  .filters > :first-child { flex-basis: 100%; }
+  .roster-search { flex-basis: 100%; }
   .filters :deep(.segment) { padding-inline: 8px; }
 }
 </style>
