@@ -18,11 +18,8 @@ from typing import Any
 
 from src.providers.base_provider import OnEvent, ToolCallRecord, dispatch_with_progress, step_event
 from src.providers.turn_guard import TurnGuard
-from src.runtime import approvals, questions, run_tools
+from src.runtime import approvals, questions, run_tools, tool_batch_settings
 from src.tools.mcp_client.mcp_upstream import NumberedFailureText, is_read_only_builtin
-
-# One model round rarely asks for more; the limit keeps a long list from taking every worker thread.
-MAX_PARALLEL = 8
 
 
 @dataclass(frozen=True)
@@ -61,8 +58,10 @@ class ToolRound:
         # What `run_tools` may call; empty keeps that tool out. `results` keeps the finished steps of this turn's batches.
         self.batch_tools = batch_tools
         self.results: dict[str, str] = {}
+        self.settings = tool_batch_settings.Settings()
 
     async def run(self, calls: Sequence[Call]) -> list[Outcome]:
+        self.settings = tool_batch_settings.current()  # an edit on the Tuning page applies from the next round
         # The guard sees the calls in order before anything runs, so a stopped turn starts no tool.
         for call in calls:
             self.guard.check_call(call.name, call.arguments)
@@ -81,7 +80,8 @@ class ToolRound:
         return outcomes
 
     def _can_overlap(self, call: Call) -> bool:
-        return not approvals.current().needs_approval(call.name) and is_read_only_builtin(call.name)
+        return (self.settings.parallel and not approvals.current().needs_approval(call.name)
+                and is_read_only_builtin(call.name))
 
     async def _emit(self, kind: str, **fields: Any) -> None:
         if self.on_event:
@@ -132,7 +132,7 @@ class ToolRound:
     async def _run_group(self, calls: Sequence[Call]) -> list[Outcome]:
         for call in calls:
             await self._start(call)
-        limit = asyncio.Semaphore(MAX_PARALLEL)
+        limit = asyncio.Semaphore(self.settings.max_parallel)
 
         async def one(call: Call) -> Outcome:
             async with limit:

@@ -11,6 +11,7 @@ const view = (overrides: TuningView["overrides"] = {}): TuningView => {
   const defaults = {
     token_limits: { default: { max_output_tokens: 2048, max_context_tokens: 100000, max_tool_rounds: 15 } },
     gateway_failover: { quota_cooldown_seconds: 3600, auth_cooldown_seconds: 3600, unavailable_cooldown_seconds: 30 },
+    tool_batch: { parallel: true, max_parallel: 8, batch_tool: true, max_steps: 10, max_result_chars: 20000, max_total_chars: 60000 },
     classifier: {
       timeout_seconds: 3, max_input_chars: 16000,
       auto_tier: { strategy: "both", min_confidence: 80 },
@@ -159,4 +160,18 @@ it("keeps the draft after cancelling navigation and discards it after confirmati
   await second;
   expect(router.currentRoute.value.path).toBe("/elsewhere");
   expect(tuningClient.save).not.toHaveBeenCalled();
+});
+
+
+it("edits the tool-call settings, switches included, and shows their defaults as On or Off", async () => {
+  const wrapper = await show(view());
+  expect(wrapper.text()).toContain("Default: On");
+  const steps = wrapper.get('[data-path="tool_batch.max_steps"]');
+  expect((steps.element as HTMLInputElement).value).toBe("10");
+  await steps.setValue("5");
+  await wrapper.get('[data-path="tool_batch.parallel"]').setValue(false);
+  vi.mocked(tuningClient.save).mockResolvedValue(view());
+  await wrapper.get('[data-test="save"]').trigger("click");
+  await flushPromises();
+  expect(tuningClient.save).toHaveBeenCalledWith({ "tool_batch.max_steps": 5, "tool_batch.parallel": false });
 });

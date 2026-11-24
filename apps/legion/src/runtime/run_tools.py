@@ -18,11 +18,9 @@ from typing import Any
 
 from src.agents import agent_spec
 from src.agents.roles.orchestrator import submit_plan
+from src.runtime import tool_batch_settings
 
 TOOL_NAME = "run_tools"
-MAX_STEPS = 10
-MAX_RESULT_CHARS = 20_000
-MAX_TOTAL_CHARS = 60_000
 _ID_CHARS = 64
 
 
@@ -37,7 +35,8 @@ class Step:
 
 def enabled() -> bool:
     """Offered to a specialist that has tools; the orchestrator plans, and architects and routers have none."""
-    return getattr(agent_spec.current(), "role", None) == "specialist" and not submit_plan.enabled()
+    return (getattr(agent_spec.current(), "role", None) == "specialist" and not submit_plan.enabled()
+            and tool_batch_settings.current().batch_tool)
 
 
 def batchable(names: Collection[str], local: Collection[str]) -> frozenset[str]:
@@ -52,7 +51,7 @@ def tool_description() -> str:
         '{"$ref": "step_id"} (the whole result) or {"$ref": "step_id.field"} (a field of a JSON result); the second '
         "step then waits for the first. A step that fails makes the steps that need it skip. Only steps with "
         '"return": true (by default, the steps nothing else uses) come back in full; the others return a status '
-        "line, so ask for the ones you need to read. Use at most 10 steps. Use a single tool call for one call, "
+        f"line, so ask for the ones you need to read. Use at most {tool_batch_settings.current().max_steps} steps. Use a single tool call for one call, "
         "and separate calls when a later call depends on what you learn from an earlier one."
     )
 
@@ -61,7 +60,7 @@ def tool_parameters() -> dict[str, Any]:
     return {
         "type": "object", "required": ["steps"], "additionalProperties": False,
         "properties": {"steps": {
-            "type": "array", "minItems": 1, "maxItems": MAX_STEPS,
+            "type": "array", "minItems": 1, "maxItems": tool_batch_settings.current().max_steps,
             "items": {
                 "type": "object", "required": ["id", "tool", "arguments"], "additionalProperties": False,
                 "properties": {
@@ -95,8 +94,9 @@ def validate(arguments: Any, tools: Collection[str],
     if extra:
         return None, None, f"run_tools unknown field: {sorted(extra)[0]}."
     raw = arguments["steps"]
-    if not 1 <= len(raw) <= MAX_STEPS:
-        return None, None, f"run_tools needs 1 to {MAX_STEPS} steps."
+    limit = tool_batch_settings.current().max_steps
+    if not 1 <= len(raw) <= limit:
+        return None, None, f"run_tools needs 1 to {limit} steps."
     ids: list[str] = []
     for item in raw:
         if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].strip():
@@ -176,15 +176,16 @@ def _lookup(ref: str, results: Mapping[str, str]) -> Any:
 def reply(steps: list[Step], status: Mapping[str, str], texts: Mapping[str, str]) -> str:
     """The text the model receives: full results only for the steps it asked to see."""
     used = {dependency for step in steps for dependency in step.depends_on}
-    budget = MAX_TOTAL_CHARS
+    each = tool_batch_settings.current().max_result_chars
+    budget = tool_batch_settings.current().max_total_chars
     rows: dict[str, dict[str, Any]] = {}
     for step in steps:
         text = texts.get(step.id, "")
         row: dict[str, Any] = {"status": status[step.id]}
         shown = step.returned if step.returned is not None else step.id not in used
         if status[step.id] != "done" or shown:
-            if len(text) > min(MAX_RESULT_CHARS, budget):
-                text = text[:max(0, min(MAX_RESULT_CHARS, budget))]
+            if len(text) > min(each, budget):
+                text = text[:max(0, min(each, budget))]
                 row["truncated"] = True
             budget -= len(text)
             row["result"] = text
