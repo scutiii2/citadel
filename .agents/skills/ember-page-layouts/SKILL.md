@@ -5,7 +5,7 @@ description: Use when laying out an Ember task page (notes, memory, skills, read
 
 # Ember page layouts and navigation
 
-Components come from `ember-shared-components`; tokens from `ember-design-system`; narrow screens from `ember-mobile-ui`.
+Components come from `ember-shared-components`; tokens from `ember-design-system`; narrow screens from the global `mobile-ui`.
 
 ## Task-focused layouts
 

@@ -15,8 +15,8 @@ Entry point. Use the target app's `AGENTS.md` for routing, permissions, and API 
 | Admin header, sidebar, panels, rows, drawers | `ember-admin-ui` |
 | Existing components, composables, global classes | `ember-shared-components` |
 | Ember task pages, workspaces, nav placement | `ember-page-layouts` |
-| Narrow layouts, touch, keyboard, sheets, async state | `ember-mobile-ui` |
-| Forms, contrast, semantics, scroll, hierarchy | `ember-ux-checks` |
+| Narrow layouts, touch, keyboard, sheets, async state | global `mobile-ui` (Citadel specifics below) |
+| Forms, contrast, semantics, scroll, hierarchy | global `ux-checks` |
 | New page, store, API call, or route | `ember-feature-scaffold` |
 
 ## Pick the app
@@ -69,3 +69,14 @@ Use the target app's permission rules for admin routes. Portcullis enforces perm
 - [ ] Links vs buttons vs tabs semantics correct; popovers not trapped as modals
 - [ ] Decoration non-blocking with a readable fallback; auto-moving content has pause/stop
 - [ ] Type check and focused tests pass
+
+## Mobile specifics (Citadel)
+
+Add these to the global `mobile-ui` skill when working in Ember or an admin app.
+
+- Tokens come from the target app's `style.css`; keep the orange accent. Reference screens: Notes (list/editor), Brains (scoped reader), Memory (row editing), Video Downloader (jobs/results).
+- Breakpoint is 767/768px. Admin panel headers wrap search and its reserved Cancel and Save slots together onto a new line. The admin shell is header-controlled (`ember-admin-ui`); record drawers are full-height on the right.
+- Viewport: `apps/ember/src/App.vue` sets `--app-viewport-height` and `--app-viewport-top` from `visualViewport` (with a `100dvh` fallback). The admin shell uses `100dvh` without that bridge.
+- Sheets sit above `--rail-height`, which already includes the bottom safe-area inset.
+- Global coarse-pointer CSS sets button minimum height only; check width, icon buttons, segmented choices and modal close buttons for 44px.
+- Reuse `BaseModal` and `ConfirmModal` for modal focus behavior.

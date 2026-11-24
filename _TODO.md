@@ -114,7 +114,7 @@ Optional follow-up features, not implemented:
 - **History converter**: convert Anthropic and OpenAI message and tool-call history both ways, including tool results already collected in the turn.
 - **portcullis**: pass the new field through the agent admin routes and validation.
 - **ember_admin**: one gateway list across providers, each row labelled with its provider (`AgentForm.vue`, `AgentGatewayList.vue`); stop resetting rows on provider change.
-- **Docs and tests**: README "Gateway failover" and the `aiagent-scaffold` skill; unit tests for the converter and failover order.
+- **Docs and tests**: README "Gateway failover" and the `legion-agent-scaffold` skill; unit tests for the converter and failover order.
 
 **Cheaper first step**: fail over to the other provider between turns only (the next turn starts fresh on the backup), which skips the converter.
 

@@ -5,7 +5,7 @@ description: Use when building or restyling a Citadel admin app page (portcullis
 
 # Citadel admin UI
 
-Approved patterns for the admin apps. Tokens and radius: `ember-design-system`. Shared components: `ember-shared-components`. Mobile: `ember-mobile-ui`.
+Approved patterns for the admin apps. Tokens and radius: `ember-design-system`. Shared components: `ember-shared-components`. Mobile and UX: global `mobile-ui` and `ux-checks` (workspace skills).
 
 Use the [Legion Admin mockup](../../../apps/legion_admin/mockups/legion-redesign.html) and [Portcullis Admin mockup](../../../apps/portcullis_admin/mockups/portcullis-redesign.html) for admin shells, panels, and drawers. Apply these patterns to both apps, including the existing Legion profile menu and tuning toolbar when implementing these revisions. Reuse the target app's components and permissions.
 
