@@ -126,6 +126,10 @@ function at(source: Record<string, unknown> | undefined, path: string): number |
   return typeof node === "number" || typeof node === "boolean" || typeof node === "string" ? node : undefined;
 }
 
+/** How many of a group's settings differ from the file, or are edited now. */
+const changedIn = (group: Group): number => group.fields.filter((field) => isChanged(field.path) || field.path in draft.value).length;
+const jump = (id: string): void => document.getElementById(`group-${id}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+
 const dirty = computed(() => Object.keys(draft.value).length > 0);
 const { discardOpen, keepFocus, answerDiscard: closeDiscard } = useDraftPanel(dirty, searchField);
 const isChanged = (path: string): boolean => path in (view.value?.overrides ?? {});
@@ -237,8 +241,16 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
       <template v-else>
         <p v-if="!visibleGroups.length" class="admin-panel-text muted">No settings match your search. <button type="button" class="small" @click="search = ''; searchField?.focus()">Clear search</button></p>
         <ActionMessage v-if="saveError && !invalidPath" kind="error" :text="saveError" class="admin-panel-text" />
-        <section v-for="group in visibleGroups" :key="group.id" class="tuning-group">
-          <div class="section-head"><div><h3>{{ group.title }}</h3><p>{{ group.note }}</p></div></div>
+        <div v-if="visibleGroups.length" class="tuning-layout">
+        <nav class="tuning-index" aria-label="Setting groups">
+          <button v-for="group in visibleGroups" :key="group.id" type="button" class="index-link" :data-test="`jump-${group.id}`" @click="jump(group.id)">
+            <span>{{ group.title }}</span>
+            <span v-if="changedIn(group)" class="count" :aria-label="`${changedIn(group)} changed`">{{ changedIn(group) }}</span>
+          </button>
+        </nav>
+        <div class="tuning-groups">
+        <section v-for="group in visibleGroups" :id="`group-${group.id}`" :key="group.id" class="tuning-group" :aria-labelledby="`group-${group.id}-title`">
+          <header class="group-head"><h3 :id="`group-${group.id}-title`">{{ group.title }}</h3><p>{{ group.note }}</p></header>
         <SettingRow v-for="field in group.fields" :key="field.path" :setting-id="field.path" :label="field.label"
           :description="`${field.path.startsWith('tool_batch.') || field.path.startsWith('budgets.') ? 'Default' : 'File default'}: ${shownDefault(field)}${field.unit && typeof at(view.defaults, field.path) === 'number' ? ' ' + field.unit : ''}`"
           :data-row="field.path" :data-changed="isChanged(field.path)">
@@ -251,10 +263,12 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
             @change="edit(field, ($event.target as HTMLSelectElement).value)"><option v-for="option in field.options" :key="option" :value="option">{{ option }}</option></select>
           <input v-else :id="field.path" :data-path="field.path" :aria-label="field.label" type="number" :aria-invalid="invalidPath === field.path || undefined" :aria-describedby="invalidPath === field.path ? `${field.path}-error` : undefined" :min="field.min" :max="field.max" :step="field.kind === 'int' ? 1 : 'any'" :value="shown(field)" :disabled="saving"
             @input="edit(field, ($event.target as HTMLInputElement).value)" />
-          <span v-if="field.unit" class="muted">{{ field.unit }}</span>
+          <span v-if="field.unit" class="muted unit">{{ field.unit }}</span>
           <span v-if="invalidPath === field.path" :id="`${field.path}-error`" class="error" role="alert">{{ saveError }}</span>
         </SettingRow>
         </section>
+        </div>
+        </div>
       </template>
     </section>
     <ConfirmModal v-if="discardOpen" :open="discardOpen" title="Discard unsaved tuning?" message="Your tuning changes have not been saved." confirm-label="Discard changes" @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
@@ -262,7 +276,22 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
 </template>
 
 <style scoped>
-input[type="number"], select { width: 10em; min-width: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; }
-.tuning-group { padding: 14px 16px; }
-.tuning-group + .tuning-group { border-top: 1px solid var(--border); }
+input[type="number"], select { width: 10em; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; font-variant-numeric: tabular-nums; }
+input[type="number"]:hover, select:hover { border-color: var(--muted); }
+.unit { min-width: 4.5em; font-size: 0.85rem; }
+.tuning-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 20px; padding: 16px; align-items: start; }
+.tuning-index { position: sticky; top: 0; display: flex; flex-direction: column; gap: 2px; }
+.index-link { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 0; border-radius: var(--radius-md); color: var(--muted); background: none; font: inherit; text-align: left; cursor: pointer; }
+.index-link:hover, .index-link:focus-visible { color: var(--text); background: var(--surface); }
+.count { min-width: 20px; padding: 0 6px; border-radius: var(--radius-full); color: var(--accent-contrast); background: var(--accent); font-size: 0.75rem; text-align: center; }
+.tuning-groups { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.tuning-group { padding: 4px 16px 8px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); scroll-margin-top: 8px; }
+.group-head { padding: 12px 0 8px; border-bottom: 1px solid var(--border); }
+.group-head h3 { margin: 0; font-size: 1rem; }
+.group-head p { margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; }
+@media (max-width: 767px) {
+  .tuning-layout { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+  .tuning-index { position: static; flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+  .index-link { flex: none; border: 1px solid var(--border); white-space: nowrap; }
+}
 </style>
