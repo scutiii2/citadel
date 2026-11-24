@@ -1,0 +1,18 @@
+{
+  "label": "NVIDIA",
+  "model": "meta/llama-3.3-70b-instruct",
+  "models": {
+    "light": {
+      "id": "meta/llama-3.3-70b-instruct",
+      "use_for": "lookups, extraction, short rewrites, simple formatting"
+    },
+    "standard": {
+      "id": "meta/llama-3.3-70b-instruct",
+      "use_for": "most tasks"
+    },
+    "heavy": {
+      "id": "meta/llama-3.3-70b-instruct",
+      "use_for": "multi-step reasoning, hard code or data analysis"
+    }
+  }
+}

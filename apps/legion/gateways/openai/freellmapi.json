@@ -1,0 +1,18 @@
+{
+  "label": "FreeLLMAPI",
+  "model": "tier:default",
+  "models": {
+    "light": {
+      "id": "tier:light",
+      "use_for": "lookups, extraction, short rewrites, simple formatting"
+    },
+    "standard": {
+      "id": "tier:standard",
+      "use_for": "most tasks"
+    },
+    "heavy": {
+      "id": "tier:heavy",
+      "use_for": "multi-step reasoning, hard code or data analysis"
+    }
+  }
+}
