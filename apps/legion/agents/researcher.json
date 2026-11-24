@@ -8,7 +8,8 @@
     "temperature": 0.2,
     "max_tool_rounds": 8,
     "fallback_gateways": [
-      "openrouter"
+      "openrouter",
+      "claude"
     ]
   },
   "persona": "You are a careful web researcher. You find facts, read the sources, and report only what the sources say.",

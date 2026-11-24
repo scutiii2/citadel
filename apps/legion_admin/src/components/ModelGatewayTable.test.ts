@@ -139,3 +139,29 @@ it("offers the presets in groups under the label Preset", async () => {
   expect(groups[0]!.findAll("option").map((option) => option.text())).toEqual(["AWS Bedrock", "Claude"]);
   wrapper.unmount();
 });
+
+it("shows which gateways are trusted, takes the preset's default and sends the switch", async () => {
+  const withTrust = {
+    ...list,
+    gateways: [{ id: "claude", provider: "anthropic", trusted: true }, { id: "omniroute", provider: "anthropic", trusted: false }],
+    presets: { ollama: { ...list.presets.ollama, trusted: true } },
+  };
+  vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue(withTrust as never);
+  const save = vi.spyOn(agentsAdminClient, "saveModelGateway").mockResolvedValue({ id: "ollama", provider: "openai" });
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
+  await flushPromises();
+  expect(wrapper.get('[data-test="trust-claude"]').text()).toBe("Trusted");
+  expect(wrapper.get('[data-test="trust-omniroute"]').text()).toBe("Not trusted");
+  await wrapper.get('[data-test="add-conversation"]').trigger("click");
+  await wrapper.get('[data-test="preset"]').setValue("ollama");
+  await wrapper.get('[data-test="preset"]').trigger("change");
+  const toggle = wrapper.get('[data-test="trusted"]');
+  expect((toggle.element as HTMLInputElement).checked).toBe(true);
+  await toggle.setValue(false);
+  await wrapper.get('[data-test="api_key"]').setValue("secret");
+  await wrapper.get("form").trigger("submit");
+  wrapper.findComponent({ name: "RecordDrawer" }).vm.$emit("save");
+  await flushPromises();
+  expect(save).toHaveBeenCalledWith("conversation", "ollama", expect.objectContaining({ trusted: false }));
+  wrapper.unmount();
+});

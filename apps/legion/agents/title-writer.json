@@ -13,7 +13,8 @@
     "max_tool_rounds": 1,
     "max_tier": "light",
     "fallback_gateways": [
-      "openrouter"
+      "openrouter",
+      "claude"
     ]
   },
   "identity": "You write titles.",

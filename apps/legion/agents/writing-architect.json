@@ -8,7 +8,8 @@
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",
-    "gateway": "omniroute"
+    "gateway": "omniroute",
+    "fallback_gateways": ["claude"]
   },
   "workers": [
     "writer"

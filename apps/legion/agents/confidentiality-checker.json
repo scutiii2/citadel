@@ -1,0 +1,21 @@
+{
+  "label": "Confidentiality Checker",
+  "port": 29629,
+  "plan_tool": false,
+  "enabled": true,
+  "entry": false,
+  "delegable": false,
+  "llm": {
+    "provider": "decision",
+    "strategy": "jev-only"
+  },
+  "persona": "",
+  "focus": "Internal: says whether a request holds confidential data (credentials, personal identifiers, private messages or documents), so Legion sends it only to trusted gateways. Uses Jev only. Called directly, never delegated to.",
+  "tools": {
+    "allow": [],
+    "deny": [
+      "*"
+    ]
+  },
+  "role": "specialist"
+}

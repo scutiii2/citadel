@@ -450,6 +450,29 @@ cooperative, and an already-running one-shot completion may finish upstream.
 
 Operations, approvals, runtime skill marking and the Ember rollout remain deferred.
 
+## Trusted gateways and confidential data
+
+Each model gateway has a **Trusted** switch on its setup (Model gateways page, chat and decision lists). A gateway
+without a saved choice defaults by what it is: the hosted models `claude`, `gpt`, `gemini` and Jev, and every gateway
+that runs on this machine (Ollama, the Scuti model services, Laya). Others, such as OmniRoute, OpenRouter,
+FreeLLMAPI, Bedrock and Vertex, start untrusted until an admin marks them. Code: `src/gateway/trust.py`.
+
+- **Every agent keeps one trusted gateway.** Saving an enabled agent whose gateways (`llm.gateway` and
+  `llm.fallback_gateways`) are all untrusted is refused (409). Untrusting or deleting a gateway that is the only trusted
+  one of an enabled agent is refused too, naming the agents. Decision agents have no chat gateway and are not checked.
+- **Confidential data goes only to trusted gateways.** The `confidentiality-checker` agent
+  (`agents/confidentiality-checker.json`, decision provider, strategy `jev-only`) says whether text holds credentials,
+  personal identifiers, bank or card numbers, health, legal or financial details, or private messages and documents
+  (`src/runtime/confidentiality.py`). The check runs at the start of a turn, and again on each round of tool results,
+  only while the agent has an untrusted gateway to protect from. A confidential turn moves to the first trusted
+  gateway of the agent (the step list shows a gateway switch with reason `confidential`) and stays on trusted ones:
+  failover never picks an untrusted gateway. Delegated agents inherit the mark (`ask(confidential=true)`).
+- **It fails closed.** A checker that is missing, disabled, unreachable, slow or unsure counts as confidential. When
+  no trusted gateway can take a confidential turn (credentials missing, in cooldown), the turn ends with an error and
+  nothing is sent to an untrusted one.
+- **Not covered:** decision agents (Router, auto-tier) and text that only appears after the last tool result of a
+  turn; the check reads at most 4,000 characters (start and end) of what it is given.
+
 ## Internal Router agent
 
 `agents/router.json` defines the supervised internal Router on port 29616. It is

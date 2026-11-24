@@ -181,6 +181,7 @@ async def ask(
     exact_context: bool = False,
     limits: dict[str, int] | None = None,
     chat_id: str | None = None,
+    confidential: bool = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ask this agent a question. Runs its own tool-calling loop against
@@ -217,6 +218,8 @@ async def ask(
     model to update the checklist only when an item changes status.
     limits: the asking user's own output-token and tool-round caps; lower only.
     chat_id: the chat for Stronghold's tools, used only as a selection hint.
+    confidential: the request is known to hold confidential data (a delegating agent found it so): only this
+    agent's trusted gateways are used (runtime/confidentiality.py).
 
     exact_context: count what fills the context window with the provider's own
     token counter; the result's `context_breakdown_exact` says whether that worked.
@@ -257,7 +260,8 @@ async def ask(
             question, history or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
             disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
-            allow_read_only=allow_read_only, exact_context=exact_context, **tier_args, **private_args, **limit_args,
+            allow_read_only=allow_read_only, exact_context=exact_context, confidential=confidential,
+            **tier_args, **private_args, **limit_args,
         )
     except ChatCancelled as error:
         reply = _cancelled_result()

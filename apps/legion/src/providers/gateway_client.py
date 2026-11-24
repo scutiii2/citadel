@@ -13,6 +13,7 @@ import time
 from typing import Any, AsyncIterator
 
 from src import gateway
+from src.gateway import trust
 from src.gateway.conversation.contract import Limits, parse_request
 from src.gateway.conversation.errors import GatewayError
 from src.gateway.conversation.settings import Settings
@@ -81,6 +82,13 @@ def saved_gateway_ids() -> frozenset[str]:
 def is_saved(gateway_id: str) -> bool:
     """Whether a gateway named `gateway_id` is saved."""
     return gateway_id in saved_gateway_ids()
+
+
+def is_trusted(gateway_id: str) -> bool:
+    """Whether confidential data may go to this gateway: its saved entry says so, or, when it is not saved
+    (a gateway only in gateways/), its default (src/gateway/trust.py)."""
+    saved = gateway.chat_store().all().get(gateway_id)
+    return trust.conversation(gateway_id, saved if isinstance(saved, dict) else None)
 
 
 def reset_cache() -> None:

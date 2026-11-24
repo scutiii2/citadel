@@ -12,6 +12,7 @@ from typing import Any
 import sqlite3
 
 from src.citadel_auth import settings_store
+from src.gateway import trust
 from src.gateway.shared import MAX_TOKEN, valid_url as _valid_url
 
 KINDS = ("typesafe", "ollama", "scuti", "freellmapi")
@@ -59,7 +60,7 @@ class GatewayStore:
 
     @staticmethod
     def _public(gid: str, entry: dict[str, Any]) -> dict[str, Any]:
-        out = {"id": gid, **{k: v for k, v in entry.items() if k not in _SECRETS}}
+        out = {"id": gid, **{k: v for k, v in entry.items() if k not in _SECRETS}, "trusted": trust.decision(gid, entry)}
         resolved = resolve(entry)
         for secret, flag in _SECRETS.items():
             if secret in _FIELDS.get(entry.get("kind", ""), ()):
@@ -133,6 +134,8 @@ class GatewayStore:
                 if isinstance(window, bool) or not isinstance(window, int) or not 16 <= window <= 8192:
                     raise ValueError("The window must be a whole number from 16 to 8192.")
                 entry["window"] = window
+        if (trusted := trust.clean(data, old)) is not None:
+            entry["trusted"] = trusted
         return entry
 
     def delete(self, gid: str) -> bool:
