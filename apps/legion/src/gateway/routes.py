@@ -103,6 +103,9 @@ def register(mcp: FastMCP) -> None:
             return JSONResponse({"error": "unknown gateway"}, status_code=404)
         rows = await gateway.call(parts[0].gateways())
         if kind == "conversation":
+            from src.providers import cooldown
+
+            rows = [{**row, "health": cooldown.health(cooldown.gateway_key(str(row.get("provider")), str(row["id"])))} for row in rows]
             presets = {key: {**preset, "trusted": trust.conversation(key, preset)} for key, preset in _with_tiers(CONVERSATION_PRESETS).items()}
             return JSONResponse({"gateways": rows, "form": CONVERSATION_FORM, "presets": presets})
         presets = {key: {**preset, "trusted": trust.decision(key, preset)} for key, preset in DECISION_PRESETS.items()}

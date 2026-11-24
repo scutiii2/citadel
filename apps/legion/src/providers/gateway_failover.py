@@ -126,7 +126,7 @@ class GatewayRoute:
         kind = classify(error)
         if kind is None:
             return None
-        cooldown.start_cooldown(cooldown.gateway_key(self.provider, self.current), cooldown_seconds(kind, error))
+        cooldown.start_cooldown(cooldown.gateway_key(self.provider, self.current), cooldown_seconds(kind, error), kind.value)
         for index in range(self._index + 1, len(self.candidates)):
             name = self.candidates[index]
             if not self._usable(name):

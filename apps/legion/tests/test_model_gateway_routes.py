@@ -82,3 +82,13 @@ def test_presets_say_whether_they_start_trusted(client):
     assert not chat["omniroute"]["trusted"] and not chat["freellmapi"]["trusted"]
     decision = client.get("/agents/model-gateways/decision").json()["presets"]
     assert decision["jev"]["trusted"] and not decision["freellmapi"]["trusted"]
+
+
+def test_a_chat_gateway_lists_its_health(client):
+    from src.providers import cooldown
+
+    client.put("/agents/model-gateways/conversation/groq", json={"provider": "openai", "base_url": "http://host.docker.internal:1/v1", "model": "m"})
+    assert client.get("/agents/model-gateways/conversation").json()["gateways"][0]["health"]["failures_24h"] == 0
+    cooldown.start_cooldown(cooldown.gateway_key("openai", "groq"), 45, "rate_limit")
+    health = client.get("/agents/model-gateways/conversation").json()["gateways"][0]["health"]
+    assert health["failures_24h"] == 1 and health["last_kind"] == "rate_limit" and health["cooldown_seconds"] > 0

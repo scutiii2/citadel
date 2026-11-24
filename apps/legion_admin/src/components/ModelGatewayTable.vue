@@ -298,6 +298,8 @@ async function remove() {
   }
 }
 
+const healthOf = (row: ModelGatewayRow) => row.health as { cooldown_seconds: number; failures_24h: number; last_kind: string | null } | undefined;
+const minutes = (seconds: number) => (seconds < 90 ? `for ${seconds} s` : `for ${Math.round(seconds / 60)} min`);
 const hasSecret = (name: string) => Boolean(selected.value?.[`has_${name}`]) && !creating.value;
 const summary = (row: ModelGatewayRow) => String(row.model ?? row.project ?? row.url ?? row.base_url ?? "");
 const drawerTitle = computed(() => (creating.value ? `Add ${props.title.toLowerCase()} gateway` : selected.value?.id ?? props.title));
@@ -326,7 +328,7 @@ onMounted(load);
     </p>
     <div v-else-if="list" class="admin-table-scroll" tabindex="0" role="region" :aria-labelledby="`${kind}-gateways-title`">
       <table class="admin-records">
-        <thead><tr><th scope="col">Name</th><th scope="col">{{ chat ? "Provider and model" : "Kind and address" }}</th><th scope="col">Test</th><th scope="col">Result</th></tr></thead>
+        <thead><tr><th scope="col">Name</th><th scope="col">{{ chat ? "Provider and model" : "Kind and address" }}</th><th scope="col">Test</th><th scope="col">Result</th><th v-if="chat" scope="col">Health</th></tr></thead>
         <tbody>
           <tr v-for="row in rows" :key="row.id">
             <th scope="row">
@@ -343,6 +345,16 @@ onMounted(load);
             </th>
             <td><code>{{ summary(row) || "—" }}</code><p class="kind">{{ row.provider ?? row.kind }}</p></td>
             <ConnectionTestCells :label="row.id" :run="() => agentsAdminClient.testModelGateway(kind, row.id)" />
+            <td v-if="chat" :data-test="`health-${row.id}`">
+              <p v-if="healthOf(row)?.cooldown_seconds" class="health bad">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>Cooling down {{ minutes(healthOf(row)!.cooldown_seconds) }}
+                <PanelHelp :title="`${row.id} is cooling down`">Its last call failed ({{ healthOf(row)?.last_kind?.replace('_', ' ') }}), so agents skip it until the time is up and use their other gateways. A restart does not clear it.</PanelHelp>
+              </p>
+              <p v-else-if="healthOf(row)?.failures_24h" class="health warn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z M12 10v4 M12 17h.01" /></svg>{{ healthOf(row)!.failures_24h }} failure{{ healthOf(row)!.failures_24h === 1 ? "" : "s" }} in 24 hours
+              </p>
+              <p v-else class="health muted">No failures in 24 hours</p>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -458,6 +470,10 @@ onMounted(load);
 <style scoped>
 .admin-panel-card { margin-bottom: 14px; }
 .kind { margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
+.health { display: flex; align-items: center; gap: 4px; margin: 0; font-size: 0.85rem; }
+.health svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.health.bad { color: var(--danger); }
+.health.warn { color: var(--warning); }
 .trust { display: flex; align-items: center; gap: 4px; margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
 .trust.on { color: var(--success); }
 .trust svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

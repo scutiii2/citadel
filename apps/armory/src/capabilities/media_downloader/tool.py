@@ -30,7 +30,7 @@ def tool_media_probe(url: Annotated[str, Field(description="Full public http(s) 
 
 
 @command(name="download", description="Queue a video, music or photo download")
-@mcp.tool(meta={"keywords": ["video", "media", "download", "audio", "music", "mp3", "photo", "tiktok", "instagram", "pinterest"], "display_label": "Queueing media download"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True), meta={"keywords": ["video", "media", "download", "audio", "music", "mp3", "photo", "tiktok", "instagram", "pinterest"], "display_label": "Queueing media download"})
 @offload
 def tool_media_download(
     url: Annotated[str, Field(description="Full public http(s) link to a video, music track, image or single photo post.")],
@@ -64,7 +64,7 @@ def tool_media_listFiles() -> ListFilesResult:
 
 
 @command(name='package', description='Create, edit or start a grouped media ZIP download')
-@mcp.tool(meta={'keywords': ['media', 'package', 'group', 'batch', 'zip', 'download'], 'display_label': 'Updating media package'})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True), meta={'keywords': ['media', 'package', 'group', 'batch', 'zip', 'download'], 'display_label': 'Updating media package'})
 @offload
 def tool_media_package(
     action: Annotated[Literal['create', 'add', 'remove', 'start'], Field(description='create a named draft, add links, remove an item, or start and permanently lock the package.')],

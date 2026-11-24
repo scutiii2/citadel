@@ -54,6 +54,7 @@ def test_route_skips_missing_credentials_and_cooldowns_and_never_flaps():
 def test_primary_recovers_on_next_turn(monkeypatch):
     clock = [100.0]
     monkeypatch.setattr(cooldown.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(cooldown.time, "time", lambda: clock[0] + 1_000_000)  # the shared table counts in wall-clock seconds
     route = failover.GatewayRoute.for_turn("openai", "primary", ["backup"], lambda _: True)
     route.advance(gateway_error(500))
     assert route.current == "backup"
@@ -109,3 +110,24 @@ def test_an_unknown_gateway_kind_is_not_retried():
 def test_rate_limit_cooldown_uses_the_gateway_retry_after():
     error = gateway_error(429, retry_after=7.0)
     assert failover.cooldown_seconds(failover.FailureKind.rate_limit, error) == 7.0
+
+
+def test_a_cooldown_is_shared_with_other_processes_and_survives_a_restart():
+    cooldown.start_cooldown("anthropic:omniroute", 120, "quota")
+    cooldown._cooldown_until.clear()  # a fresh process: nothing in memory
+    cooldown._synced_at = float("-inf")
+    assert cooldown.is_in_cooldown("anthropic:omniroute") and 100 < cooldown.seconds_remaining("anthropic:omniroute") <= 120
+
+
+def test_the_health_of_a_gateway_counts_its_recent_failures():
+    assert cooldown.health("openai:groq") == {"cooldown_seconds": 0, "failures_24h": 0, "last_failure_at": None, "last_kind": None}
+    cooldown.start_cooldown("openai:groq", 30, "rate_limit")
+    cooldown.start_cooldown("openai:groq", 30, "unavailable")
+    health = cooldown.health("openai:groq")
+    assert health["failures_24h"] == 2 and health["last_kind"] == "unavailable" and 0 < health["cooldown_seconds"] <= 30
+
+
+def test_an_unwritable_database_does_not_stop_a_turn(monkeypatch, tmp_path):
+    monkeypatch.setattr(cooldown, "DB", tmp_path)  # a folder, not a database file
+    cooldown.start_cooldown("openai:groq", 30, "quota")
+    assert cooldown.is_in_cooldown("openai:groq")

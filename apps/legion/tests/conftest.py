@@ -64,6 +64,10 @@ def _isolated_tuning_overrides(monkeypatch, tmp_path):
     """The admin's tuning edits (tool-call limits included) come from an empty per-test database, never the developer's settings.db."""
     from src.runtime import tool_batch_settings, tuning_overrides
 
+    from src.providers import cooldown
+
+    monkeypatch.setattr(cooldown, "DB", tmp_path / "cooldowns.db")
+    monkeypatch.setattr(cooldown, "_synced_at", float("-inf"))
     monkeypatch.setattr(tuning_overrides, "PATH", tmp_path / "tuning.db")
     monkeypatch.setattr(tuning_overrides, "_migrated", set())
     monkeypatch.setattr(tool_batch_settings, "_cache", None)

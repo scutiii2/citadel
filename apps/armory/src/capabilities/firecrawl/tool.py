@@ -3,6 +3,8 @@ Build the Firecrawl client from settings, call the domain function."""
 
 from __future__ import annotations
 
+from mcp.types import ToolAnnotations
+
 from typing import Annotated
 
 from pydantic import Field
@@ -26,7 +28,7 @@ def _client() -> FirecrawlClient:
 
 
 @command(name="page", description="Scrape a web page as markdown")
-@mcp.tool(meta={"keywords": ["scrape", "firecrawl", "web", "page", "url", "markdown", "extract", "article"], "display_label": "Scraping web page"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True), meta={"keywords": ["scrape", "firecrawl", "web", "page", "url", "markdown", "extract", "article"], "display_label": "Scraping web page"})
 @numbered_dependency("firecrawl", FirecrawlError)
 @offload
 def tool_scrape_page(
@@ -40,7 +42,7 @@ def tool_scrape_page(
 
 
 @command(name="map", description="List the pages of a site")
-@mcp.tool(meta={"keywords": ["scrape", "firecrawl", "map", "sitemap", "site", "links", "urls", "pages"], "display_label": "Mapping web site"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True), meta={"keywords": ["scrape", "firecrawl", "map", "sitemap", "site", "links", "urls", "pages"], "display_label": "Mapping web site"})
 @numbered_dependency("firecrawl", FirecrawlError)
 @offload
 def tool_scrape_map(
@@ -54,7 +56,7 @@ def tool_scrape_map(
 
 
 @command(name="crawl", description="Crawl a site and read its pages")
-@mcp.tool(meta={"keywords": ["scrape", "firecrawl", "crawl", "site", "docs", "documentation", "spider", "pages"], "display_label": "Crawling web site"})
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True), meta={"keywords": ["scrape", "firecrawl", "crawl", "site", "docs", "documentation", "spider", "pages"], "display_label": "Crawling web site"})
 @numbered_dependency("firecrawl", FirecrawlError)
 @offload
 def tool_scrape_crawl(

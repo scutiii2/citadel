@@ -60,6 +60,13 @@ def run(strategy: str, request: DecisionRequest, *, gateways: Mapping[str, Decis
     gateways = gateways if gateways is not None else default_gateways()
     effective_strategy = "laya-only" if request.local_only else strategy
     names = [n for n in _ORDER[effective_strategy] if not (request.local_only and not gateways[n].local)]
+    from src.providers.decision import gateway_client
+    from src.runtime import confidentiality  # imports the providers, so not at the top
+
+    if confidentiality.current():
+        names = [n for n in names if gateway_client.is_trusted(n)]
+        if not names:
+            raise DecisionError("this request holds confidential data and no trusted decision gateway can take it")
     pending = dict(request.questions)
     answers: dict[str, dict[str, Any]] = {}
     tokens = 0

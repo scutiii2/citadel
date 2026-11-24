@@ -183,3 +183,59 @@ def test_the_turn_is_checked_only_when_the_agent_has_an_untrusted_gateway(monkey
         assert asyncio.run(run()) is True and check.await_count == 1
     finally:
         confidentiality.reset(token)
+
+
+def test_a_confidential_turn_skips_untrusted_decision_gateways_and_refuses_when_none_is_left(monkeypatch):
+    from src.providers.decision import gateway_client as decision_client, strategy
+    from src.providers.decision.contract import DecisionError, DecisionRequest
+
+    class Fake:
+        local = False
+
+        def __init__(self, name):
+            self.name, self.calls = name, 0
+
+        def available(self):
+            return True
+
+        def ask(self, request, limit):
+            self.calls += 1
+            return None
+
+    laya, jev = Fake("laya"), Fake("jev")
+    monkeypatch.setattr(decision_client, "is_trusted", lambda name: name == "laya")
+    request = DecisionRequest("t", {"q": {"type": "choice", "instructions": "x", "criteria": {"a": "a", "b": "b"}}})
+    token = confidentiality.bind(True)
+    try:
+        try:
+            strategy.run("both", request, gateways={"laya": laya, "jev": jev})
+        except DecisionError:
+            pass
+        assert laya.calls == 1 and jev.calls == 0
+        with pytest.raises(DecisionError, match="no trusted decision gateway"):
+            strategy.run("jev-only", request, gateways={"laya": laya, "jev": jev})
+    finally:
+        confidentiality.reset(token)
+
+
+def test_recall_and_private_extensions_mark_the_turn_when_an_untrusted_gateway_could_get_it(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from src.agents import agent_config
+    from src.agents.roles.orchestrator import memory_recall
+
+    _agent_spec(monkeypatch, "omniroute", "claude")
+    monkeypatch.setattr(memory_recall, "with_recall", AsyncMock(return_value="note: my bank pin is 1234\n\nquestion"))
+    monkeypatch.setattr(agent_config.agent_spec, "_current", __import__("dataclasses").replace(agent_config.agent_spec.current(), memory_recall=True))
+    seen = []
+
+    async def run_chat(question, history, model, request_id, depth, **kw):
+        seen.append(confidentiality.current())
+        return SimpleNamespace(response="ok", delegated_usage=[], model_tier=None, model_note=None, reasoning_effort=None,
+                               effort_note=None, private_extension_errors=[])
+
+    monkeypatch.setattr(agent_config, "_PROVIDER_MODULE", SimpleNamespace(run_chat=run_chat, DEFAULT_MODEL="m"))
+    monkeypatch.setattr(agent_config.router_routing, "route_turn", AsyncMock(return_value=(None, None, "")))
+    asyncio.run(agent_config.run_chat("question", []))
+    assert seen == [True]
