@@ -46,6 +46,8 @@ export interface AgentConfig {
   entry?: boolean;
   /** Offer the update_plan checklist tool; on when unset. */
   plan_tool?: boolean;
+  /** Suggest a reusable skill after a qualifying task, for the user to approve; off when unset. */
+  skill_learning?: boolean;
   llm: AgentLlm;
   persona?: string;
   instructions?: string;

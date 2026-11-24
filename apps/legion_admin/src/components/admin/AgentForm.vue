@@ -43,6 +43,7 @@ const enabled = ref(true);
 const entry = ref(false);
 const role = ref<"orchestrator" | "router" | "specialist">("specialist");
 const planTool = ref(true);
+const skillLearning = ref(false);
 const provider = ref("anthropic");
 const decisionStrategy = ref<"laya-only" | "jev-only" | "both">("both");
 const minConfidence = ref("");
@@ -133,7 +134,7 @@ const initialDraft = ref("");
 function draftSignature(): string {
   return JSON.stringify([
     id.value, label.value, port.value, url.value, enabled.value, entry.value,
-    role.value, planTool.value, provider.value, decisionStrategy.value, minConfidence.value,
+    role.value, planTool.value, skillLearning.value, provider.value, decisionStrategy.value, minConfidence.value,
     gatewayRows.value.map(({ gateway, model }) => [gateway, model]),
     effort.value, minTier.value, maxTier.value, identity.value, temperature.value,
     maxTokens.value, maxToolRounds.value, maxTurnTokens.value, maxTurnSeconds.value, maxEffort.value, persona.value,
@@ -159,6 +160,7 @@ watch(
     entry.value = a?.entry ?? false;
     role.value = a?.role ?? "specialist";
     planTool.value = a?.plan_tool !== false;
+    skillLearning.value = a?.skill_learning === true;
     provider.value = a?.llm?.provider ?? providerIds.value[0] ?? "anthropic";
     decisionStrategy.value = a?.llm?.strategy ?? "both";
     minConfidence.value = a?.llm?.min_confidence === undefined ? "" : String(a.llm.min_confidence);
@@ -305,6 +307,9 @@ function buildConfig(): AgentConfig | null {
   // On is the default: leave the key out so existing agent files stay as they are.
   if (planTool.value) delete config.plan_tool;
   else config.plan_tool = false;
+  // Off is the default: leave the key out. A decision agent has no tools, so it cannot learn skills.
+  if (skillLearning.value && !isDecision.value) config.skill_learning = true;
+  else delete config.skill_learning;
   if (isRouter.value) {
     config.decision = decision.value;
     config.entry = false;
@@ -376,6 +381,7 @@ function previewPrompt(): void {
       <div class="switches">
         <ToggleSwitch :checked="enabled" data-test="enabled" @change="enabled = ($event.target as HTMLInputElement).checked">Enabled</ToggleSwitch>
         <ToggleSwitch v-if="!isRouter" :checked="planTool" :disabled="isDecision" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
+        <ToggleSwitch v-if="!isRouter" :checked="skillLearning" :disabled="isDecision" data-test="skill-learning" @change="skillLearning = ($event.target as HTMLInputElement).checked">Skill learning (after a task with 3 or more tool calls, suggest a reusable skill for you to approve)</ToggleSwitch>
         <ToggleSwitch v-if="!isRouter" :checked="entry" :disabled="isDecision" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
       </div>
       <p v-if="planTool && !isDecision" class="hint" data-test="plan-tool-cost">Task checklist costs about 200 input tokens on every model call of this agent, plus about 15-25 output tokens per item each time it updates the list. Turn it off for agents that only do short tasks.</p>

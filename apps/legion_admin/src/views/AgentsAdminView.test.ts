@@ -510,6 +510,23 @@ describe("AgentsAdminView", () => {
     expect(update.mock.calls[1]![1]).toMatchObject({ plan_tool: false });
   });
 
+  it("leaves skill_learning out while it is off and writes true when it is switched on", async () => {
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(EMBER);
+    const wrapper = await mounted();
+    await edit(wrapper, "ember");
+    expect((wrapper.find("input[data-test=skill-learning]").element as HTMLInputElement).checked).toBe(false);
+
+    await submit(wrapper);
+    await flushPromises();
+    expect(update.mock.calls[0]![1]).not.toHaveProperty("skill_learning");
+
+    await wrapper.get('dialog[open] [data-test="edit"]').trigger("click");
+    await wrapper.find("input[data-test=skill-learning]").setValue(true);
+    await submit(wrapper);
+    await flushPromises();
+    expect(update.mock.calls[1]![1]).toMatchObject({ skill_learning: true });
+  });
+
   it("refuses a model setting that is out of range before calling the server", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();
