@@ -153,6 +153,24 @@ def test_missing_fallback_file_is_startup_error(monkeypatch):
         agent_config._resolve()
 
 
+def test_a_saved_fallback_gateway_without_a_file_is_not_a_startup_error(monkeypatch, tmp_path):
+    from src import gateway
+    from src.agents import agent_config, agent_spec
+    from src.providers import llm_config
+
+    monkeypatch.setattr(gateway, "_database", lambda: tmp_path / "settings.db")
+    for name in ("_chat", "_chat_store", "_decision", "_decision_store"):
+        monkeypatch.setattr(gateway, name, None)
+    gateway.chat_store().put("freellmapi", {"provider": "openai", "base_url": "http://host.docker.internal:1/v1", "model": "x"})
+    monkeypatch.setenv("AI_AGENT_PROVIDER", "anthropic")
+    spec = agent_spec.current()
+    monkeypatch.setattr(agent_spec, "_current", replace(spec, source=Path("calc.json"), llm=replace(spec.llm,
+                        fallback_gateways=(agent_spec.GatewayChoice("freellmapi"),))))
+    monkeypatch.setattr(agent_config._PROVIDER_MODULE, "has_api_key", lambda gateway=None: True)
+    monkeypatch.setattr(llm_config, "_config", {"anthropic": {"claude": {}}})
+    agent_config._resolve()
+
+
 def test_missing_fallback_credentials_warn_and_route_skips_it(monkeypatch, caplog):
     from src.agents import agent_config, agent_spec
     from src.providers.language import anthropic_provider
@@ -560,7 +578,7 @@ def _recall_chat(monkeypatch, recall_calls, cancel_first=False):
 
     reloaded = importlib.reload(agent_config)
     spec = SimpleNamespace(id="ember", entry=False, orchestrator=False, internal_role=None,
-        memory_recall=True, skill_recall=False, skill_learning=False, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None, provider="decision", strategy="jev-only"))
+        memory_recall=True, skill_recall=False, skill_learning=False, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None, provider="anthropic", strategy="jev-only", fallback_gateways=(), gateway=None))
     monkeypatch.setattr(reloaded.agent_spec, "current", lambda: spec)
 
     async def fake_recall(question, on_event=None):

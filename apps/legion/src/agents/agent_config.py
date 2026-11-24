@@ -86,7 +86,8 @@ def _resolve() -> tuple[str, Any]:
     for index, choice in enumerate(spec.llm.fallback_gateways):
         where = f"{spec.source or spec.id}: llm.fallback_gateways[{index}].gateway"
         try:
-            llm_config.gateway(gateway_protocols.protocol_of(choice.gateway, provider_id), choice.gateway)
+            # tiers() finds a gateway in gateways/ or saved on the Model gateways page, which may have no file.
+            llm_config.tiers(gateway_protocols.protocol_of(choice.gateway, provider_id), choice.gateway)
         except KeyError:
             raise AgentConfigError(f"{where}: gateway {choice.gateway!r} has no file") from None
         if not module.has_api_key(choice.gateway):
