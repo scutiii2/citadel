@@ -77,6 +77,7 @@ const reasons: [string, string][] = [["check", "Found by the check"], ["tool_res
             <StatTile label="Left to Ember" :value="n('router.agent_uncertain')" />
             <StatTile label="Sent straight to a specialist" :value="n('router.dispatched')" />
             <StatTile label="Router unavailable" :value="n('router.unavailable')" warn />
+            <StatTile label="Turns moved to another protocol" :value="n('failover.protocol_switch')" />
           </div>
           <p class="note">Picked share: {{ percent(n("router.agent_picked"), n("router.turns")) }}. Tier chosen:
             <span v-for="tier in tiers" :key="tier" class="chip-text">{{ tier === "none" ? "default" : tier }} {{ n("router.tier." + tier) }}</span></p>

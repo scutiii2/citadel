@@ -235,8 +235,9 @@ function buildConfig(): AgentConfig | null {
   }
   if (!isDecision.value) {
     const names = gatewayRows.value.map((row) => row.gateway || DEFAULT_GATEWAY[provider.value]);
-    if (!names.length || names.some((name) => !gateways.value.some((g) => g.id === name))) {
-      localError.value = "Choose at least one available gateway for this provider.";
+    const chat = Object.entries(props.providers).filter(([id]) => id !== "decision").flatMap(([, list]) => list);
+    if (!names.length || names.some((name, index) => !(index === 0 ? gateways.value : chat).some((g) => g.id === name))) {
+      localError.value = "Choose an available gateway for each row; the primary must use this provider's protocol.";
       return null;
     }
     if (new Set(names).size !== names.length) {

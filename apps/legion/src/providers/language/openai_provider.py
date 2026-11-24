@@ -27,7 +27,7 @@ from src.runtime import confidentiality, run_tools
 from src.runtime.tool_batch import Call, ToolRound
 
 from src.agents.agent_spec import RosterEntry
-from src.providers import cancellation, cooldown, gateway_client, llm_config, llm_options, token_limits
+from src.providers import cancellation, cooldown, gateway_client, gateway_protocols, llm_config, llm_options, token_limits
 from src.providers.gateway_client import GatewayCallError
 from src.providers.language.openai_gateway_shim import GatewayShim
 from src.agents.agent_roles import SYSTEM_PROMPT, roster_block, system_prompt_for
@@ -58,7 +58,8 @@ class _OpenAI(BaseProvider):
 
     @classmethod
     def _gateway_name(cls) -> str:
-        return os.getenv(cls.GATEWAY_ENV) or "gpt"
+        # Only this protocol's gateways: an agent may list gateways of the other protocol too (gateway_protocols).
+        return (gateway_protocols.order(cls.PROVIDER_ID) or (os.getenv(cls.GATEWAY_ENV) or "gpt",))[0]
 
     @classmethod
     def has_api_key(cls, gateway: str | None = None) -> bool:
@@ -69,7 +70,7 @@ class _OpenAI(BaseProvider):
 
     @classmethod
     def is_available(cls) -> bool:
-        names = (cls._gateway_name(), *(choice.gateway for choice in agent_spec.current().llm.fallback_gateways))
+        names = gateway_protocols.order(cls.PROVIDER_ID) or (cls._gateway_name(),)
         return any(cls.has_api_key(name) and not cooldown.is_in_cooldown(cooldown.gateway_key(cls.PROVIDER_ID, name))
                    for name in names)
 
@@ -248,7 +249,7 @@ def _route_for_turn() -> GatewayRoute:
 
 def _open_route() -> GatewayRoute:
     return GatewayRoute.for_turn(PROVIDER_ID, _OpenAI._gateway_name(),
-                                 (choice.gateway for choice in agent_spec.current().llm.fallback_gateways),
+                                 gateway_protocols.order(PROVIDER_ID)[1:],
                                  lambda gateway: has_api_key(gateway))
 
 

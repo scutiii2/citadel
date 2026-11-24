@@ -171,7 +171,7 @@ ordered list in that agent's `llm` block; this example enables nothing by itself
 }
 ```
 
-Every name must have a gateway file under the same provider. Duplicate names,
+Every name must be a chat gateway. Duplicate names,
 the primary itself, malformed entries, unknown entry keys, and fallbacks on
 Laya are rejected. A missing primary key still prevents startup; an unkeyed
 backup is warned about at startup and skipped. Admin overrides accept the
@@ -184,6 +184,25 @@ from earlier rounds is removed before sending to another gateway. Partial
 answer text is reset before retrying. Ordinary bad requests and cancellation
 do not trigger failover. If every candidate fails, the last error is raised;
 if all are cooling down at turn start, the primary is attempted once.
+
+#### Backups of the other protocol
+
+A backup may speak the other chat protocol (an `anthropic` agent can list an `openai` gateway, and the reverse). The
+list is then split by protocol (`src/providers/gateway_protocols.py`; a gateway's protocol is the `provider` of its
+saved entry): each provider module runs only its own protocol's gateways, in list order.
+
+- A turn starts on the first protocol that has a gateway that is saved, outside cooldown, and trusted when the turn is
+  confidential.
+- When every gateway of that protocol has failed (or none is trusted for a confidential turn), the **whole turn is run
+  again from the start** on the next protocol with the same question and history. Nothing in flight is converted:
+  history between turns is protocol-neutral, and the tool loop stays in each protocol's own message shape.
+- The rerun happens only while the turn has run nothing that could change something. A tool that is not a known
+  read-only built-in, or a call to another agent, ends the right to rerun (`src/runtime/turn_effects.py`); the error is
+  then raised as for a single protocol.
+- The client gets `token_reset` (so the streamed text is cleared) and a `gateway_switch` event with reason `protocol`.
+  The count is `failover.protocol_switch` on the Insights page.
+- The other protocol runs with that gateway's own pinned `model`, else the requested tier on that gateway's tiers, else
+  its default model; the agent's pinned `model` belongs to the primary protocol and is not used there.
 
 Backups use their explicit `model` first, otherwise the matching primary tier,
 then their gateway's default model, then the provider default. The advertised

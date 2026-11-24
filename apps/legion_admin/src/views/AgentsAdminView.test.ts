@@ -114,7 +114,13 @@ describe("per-agent gateway order", () => {
     const backup = wrapper.find<HTMLSelectElement>("[data-test=backup-gateway]");
     expect(backup.element.value).toBe("openrouter");
     expect(backup.find<HTMLOptionElement>('option[value="claude"]').element.disabled).toBe(true);
+    // Every same-protocol gateway is used, but the openai one may still be a backup: the agent moves a turn to it when anthropic has none left.
+    expect(wrapper.find<HTMLButtonElement>("[data-test=add-gateway]").element.disabled).toBe(false);
+    await wrapper.find("[data-test=add-gateway]").trigger("click");
+    expect(wrapper.findAll("[data-test=gateway-row]")[2]!.find<HTMLSelectElement>("[data-test=backup-gateway]").element.value).toBe("gpt");
+    expect(wrapper.findAll("[data-test=gateway-row]")[2]!.text()).toContain("Backup · openai");
     expect(wrapper.find<HTMLButtonElement>("[data-test=add-gateway]").element.disabled).toBe(true);
+    await wrapper.findAll("[data-test=gateway-row]")[2]!.find("[data-test=remove-gateway]").trigger("click");
     await wrapper.findAll("[data-test=gateway-row]")[1]!.find("[data-test=remove-gateway]").trigger("click");
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
     wrapper.unmount();
