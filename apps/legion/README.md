@@ -122,7 +122,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `llm.strategy` | decision only | `both` | `laya-only`, `jev-only`, or `both`. |
 | `llm.min_confidence` | decision only | unset | Above 0 and at most 1. Unset: each model applies its own thresholds. Per-request overrides are accepted. |
 | `llm.gateway` | no | provider default | A filename stem from `gateways/<provider>/<gateway>.json`. |
-| `llm.fallback_gateways` | no | `[]` | Ordered same-provider backup gateways, as names or `{gateway, model?}` objects. See Gateway failover below. |
+| `llm.fallback_gateways` | no | `[]` | Ordered same-provider backup gateways, as names or `{gateway, model?}` objects. At most 19, so an agent holds 20 gateways with its primary. See Gateway failover below. |
 | `llm.model` | no | gateway's `model` | Model id. |
 | `llm.temperature` | no | unset (provider default) | Float 0-2. |
 | `llm.reasoning_effort` | no | `off` | `off`, `low`, `medium`, `high`. Maps to the Anthropic thinking budget or OpenAI `reasoning_effort`. |

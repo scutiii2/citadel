@@ -42,6 +42,7 @@ _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "decision": "laya"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 _TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "role", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "decision", "kind", "workers", "prefetch", "limits"}
+MAX_GATEWAYS = 20  # the primary gateway plus its fallbacks
 _LLM_KEYS = {"strategy", "min_confidence", "provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort", "fallback_gateways"}
 _TOOLS_KEYS = {"allow", "deny"}
 
@@ -460,6 +461,8 @@ def load_file(path: Path) -> AgentSpec:
         raise check.fail("llm.fallback_gateways", "must be a list")
     if provider == "decision" and fallback_data:
         raise check.fail("llm.fallback_gateways", "Laya does not support gateway failover")
+    if len(fallback_data) >= MAX_GATEWAYS:
+        raise check.fail("llm.fallback_gateways", f"allows at most {MAX_GATEWAYS - 1} fallbacks, {MAX_GATEWAYS} gateways with the primary")
     primary = check.text(llm_data, "gateway", None, "llm.") or _DEFAULT_GATEWAY[provider]
     choices: list[GatewayChoice] = []
     seen = {primary}

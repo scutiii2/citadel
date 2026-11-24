@@ -53,6 +53,16 @@ def test_fallback_gateways_preserve_order_and_primary_environ(tmp_path, monkeypa
     assert os.environ["AI_AGENT_MODEL"] == ""
 
 
+def test_an_agent_holds_at_most_twenty_gateways(tmp_path):
+    def spec(count):
+        names = [f"backup{n}" for n in range(count)]
+        return agent_spec.load_file(_write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {
+            "provider": "anthropic", "fallback_gateways": names}}))
+    assert len(spec(19).llm.fallback_gateways) == 19  # plus the primary: 20
+    with pytest.raises(AgentSpecError, match=r"calc.json: llm.fallback_gateways allows at most 19"):
+        spec(20)
+
+
 @pytest.mark.parametrize("provider,value", [
     ("anthropic", "openrouter"), ("anthropic", None), ("anthropic", [{}]),
     ("anthropic", [{"gateway": ""}]), ("anthropic", [{"gateway": 3}]),

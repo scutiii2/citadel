@@ -48,9 +48,12 @@ function update(key: number, field: "gateway" | "model", event: Event): void {
   emit("update:modelValue", props.modelValue.map((row) => row.key === key ? { ...row, [field]: value } : row));
 }
 
+/** The most gateways one agent may hold, the primary included; Legion refuses a longer list. */
+const MAX_GATEWAYS = 20;
+
 function add(): void {
   const gateway = available.value[0];
-  if (props.busy || !gateway) return;
+  if (props.busy || !gateway || props.modelValue.length >= MAX_GATEWAYS) return;
   const key = Math.max(-1, ...props.modelValue.map((row) => row.key)) + 1;
   emit("update:modelValue", [...props.modelValue, { key, gateway: gateway.id, model: "" }]);
 }
@@ -142,8 +145,8 @@ function drop(key: number): void {
       </li>
     </ol>
     <div class="list-footer">
-      <button type="button" class="add-gateway" data-test="add-gateway" :disabled="busy || !available.length" @click="add">＋ Add gateway</button>
-      <p class="hint">Drag or use arrows to reorder. Changes apply when you save.</p>
+      <button type="button" class="add-gateway" data-test="add-gateway" :disabled="busy || !available.length || modelValue.length >= MAX_GATEWAYS" @click="add">＋ Add gateway</button>
+      <p class="hint">Drag or use arrows to reorder. At most {{ MAX_GATEWAYS }} gateways. Changes apply when you save.</p>
     </div>
     <p class="sr-only" role="status" aria-live="polite">{{ announcement }}</p>
   </div>
