@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./admin/ActionMessage.vue";
 import { computed, ref, watch } from "vue";
 import { commandsClient } from "../api/CommandsClient";
 import { McpServerClient } from "../api/McpServerClient";
@@ -103,7 +104,7 @@ function close(): void { emit("close"); }
           </p>
           <label class="tool-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="search" type="search" placeholder="Find a tool" aria-label="Find a tool" :disabled="running" /></label>
           <p v-if="loading" class="browser-note" role="status">Loading tools…</p>
-          <div v-else-if="error" class="browser-note"><p class="error" role="alert">{{ error }}</p><button type="button" class="small" @click="load">Retry</button></div>
+          <div v-else-if="error" class="browser-note"><ActionMessage kind="error" :text="error" /><button type="button" class="small" @click="load">Retry</button></div>
           <p v-else-if="!names.length" class="browser-note">No tools are available.</p>
           <ul v-else class="tool-list" :aria-busy="loading || running">
             <li v-for="{ name, tool } in visibleTools" :key="name">

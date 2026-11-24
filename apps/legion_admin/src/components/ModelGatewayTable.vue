@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { agentsAdminClient } from "../api/AgentsAdminClient";
 import type { ModelGatewayField, ModelGatewayKind, ModelGatewayList, ModelGatewayRow } from "../api/AgentsAdminClient";
@@ -313,7 +314,7 @@ onMounted(load);
         <AdminSearch ref="searchField" v-model="search" :label="`Search ${title.toLowerCase()}`" />
       </div>
     </header>
-    <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button type="button" class="chip" @click="load">Retry</button></p>
+    <ActionMessage v-if="loadError" kind="error" :text="loadError" class="admin-panel-text"><button type="button" class="chip" @click="load">Retry</button></ActionMessage>
     <p v-else-if="loading && !list" class="admin-panel-text muted" role="status">Loading…</p>
     <p v-else-if="list && !rows.length" class="admin-panel-text muted" :data-test="`empty-${kind}`">
       {{ list.gateways.length ? "No gateways match your search." : "No gateway is saved yet. Use + to add one." }}
@@ -409,7 +410,7 @@ onMounted(load);
             <input :id="`${kind}-note-${tier}`" v-model="notes[tier]" maxlength="300" autocomplete="off" :data-test="`note-${tier}`" :disabled="saving" placeholder="Built-in description" />
           </div>
         </section>
-        <p v-if="error" class="error" role="alert" data-test="error">{{ error }}</p>
+        <ActionMessage v-if="error" kind="error" :text="error" data-test="error" />
         <p v-if="draftTest" class="draft-test" :class="draftTest.ok ? 'ok' : 'bad'" role="status" data-test="draft-result">
           <svg v-if="draftTest.ok" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.7 2.7L16 9.8" /></svg>
           <svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>

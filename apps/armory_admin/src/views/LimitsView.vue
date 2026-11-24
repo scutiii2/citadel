@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FieldLabel from "../components/admin/FieldLabel.vue";
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { limitsClient, type CapabilityLimits, type LimitsCapability, type LimitsChanges, type LimitsView } from "../api/LimitsClient";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
@@ -6,40 +8,40 @@ import { errorMessage } from "../utils/errors";
 
 /** How much one caller may use and how long files and links last, for the PDF and video capabilities. Saved in
  * Armory's database. Each capability reads these once when its engine starts, so a change is used from Armory's next start. */
-interface Field { key: string; label: string; unit?: string; limit?: boolean }
-interface Card { name: LimitsCapability; title: string; fields: Field[] }
+interface Field { key: string; label: string; help: string; unit?: string; limit?: boolean }
+interface Card { name: LimitsCapability; title: string; lede: string; fields: Field[] }
 
 const LIFETIMES: Field[] = [
-  { key: "file_ttl_hours", label: "Keep a file for", unit: "hours" },
-  { key: "sweep_interval_minutes", label: "Look for expired files every", unit: "minutes" },
-  { key: "download_link_minutes", label: "A download link works for", unit: "minutes" },
+  { key: "file_ttl_hours", label: "Keep a file for", unit: "hours", help: "How long a stored file (an upload, a merged file or a finished download) is kept before it is removed." },
+  { key: "sweep_interval_minutes", label: "Look for expired files every", unit: "minutes", help: "How often Armory looks for expired files and removes them." },
+  { key: "download_link_minutes", label: "A download link works for", unit: "minutes", help: "How long a signed download link works after it is made." },
 ];
 const CARDS: Card[] = [
   {
-    name: "pdf_merger", title: "PDF merging",
+    name: "pdf_merger", title: "PDF merging", lede: "How long files and links last, and how much one account and one merge may use.",
     fields: [
       ...LIFETIMES,
-      { key: "mcp_wait_seconds", label: "Longest wait for a tool call (up to 100)", unit: "seconds" },
-      { key: "max_file_mb", label: "Largest file", unit: "MB", limit: true },
-      { key: "max_session_mb", label: "Most data per account", unit: "MB", limit: true },
-      { key: "max_segments", label: "Most pieces in one merge", limit: true },
-      { key: "max_output_pages", label: "Most pages in the result", limit: true },
-      { key: "max_image_megapixels", label: "Largest image", unit: "megapixels", limit: true },
-      { key: "max_concurrent_merges", label: "Merges at the same time", limit: true },
-      { key: "job_timeout_seconds", label: "Longest merge", unit: "seconds", limit: true },
+      { key: "mcp_wait_seconds", label: "Longest wait for a tool call", unit: "seconds", help: "How long a tool call waits for a merge to finish before it answers \"still running\". At most 100." },
+      { key: "max_file_mb", label: "Largest file", unit: "MB", limit: true, help: "The size cap for one file." },
+      { key: "max_session_mb", label: "Most data per account", unit: "MB", limit: true, help: "The size cap for all the files one account has stored." },
+      { key: "max_segments", label: "Most pieces in one merge", limit: true, help: "The most pieces one merge may join." },
+      { key: "max_output_pages", label: "Most pages in the result", limit: true, help: "The most pages the merged file may have." },
+      { key: "max_image_megapixels", label: "Largest image", unit: "megapixels", limit: true, help: "The size cap for one image placed in a merge." },
+      { key: "max_concurrent_merges", label: "Merges at the same time", limit: true, help: "How many merges run at the same time. More wait for a free place." },
+      { key: "job_timeout_seconds", label: "Longest merge", unit: "seconds", limit: true, help: "A merge that runs longer than this is stopped." },
     ],
   },
   {
-    name: "media_downloader", title: "Video downloads",
+    name: "media_downloader", title: "Video downloads", lede: "How long files and links last, and how much one account and one download may use.",
     fields: [
       ...LIFETIMES,
-      { key: "max_file_mb", label: "Largest download", unit: "MB", limit: true },
-      { key: "max_duration_minutes", label: "Longest video", unit: "minutes", limit: true },
-      { key: "max_session_mb", label: "Most data per account", unit: "MB", limit: true },
-      { key: "max_concurrent_downloads", label: "Downloads at the same time", limit: true },
-      { key: "max_queued_downloads", label: "Downloads waiting in line", limit: true },
-      { key: "max_caller_downloads", label: "Downloads per account at the same time", limit: true },
-      { key: "job_timeout_minutes", label: "Longest download", unit: "minutes", limit: true },
+      { key: "max_file_mb", label: "Largest download", unit: "MB", limit: true, help: "The size cap for one download." },
+      { key: "max_duration_minutes", label: "Longest video", unit: "minutes", limit: true, help: "The length cap for one video." },
+      { key: "max_session_mb", label: "Most data per account", unit: "MB", limit: true, help: "The size cap for all the files one account has stored." },
+      { key: "max_concurrent_downloads", label: "Downloads at the same time", limit: true, help: "How many downloads run at the same time." },
+      { key: "max_queued_downloads", label: "Downloads waiting in line", limit: true, help: "How many downloads may wait for a free place." },
+      { key: "max_caller_downloads", label: "Downloads per account at the same time", limit: true, help: "How many downloads one account may have going at the same time." },
+      { key: "job_timeout_minutes", label: "Longest download", unit: "minutes", limit: true, help: "A download that runs longer than this is stopped." },
     ],
   },
 ];
@@ -146,12 +148,13 @@ async function reset(card: Card) {
     </template>
     <p v-if="loading" class="note muted" role="status">Loading…</p>
     <div v-else-if="view" class="cards">
-      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" class="note" />
       <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
-      <section v-for="card in CARDS" v-show="panel?.matches(card.title, ...card.fields.map((field) => field.label))" :key="card.name" class="group" :data-test="`card-${card.name}`" :aria-labelledby="`${card.name}-title`">
+      <section v-for="card in CARDS" v-show="panel?.matches(card.title, ...card.fields.map((field) => field.label))" :key="card.name" class="group fields" :data-test="`card-${card.name}`" :aria-labelledby="`${card.name}-title`">
         <h3 :id="`${card.name}-title`">{{ card.title }} <span v-if="view[card.name].stored" class="tag">changed</span></h3>
+        <p class="lede">{{ card.lede }}</p>
         <div v-for="field in card.fields" v-show="panel?.matches(card.title, field.label)" :key="field.key" class="field">
-          <label :for="`${card.name}-${field.key}`">{{ field.label }}<span v-if="field.unit" class="unit"> ({{ field.unit }})</span></label>
+          <FieldLabel :title="field.unit ? `${field.label} (${field.unit})` : field.label" :for="`${card.name}-${field.key}`">{{ field.help }}</FieldLabel>
           <input
             :id="`${card.name}-${field.key}`"
             :value="shown(card, field)"
@@ -168,7 +171,7 @@ async function reset(card: Card) {
         </div>
       </section>
     </div>
-    <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
+    <ActionMessage v-else-if="error" kind="error" :text="error" class="note" />
   </SettingsPanel>
 </template>
 
@@ -186,4 +189,7 @@ async function reset(card: Card) {
 .unit { font-weight: 400; color: var(--muted); }
 .field > input { min-width: 0; min-height: 44px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
 .actions { display: flex; }
+.group.fields { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); max-width: none; align-items: start; }
+.group.fields > h3, .group.fields > .lede { grid-column: 1 / -1; }
+.lede { margin: -8px 0 0; color: var(--muted); font-size: 0.9em; }
 </style>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FieldLabel from "../components/admin/FieldLabel.vue";
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { emailSettingsClient, type EmailChanges, type EmailSettings } from "../api/EmailSettingsClient";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
@@ -97,20 +99,21 @@ function discard() {
     <p v-if="loading" class="note muted" role="status">Loading…</p>
     <form v-else class="form" data-test="form" @submit.prevent="save">
       <p v-if="!saved.configured" class="note muted" data-test="empty">Email is not set up. Fill in the server, port and sender, then save.</p>
-      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" class="note" />
       <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
-      <section v-show="panel?.matches('Mail server', 'Server', 'Port', 'Connection', 'Sender address', 'Password')" class="group" aria-labelledby="smtp-title">
+      <section v-show="panel?.matches('Mail server', 'Server', 'Port', 'Connection', 'Sender address', 'Password')" class="group fields" aria-labelledby="smtp-title">
         <h3 id="smtp-title">Mail server</h3>
+        <p class="lede">The account Armory sends mail through.</p>
         <div class="field">
-          <label for="smtp-server">Server</label>
+          <FieldLabel title="Server" for="smtp-server">The address of your mail provider's SMTP server, such as smtp.gmail.com.</FieldLabel>
           <input id="smtp-server" v-model="server" :disabled="saving" autocomplete="off" spellcheck="false" placeholder="smtp.gmail.com" data-test="server" />
         </div>
         <div class="field">
-          <label for="smtp-port">Port</label>
+          <FieldLabel title="Port" for="smtp-port">The server's port, such as 465 for ssl or 587 for starttls. 1 to 65535.</FieldLabel>
           <input id="smtp-port" v-model="port" type="number" min="1" max="65535" step="1" :disabled="saving" placeholder="465" data-test="port" />
         </div>
         <div class="field">
-          <label for="smtp-security">Connection</label>
+          <FieldLabel title="Connection" for="smtp-security">How the connection is protected: ssl, starttls, or none (no encryption). Left on the default, Armory chooses from the port: 465 is ssl, any other port is starttls.</FieldLabel>
           <select id="smtp-security" v-model="security" :disabled="saving" data-test="security">
             <option value="">Choose from the port (465 is ssl, others starttls)</option>
             <option value="ssl">ssl</option>
@@ -119,7 +122,7 @@ function discard() {
           </select>
         </div>
         <div class="field">
-          <label for="smtp-from">Sender address</label>
+          <FieldLabel title="Sender address" for="smtp-from">The address the mail is sent from.</FieldLabel>
           <input id="smtp-from" v-model="from" type="email" :disabled="saving" autocomplete="off" data-test="from" />
         </div>
         <div class="field">
@@ -136,17 +139,16 @@ function discard() {
         </div>
       </section>
 
-      <section v-show="panel?.matches('Recipients', 'Standing recipients', 'Domains')" class="group" aria-labelledby="who-title">
+      <section v-show="panel?.matches('Recipients', 'Standing recipients', 'Domains')" class="group fields" aria-labelledby="who-title">
         <h3 id="who-title">Recipients</h3>
+        <p class="lede">Who the mail may be sent to.</p>
         <div class="field">
-          <label for="smtp-to">Standing recipients</label>
+          <FieldLabel title="Standing recipients" for="smtp-to">One address per line. Empty is fine if every send names its own address.</FieldLabel>
           <textarea id="smtp-to" v-model="recipients" rows="3" :disabled="saving" spellcheck="false" data-test="to"></textarea>
-          <p class="help">One address per line. Empty is fine if every send names its own address.</p>
         </div>
         <div class="field">
-          <label for="smtp-domains">Domains a caller may name any address at</label>
+          <FieldLabel title="Domains a caller may name any address at" for="smtp-domains">One domain per line. Empty means no domain.</FieldLabel>
           <textarea id="smtp-domains" v-model="domains" rows="3" :disabled="saving" spellcheck="false" data-test="domains"></textarea>
-          <p class="help">One domain per line. Empty means no domain.</p>
         </div>
       </section>
     </form>
@@ -165,4 +167,7 @@ function discard() {
 .field > label:first-child { font-size: 0.9em; font-weight: 600; }
 .field > input, .field > select, .field > textarea { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
+.group.fields { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); max-width: none; align-items: start; }
+.group.fields > h3, .group.fields > .lede { grid-column: 1 / -1; }
+.lede { margin: -8px 0 0; color: var(--muted); font-size: 0.9em; }
 </style>

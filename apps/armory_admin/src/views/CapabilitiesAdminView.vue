@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { capabilitiesAdminClient, type CapabilityStatus } from "../api/CapabilitiesAdminClient";
@@ -150,7 +151,7 @@ onMounted(load);
           <AdminSearch ref="searchField" v-model="query" label="Search capabilities" />
         </div>
       </header>
-      <p v-if="error" class="admin-panel-text error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" class="admin-panel-text" />
       <p v-if="loading" class="admin-panel-text muted" role="status">Loading…</p>
       <p v-else-if="!rows.length" class="admin-panel-text muted">{{ capabilities.length ? "No capabilities match your search." : "No capabilities are available." }} <button v-if="query || filter !== 'all'" type="button" class="chip" @click="query = ''; filter = 'all'; searchField?.focus()">Clear filters</button></p>
       <div v-else class="admin-table-scroll" role="region" aria-labelledby="capability-roster" tabindex="0">
@@ -166,7 +167,7 @@ onMounted(load);
                   </div>
                 </div>
                 <pre v-if="c.load_error" class="load-error" data-test="load-error">{{ c.load_error }}</pre>
-                <p v-if="rowErrors[c.name]" class="error" role="alert" data-test="row-error">{{ rowErrors[c.name] }}</p>
+                <ActionMessage v-if="rowErrors[c.name]" kind="error" :text="rowErrors[c.name]" data-test="row-error" />
               </th>
               <td><div class="state-cell"><span class="state" :class="state"><span aria-hidden="true">{{ state === "online" ? "●" : "○" }}</span> {{ STATE_LABELS[state] }}</span>
                 <PanelHelp :title="STATE_LABELS[state]"><p>{{ STATE_HELP[state] }}</p></PanelHelp></div></td>

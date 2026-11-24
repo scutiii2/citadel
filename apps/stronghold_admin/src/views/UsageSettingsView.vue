@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FieldLabel from "../components/admin/FieldLabel.vue";
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { usageSettingsClient, type UsageLimits, type UsageSettings, type UsageSettingsChanges } from "../api/UsageSettingsClient";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
@@ -110,15 +112,16 @@ function discard() {
     </template>
     <p v-if="loading" class="note muted" role="status">Loading…</p>
     <form v-else class="form" data-test="form" @submit.prevent="save">
-      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" class="note" />
       <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
       <p v-if="problem && dirty" class="note muted" data-test="problem">{{ problem }}</p>
       <section v-show="panel?.matches('Limits', ...LIMITS.map((field) => field.label))" class="group" aria-labelledby="limits-title">
         <h3 id="limits-title">Limits</h3>
+        <p class="help">How many tokens an account may use, and when a long chat is summarized.</p>
         <div v-for="field in LIMITS" v-show="panel?.matches('Limits', field.label)" :key="field.key" class="field">
-          <label :for="`l-${field.key}`">{{ field.label }}</label>
+          <FieldLabel v-if="field.help" :title="field.label" :for="`l-${field.key}`">{{ field.help }}</FieldLabel>
+          <label v-else :for="`l-${field.key}`">{{ field.label }}</label>
           <input :id="`l-${field.key}`" v-model="limits[field.key]" type="number" min="0" :step="field.step ?? '1'" :disabled="saving" :data-test="field.key" />
-          <p v-if="field.help" class="help">{{ field.help }}</p>
         </div>
       </section>
 

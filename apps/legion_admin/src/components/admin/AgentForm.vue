@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed, ref, watch } from "vue";
 import type { AgentConfig, AgentFile, ProviderCatalog } from "../../api/AgentsAdminClient";
 import ToggleSwitch from "../ToggleSwitch.vue";
@@ -505,12 +506,12 @@ function previewPrompt(): void {
           <ToggleSwitch :checked="previewCaveman" data-test="preview-caveman" @change="previewCaveman = ($event.target as HTMLInputElement).checked">Preview with the chat's caveman toggle on</ToggleSwitch>
           <button type="button" class="cancel" data-test="preview" :disabled="previewing" @click="previewPrompt">{{ previewing ? "Building…" : "Show prompt" }}</button>
         </div>
-        <p v-if="previewError" class="error" role="alert" data-test="preview-error">{{ previewError }}</p>
+        <ActionMessage v-if="previewError" kind="error" :text="previewError" data-test="preview-error" />
         <pre v-if="previewText" class="prompt-text" data-test="preview-text">{{ previewText }}</pre>
       </fieldset>
       </section>
 
-      <p v-if="localError || error" class="error" role="alert" data-test="form-error">{{ localError || error }}</p>
+      <ActionMessage v-if="localError || error" kind="error" :text="localError || error" data-test="form-error" />
       <span v-if="modified" class="unsaved" role="status" data-test="unsaved">● Unsaved changes</span>
     </form>
 </template>

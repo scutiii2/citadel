@@ -8,7 +8,7 @@ test("the sidebar collapses behind the header toggle on mobile and the profile m
   const sidebar = page.getByRole("complementary", { name: "Armory Admin" });
   const nav = page.getByRole("navigation", { name: "Armory sections" });
   await expect(page.getByRole("heading", { name: "Overview", level: 1 })).toBeVisible();
-  await expect(nav.getByRole("link")).toHaveCount(6);
+  await expect(nav.getByRole("link")).toHaveCount(7);
   await expect(nav.getByRole("link", { name: "Overview", exact: true })).toHaveAttribute("aria-current", "page");
   for (const width of [1280, 768, 375]) {
     await page.setViewportSize({ width, height: 800 });

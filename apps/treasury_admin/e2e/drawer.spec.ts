@@ -21,7 +21,7 @@ test("the drawer expands, scrolls its own body, keeps the footer reachable and d
     await drawer.getByRole("button", { name: "Restore drawer size" }).click();
     expect((await drawer.boundingBox())!.width).toBe(normal);
   }
-  await drawer.getByLabel("Pool size (optional)").fill("4");
+  await drawer.getByLabel("Pool size (optional)", { exact: true }).fill("4");
   await drawer.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("dialog", { name: "Discard changes?" }).getByRole("button", { name: "Discard changes" }).click();
   await expect(drawer.getByRole("button", { name: "Edit", exact: true })).toBeVisible();

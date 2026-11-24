@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -288,7 +289,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
   <PageLayout class="agents-admin" title="Agents" wide>
     <StatusFilters :model-value="filter" label="Filter agents" :options="filterOptions" @update:model-value="setFilter" />
     <StatusFilters v-model="roleFilter" label="Filter agents by role" :options="roleOptions" data-test="role-filter" />
-    <p v-if="notice" class="notice" role="status" data-test="notice">{{ notice }}</p>
+    <ActionMessage v-if="notice" kind="ok" :text="notice" data-test="notice" />
     <section class="admin-panel-card" aria-labelledby="agent-roster">
       <header class="admin-panel-head">
         <h2 id="agent-roster">Agents</h2>
@@ -299,7 +300,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
           <AdminSearch ref="searchField" v-model="search" label="Search agents" />
         </div>
       </header>
-      <p v-if="error" class="admin-panel-text error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" class="admin-panel-text" />
       <p v-else-if="loading" class="admin-panel-text muted" role="status">Loading agents…</p>
       <p v-else-if="!visible.length" class="admin-panel-text muted">{{ agents.length ? 'No agents match these filters.' : 'No agents are defined.' }}
         <button v-if="search" type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button>

@@ -161,7 +161,8 @@ describe("TicketsPanel", () => {
     await select.trigger("change");
     await flushPromises();
 
-    expect(wrapper.find("aside.drawer .error").text()).toBe("The status must be one of: open.");
+    expect(wrapper.find("aside.drawer .error .text").text()).toBe("The status must be one of: open.");
+    expect(wrapper.find("aside.drawer .error .code").text()).toBe("400");
     expect((select.element as HTMLSelectElement).value).toBe("open");
   });
 

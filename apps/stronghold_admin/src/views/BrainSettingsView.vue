@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FieldLabel from "../components/admin/FieldLabel.vue";
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { brainSettingsClient, type BrainSettings, type BrainSettingsChanges, type Part } from "../api/BrainSettingsClient";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
@@ -155,7 +157,7 @@ function discard(): void {
       <button type="button" class="chip" data-test="retry" @click="load">Try again</button>
     </div>
     <form v-else-if="saved" class="form" data-test="form" novalidate @submit.prevent="save">
-      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" class="note" />
       <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
       <section v-show="panel?.matches('Where the files are kept', saved.root)" class="group" aria-labelledby="root-title">
         <h3 id="root-title">Where the files are kept</h3>
@@ -167,7 +169,8 @@ function discard(): void {
         <p class="help">{{ spec.intro }}</p>
         <p class="help" :data-test="`state-${spec.part}`">{{ saved.stored[spec.part] ? "Stronghold marks this part as changed from the defaults." : "Using the defaults." }}</p>
         <div v-for="field in spec.fields" v-show="panel?.matches(spec.title, field.label)" :key="field.key" class="field">
-          <label :for="`f-${id(spec.part, field.key)}`">{{ field.label }}</label>
+          <FieldLabel v-if="field.help" :title="field.label" :for="`f-${id(spec.part, field.key)}`">{{ field.help }}</FieldLabel>
+          <label v-else :for="`f-${id(spec.part, field.key)}`">{{ field.label }}</label>
           <input
             :id="`f-${id(spec.part, field.key)}`" :value="values[id(spec.part, field.key)]" type="number"
             @input="values[id(spec.part, field.key)] = ($event.target as HTMLInputElement).value"
@@ -177,7 +180,6 @@ function discard(): void {
             :aria-describedby="problemOf(spec.part, field.key) ? `problem-${id(spec.part, field.key)}` : undefined"
           />
           <p v-if="problemOf(spec.part, field.key)" :id="`problem-${id(spec.part, field.key)}`" class="problem" :data-test="`problem-${id(spec.part, field.key)}`">{{ problemOf(spec.part, field.key) }}</p>
-          <p v-if="field.help" class="help">{{ field.help }}</p>
           <p v-if="bytesHint(spec.part, field.key)" class="help" :data-test="`hint-${id(spec.part, field.key)}`">{{ bytesHint(spec.part, field.key) }}</p>
         </div>
       </section>

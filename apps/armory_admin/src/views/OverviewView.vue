@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { capabilitiesAdminClient } from "../api/CapabilitiesAdminClient";
@@ -75,7 +76,7 @@ onMounted(async () => {
 
 <template>
   <PageLayout class="admin-overview admin-panel" title="Workspace overview" wide>
-    <p v-if="error" class="error" role="alert">Couldn't load all of the overview: {{ error }}</p>
+    <ActionMessage v-if="error" kind="error" :text="`Couldn't load all of the overview: ${error}`" />
     <div class="stats">
       <RouterLink v-for="tile in tiles" :key="tile.path" :to="tile.path" class="stat">
         <StatTile :label="tile.label" :value="counts[tile.key]" :unavailable="failed(tile.key)"><svg viewBox="0 0 24 24"><path :d="tile.icon" /></svg></StatTile>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { treasuryAdminClient, type TreasuryInstance, type TreasuryView } from "../api/TreasuryAdminClient";
 import AdminSearch from "../components/admin/AdminSearch.vue";
@@ -53,8 +54,8 @@ const usedByPortcullis = (name: string) => view.value?.portcullis.instance === n
         </div>
       </header>
       <p v-if="loading && !view" class="admin-panel-text muted" role="status">Loading…</p>
-      <p v-else-if="error" class="admin-panel-text error" role="alert">{{ error }}</p>
-      <p v-else-if="view && !view.reachable" class="admin-panel-text error" role="alert">Treasury does not answer. Check that it is running.</p>
+      <ActionMessage v-else-if="error" kind="error" :text="error" class="admin-panel-text" />
+      <ActionMessage v-else-if="view && !view.reachable" kind="error" :text="`Treasury does not answer. Check that it is running.`" class="admin-panel-text" />
       <p v-else-if="!view?.instances.length" class="admin-panel-text muted">No instances yet.</p>
       <p v-else-if="!visible.length" class="admin-panel-text muted">No instances match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
       <div v-else class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="instance-roster">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { treasuryAdminClient, type ServiceRow, type ServicesView } from "../api/TreasuryAdminClient";
 import AdminSearch from "../components/admin/AdminSearch.vue";
@@ -94,7 +95,7 @@ async function save(unpin = false) {
           <AdminSearch ref="searchField" v-model="search" label="Search services" />
         </div>
       </header>
-      <p v-if="error && !selected" class="admin-panel-text error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error && !selected" kind="error" :text="error" class="admin-panel-text" />
       <p v-if="loading" class="admin-panel-text muted" role="status">Loading…</p>
       <p v-else-if="view && !visible.length" class="admin-panel-text muted">No services match. <button v-if="search || filter !== 'all'" type="button" class="chip" @click="search = ''; filter = 'all'; searchField?.focus()">Clear filters</button></p>
       <div v-else-if="view" class="admin-table-scroll" role="region" aria-labelledby="service-roster" tabindex="0">
@@ -124,7 +125,7 @@ async function save(unpin = false) {
           <label :for="'pin-' + selected.name">Address for {{ selected.name }}</label>
           <input :id="'pin-' + selected.name" v-model="draft" :disabled="busy" autocomplete="off" spellcheck="false" :aria-describedby="error ? 'service-error' : undefined" />
         </form>
-        <p v-if="error" id="service-error" class="error" role="alert">{{ error }}</p>
+        <ActionMessage v-if="error" kind="error" :text="error" id="service-error" />
         <button v-if="selected.pinned && !editing" type="button" class="chip" data-test="unpin" :disabled="busy" :aria-busy="busy" @click="save(true)">Use the registered address</button>
       </div>
       <template v-if="editing" #footer>

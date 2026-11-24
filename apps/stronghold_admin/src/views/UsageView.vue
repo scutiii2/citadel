@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { usageClient, type AccountUsage, type MyUsage, type UsageGroupBy, type UsageRecordRow } from "../api/UsageClient";
@@ -189,7 +190,7 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
           <AdminSearch ref="searchField" v-model="search" label="Search users" />
         </div>
       </header>
-      <p v-if="summaryError" class="admin-panel-text error" role="alert">Could not load user usage: {{ summaryError }} <button type="button" class="chip summary-retry" @click="loadSummary">Retry</button></p>
+      <ActionMessage v-if="summaryError" kind="error" :text="`Could not load user usage: ${summaryError}`" class="admin-panel-text"><button type="button" class="chip summary-retry" @click="loadSummary">Retry</button></ActionMessage>
       <p v-else-if="summaryLoading" class="admin-panel-text muted" role="status">Loading user usage…</p>
       <p v-else-if="accounts.length === 0" class="admin-panel-text muted">No accounts.</p>
       <p v-else-if="visible.length === 0" class="admin-panel-text muted">No users match. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
@@ -220,7 +221,7 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
         </button>
       </div>
       <p v-if="detailLoading" class="muted" role="status">Loading usage for {{ selected?.username }}…</p>
-      <p v-else-if="detailError" class="error" role="alert">Could not load usage for {{ selected?.username }}: {{ detailError }} <button type="button" class="chip detail-retry" @click="loadDetails">Retry</button></p>
+      <ActionMessage v-else-if="detailError" kind="error" :text="`Could not load usage for ${selected?.username}: ${detailError}`"><button type="button" class="chip detail-retry" @click="loadDetails">Retry</button></ActionMessage>
       <UsageDetails v-if="loaded" :username="loaded.username" :usage="loaded.usage" :year="year" :records="records" :records-failed="recordsFailed" :year-failed="yearFailed" :loading="detailLoading" :group-by="groupBy" @group="groupBy = $event" />
     </RecordDrawer>
   </PageLayout>

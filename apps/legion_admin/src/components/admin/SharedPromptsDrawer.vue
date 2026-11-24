@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed, ref, watch } from "vue";
 import { agentsAdminClient, type SharedPrompts } from "../../api/AgentsAdminClient";
 import { errorMessage } from "../../utils/errors";
@@ -107,7 +108,7 @@ async function save(): Promise<void> {
           <small>{{ f.help }}</small>
         </label>
       </template>
-      <p v-if="error" class="error" role="alert" data-test="prompts-error">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" data-test="prompts-error" />
     </div>
     <template #footer>
       <button type="button" class="chip" :disabled="saving" @click="requestClose">Close</button>

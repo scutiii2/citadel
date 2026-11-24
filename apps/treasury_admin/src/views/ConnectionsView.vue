@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FieldLabel from "../components/admin/FieldLabel.vue";
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { treasuryAdminClient, type CacheDefaults, type ConnectionRow, type ConnectionSpec, type ConnectionsView } from "../api/TreasuryAdminClient";
 import AdminSearch from "../components/admin/AdminSearch.vue";
@@ -209,9 +211,9 @@ const cacheChanged = computed(() => {
 });
 const { discardOpen, keepFocus, answerDiscard } = useDraftPanel(cacheChanged, cacheSearchField);
 const cacheFields = [
-  { id: "default-ttl", label: "Keep an entry for (seconds)", words: "keep entry seconds ttl" },
-  { id: "default-entries", label: "Most entries", words: "most entries maximum" },
-  { id: "default-negative", label: "Remember a missing record for (seconds)", words: "remember missing record negative seconds" },
+  { id: "default-ttl", label: "Keep an entry for (seconds)", help: "How long a looked-up record is kept before it is read from the database again. 0 turns the cache off.", words: "keep entry seconds ttl" },
+  { id: "default-entries", label: "Most entries", help: "The most records kept at once. When it is full, the entry used least recently is dropped. 0 turns the cache off.", words: "most entries maximum" },
+  { id: "default-negative", label: "Remember a missing record for (seconds)", help: "How long \"not found\" is remembered for a record that does not exist, so the database is not asked again at once.", words: "remember missing record negative seconds" },
 ] as const;
 const showField = (words: string) => words.includes(cacheSearch.value.trim().toLowerCase());
 
@@ -231,7 +233,7 @@ watch([editing, creating], () => { tab.value = "general"; });
 <template>
   <PageLayout class="admin-panel" title="Connections" wide>
     <StatusFilters v-model="filter" label="Filter connections" :options="options" />
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <ActionMessage v-if="error" kind="error" :text="error" />
     <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
 
     <section class="admin-panel-card" aria-labelledby="connection-roster">
@@ -274,8 +276,9 @@ watch([editing, creating], () => { tab.value = "general"; });
         </div>
       </header>
       <div class="cache-body">
+        <p class="lede">Used by every connection that sets none of its own.</p>
         <div v-for="field in cacheFields" v-show="showField(field.words)" :key="field.id" class="field">
-          <label :for="field.id">{{ field.label }}</label>
+          <FieldLabel :title="field.label" :for="field.id">{{ field.help }}</FieldLabel>
           <input v-if="field.id === 'default-ttl'" :id="field.id" v-model="cacheTtlDefault" type="number" min="0" :disabled="busy" :data-test="field.id" />
           <input v-else-if="field.id === 'default-entries'" :id="field.id" v-model="cacheEntries" type="number" min="0" :disabled="busy" :data-test="field.id" />
           <input v-else :id="field.id" v-model="cacheNegative" type="number" min="0" :disabled="busy" :data-test="field.id" />
@@ -290,12 +293,11 @@ watch([editing, creating], () => { tab.value = "general"; });
         <FormTabs v-model="tab" :items="tabItems" prefix="conn" label="Connection settings" />
         <section v-show="tab === 'general'" id="conn-panel-general" class="pane" role="tabpanel" aria-labelledby="conn-tab-general">
         <div class="field">
-          <label for="c-name">Name</label>
+          <FieldLabel title="Name" for="c-name">Lowercase letters, digits and _. Saving a built-in name replaces that connection.</FieldLabel>
           <input id="c-name" v-model="name" required :disabled="!creating || busy" autocomplete="off" spellcheck="false" data-test="name" />
-          <p class="help">Lowercase letters, digits and _. Saving a built-in name replaces that connection.</p>
         </div>
         <div class="field">
-          <label for="c-type">Type</label>
+          <FieldLabel title="Type" for="c-type">The kind of database: an SQLite file, Postgres or Firestore. The fields below change with it.</FieldLabel>
           <select id="c-type" v-model="type" :disabled="busy" data-test="type">
             <option value="sqlite">SQLite file</option>
             <option value="postgres">Postgres</option>
@@ -303,18 +305,16 @@ watch([editing, creating], () => { tab.value = "general"; });
           </select>
         </div>
         <div v-if="type === 'sqlite'" class="field">
-          <label for="c-path">File</label>
+          <FieldLabel title="File" for="c-path">Relative to Treasury's data folder.</FieldLabel>
           <input id="c-path" v-model="path" :disabled="busy" autocomplete="off" spellcheck="false" placeholder="reports.db" data-test="path" />
-          <p class="help">Relative to Treasury's data folder.</p>
         </div>
         <template v-if="type === 'postgres'">
           <div class="field">
-            <label for="c-dsn">Address</label>
+            <FieldLabel title="Address" for="c-dsn">A placeholder such as ${POSTGRES_DSN}. Put the real address in Treasury's .env under that name.</FieldLabel>
             <input id="c-dsn" v-model="dsn" :disabled="busy" autocomplete="off" spellcheck="false" placeholder="${POSTGRES_DSN}" data-test="dsn" />
-            <p class="help">A placeholder such as ${POSTGRES_DSN}. Put the real address in Treasury's .env under that name.</p>
           </div>
           <div class="field">
-            <label for="c-pool">Pool size (optional)</label>
+            <FieldLabel title="Pool size (optional)" for="c-pool">The most connections Treasury keeps open to this database. At least 1.</FieldLabel>
             <input id="c-pool" v-model="poolSize" type="number" min="1" :disabled="busy" data-test="pool" />
           </div>
         </template>
@@ -327,9 +327,8 @@ watch([editing, creating], () => { tab.value = "general"; });
         <section v-show="tab === 'options'" id="conn-panel-options" class="pane" role="tabpanel" aria-labelledby="conn-tab-options">
         <ToggleSwitch :checked="rawSql" :disabled="busy" data-test="raw-sql" @change="rawSql = ($event.target as HTMLInputElement).checked">Allow raw SQL on this connection</ToggleSwitch>
         <div class="field">
-          <label for="c-cache">Cache for this connection (seconds, optional)</label>
+          <FieldLabel title="Cache for this connection (seconds, optional)" for="c-cache">Empty uses the cache defaults. 0 turns the cache off for this connection.</FieldLabel>
           <input id="c-cache" v-model="cacheTtl" type="number" min="0" :disabled="busy" data-test="cache" />
-          <p class="help">Empty uses the cache defaults. 0 turns the cache off for this connection.</p>
         </div>
         </section>
       </form>
@@ -349,7 +348,7 @@ watch([editing, creating], () => { tab.value = "general"; });
           <button type="button" class="danger" data-test="remove" @click="removing = selected">{{ selected.source === "changed" ? "Use the built-in" : "Remove" }}</button>
         </section>
       </div>
-      <p v-if="formError" class="error" role="alert">{{ formError }}</p>
+      <ActionMessage v-if="formError" kind="error" :text="formError" />
       <template v-if="editing" #footer>
         <button type="button" class="chip" :disabled="busy" data-test="cancel-edit" @click="drawer?.requestCancel()">Cancel</button>
         <button type="button" class="primary" :disabled="busy || !name.trim()" :aria-busy="busy" data-test="save" @click="requestSave">{{ creating ? "Add connection" : "Save changes" }}</button>
@@ -381,7 +380,9 @@ watch([editing, creating], () => { tab.value = "general"; });
 .pane { display: grid; gap: 12px; min-width: 0; }
 .error { margin: 0 0 12px; color: var(--danger); }
 .cache { margin-top: 14px; }
-.cache-body { display: grid; gap: 12px; padding: 14px; max-width: 560px; }
+.cache-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 16px; align-items: start; padding: 14px; }
+.cache-body > .lede, .cache-body > .reset { grid-column: 1 / -1; }
+.lede { margin: 0; color: var(--muted); font-size: 0.9em; }
 .tag { margin-left: 6px; padding: 1px 8px; border: 1px solid var(--border); border-radius: var(--radius-full); font-size: 0.75em; font-weight: 400; color: var(--muted); }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > label { font-size: 0.9em; font-weight: 600; }

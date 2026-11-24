@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { treasuryAdminClient, type OutsideGroup, type OutsideOrigin, type OutsideView } from "../api/TreasuryAdminClient";
 import AdminSearch from "../components/admin/AdminSearch.vue";
@@ -116,7 +117,7 @@ async function remove() {
           <AdminSearch ref="searchField" v-model="search" label="Search outside services" />
         </div>
       </header>
-      <p v-if="error && !error.serviceId && !error.deleteId" class="admin-panel-text error" role="alert">{{ error.message }}</p>
+      <ActionMessage v-if="error && !error.serviceId && !error.deleteId" kind="error" :text="error.message" class="admin-panel-text" />
       <p v-if="loading" class="admin-panel-text muted" role="status">Loading…</p>
       <p v-else-if="!error && !groups.length" class="admin-panel-text muted">No outside services yet.</p>
       <p v-else-if="groups.length && !visible.length" class="admin-panel-text muted">No outside services match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
@@ -150,16 +151,16 @@ async function remove() {
             autocomplete="off"
             spellcheck="false"
           />
-          <p v-if="error?.serviceId === selected.service_id" :id="'error-' + selected.service_id" class="error" role="alert">{{ error.message }}</p>
+          <ActionMessage v-if="error?.serviceId === selected.service_id" kind="error" :text="error.message" :id="'error-' + selected.service_id" />
           <button type="submit" class="primary" :disabled="busy || !drafts[selected.service_id]?.trim() || drafts[selected.service_id]?.trim() === selected.name" :aria-busy="renaming === selected.service_id">Rename</button>
         </form>
-        <p v-if="error && !error.serviceId && !error.deleteId" class="error" role="alert">{{ error.message }}</p>
+        <ActionMessage v-if="error && !error.serviceId && !error.deleteId" kind="error" :text="error.message" />
         <h4>Origins</h4>
         <ul v-if="selected.origins.length" class="origin-list">
           <li v-for="origin in selected.origins" :key="origin.origin_id">
             <code>{{ origin.origin }}</code>
             <button type="button" class="danger" :data-test="'delete-origin-' + origin.origin_id" :aria-label="'Remove origin ' + origin.origin" :aria-describedby="error?.deleteId === origin.origin_id ? 'delete-origin-error-' + origin.origin_id : undefined" :disabled="busy" @click="target = { group: selected, origin }">Remove origin</button>
-            <p v-if="error?.deleteId === origin.origin_id" :id="'delete-origin-error-' + origin.origin_id" class="error delete-error" role="alert">{{ error.message }}</p>
+            <ActionMessage v-if="error?.deleteId === origin.origin_id" kind="error" :text="error.message" class="delete-error" :id="'delete-origin-error-' + origin.origin_id" />
           </li>
         </ul>
         <p v-else class="muted">No origins</p>
@@ -168,7 +169,7 @@ async function remove() {
           <h4>Danger zone</h4>
           <p class="muted">Removes this service and all its origins. Services that use it can lose their connection.</p>
           <button type="button" class="danger" data-test="delete-group" :aria-label="'Remove service ' + selected.name" :aria-describedby="error?.deleteId === selected.service_id ? 'delete-service-error-' + selected.service_id : undefined" :disabled="busy" @click="target = { group: selected }">Remove service</button>
-          <p v-if="error?.deleteId === selected.service_id" :id="'delete-service-error-' + selected.service_id" class="error delete-error" role="alert">{{ error.message }}</p>
+          <ActionMessage v-if="error?.deleteId === selected.service_id" kind="error" :text="error.message" class="delete-error" :id="'delete-service-error-' + selected.service_id" />
         </section>
       </div>
     </RecordDrawer>
