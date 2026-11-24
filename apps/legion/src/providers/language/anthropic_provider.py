@@ -23,6 +23,8 @@ from src.agents.roles.orchestrator import ask_user, delegation, plan, plan_runne
 from src.providers.gateway_failover import GatewayRoute, classify
 
 from src.runtime import approvals, questions
+from src.runtime import run_tools
+from src.runtime.tool_batch import Call, ToolRound
 from src.runtime.chat_history import validate_history
 
 from src.agents.agent_spec import RosterEntry
@@ -32,9 +34,9 @@ from src.providers.language.anthropic_gateway_shim import GatewayShim
 from src.agents.agent_roles import SYSTEM_PROMPT, roster_block, system_prompt_for
 from src.providers.context_breakdown import ProviderCounter, breakdown_fields
 from src.providers.base_provider import (
-    BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, cancel_on_stop, dispatch_with_progress, step_event,
+    BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, cancel_on_stop, step_event,
 )
-from src.tools.mcp_client.mcp_upstream import NumberedFailureText, call_tool, list_tools, tool_description
+from src.tools.mcp_client.mcp_upstream import call_tool, list_tools, tool_description
 
 
 PROVIDER_NAME = "anthropic"
@@ -130,6 +132,10 @@ def _dispatch(name: str, arguments: dict[str, Any], depth: int) -> str:
     return call_tool(name, arguments)
 
 
+# The tools the model has that are not real tools: a batch step may not call them.
+_LOCAL_TOOLS = frozenset({delegation.TOOL_NAME, ask_user.TOOL_NAME, plan.TOOL_NAME, submit_plan.TOOL_NAME})
+
+
 def _tool_schemas(roster: Sequence[RosterEntry] = ()) -> list[dict[str, Any]]:
     # display_label rides along on every schema dict returned here so
     # run_chat can build its step_start "label" lookup from the same
@@ -173,6 +179,14 @@ def _tool_schemas(roster: Sequence[RosterEntry] = ()) -> list[dict[str, Any]]:
             "description": plan.tool_description(policy.lean),
             "input_schema": plan.tool_parameters(),
             "display_label": "Plan",
+        })
+    # More than one real tool: they can be batched, with dependencies, in one step (runtime/run_tools.py).
+    if run_tools.enabled() and sum(1 for s in schemas if s["name"] not in _LOCAL_TOOLS) > 1:
+        schemas.append({
+            "name": run_tools.TOOL_NAME,
+            "description": run_tools.tool_description(),
+            "input_schema": run_tools.tool_parameters(),
+            "display_label": "Run tools",
         })
     if plan_mode:
         schemas.append({"name": submit_plan.TOOL_NAME, "description": submit_plan.tool_description(),
@@ -337,6 +351,10 @@ async def run_chat(
     options = llm_options.for_provider(PROVIDER_ID)
     guard = options.turn_guard()
     checklist = plan.Checklist()
+    runner = ToolRound(guard=guard, dispatch=_dispatch, labels=labels, depth=depth, request_id=request_id,
+                       on_event=on_event, planning=planning, checklist=checklist, tools_used=tools_used, tool_calls=tool_calls,
+                       batch_tools=run_tools.batchable([s["name"] for s in schemas], _LOCAL_TOOLS)
+                       if run_tools.TOOL_NAME in {s["name"] for s in schemas} else frozenset())
     empty_answer_retried = False
     stop_message = 'Reached maximum tool-call rounds without a final answer.'
     # The full prompt just sent (all resent history + this round's tool
@@ -472,49 +490,13 @@ async def run_chat(
                     await on_event(step_event("token_reset"))
                 messages.append({"role": "assistant", "content": response.content})
 
-                tool_results: list[dict[str, Any]] = []
-                for block in response.content:
-                    if block.type != "tool_use":
-                        continue
-                    guard.check_call(block.name, block.input)
-                    tools_used.append(block.name)
-                    step_id = block.id
-                    if on_event:
-                        await on_event(step_event(
-                            "step_start", id=step_id, tool=block.name, label=labels.get(block.name), arguments=block.input,
-                        ))
-                    # Local planning and questions do not run external tools or need approval.
-                    asked = (await planning.handle(block.name, block.input, depth, request_id, on_event)
-                             if planning else await checklist.handle(block.name, block.input, on_event))
-                    if asked is None:
-                        asked = await questions.handle(block.name, request_id, step_id, block.input, on_event)
-                    if asked is not None:
-                        result_text, ok = asked
-                        if planning and planning.closed:
-                            schemas = []
-                            system, tools = _cached_request(system_prompt, schemas) if use_cache else (system_prompt, schemas)
-                    else:
-                        # With approvals on, the user answers before anything runs; a
-                        # refusal is handed to the model as this step's result.
-                        declined = await approvals.review(
-                            request_id, step_id, block.name, labels.get(block.name), block.input, on_event
-                        )
-                        if declined is not None:
-                            result_text, ok = declined, False
-                        else:
-                            try:
-                                result_text = await dispatch_with_progress(_dispatch, on_event, step_id, block.name, block.input, depth)
-                                ok = True
-                            except Exception as error:
-                                result_text = f"Tool '{block.name}' failed: {error}"
-                                ok = False
-                    if isinstance(result_text, NumberedFailureText):
-                        guard.note_result(block.name, block.input, result_text)
-                        ok = False
-                    if on_event:
-                        await on_event(step_event("step_end", id=step_id, ok=ok, result=result_text))
-                    tool_calls.append(ToolCallRecord(name=block.name, arguments=block.input, result=result_text))
-                    tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result_text})
+                blocks = [block for block in response.content if block.type == "tool_use"]
+                outcomes = await runner.run([Call(block.id, block.name, block.input) for block in blocks])
+                if planning and planning.closed:
+                    schemas = []
+                    system, tools = _cached_request(system_prompt, schemas) if use_cache else (system_prompt, schemas)
+                tool_results = [{"type": "tool_result", "tool_use_id": block.id, "content": outcome.text}
+                                for block, outcome in zip(blocks, outcomes)]
 
                 messages.append({"role": "user", "content": tool_results})
     except TurnStopped as error:

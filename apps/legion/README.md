@@ -364,6 +364,24 @@ empty, nobody is left out. The
 `agent_id` argument of `delegate_to_agent` is an enum of the roster ids. An
 orchestrator may still answer directly when no specialist fits.
 
+Tool calls of one model round (`src/runtime/tool_batch.py`, shared by the Anthropic and OpenAI
+loops): consecutive calls run at the same time (at most 8) only when each needs no approval and is a
+built-in tool that declares `readOnlyHint`. Any other call (a write, a delegation, a local tool such as
+`update_plan`, a private tool, one that needs approval) runs alone and in order, so approvals are asked
+one by one. Results go back to the model in the model's call order. The turn guard checks every call of the
+round before the first one runs.
+
+A specialist with more than one real tool is also offered `run_tools` (`src/runtime/run_tools.py`): one
+step that holds up to 10 tool calls `{id, tool, arguments, return?}`. Steps with no link between them run
+in the same wave under the rule above; an argument `{"$ref": "id"}` (whole result) or
+`{"$ref": "id.field.0"}` (a field of a JSON result) makes a step wait for that step. The model gets one reply:
+steps with `"return": true`, and by default the steps nothing else uses, come back in full (each cut at
+20,000 characters, 60,000 in all); the others show a status line and their result stays available to later
+`$ref`s of the same turn. A failed or declined step makes only the steps that need it skip. Every step is an
+ordinary call, so the turn guard, approvals (asked step by step), tool filters and error numbers apply to it.
+A step may not call `delegate_to_agent`, `ask_user`, the plan tools or `run_tools`. The orchestrator, architects
+and the router are not offered it.
+
 With `mode: "plan"`, the model sees only `ask_user` (when the caller supports
 questions) and `submit_plan`. The catalog is rebuilt from the live registry,
 capped at 8,192 characters; worker lines are dropped before architect lines.
