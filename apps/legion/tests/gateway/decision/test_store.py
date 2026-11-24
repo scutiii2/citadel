@@ -57,6 +57,15 @@ def test_bad_url_timeout_window(store):
         store.put("a", {"kind": "scuti", "url": "http://h:1", "window": 5})
 
 
+def test_window_sent_as_text_by_the_admin_form(store):
+    store.put("a", {"kind": "scuti", "url": "http://h:1", "window": "4096"})
+    assert store.all()["a"]["window"] == 4096
+    store.put("b", {"kind": "scuti", "url": "http://h:1", "window": ""})
+    assert "window" not in store.all()["b"]
+    with pytest.raises(ValueError, match="window"):
+        store.put("c", {"kind": "scuti", "url": "http://h:1", "window": "abc"})
+
+
 def test_delete(store):
     store.put("a", {"kind": "scuti", "url": "http://h:1"})
     assert store.delete("a") is True and store.delete("a") is False and store.all() == {}
