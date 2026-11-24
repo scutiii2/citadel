@@ -37,6 +37,7 @@ DEPLOY_PATHS = [
     "apps/stronghold",
     "apps/portcullis",
     "apps/portcullis_admin",
+    "apps/ember",
     "apps/legion_admin",
     "apps/armory_admin",
     "apps/stronghold_admin",
@@ -47,7 +48,7 @@ DEPLOY_PATHS = [
 # Left out of live. Python tests/ folders are not built into any image; e2e/ and src/*.test.ts stay
 # because the web apps' tsconfig includes them.
 EXCLUDE_DIRS = {"tests"}
-EXCLUDE_PREFIXES: tuple[str, ...] = ()
+EXCLUDE_PREFIXES: tuple[str, ...] = ("apps/ember/src-tauri",)  # the Windows shell is not built on the server
 BRANCH = "live"
 REMOTE = "origin"
 ROOT = Path(__file__).resolve().parent.parent
