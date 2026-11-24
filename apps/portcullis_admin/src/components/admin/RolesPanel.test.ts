@@ -109,7 +109,7 @@ describe("RolesPanel", () => {
     await ask(wrapper, "Save changes?").vm.$emit("confirm");
     await flushPromises();
     expect(client.updateRole).toHaveBeenCalledWith(2, { permissions: ["chat.use", "roles.manage"] });
-    expect(body(wrapper).get(".chip.saved").text()).toBe("Saved");
+    expect(body(wrapper).get(".action-message.ok").text()).toBe("Saved");
     expect(wrapper.find("#role-editor").exists()).toBe(false);
     wrapper.unmount();
   });
@@ -220,7 +220,7 @@ describe("RolesPanel", () => {
     await open(wrapper, "Member");
     await body(wrapper).findAll("button").find((b) => b.text() === "Delete role")!.trigger("click");
     const dialog = ask(wrapper, "Delete role");
-    expect(dialog.props("message")).toBe("Delete role 'Member'? It is removed from 3 accounts.");
+    expect(dialog.props("message")).toBe("Delete role 'Member'? It is removed from 3 users.");
     expect(dialog.props("requireText")).toBe("Member");
     expect(client.deleteRole).not.toHaveBeenCalled();
     await dialog.vm.$emit("confirm");
@@ -286,7 +286,7 @@ describe("RolesPanel", () => {
     const wrapper = await panel();
     expect(client.listAccounts).not.toHaveBeenCalled();
     await open(wrapper, "Member");
-    await body(wrapper).findAll("button").find((b) => b.text() === "View affected accounts")!.trigger("click");
+    await body(wrapper).findAll("button").find((b) => b.text() === "View affected users")!.trigger("click");
     await flushPromises();
     expect(wrapper.findAll(".affected-accounts li")).toHaveLength(1);
     expect(wrapper.find(".affected-accounts").text()).toContain("m@example.com");

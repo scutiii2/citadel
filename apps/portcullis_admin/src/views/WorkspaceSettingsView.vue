@@ -6,6 +6,6 @@ import AppConfigCard from "../components/AppConfigCard.vue";
 </script>
 
 <template>
-  <PageLayout class="admin-panel" title="Workspace settings" wide><SettingsPanel /><SidebarPagesPanel /><AppConfigCard />
+  <PageLayout class="admin-panel" title="Workspace settings" wide><AppConfigCard /><SidebarPagesPanel /><SettingsPanel />
   </PageLayout>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import PasswordInput from "../components/PasswordInput.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, reactive, ref } from "vue";
@@ -147,7 +148,7 @@ async function changePassword(): Promise<void> {
           <form v-if="openForm === 'email'" id="account-email-form" class="stack" :aria-busy="emailForm.busy" @submit.prevent="changeEmail">
             <label>New email<input v-model="emailForm.email" type="email" autocomplete="email" required /></label>
             <PasswordInput v-model="emailForm.password" label="Current password" autocomplete="current-password" required />
-            <p v-if="emailForm.error" class="error" role="alert">{{ emailForm.error }}</p>
+            <ActionMessage v-if="emailForm.error" kind="error" :text="emailForm.error" />
             <button class="primary" :disabled="emailForm.busy" :aria-busy="emailForm.busy"><span v-if="emailForm.busy" class="spinner" aria-hidden="true" />{{ emailForm.busy ? 'Changing email…' : 'Change email' }}</button>
           </form>
           <div class="row">
@@ -158,9 +159,9 @@ async function changePassword(): Promise<void> {
             <PasswordInput v-model="passwordForm.next" label="New password" autocomplete="new-password" minlength="8" required />
             <PasswordInput v-model="passwordForm.confirm" label="Repeat new password" autocomplete="new-password" required />
             <PasswordInput v-model="passwordForm.current" label="Current password" autocomplete="current-password" required />
-            <p v-if="passwordMismatch" class="error" role="alert">The new passwords don't match.</p>
-            <p v-else-if="passwordForm.error" class="error" role="alert">{{ passwordForm.error }}</p>
-            <p v-else-if="passwordForm.done" class="notice" role="status">Password changed.</p>
+            <ActionMessage v-if="passwordMismatch" kind="error" text="The new passwords don't match." />
+            <ActionMessage v-else-if="passwordForm.error" kind="error" :text="passwordForm.error" />
+            <ActionMessage v-else-if="passwordForm.done" kind="ok" text="Password changed." />
             <button class="primary" :disabled="passwordForm.busy || passwordMismatch" :aria-busy="passwordForm.busy"><span v-if="passwordForm.busy" class="spinner" aria-hidden="true" />{{ passwordForm.busy ? 'Changing password…' : 'Change password' }}</button>
           </form>
         </div>
@@ -190,7 +191,7 @@ async function changePassword(): Promise<void> {
             <PanelHelp title="Remembered devices"><p>Devices you have used to sign in. A login from a new device is noted in the activity log.</p><p>Forgetting a device makes its next sign-in appear as a new device.</p></PanelHelp>
           </div>
         </header>
-        <p v-if="devicesError" class="device-message error" role="alert">{{ devicesError }}</p>
+        <ActionMessage v-if="devicesError" kind="error" :text="devicesError" class="device-message" />
         <p v-else-if="devices.length === 0" class="device-message muted">None recorded yet.</p>
         <ul v-else class="devices">
           <li v-for="d in devices" :key="d.id" :title="d.user_agent || '(no browser name)'">

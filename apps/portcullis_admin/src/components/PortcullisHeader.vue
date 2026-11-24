@@ -89,7 +89,7 @@ watch(() => route.fullPath, () => { panel.value = undefined; });
       </template>
       <template v-else-if="panel === 'help'">
         <strong>Help</strong>
-        <p>Open a row to see its details and edit it in the drawer. Accounts: search by name, email or role, change roles and save. Roles: edit permissions and save to apply them to every holder. Invites: Invite member sends an email invite. Workspace settings apply to every account, and each panel saves on its own.</p>
+        <p>Open a row to see its details and edit it in the drawer. Users: search by name, email or role, change roles and save. Roles: edit permissions and save to apply them to every holder. Invites: Invite member sends an email invite. Workspace settings apply to every user, and each panel saves on its own.</p>
       </template>
       <AccountMenu v-else-if="auth.account" :username="auth.account.username" :email="auth.account.email" @navigate="panel = undefined" @logout="auth.logout().catch(() => {})" />
     </section>

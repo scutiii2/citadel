@@ -28,7 +28,7 @@ const labels = (w: Awaited<ReturnType<typeof show>>) => w.findAll("nav[aria-labe
 it("names icon-only links and marks the current page", async () => {
   const w = await show(["invites.manage", "settings.manage", "accounts.view"]);
   const links = w.findAll("nav[aria-label='Admin sections'] a");
-  expect(labels(w)).toEqual(["Overview", "Accounts", "Workspace settings", "Invites"]);
+  expect(labels(w)).toEqual(["Overview", "Users", "Workspace settings", "Invites"]);
   expect(links.every((a) => a.text() === "" && a.find("svg").exists())).toBe(true);
   expect(w.get("a[aria-label='Overview']").attributes("aria-current")).toBe("page");
 });
@@ -45,14 +45,14 @@ it("marks only the current administration page", async () => {
 
 it("lists the pages in the default arrangement after Overview", async () => {
   const w = await show(["accounts.manage", "roles.manage", "invites.manage", "settings.manage"]);
-  expect(labels(w)).toEqual(["Overview", "Roles & permissions", "Accounts", "Workspace settings", "Invites"]);
+  expect(labels(w)).toEqual(["Overview", "Roles & permissions", "Users", "Workspace settings", "Invites"]);
 });
 
 it("follows the saved order and hidden pages", async () => {
   const w = await show(["accounts.manage", "invites.manage", "settings.manage"]);
   useNavPrefsStore().update({ order: ["/admin/invites", "/admin/accounts", "/admin/settings"], pinned: [], hidden: ["/admin/settings"] });
   await flushPromises();
-  expect(labels(w)).toEqual(["Overview", "Invites", "Accounts"]);
+  expect(labels(w)).toEqual(["Overview", "Invites", "Users"]);
 });
 
 it("offers only the permitted pages", async () => {

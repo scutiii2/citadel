@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { adminClient, type AdminAccount, type PermissionInfo, type Role } from "../../api/AdminClient";
 import { useAuthStore } from "../../stores/auth";
@@ -178,7 +179,7 @@ function discardEdit(): void {
 const deleteMessage = computed(() => {
   const role = pendingDelete.value;
   if (!role) return "";
-  const users = role.account_count === 1 ? "1 account" : `${role.account_count} accounts`;
+  const users = role.account_count === 1 ? "1 user" : `${role.account_count} users`;
   return `Delete role '${role.name}'? It is removed from ${users}.`;
 });
 
@@ -204,12 +205,12 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
       <header class="admin-panel-head">
         <h2 id="role-roster">Role roster</h2>
         <div class="admin-panel-tools">
-          <PanelHelp title="Role roster">A role is a named set of permissions. Open a role to change what it allows, and see which accounts hold it. Changes apply to every holder at once.</PanelHelp>
+          <PanelHelp title="Role roster">A role is a named set of permissions. Open a role to change what it allows, and see which users hold it. Changes apply to every holder at once.</PanelHelp>
           <button v-if="auth.hasPermission('roles.manage')" type="button" class="admin-icon accent" data-test="new-role" aria-label="New role" title="New role" :disabled="loading || !!loadError" @click="openCreate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
           <AdminSearch ref="searchField" v-model="search" label="Search roles" />
         </div>
       </header>
-      <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button type="button" class="chip" @click="load">Retry</button></p>
+      <ActionMessage v-if="loadError" kind="error" :text="loadError" class="admin-panel-text"><button type="button" class="chip" @click="load">Retry</button></ActionMessage>
       <p v-else-if="loading" class="admin-panel-text muted" role="status">Loading roles…</p>
       <p v-else-if="!visible.length" class="admin-panel-text muted">{{ roles.length ? "No roles match your search." : "No roles yet. Create one to get started." }}
         <button v-if="search" type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button>
@@ -245,7 +246,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
       <form id="role-create" class="create admin-editor" @submit.prevent>
         <label>Name<input v-model="newRole.name" type="text" maxlength="80" required :disabled="newRole.saving" /></label>
         <label>Description<input v-model="newRole.description" type="text" maxlength="255" placeholder="Optional" :disabled="newRole.saving" /></label>
-        <p v-if="newRole.error" class="error" role="alert">{{ newRole.error }}</p>
+        <ActionMessage v-if="newRole.error" kind="error" :text="newRole.error" />
       </form>
       <template #footer>
         <button type="button" class="chip" :disabled="newRole.saving" @click="creating = false">Cancel</button>

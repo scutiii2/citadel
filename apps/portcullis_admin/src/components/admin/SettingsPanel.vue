@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { settingsClient, type AppSettings } from "../../api/SettingsClient";
 import { useDraftPanel } from "../../composables/useDraftPanel";
 import { errorMessage } from "../../utils/errors";
 import LockSwitch from "../LockSwitch.vue";
 import AdminSearch from "./AdminSearch.vue";
+import FieldLabel from "./FieldLabel.vue";
 import PanelHelp from "./PanelHelp.vue";
 import ConfirmModal from "./ConfirmModal.vue";
 import DraftActions from "./DraftActions.vue";
@@ -85,22 +87,25 @@ onMounted(load);
     <header class="admin-panel-head">
       <h2 id="tool-approval-title"><span v-if="storedOn" class="dot" title="Changed from the default" aria-hidden="true" /> Tool approval</h2>
       <div class="admin-panel-tools tools">
-        <PanelHelp title="Tool approval"><p>Chooses which tool actions need approval before they run. Edit, then Save to apply to every account.</p><p>When on, every account's answers ask before each tool the agent runs, whatever the account chose, and "Allow for this chat" is not offered. A tool runs only after its own "Allow once". Typed commands (such as /tool) are not affected: the person types the exact command themselves.</p></PanelHelp>
+        <PanelHelp title="Tool approval"><p>Chooses which tool actions need approval before they run. Edit, then Save to apply to every user.</p><p>When on, every user's answers ask before each tool the agent runs, whatever the user chose, and "Allow for this chat" is not offered. A tool runs only after its own "Allow once". Typed commands (such as /tool) are not affected: the person types the exact command themselves.</p></PanelHelp>
         <DraftActions :dirty="dirty" :saving="saving" label="tool approval changes" @cancel="discardOpen = true" @save="save" />
         <AdminSearch ref="searchField" v-model="search" label="Search tool approval" />
       </div>
     </header>
-    <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }}</p>
+    <ActionMessage v-if="loadError" kind="error" :text="loadError" class="admin-panel-text" />
     <p v-if="!matches" class="admin-panel-text muted">No settings match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
     <div v-show="matches" class="body">
       <div class="meta">
-        <span class="chip scope">Applies to all accounts</span>
+        <span class="chip scope">Applies to all users</span>
         <button v-if="draft" type="button" class="small" :disabled="saving" @click="resetToDefault">Back to default</button>
-        <span v-if="saved && !dirty" class="chip saved" role="status">Saved</span>
+        <ActionMessage v-if="saved && !dirty" kind="ok" text="Saved" />
       </div>
-      <LockSwitch v-if="settings" :checked="draft" :disabled="saving" @change="setDraft($event.target as HTMLInputElement)">Require approval for every tool</LockSwitch>
-      <p v-if="dirty" class="unsaved" role="status">You have an unsaved change. Turning it {{ draft ? "on" : "off" }} applies to every account.</p>
-      <p v-if="saveError" class="error" role="alert">{{ saveError }}</p>
+      <div v-if="settings" class="switch-row">
+        <LockSwitch :checked="draft" :disabled="saving" @change="setDraft($event.target as HTMLInputElement)">Require approval for every tool</LockSwitch>
+        <FieldLabel bare title="Require approval for every tool"><p><b>On:</b> every tool the agent wants to run waits for the user's own "Allow once". "Allow for this chat" is not offered, whatever the user chose.</p><p><b>Off:</b> each user decides for themselves, per chat.</p><p>Typed commands such as /tool are never held: the person types the exact command themselves.</p></FieldLabel>
+      </div>
+      <p v-if="dirty" class="unsaved" role="status">You have an unsaved change. Turning it {{ draft ? "on" : "off" }} applies to every user.</p>
+      <ActionMessage v-if="saveError" kind="error" :text="saveError" />
     </div>
     <ConfirmModal :open="discardOpen" title="Discard unsaved change?" message="Your tool approval change has not been saved." confirm-label="Discard change" @confirm="answerDiscard(true, cancel)" @close="answerDiscard(false, cancel)" />
   </section>
@@ -111,6 +116,7 @@ onMounted(load);
 .body { display: grid; gap: 10px; padding: 14px; }
 .body p { margin: 0; }
 .body > .muted { max-width: 620px; font-size: 0.9em; }
+.switch-row { display: flex; align-items: center; gap: 4px; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .chip.saved { color: var(--success); border-color: var(--success); }
 .unsaved { font-size: 0.9em; }

@@ -59,7 +59,7 @@ test("settings applies theme instantly and saves sidebar drafts for reload", asy
   await page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true }).click();
   await inviteSwitch.focus();
   await inviteSwitch.press("Space");
-  await page.getByRole("button", { name: "Pin Accounts to the top" }).click();
+  await page.getByRole("button", { name: "Pin Users to the top" }).click();
   for (const width of [1280, 768, 375]) {
     await page.setViewportSize({ width, height: 800 });
     const save = page.getByRole("button", { name: "Save settings changes", exact: true });
@@ -70,7 +70,7 @@ test("settings applies theme instantly and saves sidebar drafts for reload", asy
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.getByRole("button", { name: "Save settings changes", exact: true }).click();
   await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("link").nth(1)).toHaveAttribute("aria-label", "Accounts");
+  await expect(nav.getByRole("link").nth(1)).toHaveAttribute("aria-label", "Users");
   await page.reload();
   await expect(page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(0);

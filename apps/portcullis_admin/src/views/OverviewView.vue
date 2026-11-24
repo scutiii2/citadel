@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import PageLayout from "../components/PageLayout.vue";
 import PanelHelp from "../components/admin/PanelHelp.vue";
 import { computed, onMounted, ref } from "vue";
@@ -24,15 +25,15 @@ const count = (key: keyof AdminSummary): number | null => summary.value?.[key] ?
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 const descriptions: Record<string, string> = {
-  "/admin/accounts": "Manage profiles, account status, and assigned roles.",
+  "/admin/accounts": "Manage profiles, user status, and assigned roles.",
   "/admin/roles": "Define exactly what each role can view and change.",
   "/admin/invites": "Invite a member, check expiry, or revoke access.",
-  "/admin/settings": "Control approval requirements for every account.",
+  "/admin/settings": "Control approval requirements for every user.",
 };
 /** What each destination shows beyond its description, when the live count is known. */
 function detail(path: string): string {
   const s = summary.value;
-  if (path === "/admin/accounts" && s?.accounts != null) return `${plural(s.accounts, "account")}${s.unverified ? ` · ${s.unverified} unverified` : ""}${s.disabled ? ` · ${s.disabled} disabled` : ""}`;
+  if (path === "/admin/accounts" && s?.accounts != null) return `${plural(s.accounts, "user")}${s.unverified ? ` · ${s.unverified} unverified` : ""}${s.disabled ? ` · ${s.disabled} disabled` : ""}`;
   if (path === "/admin/roles" && s?.roles != null) return plural(s.roles, "role");
   if (path === "/admin/invites" && s?.open_invites != null) return plural(s.open_invites, "open invite");
   return descriptions[path] ?? "";
@@ -54,19 +55,19 @@ onMounted(async () => {
 
 <template>
   <PageLayout class="admin-overview admin-panel" title="Workspace overview" wide>
-    <p v-if="error" class="error" role="alert">Couldn't load the overview: {{ error }}</p>
+    <ActionMessage v-if="error" kind="error" :text="`Couldn't load the overview: ${error}`" />
     <div v-if="canSummarize" class="stats">
       <RouterLink v-if="auth.hasPermission('accounts.view')" to="/admin/accounts" class="stat">
-        <StatTile label="Accounts" :value="count('accounts')" :unavailable="unavailable('accounts')"><svg viewBox="0 0 24 24"><path d="M16 19v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1M10 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6M20 19v-1a4 4 0 0 0-3-3.9M16 5.1a3 3 0 0 1 0 5.8" /></svg></StatTile>
-        <span class="stat-link">Browse accounts</span>
+        <StatTile label="Users" :value="count('accounts')" :unavailable="unavailable('accounts')"><svg viewBox="0 0 24 24"><path d="M16 19v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1M10 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6M20 19v-1a4 4 0 0 0-3-3.9M16 5.1a3 3 0 0 1 0 5.8" /></svg></StatTile>
+        <span class="stat-link">Browse users</span>
       </RouterLink>
       <RouterLink v-if="auth.hasPermission('accounts.view')" to="/admin/accounts?status=unverified" class="stat">
         <StatTile label="Unverified" :value="count('unverified')" :unavailable="unavailable('unverified')" warn><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6zM12 9v4m0 3h.01" /></svg></StatTile>
-        <span class="stat-link">Review accounts</span>
+        <span class="stat-link">Review users</span>
       </RouterLink>
       <RouterLink v-if="auth.hasPermission('accounts.view')" to="/admin/accounts?status=disabled" class="stat">
         <StatTile label="Disabled" :value="count('disabled')" :unavailable="unavailable('disabled')"><svg viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M5.6 5.6l12.8 12.8" /></svg></StatTile>
-        <span class="stat-link">Review accounts</span>
+        <span class="stat-link">Review users</span>
       </RouterLink>
       <RouterLink v-if="auth.hasPermission('invites.manage')" to="/admin/invites" class="stat">
         <StatTile label="Open invites" :value="count('open_invites')" :unavailable="unavailable('open_invites')"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 7l9 6 9-6" /></svg></StatTile>
@@ -75,7 +76,7 @@ onMounted(async () => {
     </div>
     <div v-if="auth.hasPermission('accounts.view') && summary?.unverified" class="attention" role="status">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 10 18H2zM12 9v5m0 3v.01" /></svg>
-      <div class="attention-text"><strong>{{ summary.unverified }} {{ summary.unverified === 1 ? 'account hasn’t' : 'accounts haven’t' }} verified their email</strong><span>Review their details or resend a verification email.</span></div>
+      <div class="attention-text"><strong>{{ summary.unverified }} {{ summary.unverified === 1 ? 'user hasn’t' : 'users haven’t' }} verified their email</strong><span>Review their details or resend a verification email.</span></div>
       <RouterLink class="attention-action" to="/admin/accounts?status=unverified">Review</RouterLink>
     </div>
     <section class="admin-panel-card" aria-labelledby="overview-access">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import {
@@ -60,9 +61,9 @@ type RowStatus = "active" | "unverified" | "disabled";
 const statusOf = (a: AdminAccount): RowStatus => !a.is_active ? "disabled" : !a.email_verified ? "unverified" : "active";
 /** What each status means and what to do about it, shown in the helper popover beside the status. */
 const STATUS_HELP: Record<RowStatus, string> = {
-  active: "The account can sign in. Nothing to do.",
+  active: "The user can sign in. Nothing to do.",
   unverified: "The email address is not confirmed yet, so sign-in is held back. Ask the person to open the verification link in their email, or invite them again.",
-  disabled: "The account cannot sign in. Open it and turn Active on to let the person back in.",
+  disabled: "The user cannot sign in. Open the user and turn Active on to let the person back in.",
 };
 const selected = computed(() => (selectedId.value === null ? null : known.value.get(selectedId.value) ?? null));
 const canEdit = computed(() => !!selected.value && !selected.value.is_protected && (auth.hasPermission("accounts.manage") || auth.hasPermission("roles.assign")));
@@ -264,8 +265,8 @@ const confirmText = computed(() => {
   const p = pending.value;
   if (!p) return { title: "", message: "", label: "", requireText: "" };
   const name = p.account.username;
-  if (p.kind === "disable") return { title: "Disable account", message: `Disable '${name}'? They are logged out and can't log in until enabled.`, label: "Disable", requireText: "" };
-  return { title: "Delete account", message: `Delete '${name}' permanently? This can't be undone.`, label: "Delete", requireText: name };
+  if (p.kind === "disable") return { title: "Disable user", message: `Disable '${name}'? They are logged out and can't log in until enabled.`, label: "Disable", requireText: "" };
+  return { title: "Delete user", message: `Delete '${name}' permanently? This can't be undone.`, label: "Delete", requireText: name };
 });
 
 async function confirm(): Promise<void> {
@@ -289,24 +290,24 @@ async function confirm(): Promise<void> {
 
 <template>
   <div class="accounts-panel admin-panel">
-    <StatusFilters v-model="status" label="Filter by account status" :options="STATUS_OPTIONS" />
+    <StatusFilters v-model="status" label="Filter by user status" :options="STATUS_OPTIONS" />
     <section class="admin-panel-card" aria-labelledby="account-roster">
       <header class="admin-panel-head">
-        <h2 id="account-roster">Account roster</h2>
+        <h2 id="account-roster">User roster</h2>
         <div class="admin-panel-tools">
-          <PanelHelp title="Account roster">Everyone who can sign in. Search by name, email or role, open a row to see details, change roles and save, or invite someone new. Disabled and unverified accounts have their own filters above.</PanelHelp>
+          <PanelHelp title="User roster">Everyone who can sign in. Search by name, email or role, open a row to see details, change roles and save, or invite someone new. Disabled and unverified users have their own filters above.</PanelHelp>
           <RouterLink v-if="auth.hasPermission('invites.manage')" class="admin-icon accent" to="/admin/invites?create=1" aria-label="Invite member" title="Invite member"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19 8v6M16 11h6" /></svg></RouterLink>
-          <AdminSearch ref="searchField" v-model="search" label="Search accounts" />
+          <AdminSearch ref="searchField" v-model="search" label="Search users" />
         </div>
       </header>
-      <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button type="button" class="chip" @click="loadAccounts">Retry</button></p>
-      <p v-else-if="loading && !accounts.length" class="admin-panel-text muted" role="status">Loading accounts…</p>
-      <p v-else-if="!visible.length" class="admin-panel-text muted">{{ accounts.length ? "No accounts match your search." : "No accounts match this filter." }}
+      <ActionMessage v-if="loadError" kind="error" :text="loadError" class="admin-panel-text"><button type="button" class="chip" @click="loadAccounts">Retry</button></ActionMessage>
+      <p v-else-if="loading && !accounts.length" class="admin-panel-text muted" role="status">Loading users…</p>
+      <p v-else-if="!visible.length" class="admin-panel-text muted">{{ accounts.length ? "No users match your search." : "No users match this filter." }}
         <button v-if="search" type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button>
       </p>
       <div v-else class="admin-table-scroll" tabindex="0" role="region" aria-labelledby="account-roster">
         <table class="admin-records">
-          <thead><tr><th scope="col">Account</th><th scope="col">Roles</th><th scope="col">Status</th></tr></thead>
+          <thead><tr><th scope="col">User</th><th scope="col">Roles</th><th scope="col">Status</th></tr></thead>
           <tbody>
             <tr v-for="a in visible" :key="a.id" :data-id="a.id" data-test="account" :class="{ selected: a.id === selectedId }">
               <th scope="row">
@@ -317,11 +318,11 @@ async function confirm(): Promise<void> {
                     <span v-if="a.id === myId" class="badge">you</span>
                     <span v-if="a.is_protected" class="badge">protected</span>
                     <p>{{ a.email }}</p>
-                    <div class="mobile-roles"><span v-for="r in a.roles" :key="r.id" class="chip fixed">{{ r.name }}</span><span v-if="!a.roles.length" class="muted">No roles</span></div>
+                    <div class="role-tags mobile-roles"><span v-for="r in a.roles" :key="r.id" class="role-tag">{{ r.name }}</span><span v-if="!a.roles.length" class="no-roles">No roles</span></div>
                   </div>
                 </div>
               </th>
-              <td class="role-cell"><span v-for="r in a.roles" :key="r.id" class="chip fixed">{{ r.name }}</span><span v-if="!a.roles.length" class="muted">No roles</span></td>
+              <td class="role-cell"><div class="role-tags"><span v-for="r in a.roles" :key="r.id" class="role-tag">{{ r.name }}</span><span v-if="!a.roles.length" class="no-roles">No roles</span></div></td>
               <td><div class="status-cell">
                 <span v-if="!a.is_active" class="account-status disabled"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0" /></svg>disabled</span>
                 <span v-else-if="!a.email_verified" class="account-status unverified"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0" /></svg>unverified</span>
@@ -332,10 +333,10 @@ async function confirm(): Promise<void> {
           </tbody>
         </table>
       </div>
-      <p v-if="!loadError && accounts.length" class="admin-panel-text muted count" role="status">{{ visible.length }} of {{ accounts.length }} {{ accounts.length === 1 ? "account" : "accounts" }}</p>
+      <p v-if="!loadError && accounts.length" class="admin-panel-text muted count" role="status">{{ visible.length }} of {{ accounts.length }} {{ accounts.length === 1 ? "user" : "users" }}</p>
     </section>
 
-    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected ? `Account ${selected.username}` : 'Account details'"
+    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected ? `User ${selected.username}` : 'User details'"
       :editable="canEdit" :editing="editing" :busy="busy" :fallback-focus="() => searchField?.focus()"
       @edit="startEdit" @close="closeDrawer" @discard="discard" @save="save">
       <AccountDrawer v-if="selected" v-model:draft="draft" :account="selected" :roles="roles" :is-self="selected.id === myId" :busy="busy"
@@ -365,11 +366,15 @@ async function confirm(): Promise<void> {
 .status-cell { display: flex; align-items: center; gap: 4px; }
 .accounts-panel { min-width: 0; }
 .admin-records tbody tr.selected { background: var(--surface); }
-.mobile-roles { display: none; }
+.role-tags.mobile-roles { display: none; }
 .admin-record-name p { overflow-wrap: anywhere; }
 .badge { margin-inline-start: 6px; }
-.chip.fixed { margin: 0 4px 4px 0; }
-.account-status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 0.85em; text-transform: capitalize; }
+.role-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.role-tag { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--surface); color: var(--text); font-size: 0.78em; font-weight: 400; white-space: nowrap; }
+.no-roles { color: var(--muted); font-size: 0.85em; font-style: italic; }
+.account-status { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); white-space: nowrap; font-size: 0.8em; text-transform: capitalize; }
+.account-status.active { background: color-mix(in srgb, var(--success) 8%, var(--bg)); }
+.account-status.unverified { background: color-mix(in srgb, var(--warning) 8%, var(--bg)); }
 .account-status svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .account-status.active { color: var(--success); }
 .account-status.unverified { color: var(--warning); }
@@ -377,7 +382,8 @@ async function confirm(): Promise<void> {
 .count { border-top: 1px solid var(--border); font-size: 0.8rem; }
 @media (max-width: 767px) {
   .role-cell, thead th:nth-child(2) { display: none; }
-  .mobile-roles { display: flex; flex-wrap: wrap; margin-top: 4px; font-size: 0.85em; }
+  .role-tags.mobile-roles { display: flex; margin-top: 6px; }
 }
+@media (max-width: 520px) { .status-cell :deep(.admin-icon) { display: none; } .admin-records :is(th, td):first-child { width: auto; } }
 @media (max-width: 400px) { .admin-record-badge { display: none; } }
 </style>

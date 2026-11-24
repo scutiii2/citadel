@@ -40,7 +40,7 @@ describe("SettingsPanel", () => {
     const off = await panel(false);
     expect(isOn(off)).toBe(false);
     expect(off.text()).toContain("Require approval for every tool");
-    expect(off.text()).toContain("Applies to all accounts");
+    expect(off.text()).toContain("Applies to all users");
     await off.get('[data-test="panel-help"]').trigger("click");
     expect(document.body.textContent).toContain("Allow for this chat");
   });
@@ -54,7 +54,7 @@ describe("SettingsPanel", () => {
     expect(cancelIcon(wrapper).element.parentElement).toBe(slots[0]!.element);
     expect(save(wrapper).element.parentElement).toBe(slots[1]!.element);
     expect(cancelIcon(wrapper).attributes("aria-label")).toBe("Cancel tool approval changes");
-    expect(wrapper.get(".unsaved").text()).toContain("on applies to every account");
+    expect(wrapper.get(".unsaved").text()).toContain("on applies to every user");
     expect(client.set).not.toHaveBeenCalled();
   });
 
@@ -65,7 +65,7 @@ describe("SettingsPanel", () => {
     await flushPromises();
     expect(client.set).toHaveBeenCalledWith("force_tool_approval", true);
     expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
-    expect(wrapper.get(".chip.saved").text()).toBe("Saved");
+    expect(wrapper.get(".action-message.ok").text()).toBe("Saved");
     expect(isOn(wrapper)).toBe(true);
   });
 
@@ -116,7 +116,7 @@ describe("SettingsPanel", () => {
     await flushPromises();
     expect(wrapper.get(".error").text()).toContain("Missing permission: roles.manage");
     expect(wrapper.find('[data-test="save"]').exists()).toBe(true);
-    expect(wrapper.find(".chip.saved").exists()).toBe(false);
+    expect(wrapper.find(".action-message.ok").exists()).toBe(false);
   });
 
   it("keeps the draft while search hides the setting", async () => {
@@ -145,7 +145,7 @@ describe("SettingsPanel", () => {
     await reset()!.trigger("click");
     expect(client.set).not.toHaveBeenCalled();
     expect(isOn(wrapper)).toBe(false);
-    expect(wrapper.get(".unsaved").text()).toContain("off applies to every account");
+    expect(wrapper.get(".unsaved").text()).toContain("off applies to every user");
     expect(reset()).toBeUndefined();
     await save(wrapper).trigger("click");
     await flushPromises();

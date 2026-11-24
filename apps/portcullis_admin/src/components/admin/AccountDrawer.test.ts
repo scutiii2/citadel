@@ -29,7 +29,7 @@ describe("AccountDrawer", () => {
   beforeEach(() => localStorage.clear());
 
   it("shows every role, or No roles for an empty set", () => {
-    expect(show().findAll(".roles-section .chip").map((c) => c.text())).toEqual(["Member", "Support"]);
+    expect(show().findAll(".roles-section .role-name").map((c) => c.text())).toEqual(["Member", "Support"]);
     expect(show({ account: account({ roles: [] }) }).get(".roles-section").text()).toContain("No roles");
   });
 
@@ -74,7 +74,7 @@ describe("AccountDrawer", () => {
   it("reports delete and send verification", async () => {
     const w = show({ account: account({ email_verified: false }) });
     await w.findAll("button").find((b) => b.text() === "Send verification")!.trigger("click");
-    await w.findAll("button").find((b) => b.text() === "Delete account")!.trigger("click");
+    await w.findAll("button").find((b) => b.text() === "Delete user")!.trigger("click");
     expect(w.emitted("sendVerification")).toHaveLength(1);
     expect(w.emitted("remove")).toHaveLength(1);
   });
@@ -83,14 +83,14 @@ describe("AccountDrawer", () => {
     const w = show({ isSelf: true });
     expect(w.text()).toContain("Your account");
     expect(w.find('input[role="switch"]').exists()).toBe(false);
-    expect(w.text()).not.toContain("Delete account");
+    expect(w.text()).not.toContain("Delete user");
   });
 
   it("offers nothing to change on the protected account", () => {
     const w = show({ account: account({ is_protected: true }) });
-    expect(w.text()).toContain("protected admin account");
+    expect(w.text()).toContain("protected admin user");
     expect(w.find('input[role="switch"]').exists()).toBe(false);
-    expect(w.text()).not.toContain("Delete account");
+    expect(w.text()).not.toContain("Delete user");
   });
 
   it("disables the controls while a call runs and shows the error and notice", () => {

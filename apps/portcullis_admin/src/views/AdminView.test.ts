@@ -39,12 +39,12 @@ it('shows separate destinations and marks the active child page', async () => {
   expect(wrapper.text()).toContain('roles page');
   expect(client.summary).not.toHaveBeenCalled();
   await router.push('/admin/accounts');
-  expect(wrapper.get('nav[aria-label="Admin sections"] a[aria-current="page"]').attributes('aria-label')).toBe('Accounts');
+  expect(wrapper.get('nav[aria-label="Admin sections"] a[aria-current="page"]').attributes('aria-label')).toBe('Users');
 });
 it('shows counts only on the overview and refreshes when returning', async () => {
   const { wrapper, router } = await view();
-  expect(wrapper.findAll('.stats .tile').map(t => t.text())).toEqual(['Accounts24', 'Unverified3', 'Disabled1', 'Open invites5']);
-  expect(wrapper.findAll('.destination .live').map(t => t.text())).toContain('24 accounts · 3 unverified · 1 disabled');
+  expect(wrapper.findAll('.stats .tile').map(t => t.text())).toEqual(['Users24', 'Unverified3', 'Disabled1', 'Open invites5']);
+  expect(wrapper.findAll('.destination .live').map(t => t.text())).toContain('24 users · 3 unverified · 1 disabled');
   expect(wrapper.get('.attention a').attributes('href')).toBe('/admin/accounts?status=unverified');
   await router.push('/admin/roles');
   expect(wrapper.find('.stats').exists()).toBe(false);
@@ -62,7 +62,7 @@ it('keeps navigation and destination links usable when summary fails', async () 
 it('shows a count the server withheld as unavailable, not zero', async () => {
   client.summary.mockResolvedValue({ accounts: 24, unverified: null, disabled: 0, open_invites: null, roles: 2 });
   const { wrapper } = await view();
-  expect(wrapper.findAll('.stats .tile').map(t => t.text())).toEqual(['Accounts24', 'UnverifiedUnavailable', 'Disabled0', 'Open invitesUnavailable']);
+  expect(wrapper.findAll('.stats .tile').map(t => t.text())).toEqual(['Users24', 'UnverifiedUnavailable', 'Disabled0', 'Open invitesUnavailable']);
 });
 it('offers only overview and roles to a role viewer and hides unrelated counts', async () => {
   useAuthStore().account!.permissions = ['roles.view'];

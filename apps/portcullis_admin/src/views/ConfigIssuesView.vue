@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -72,7 +73,7 @@ async function check(): Promise<void> {
 
 <template>
   <PageLayout class="config-issues" title="Config issues" wide>
-    <p v-if="store.error" class="error" role="alert" data-test="check-error">The check failed: {{ store.error }}</p>
+    <ActionMessage v-if="store.error" kind="error" :text="`The check failed: ${store.error}`" data-test="check-error" />
     <StatusFilters v-model="filter" label="Filter by level" :options="options" />
     <section class="admin-panel-card" aria-labelledby="issues-title">
       <header class="admin-panel-head">
@@ -91,16 +92,22 @@ async function check(): Promise<void> {
         <section v-for="g in byFile" :key="g.file" class="file" :aria-label="g.file">
           <div class="file-head"><code>{{ g.file }}</code><span class="muted">{{ plural(g.items.length, "problem") }}</span></div>
           <div v-for="(i, n) in g.items" :key="n" class="row">
-            <span class="level" :class="i.severity"><span aria-hidden="true">{{ i.severity === "error" ? "✕" : "!" }}</span> {{ i.severity }}</span>
-            <code class="key">{{ i.key }}</code>
-            <span class="message">{{ i.message }}</span>
+            <svg class="level" :class="i.severity" role="img" :aria-label="i.severity" viewBox="0 0 24 24">
+              <title>{{ i.severity === "error" ? "Error" : "Warning" }}</title>
+              <template v-if="i.severity === 'error'"><circle cx="12" cy="12" r="9" /><path d="m9 9 6 6M15 9l-6 6" /></template>
+              <template v-else><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></template>
+            </svg>
+            <div class="issue">
+              <code class="key">{{ i.key }}</code>
+              <span class="message">{{ i.message }}</span>
+            </div>
             <span class="row-actions">
+              <button v-if="filter === 'ignored'" type="button" class="admin-icon" :aria-label="`Stop ignoring ${i.key}`" title="Stop ignoring" data-test="restore" @click="restore(i)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s4-6 9-6 9 6 9 6-4 6-9 6-9-6-9-6M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6" /></svg></button>
+              <button v-else-if="i.severity === 'warning'" type="button" class="admin-icon" :aria-label="`Ignore warning ${i.key}`" title="Ignore this warning" data-test="ignore" @click="store.ignore(i)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.2A9 9 0 0 1 12 6c5 0 9 6 9 6a15 15 0 0 1-2.9 3.5M6.6 6.6A15 15 0 0 0 3 12s4 6 9 6a8.6 8.6 0 0 0 3.4-.7M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg></button>
               <template v-if="fixFor(i)">
                 <RouterLink v-if="fixFor(i)!.to" class="admin-icon" :to="fixFor(i)!.to!" :aria-label="`${fixFor(i)!.label}: ${i.key}`" :title="fixFor(i)!.label" data-test="fix"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg></RouterLink>
                 <a v-else class="admin-icon" :href="fixFor(i)!.href" :aria-label="`${fixFor(i)!.label}: ${i.key}`" :title="fixFor(i)!.label" data-test="fix"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg></a>
               </template>
-              <button v-if="filter === 'ignored'" type="button" class="admin-icon" :aria-label="`Stop ignoring ${i.key}`" title="Stop ignoring" data-test="restore" @click="restore(i)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s4-6 9-6 9 6 9 6-4 6-9 6-9-6-9-6M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6" /></svg></button>
-              <button v-else-if="i.severity === 'warning'" type="button" class="admin-icon" :aria-label="`Ignore warning ${i.key}`" title="Ignore this warning" data-test="ignore" @click="store.ignore(i)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.2A9 9 0 0 1 12 6c5 0 9 6 9 6a15 15 0 0 1-2.9 3.5M6.6 6.6A15 15 0 0 0 3 12s4 6 9 6a8.6 8.6 0 0 0 3.4-.7M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg></button>
             </span>
           </div>
         </section>
@@ -112,12 +119,12 @@ async function check(): Promise<void> {
 <style scoped>
 .file + .file { border-top: 1px solid var(--border); }
 .file-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 14px; background: var(--surface); font-size: 0.85em; }
-.row { display: flex; align-items: baseline; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--border); font-size: 0.9em; }
-.level { flex-shrink: 0; min-width: 72px; padding: 1px 8px; border-radius: var(--radius-full); font-size: 0.78em; text-align: center; color: var(--tone); background: color-mix(in srgb, var(--tone) 12%, var(--bg)); }
+.row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--border); }
+.level { flex: none; width: 22px; height: 22px; fill: none; stroke: var(--tone); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .level.error { --tone: var(--status-failed); }
 .level.warning { --tone: var(--warning); }
-.key { flex-shrink: 0; padding: 1px 6px; border-radius: var(--radius-sm); background: var(--code-bg); }
-.message { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
-.row-actions { display: flex; flex: none; gap: 2px; margin-inline-start: auto; align-self: center; }
-@media (max-width: 600px) { .row { flex-wrap: wrap; } }
+.issue { display: grid; flex: 1 1 auto; gap: 2px; min-width: 0; }
+.key { justify-self: start; max-width: 100%; font-size: 0.9em; font-weight: 600; overflow-wrap: anywhere; }
+.message { color: var(--muted); font-size: 0.85em; overflow-wrap: anywhere; }
+.row-actions { display: flex; flex: none; gap: 2px; margin-inline-start: auto; }
 </style>

@@ -20,23 +20,23 @@ test("an administrator deletes an account from the Danger zone by typing its nam
   await logInAdmin(page);
   await page.getByRole("link", { name: "Overview", exact: true }).click();
   await expect(page).toHaveURL(/\/overview/);
-  await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Accounts', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Users', exact: true }).click();
 
-  // Open maria's drawer: Delete account is in its own Danger zone, not among the edit buttons.
+  // Open maria's drawer: Delete user is in its own Danger zone, not among the edit buttons.
   await page.getByRole("row").filter({ hasText: "maria" }).click();
   const zone = page.locator(".danger-zone");
   await expect(zone).toContainText("Danger zone");
-  await expect(zone.getByRole("button", { name: "Delete account" })).toBeVisible();
+  await expect(zone.getByRole("button", { name: "Delete user" })).toBeVisible();
 
   // Protected accounts offer no Danger zone at all.
-  await page.getByRole('dialog', { name: 'Account maria', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('dialog', { name: 'User maria', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole("row").filter({ hasText: "ada" }).click();
   await expect(page.locator(".danger-zone")).toHaveCount(0);
-  await page.getByRole('dialog', { name: 'Account ada', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('dialog', { name: 'User ada', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole("row").filter({ hasText: "maria" }).click();
 
-  await zone.getByRole("button", { name: "Delete account" }).click();
-  const dialog = page.getByRole("dialog", { name: "Delete account" });
+  await zone.getByRole("button", { name: "Delete user" }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete user" });
   await expect(dialog).toContainText("Delete 'maria' permanently?");
   const field = dialog.getByRole("textbox");
   const confirm = dialog.getByRole("button", { name: "Delete" });
@@ -70,12 +70,12 @@ test("an administrator saves tool approval through the reserved icon slots", asy
   const cancel = actions.getByRole("button", { name: "Cancel tool approval changes" });
   const save = actions.getByRole("button", { name: "Save tool approval changes" });
   const panel = page.locator("section.admin-panel-card").filter({ has: page.getByRole("heading", { name: "Tool approval", exact: true }) });
-  await expect(panel.getByText("Applies to all accounts", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Applies to all users", { exact: true })).toBeVisible();
   await expect(actions.getByRole("button")).toHaveCount(0);
 
   // Flipping it is only a draft: the panel says who it reaches, and nothing is sent.
   await flipSwitch(page, "Require approval for every tool");
-  await expect(panel.locator(".unsaved")).toContainText("Turning it on applies to every account");
+  await expect(panel.locator(".unsaved")).toContainText("Turning it on applies to every user");
   expect(api.settings.forceToolApproval).toBe(false);
 
   // Cancel asks, and dismissing the question keeps the draft.
@@ -99,7 +99,7 @@ test("an administrator saves tool approval through the reserved icon slots", asy
 
   // Back to default is a draft too, until it is saved.
   await page.getByRole("button", { name: "Back to default" }).click();
-  await expect(panel.locator(".unsaved")).toContainText("Turning it off applies to every account");
+  await expect(panel.locator(".unsaved")).toContainText("Turning it off applies to every user");
   expect(api.settings.forceToolApproval).toBe(true);
   await save.click();
   await expect.poll(() => api.settings.forceToolApproval).toBe(false);
@@ -128,7 +128,7 @@ test("deleting a role: one that accounts hold needs its name typed, an unused on
   await expect(zone).toContainText("Danger zone");
   await zone.getByRole("button", { name: "Delete role" }).click();
   const dialog = page.getByRole("dialog", { name: "Delete role", exact: true });
-  await expect(dialog).toContainText("Delete role 'Member'? It is removed from 1 account.");
+  await expect(dialog).toContainText("Delete role 'Member'? It is removed from 1 user.");
   const confirm = dialog.getByRole("button", { name: "Delete" });
   await expect(dialog.getByRole("textbox")).toBeFocused();
   await expect(confirm).toBeDisabled();
@@ -143,7 +143,7 @@ test("deleting a role: one that accounts hold needs its name typed, an unused on
   // Ops holds no account: no text to type, the button is ready at once.
   await roleRow("Ops").click();
   await page.locator(".danger-zone").getByRole("button", { name: "Delete role" }).click();
-  await expect(dialog).toContainText("It is removed from 0 accounts.");
+  await expect(dialog).toContainText("It is removed from 0 users.");
   await expect(dialog.getByRole("textbox")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Delete" }).click();
   await expect.poll(() => api.roles.has(3)).toBe(false);
@@ -227,7 +227,7 @@ test("role edits save through the drawer footer after confirmation, discard on C
   await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Roles & permissions', exact: true }).click();
   await page.locator('tbody .admin-row-button').filter({ hasText: 'Member' }).click();
   const drawer = page.getByRole('dialog', { name: 'Role Member', exact: true });
-  await drawer.getByRole('button', { name: 'View affected accounts' }).click();
+  await drawer.getByRole('button', { name: 'View affected users' }).click();
   await expect(drawer.locator('.affected-accounts')).toContainText('maria');
   await expect(drawer.locator('.affected-accounts')).not.toContainText('ada');
 
