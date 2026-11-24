@@ -2,7 +2,7 @@
 
 Project note: `Brain/Projects/portcullis_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder). Renamed from `ember_admin` in Plan 7.
 
-Vue 3 + TypeScript admin app for Portcullis: Overview, Accounts, Roles, Invites, Workspace settings, Config issues, Profile and Login. It talks only to `portcullis` through the Vite `/api` proxy. The other backends have their own admin apps (`legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`); the sidebar shortcuts link to them. Follow the `ember-design-system` and `ember-feature-scaffold` skills for UI and API conventions.
+Vue 3 + TypeScript admin app for Portcullis: Overview, Accounts, Roles, Invites, Workspace settings, Config issues, Profile and Login. It talks only to `portcullis` through the Vite `/api` proxy. The other backends have their own admin apps (`legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`); the sidebar shortcuts link to them. Follow the `ember-frontend-design`, `ember-design-system`, `ember-admin-ui` and `ember-feature-scaffold` skills for UI and API conventions.
 
 ## Rules
 - Code is copied between the admin apps, not shared. Apply a fix to a shared component (PageLayout, ToggleSwitch, BaseModal, ThemeSelect, AdminSearch, RecordDrawer, StatusFilters, DraftActions...) in every admin app that has a copy.

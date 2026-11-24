@@ -2,7 +2,7 @@
 
 Project note: `Brain/Projects/ember.md` in the Obsidian vault (`../../../../Brain/` from this folder), once it exists.
 
-Ember Windows app: Vue 3 + TypeScript UI inside a Tauri 2 shell (`src-tauri/`). It talks only to Portcullis, at the address the user enters. Follow the `ember-frontend-design` and `ember-design-system` skills.
+Ember Windows app: Vue 3 + TypeScript UI inside a Tauri 2 shell (`src-tauri/`). It talks only to Portcullis, at the address the user enters. Follow the `ember-frontend-design` skill (it routes to `ember-design-system`, `ember-shared-components`, `ember-page-layouts` and the others).
 
 ## Rules
 - Never call `fetch` or build an `/api` URL by hand: use `apiRequest`, or `apiUrl`, `authHeaders` and `credentialsMode` from `src/utils/server.ts`. Use `mediaUrl` for `<img>` and `<audio>` sources. The browser build and the Windows app differ only there.

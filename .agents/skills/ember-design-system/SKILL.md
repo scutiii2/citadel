@@ -5,7 +5,7 @@ description: Use when building or reviewing Citadel UI that uses Ember colors, t
 
 # Ember design system
 
-Use the target app's `style.css` and shared components as the token and implementation source. For Citadel admin layout and interactions, follow the [approved admin design reference](../ember-frontend-design/SKILL.md#admin-design-reference).
+Use the target app's `style.css` and shared components as the token and implementation source. For Citadel admin layout and interactions, follow the `ember-admin-ui` skill.
 
 **Core idea:** one coherent system, not per-component choices. Pick tokens and patterns first, write styles second. Never hardcode a colour or a pixel radius.
 

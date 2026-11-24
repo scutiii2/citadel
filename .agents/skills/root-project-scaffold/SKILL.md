@@ -1,108 +1,45 @@
 ---
 name: root-project-scaffold
-description: Create or audit a new top-level project directory under apps/ (a new server, service, or standalone application sitting alongside mcp_server/ai_agent) so it follows the same folder-structure convention those already share. Use whenever the user asks to add a new app/server/service to this repo, scaffold a new root-level project, or wants to check whether an existing root folder matches repo convention — even if they only describe it ("I want a new microservice for X", "add another backend next to mcp_server") without naming this skill or "folder structure" explicitly. This is about the project's *top-level shape* (what folders exist at its root) — for what goes *inside* mcp_server's capabilities/, use mcp-capability-scaffold instead.
+description: Use when adding a new backend service under apps/ (a sibling of armory, legion, portcullis, stronghold, treasury) or auditing whether an apps/<name> folder matches the shared top-level shape, compose wiring and service identity setup. For what goes inside Armory capabilities, Legion agents or Ember pages use the matching scaffold skill.
 ---
 
-# root_project_scaffold
+# Citadel service scaffolding
 
-Every Python project in this repo's `apps/` folder (`mcp_server`, `ai_agent`, `portcullis`,
-`chat_cli` and `db_gateway`;
-`PDFMerger` and `MediaDownloader` each hold a Python app and a web app) shares one top-level shape. The three Ember projects sit together in
-`apps/` (`portcullis`, plus the Node apps `ember` and the admin apps, which have their
-own layout - see ember-feature-scaffold); everything else is `apps/<name>/`. A new root-level project must match it, not
-invent its own layout — consistency here is what lets `docker-compose.yml`,
-onboarding docs, and anyone jumping between projects rely on the same
-mental map.
+Python services in `apps/`: `armory` (tools), `legion` (agents and model gateways), `portcullis` (auth and the browser's only door), `stronghold` (product logic), `treasury` (database gateway). Vue apps (`ember`, `*_admin`) have their own layout (`ember-feature-scaffold`). A new service must match this shape so `docker-compose.yml`, deploy scripts and docs work the same for all.
 
-## The required shape
+## Required shape of `apps/<name>/`
 
-Mandatory in every root project:
-
-| Path | What it is |
+| Path | What |
 |---|---|
-| `README.md` | What the project does, setup steps, requirements — see apps/armory/README.md as the fullest example |
-| `pyproject.toml` | Its own dependencies — each root project is a separate Python environment, never a shared venv |
-| `Dockerfile` | Builds the image the root `docker-compose.yml` runs. Local dev: `uv sync`, then `uv run python -m src.run` (legion runs `uv run python -m src.supervisor`, one child per `agents/<id>.json`) |
-| `shell.bat` | Opens a terminal with the project's venv active, in the project folder (`cmd /k "call .venv\Scripts\activate.bat"`); prints `uv sync` as the hint and exits if the venv is missing. Copy `apps/portcullis/shell.bat` |
-| `configs/` | JSON config, each real file gitignored with a committed `.example` twin (`config_x.json` + `config_x.json.example`) |
-| `.env`, `.env.example` | The project's one credentials file, in the project root beside `configs/` (no `secrets/` folder). The real `.env` is gitignored; `.env.example` is committed. `mcp_server`, `ai_agent` and `db_gateway` follow this |
-| `src/` | The actual code |
-| `tests/` | Its test suite |
+| `README.md` | What it does, setup, run. Model on `apps/armory/README.md` |
+| `pyproject.toml`, `uv.lock` | Own dependencies, own venv, never shared. Use `uv` (`use-uv`) |
+| `Dockerfile`, `.dockerignore` | Image the root compose runs. Start from `apps/armory/Dockerfile` |
+| `dev_deploy.bat` | Rebuilds and restarts only this container from the root compose. Copy `apps/portcullis/dev_deploy.bat`, change `SERVICE` |
+| `shell.bat` | Terminal with the venv active. Copy `apps/portcullis/shell.bat` |
+| `configs/` | Tracked JSON config plus a `README.md` documenting each key. No `.example` twins for JSON |
+| `.env`, `.env.example` | Secrets only, in the project root. `.env` is gitignored, `.env.example` tracked |
+| `src/`, `tests/` | Code and tests. Entry: `uv run python -m src.run` |
+| `src/citadel_auth/` | Copy of `libs/citadel_auth/citadel_auth`; never edit it by hand |
 
-Conditional — add only if the project actually needs it, don't
-pre-create empty ones "for consistency":
+Add only if needed: `docs/` (beyond the README), `migrations/` + `scripts/` (Alembic and CLIs, as Portcullis). Runtime state lives in `.data/<service>/` of the Citadel folder, not in the app. No other top-level folders: put code in `src/` or ask the user.
 
-| Path | When to add it |
-|---|---|
-| `data/` | Persists runtime data to disk (mcp_server, portcullis have it; ai_agent keeps its registry and usage JSONL under `.data/`; chat_cli keeps nothing, portcullis stores its chats) |
-| `docs/` | Documentation beyond the README is substantial enough to split out |
-| `migrations/`, `scripts/` | portcullis only: Alembic revisions and its CLIs (`migrate_db`, `backup_db`). A new project with a database may follow it; otherwise use `src/` |
-| `logs/` | The project writes its own log files (needs a `logging_setup.py`-style module in `src/`, not an ad-hoc log call) |
+## Adding a service
 
-Do not invent additional top-level folders (`lib/`, `scripts/`, `bin/`,
-`app/`, etc.) — if something doesn't fit `src/`, it likely belongs inside
-`src/` as a subpackage instead. If a genuinely new top-level folder seems
-necessary, flag it to the user rather than adding it silently, since it
-changes the convention for every project after it.
+1. Confirm it is a new deployable process, not a capability, agent or page.
+2. Copy the files above from the nearest service and strip what does not apply.
+3. Add the service name to `SERVICES` in `scripts/sync_citadel_auth.py`, then run `uv run scripts/sync_citadel_auth.py` (`--check` verifies).
+4. Compose: add a service to `docker-compose.yml` with its `trust_<name>` and `identity_<name>` volumes, mount the peers' public trust folders read-only, publish a port only for a web UI, add `extra_hosts: ["host.docker.internal:host-gateway"]` for UI services, and run `python scripts/check_compose.py`.
+5. Port: next free in the right block (workspace `AGENTS.md` "Ports"); an env override read by `src/config.py` set in compose. Armory 29600, Portcullis 29601, Treasury 29602, Legion agents 29603 up, Stronghold 29650, admin web apps 26500 up.
+6. Every route reached by other services takes the signed service identity (`citadel_auth`); `/mcp` rejects calls without it. `GET /health` is public and `GET /ready` needs a signed assertion. Never import another service's code or expose the shared token to a browser.
+7. A web UI also needs the ServiceHub checks in the workspace `AGENTS.md`.
+8. Add the service to the table in `docs/deployment.md` and a `.env.example` entry in `tools/setup_env.py` if it needs a generated secret.
 
-## Adding a new root-level project
+## Audit
 
-(New projects go in `apps/<name>/`, next to the others.)
+Flag: a missing required item; a secret in a tracked file or an `.env` without `.env.example`; JSON config without a `configs/README.md`; `src/citadel_auth` differing from `libs/` (run the sync check); a top-level folder not listed; a conditional folder that is empty.
 
-1. Confirm it's actually a new *project* (its own deployable
-   process/environment) and not a new capability/page/agent inside an
-   existing one — those go through mcp-capability-scaffold,
-   ember-feature-scaffold, or aiagent-scaffold instead.
-2. Create the mandatory folders/files from the table above. Copy
-   `apps/armory/Dockerfile` and `apps/armory/pyproject.toml` as starting
-   templates — they're the most complete examples — and strip anything
-   MCP-specific that doesn't apply.
-3. For every config/secret file, write both the real (gitignored) file
-   and a `.example` twin with placeholder values, matching how
-   `apps/armory/configs/*.json.example` and the root `.env.example` do it.
-   Loaders should auto-create a missing real file by copying its
-   `.example` (see `apps/legion/src/runtime/seed.py`) rather than raising on first run.
-4. Write `README.md` covering: what the project does, requirements,
-   setup steps, how to run it — model it on `apps/armory/README.md`.
-5. Add a service for it to the root `docker-compose.yml` if it is a
-   **long-running service**; an interactive program like `chat_cli` (a terminal
-   client, not a server) gets none. Give the port an env var (`DB_GATEWAY_PORT=29602`,
-   read by `src/config.py` as an override) and set it in the compose service.
-   Pick a free port: 29600 mcp_server,
-   29601 portcullis, 8040 pdf_merger, 29602 db_gateway,
-   29603+ ai_agent agents.
-6. Services reached over HTTP/MCP by other projects must take the shared
-   signed service identity (`citadel_auth`) and, for `/mcp`, reject calls without it. Never import another root
-   project: self-contained means a separate venv and no shared packages
-   (see `chat_cli`, which talks to portcullis over HTTP instead of reusing
-   its code). Never expose the shared token in a browser UI.
+## Verify
 
-## mcp_server's dotted variant
-
-`mcp_server` already goes one step further, and a new server that owns per-capability state should copy it: the rule is
-**dot-prefixed = untracked runtime state or secrets, plain `configs/` = tracked**. Its root has `.data/`, `.logs/`, `.cache/`
-(in place of plain `data/`, `logs/`), a single `.env`, and `configs/`; each capability keeps its runtime files in `.data/<capability_name>/` and `.cache/<capability_name>/`. An untracked dot-folder needs no `README.md`; a
-credentials README that is worth keeping lives in `docs/` (see `apps/armory/docs/secrets.md`); `.env.example` stays tracked. `ai_agent`, `portcullis` and `chat_cli` use the
-plain folder names above.
-
-## Auditing an existing root folder
-
-Walk the table above against the folder in question. Flag:
-- A missing mandatory item.
-- A config/secret file committed without a `.example` twin, or an
-  `.example` twin that's drifted out of sync with the real file's keys.
-- A top-level folder not in either table — ask whether it should move
-  under `src/` or whether the convention itself needs to grow.
-- A conditional folder (`data/`/`docs/`/`logs/`, or mcp_server's dotted equivalents) present but empty/unused
-  — likely copy-pasted out of habit rather than needed.
-
-## Verify before calling it done
-
-- `ls` the new project root and confirm it matches the mandatory table
-  exactly, with no extra top-level entries.
-- Every `configs/*.json` file and the root `.env` has a committed `.example`
-  counterpart, and neither the real file nor real secrets are staged in
-  git (`git status` — they should show as untracked/ignored, not staged).
-- `shell.bat` opens a terminal with the venv active.
-- `python -m src.run` starts the project standalone (not just importable) before
-  adding it to `docker-compose.yml`.
+- `ls` shows exactly the shape above, `git status` shows no real `.env` staged.
+- `uv run python -m src.run` starts it standalone before it goes into compose.
+- `python scripts/check_compose.py --self-test` passes (no Docker needed).

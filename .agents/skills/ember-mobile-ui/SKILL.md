@@ -1,6 +1,11 @@
+---
+name: ember-mobile-ui
+description: Use when changing or reviewing narrow-screen layouts, touch controls, virtual keyboard behavior, bottom sheets, mobile navigation, drafts across mode switches, or async/search state in Citadel Ember or admin UI.
+---
+
 # Citadel mobile UI instructions
 
-Use with [Citadel frontend design](SKILL.md) and `ember-design-system` for Ember and admin UI. Follow the target app's instructions and motion policy.
+Use with `ember-frontend-design` and `ember-design-system` for Ember and admin UI. Follow the target app's instructions and motion policy.
 
 ## Read the existing implementation first
 
@@ -10,7 +15,7 @@ Use with [Citadel frontend design](SKILL.md) and `ember-design-system` for Ember
 
 ## Layout and navigation
 
-- Check the 767px and 768px transition. At narrow widths, give the active task the full content width. Use list-to-detail navigation or a labeled mode switch for Ember workspaces. Follow the [admin shell](SKILL.md#admin-design-reference) for the header-controlled sidebar and record drawers.
+- Check the 767px and 768px transition. At narrow widths, give the active task the full content width. Use list-to-detail navigation or a labeled mode switch for Ember workspaces. Follow the `ember-admin-ui` shell for the header-controlled sidebar and record drawers.
 - Preserve primary actions such as Save, Send, download and confirmation. Place secondary setup and management behind clear disclosure. Reflow header actions before shrinking text or targets; do not hide supported actions merely to fit a phone.
 - Keep DOM reading order aligned with visual order. Retain meaningful labels and selected states. Mobile actions work without hover. In admin panel headers, move search and its reserved Cancel and Save slots together to a new line when space is tight.
 - The view owns scrolling; preserve `min-width: 0` and `min-height: 0` through flex/grid ancestors. Wrap long titles, names, errors and URLs. Keep code or genuinely wide tables in a labeled local horizontal scroller instead of making the whole page scroll sideways.

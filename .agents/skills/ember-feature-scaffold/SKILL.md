@@ -1,249 +1,38 @@
 ---
 name: ember-feature-scaffold
-description: Add a feature to ember (the Vue 3 + TypeScript browser app) and/or portcullis (its FastAPI backend) following this repo's established layout, auth and proxy conventions. Use whenever the user asks for a new ember page, screen, tab, panel, store or API call, a new portcullis route, permission, admin action or model, or wants ember to reach a new ai_agent / mcp_server capability - even if they only describe the behavior ("let admins see login attempts", "add a settings page to ember", "show token usage per answer") without naming files. Also use when reviewing whether ember/portcullis code follows these conventions. Not for new mcp_server tools (use mcp-capability-scaffold).
+description: Use when adding an Ember (Vue 3 + TypeScript Windows app) page, tab, panel, store, router entry or API client call, or when reviewing whether Ember code follows the repo conventions. For the Portcullis backend use portcullis-feature-scaffold; for reaching Armory, Legion or Stronghold use portcullis-mcp-bridge; for a new Armory tool use armory-capability-scaffold.
 ---
 
-# ember + portcullis feature scaffolding
+# Ember feature scaffolding
 
-Two projects that ship together (plus **ember_admin/**, a second Vue app in
-`apps/` for administrators on port 26501: same stack and shared control
-files as ember, talks only to portcullis; staff-only pages such as Tickets,
-Capabilities, Agents and Analytics go there, not in ember):
+Ember (`apps/ember`) is a Vue 3 + TS UI in a Tauri 2 shell. It talks only to Portcullis, at the address the user enters. Staff pages live in the admin apps (`portcullis_admin`, `legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`), not in Ember. `apps/ember/AGENTS.md` holds the hard rules; look and feel: `ember-frontend-design`.
 
-- **ember/** - Vue 3 + TS (Vite, Pinia, vue-router). Talks **only** to
-  portcullis, same-origin: Vite forwards `/api` to portcullis (`vite.config.ts`),
-  so the `HttpOnly` session cookie just works and no server URL, token or
-  key is ever in the bundle.
-- **portcullis/** - FastAPI + async SQLAlchemy (SQLite/aiosqlite). Owns
-  accounts, sessions, roles/permissions, emailed invites, required email verification, and
-  proxies MCP to ai_agent (`/api/mcp/agents/{id}`) and mcp_server
-  (`/api/mcp/server`). Auth logic lives in its own database.
+## Working agreement
 
-Read both READMEs (`apps/ember/README.md`, `apps/portcullis/README.md`) before
-designing - they hold the current API table and security model this skill
-compresses.
+Propose each step first (files, packages, deletions), wait for approval, implement, verify, report. One step at a time. Do not commit unless asked.
 
-## Working agreement with this user
+## Where the feature lives
 
-Propose each step first (files to create/change, packages, deletions),
-wait for approval, then implement, verify, and report. Commit only after
-verification passes and the user agrees; push only when asked. One step at
-a time - never scaffold several unapproved pieces in one go. This is how
-every ember change so far was made, and the user explicitly asked for it.
-
-## 1. Decide where the feature lives
-
-| The feature needs... | Touch |
+| Need | Touch |
 |---|---|
-| Only presentation of data ember already has | ember only |
-| New data, a new action, or anything that must be enforced | portcullis route (+ service/model) **and** ember client/view |
-| Something ai_agent or mcp_server can do | the MCP proxy path (section 4) - never a direct browser call |
+| Presentation of data Ember already has | Ember only |
+| New data, action, or anything to enforce | Portcullis route (`portcullis-feature-scaffold`) and the Ember client and view |
+| Something Armory, Legion or Stronghold does | The Portcullis proxy or pass-through (`portcullis-mcp-bridge`); never a direct browser call |
 
-Anything security-relevant (who may see or do what) must be enforced in
-portcullis. ember's router guard and hidden tabs are cosmetic: they
-keep the UI from offering calls the server would refuse, nothing more.
+The router guard and hidden tabs are cosmetic. Portcullis enforces permissions.
 
-## 2. portcullis side
+## Steps
 
-Layout: `src/routes/` (one `APIRouter` per area, prefix `/api/...`),
-`src/services/` (classes taking an `AsyncSession` - logic lives here, not
-in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
-(dependencies), `src/services/permissions.py`.
+Layout in `apps/ember/src/`: `features/<area>/` (view, `components/`, `api/`, `stores/`, tests together), `api/` (shared clients), `stores/`, `components/` (shared pieces, `ember-shared-components`), `composables/`, `router/`, `utils/`.
 
-1. **Permission.** Reuse an existing one when it fits. The old broad
-   `admin.manage` / `tools.use` / `chat.use` were split (migration `0010`) into
-   finer names in `services/permissions.py`: `chat.use`, `chat.share`,
-   `tools.view`, `tools.execute`, `accounts.*`, `roles.*`, `invites.manage`,
-   `settings.manage`, `capabilities.manage`, `extensions.manage`,
-   `agents.manage`, `usage.all.view`, `logs.*`, `traffic.view`,
-   `tickets.create` and `tickets.manage`. A new one goes in `ALL_PERMISSIONS`
-   (name -> description); the Administrator role picks it up automatically on
-   next start. It is *not* added to existing roles such as `Member`
-   (`ensure_default_role` only seeds a role when creating it): if members need
-   it, the migration that adds the feature grants it once to the roles that hold
-   a related permission (`0012` gave `tickets.create` to every role with
-   `chat.use`), so a later revocation sticks. A read-only permission never grants
-   mutation. Say which roles get it to the user.
-2. **Model** (if new data): new file in `src/models/`, export it from
-   `src/models/__init__.py` (that import is what registers the table).
-   Relationships use `lazy="selectin"` - async sessions can't lazy-load.
-   Store times as naive UTC via `src.db.utcnow`. Any model change (new
-   table or column) needs an Alembic migration: stop portcullis, run
-   `python -m scripts.migrate_db revision "what changed"`, read the file it
-   writes (a new `NOT NULL` column needs a `server_default`). Startup applies
-   it after a backup; `tests/test_migrations.py` fails if it is missing. Bump its
-   `HEAD`/`NEXT` and the `"00NN*"` ignore list, and for a new column on an
-   existing table add a `drop_<column>` helper beside `drop_log_prompts` and call
-   it wherever a test rewinds a model-built database (they build from the
-   models, so the column already exists).
-3. **Service**: a class with `__init__(self, session: AsyncSession)`.
-   Anything blocking (hashing, file I/O) goes through
-   `asyncio.to_thread`. Secrets/codes/tokens are stored hashed, never raw.
-   Mail is not sent from here: it goes through mcp_server's `email` capability
-   (`services/email_service.py`).
-   **Where data lives.** Relational core data (accounts, chats, usage, logs)
-   stays in this database. Per-account data keys on `account.uid`, the immutable
-   uid (migration `0011`), never the username, so a rename keeps it; remove it
-   when the account is deleted. New data that needs no joins or foreign keys
-   (Notes is the example) goes to `db_gateway` through `DbGatewayClient`
-   (`services/db_gateway.py`, the `get_db_gateway` dependency, `Settings.db_gateway`;
-   tests pass `FakeDbGateway` through the `db_gateway` fixture). Answer `503`
-   when it is unreachable: portcullis must start and the rest of the API must keep
-   working without it. Data that mcp_server owns (tickets, memory) is not copied
-   here: the route is a thin authenticated proxy in a gateway service
-   (`services/ticket_gateway.py`, `services/memory.py`) that sends the internal
-   token and the account uid, maps upstream `404` through, other `4xx` to `400`
-   and an unreachable or `5xx` upstream to `502`/`503`, and logs ids and field
-   names only, never user text.
-4. **Route**: gate with `Depends(require_permission(NAME))` (it also
-   rejects unverified accounts) or `Depends(current_account)` for any
-   logged-in user. Request/response bodies are pydantic models; response
-   models get a `@classmethod of(cls, row)`. Register a new router in
-   `src/app.py` (`app.include_router(...)`). New app-wide dependencies
-   (clients, senders) are created in the lifespan, stored on `app.state`,
-   read via a `deps.py` getter, and injectable through `create_app(...)`
-   parameters so tests can pass fakes.
-5. **POST bodies are always JSON** - `JsonOnlyMiddleware` rejects anything
-   else with 415 (CSRF guard with the `SameSite=Strict` cookie). Don't
-   add form endpoints.
-6. **Tests** in `apps/portcullis/tests/`: fixtures in `conftest.py` give
-   `client`, `client_factory(**settings)`, `email` (FakeEmailSender) and
-   `upstream` (FakeUpstream for the MCP proxy); `tests/test_registration.py`
-   has `as_admin`, `new_invite`, `register` helpers. Cover: happy path,
-   401 when logged out, 403 without the permission / unverified, and
-   validation errors. Run:
-   `uv run pytest -q` (from `apps/portcullis/`).
-7. Update the API table in `apps/portcullis/README.md`.
+1. **Client**: never `fetch` or hand-built `/api` URLs. Use `apiRequest` from `api/http.ts`, or `apiUrl`, `authHeaders`, `credentialsMode`, `mediaUrl` from `utils/server.ts`. A 401 raises `UnauthorizedError` and the auth store drops the account. Export a plain object of functions with TypeScript response types. Armory tools go through `api/tools/McpServerClient.ts`.
+2. **Store** only when state outlives one view (`defineStore` setup stores). Per-user state resets when `useAuthStore().account?.id` changes. Local storage is keyed per account and wrapped in try/catch (`readStored`/`writeStored`).
+3. **View** `features/<area>/XxxView.vue` with a lazy route in `src/router/index.ts` (`meta: { permission: "..." }`, or `guestOnly: true`). A page the nav rail should show goes in `NAV_PAGES` in `src/router/pages.ts` (`to`, `label`, stroked 24x24 `icon` paths, one-line `description`, `permission`); others go in `AccountMenu.vue` (see `ember-page-layouts`). Do not duplicate a page: tool UI belongs on Capabilities. Keep state across tab switches by adding the view name to the `KeepAlive include` list in `App.vue`.
+4. **Components and styling**: reuse the shared pieces and tokens (`ember-shared-components`, `ember-design-system`). Destructive actions use `ConfirmModal`; a setting that reaches other accounts saves explicitly, a local one applies instantly.
+5. **TypeScript**: `erasableSyntaxOnly` is on, so no constructor parameter properties and no enums; declare fields explicitly.
+6. **Markdown or HTML from the server or a model** only through `components/content/MarkdownContent.vue` (DOMPurify). Never raw `v-html`.
+7. **Verify** from `apps/ember`: `pnpm exec vue-tsc -b`, then the nearest test (`*.test.ts`, Vitest + jsdom). If a page calls a new `/api` route, add it to `e2e/fakeApi.ts`, because the Playwright run (`pnpm run test:e2e`) fails on unknown calls. Use `use-pnpm`.
 
-## 3. ember side
+## Before reporting done
 
-Layout: `src/api/` (clients), `src/stores/` (Pinia setup stores),
-`src/views/` (**pages - always here, never in components/**, a user
-preference), `src/components/` (reusable pieces only), `src/router/`,
-`src/utils/`, `src/services/`.
-
-1. **Client** in `src/api/`: REST calls go through `apiRequest` from
-   `api/http.ts` (JSON, same-origin cookie, 401 -> `UnauthorizedError` and
-   the auth store drops the account). Export a plain object of functions
-   like `authClient` / `adminClient`, with TypeScript interfaces for the
-   response shapes.
-2. **Store** (when state outlives one view): `defineStore("name", () => {...})`.
-   Per-user state must reset when the user changes - watch
-   `useAuthStore().account?.id` (see `stores/entryAgent.ts`, `stores/chat.ts`).
-   Anything saved in `localStorage` is keyed per account and wrapped in
-   try/catch (storage may be blocked) - see `services/ConversationStorage.ts`.
-3. **View** in `src/views/XxxView.vue`, lazy-loaded route in
-   `src/router/index.ts` with `meta: { permission: "..." }` (or
-   `guestOnly: true` for logged-out pages). If it can be a landing page,
-   add it to `HOME_PAGES`. Add it to `NAV_PAGES` in `src/router/pages.ts`
-   (label, **`icon`** = stroked 24x24 SVG path data, one-line description,
-   permission): that list drives both the icon-only left rail
-   (`components/NavRail.vue`) and the Overview tiles. Don't
-   add a page that duplicates one: Tools was merged into Capabilities
-   (`/tools` redirects), so put tool UI there (`CapabilitySection`
-   and `SupermarketItem` share `CapabilityHeading`, the icon tile, name and summary;
-   rows that open `ToolRunModal`). To keep its state across tab switches, add it
-   to the `KeepAlive include` list (cache is keyed per account already).
-4. **Shared controls - reuse, don't hand-roll**: `ToggleSwitch` (pill, instead
-   of a checkbox), `LockSwitch` (ember_admin only: a setting an admin can force on),
-   `SegmentedControl` (period/tab pickers; Admin, Logs and Usage use it),
-   `BaseModal` (every dialog: `AddExtensionModal`, `ToolRunModal`, ...),
-   `SaveButton`, `CopyButton`. Dialog buttons use the global `pill-btn primary` /
-   `pill-btn ghost` classes, and a dropdown that closes on an outside press uses
-   the `useOutsideClose` composable. A page with a draft asks before it is left through
-   `useUnsavedGuard`, and file sizes and counts use `formatBytes` / `plural` from
-   `utils/format.ts`.
-   Look in `src/components/` before writing a new one.
-5. **Styling**: theme tokens from `src/style.css` (`--bg`, `--surface`,
-   `--text`, `--muted`, `--border`, `--accent`, `--accent-contrast`,
-   `--danger`, `--code-bg`, `--mono`) - never hardcoded colors, so light and
-   dark both work. Corners come from the radius scale (`--radius-sm|md|lg|xl|full`;
-   `src/radiusScale.test.ts` fails on a literal radius). Animations always play:
-   never add a reduced-motion setting or `prefers-reduced-motion` rule. Page views
-   scroll themselves (`flex: 1; min-height: 0;
-   overflow-y: auto`), content column `max-width: 820px`. A destructive action asks
-   in `ConfirmModal` (never a native `confirm()`), and a setting that reaches
-   other accounts saves explicitly while a local one applies instantly. The
-   `ember-design-system` skill has the full visual rules.
-6. **TypeScript gotcha**: `tsconfig.app.json` has `erasableSyntaxOnly`, so
-   no constructor parameter properties (`constructor(private x: T)`) and no
-   enums - declare fields explicitly.
-7. **Markdown/HTML from the server or a model** only via
-   `components/MarkdownContent.vue` (DOMPurify-sanitized) - never raw `v-html`.
-8. Verify from `apps/ember/`: `pnpm exec vue-tsc -b --noEmit` (must print
-   nothing) and `pnpm exec vite build`, then delete `dist/`. Tests sit beside the source
-   (`*.test.ts`, Vitest + jsdom, portcullis mocked): `pnpm test`. If a page now
-   calls a new `/api` route, add it to `e2e/fakeApi.ts` - the Playwright test
-   (`pnpm run test:e2e`) fails on any call the fake does not know.
-
-## 4. Reaching ai_agent / mcp_server
-
-The browser never gets their URLs; everything goes through portcullis's
-proxy, which drops browser-supplied identity/token headers and adds
-`X-Requester-Username` / `X-Requester-Email` (+ `X-Internal-Token` if
-configured) itself. ai_agent and mcp_server reject `/mcp` without that
-token once it's configured, so any new portcullis client of theirs must
-send it too (`identity_headers()` in `services/mcp_session.py` does).
-
-- **mcp_server tools and resources**: already allowed for `tools.execute`
-  (`SERVER_POLICY`: `tools/list`, any `tools/call`, `resources/*`). Call them
-  from ember with `McpServerClient` (`api/McpServerClient.ts`).
-  mcp_server's plain HTTP routes (`/commands`, `/capabilities`, ...) go
-  through `services/mcp_server_info.py` + `routes/server_info.py`.
-- **A page for one mcp_server capability**: a simple one (forms bound to its own
-  tools, result lists) can be declared in that capability's `gui/page.json`
-  (see mcp_server's capabilities README) and drawn by `CapabilityPageView` at
-  `/capabilities/<name>`; no capability uses that today. A richer page is a real
-  view with its own client and route (`GeneratorView` at `/generator`,
-  `NotesView`, `MemoryView`), and the capability card gets an "Open page" button.
-  Note the split: Notes are text the user writes and may share with agents
-  (`/notes`, stored in db_gateway); Memory is what the assistant saved about
-  them (`/memory`, stored by mcp_server).
-- **Tickets**: the reporter side is ember (`/tickets`, `tickets.create`),
-  the staff board is ember_admin (`/tickets`, `tickets.manage`); portcullis only
-  proxies to mcp_server. A change to the reporter and the staff routes should be
-  checked on both apps.
-- **Chat with ai_agent** runs inside portcullis, never through the proxy:
-  `services/turns.py` (TurnRegistry) calls the agent through
-  `services/agent_gateway.py` (the `mcp` SDK), saves the answer and records
-  usage; the browser starts a turn (`POST /api/chats/{id}/turns`) and
-  watches `/events` (SSE, `services/turnStream.ts`). The proxy allows only
-  `status` on agents - adding `ask` there would let the browser bypass the
-  usage limits. A new agent tool the server needs goes on `AgentGateway`
-  (and `FakeAgent` in `tests/conftest.py`); one the browser may call
-  directly goes in `AGENT_POLICY.tools` with its exact argument names.
-- **Server-side mcp_server calls** (such as command-option metadata)
-  go through `services/server_tools.py` (`ServerTools`
-  Protocol, `McpServerTools` on one MCP session; `FakeServerTools` in
-  tests) behind its own permission, not through the browser proxy.
-- **Audit:** a route that changes something calls
-  `logs.action(account, "<area>.<verb>", "<what changed>")`
-  (`LogWriter` via `Depends(get_log_writer)`) after it succeeded. New
-  permissions go in `services/permissions.py`; the Administrator role gets
-  them on the next start.
-- Agent discovery is portcullis's `GET /api/agent` (the entry agent; reads ai_agent's
-  `.data/agent_registry.json` through `AgentDirectory`: `entry`, `orchestrator`,
-  `focus`); don't add a tool for it. **There is no agent picker**: every turn goes
-  to the entry agent, a browser-sent `agent_id` is ignored, and the entry agent
-  delegates to specialists itself. The chat store tracks who is working from
-  `agent_start` / `agent_end` / `agent_token` events and the snapshot's
-  `active_agents`; steps and tokens are keyed by `(agent_id, id)` because a
-  specialist's step ids can collide with the entry agent's. New per-agent
-  display belongs on those events, not on a new route.
-- **Usage** carries agent, provider, gateway, model and call times
-  (`agent_usage` on answers, usage rows in the DB): reports take `group_by`
-  (`agent|provider|gateway|model`) and `agent`/`provider` filters, and
-  `GET /api/usage/records` lists calls. Adding a column to usage rows is a
-  model change - see the Alembic step in section 2 (`0003` did this).
-- Tests: route tests use `FakeAgent` (the `agent` fixture; `hold=True` keeps
-  a turn running until `agent.release()`); `tests/test_agent_gateway.py`
-  runs the real gateway against a real FastMCP server. Starlette's
-  TestClient only returns a streamed body once it's complete.
-
-## 5. Before reporting done
-
-- portcullis tests pass; ember (and ember_admin, if touched) type-check and build pass.
-- READMEs updated (API table, features, layout) when the surface changed.
-- Summarize for the user what changed, what was verified and how, what
-  they should test by hand (they test manually - don't launch browser
-  verification agents), and propose the commit message.
+Type-check and the nearest tests pass; READMEs updated when the surface changed. Summarize what changed, what was verified, what the user should test by hand (they test manually; do not launch browser verification agents), and propose a commit message.
