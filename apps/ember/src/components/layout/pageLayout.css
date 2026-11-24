@@ -42,3 +42,11 @@
   .page-head-copy { flex: 1 1 auto; }
   .page-actions { flex-shrink: 1; }
 }
+
+/* Wide layout with the app header: the header shows the page name, so the heading stays only for screen readers. */
+@media (min-width: 768px) {
+  .has-header .page-title { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .has-header .page-actions { margin-inline-start: auto; }
+  .has-header .page-head { margin-bottom: 12px; }
+  .has-header .page-column { padding-top: 16px; }
+}

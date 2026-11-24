@@ -14,12 +14,14 @@ import ThemeIcon from "./ThemeIcon.vue";
 import { OVERVIEW_ICON, PROFILE_ICON, visiblePages } from "../../router/pages";
 import { usePageVisibilityStore } from "../../stores/navigation/pageVisibility";
 import { useLogout } from "../../composables/useLogout";
+import { useSidebar } from "../../composables/useSidebar";
 import { useAuthStore } from "../../stores/auth";
 import { useNavPrefsStore } from "../../stores/navigation/navPrefs";
 import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../../utils/navigation/adminLink";
 import { railPages } from "../../utils/navigation/navArrangement";
 
 const { theme, next, cycle } = useTheme();
+const { expanded } = useSidebar();
 const auth = useAuthStore();
 const ticketUnread = ref(0);
 let unreadSeq = 0;
@@ -53,6 +55,8 @@ const adminUrl = emberAdminUrl();
 const canAdmin = computed(() => ADMIN_ACCESS_PERMISSIONS.some(auth.hasPermission));
 const canBrowse = computed(() => auth.account !== null && !auth.needsVerification);
 const navPrefs = useNavPrefsStore();
+// Wide screens with the app header: the sidebar names each page when expanded. The header holds the logo and account menu.
+const labeled = computed(() => canBrowse.value && expanded.value);
 // These pages live in the account menu, in two groups, outside the account's
 // pin/reorder/hide arrangement; an administrator's hide list still removes them.
 const MENU_GROUPS = [["/capabilities", "/agents"], ["/usage", "/settings"]];
@@ -113,7 +117,7 @@ const logout = useLogout();
 </script>
 
 <template>
-  <aside class="rail">
+  <aside id="app-sidebar" class="rail" :class="{ labeled, 'with-header': canBrowse }" aria-label="Ember">
     <RouterLink v-if="canBrowse" to="/overview" class="wordmark" data-label="Overview" aria-label="Ember - overview of every page"><EmberLogo /></RouterLink>
     <span v-else class="wordmark" role="img" aria-label="Ember"><EmberLogo /></span>
 
@@ -138,6 +142,7 @@ const logout = useLogout();
         <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path v-for="d in chatPage.icon" :key="d" :d="d" />
         </svg>
+        <span class="label" aria-hidden="true">{{ chatPage.label }}</span>
       </RouterLink>
     </nav>
     <span v-if="chatPage && hasPages" class="divider" aria-hidden="true" />
@@ -156,6 +161,7 @@ const logout = useLogout();
           <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
             <path v-for="d in p.icon" :key="d" :d="d" />
           </svg>
+          <span class="label" aria-hidden="true">{{ p.label }}</span>
           <span v-if="p.to === '/tickets' && ticketUnread" class="ticket-count">{{ ticketUnread }}</span>
         </RouterLink>
       </template>
@@ -163,7 +169,7 @@ const logout = useLogout();
 
     <div class="bottom">
       <AccountMenu
-        v-if="auth.account"
+        v-if="auth.account && !canBrowse"
         :username="auth.account.username"
         :email="auth.account.email"
         :groups="menuGroups"
@@ -171,7 +177,7 @@ const logout = useLogout();
         @logout="logout"
       />
       <button
-        v-else
+        v-else-if="!auth.account"
         type="button"
         class="theme"
         :data-label="`Theme: ${THEME_LABELS[theme]}`"
@@ -285,6 +291,20 @@ nav a.current {
   background: var(--surface);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   pointer-events: none;
+}
+
+/* Wide screens with the app header: the header holds the logo and account menu, and the sidebar
+   names each page while expanded (the header toggle folds it back to icons). */
+.label { display: none; }
+@media (min-width: 768px) {
+  .rail.with-header .wordmark { display: none; }
+  .rail.labeled { width: 210px; align-items: stretch; padding: 10px 8px; }
+  .rail.labeled nav { align-items: stretch; gap: 2px; margin-top: 0; }
+  .rail.labeled nav a { display: flex; justify-content: flex-start; gap: 12px; width: auto; padding: 0 10px; }
+  .rail.labeled .label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85rem; font-weight: 500; }
+  .rail.labeled .divider { width: auto; margin: 6px 4px; }
+  .rail.labeled .ticket-count { position: static; margin-inline-start: auto; }
+  .rail.labeled [data-label]:hover::after, .rail.labeled [data-label]:focus-visible::after { content: none; }
 }
 
 /* The narrow-screen bar only; the column above is for wide screens. */

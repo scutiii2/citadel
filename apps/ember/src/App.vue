@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { storeToRefs } from "pinia";
-import { onBeforeUnmount, onMounted, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
+import AppHeader from "./components/layout/AppHeader.vue";
 import NavRail from "./components/layout/NavRail.vue";
 import { usePageVisibilityStore } from "./stores/navigation/pageVisibility";
 import { useAuthStore } from "./stores/auth";
@@ -12,6 +13,8 @@ usePageVisibilityStore();
 const { account } = storeToRefs(auth);
 const route = useRoute();
 const router = useRouter();
+// The wide layout's header shows for a signed-in, verified account, the same condition as the sidebar's pages.
+const hasHeader = computed(() => account.value !== null && !auth.needsVerification);
 
 // Mobile Safari can leave 100dvh unchanged when its keyboard opens. Keep the
 // entire shell in the visible area, including when focus pans that area.
@@ -53,7 +56,9 @@ onServerLost(() => {
 </script>
 
 <template>
-  <div class="shell">
+  <div class="frame" :class="{ 'has-header': hasHeader }">
+    <AppHeader v-if="hasHeader" />
+    <div class="shell">
     <NavRail />
     <main class="page" :class="{ 'has-tabs': account && !auth.needsVerification }">
       <!-- KeepAlive: switching to Tools and back keeps the chat (and a turn in
@@ -66,10 +71,17 @@ onServerLost(() => {
         </KeepAlive>
       </RouterView>
     </main>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.frame {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
 .shell {
   display: flex;
   flex: 1;
