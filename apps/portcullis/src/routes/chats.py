@@ -45,7 +45,10 @@ from src.services.chat_service import (
 from src.services.log_service import LogWriter
 from src.services.permissions import CHAT_USE, TOOLS_EXECUTE
 from src.services.pricing import Pricing, with_cost
-from src.services.settings_service import FORCE_TOOL_APPROVAL, SettingsService
+from src.routes.server_info import get_server_info
+from src.services.mcp_server_info import McpServerInfo
+from src.services.settings_service import SettingsService
+from src.services.tool_approval import forced_approval
 from src.routes.stronghold import as_response, pass_on
 from src.services.stronghold_forwarder import ForwardedResponse, StrongholdForwarder, StrongholdUnavailable
 from src.services.stronghold_turns import running_chat_ids
@@ -531,6 +534,7 @@ async def start_turn(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     stronghold: StrongholdForwarder = Depends(get_stronghold),
+    info: McpServerInfo = Depends(get_server_info),
     app_settings: SettingsService = Depends(get_settings_service),
 ) -> Response:
     """Starts answering in Stronghold, which saves the question and keeps going (and saves the answer)
@@ -539,7 +543,7 @@ async def start_turn(
     payload = {
         **body.model_dump(exclude={"agent_id"}),
         "trusted": {
-            "forced_approval": await app_settings.get_bool(FORCE_TOOL_APPROVAL),
+            "forced_approval": await forced_approval(info, app_settings, account),
             "tools_execute": TOOLS_EXECUTE in account.permission_names,
         },
     }
@@ -592,12 +596,13 @@ async def decide_approval(
     account: Account = Depends(require_chat),
     stronghold: StrongholdForwarder = Depends(get_stronghold),
     logs: LogWriter = Depends(get_log_writer),
+    info: McpServerInfo = Depends(get_server_info),
     app_settings: SettingsService = Depends(get_settings_service),
 ) -> Response:
     """Answers a tool the running answer is waiting to run (the `id` of an `approval_request` event).
     Only the chat's own account can; once a step is answered nothing else can answer it. Recorded in the
     activity log. While the administrator requires approval, "always" means "this once"."""
-    payload = {**body.model_dump(), "trusted": {"forced_approval": await app_settings.get_bool(FORCE_TOOL_APPROVAL)}}
+    payload = {**body.model_dump(), "trusted": {"forced_approval": await forced_approval(info, app_settings, account)}}
     answer = await stronghold.forward("POST", f"/turns/{chat_id}/approvals", account, json=payload)
     if answer.status != status.HTTP_200_OK:
         return as_response(answer)

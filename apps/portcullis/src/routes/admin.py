@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.deps import (
@@ -35,7 +35,7 @@ from src.services.permissions import (
     ADMIN_ROLE, is_known_permission, ADMIN_PERMISSIONS, ACCOUNTS_VIEW, ACCOUNTS_MANAGE,
     ACCOUNTS_DELETE, ROLES_VIEW, ROLES_MANAGE, ROLES_ASSIGN, INVITES_MANAGE, SETTINGS_MANAGE,
 )
-from src.services.settings_service import BOOLEAN_SETTINGS, MAX_HIDDEN_PAGES, InvalidPages, SettingsService
+from src.services.settings_service import MAX_HIDDEN_PAGES, InvalidPages, SettingsService
 
 logger = logging.getLogger(__name__)
 
@@ -184,16 +184,12 @@ class CreateInviteRequest(BaseModel):
 # --- accounts ----------------------------------------------------------------
 
 
-class SettingIn(BaseModel):
-    value: StrictBool
-
 
 class HiddenPagesIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     hidden: list[str] = Field(max_length=MAX_HIDDEN_PAGES)
 
 
-# Declared before /settings/{name}, so "pages" is not read as a setting name.
 @router.put("/settings/pages")
 async def change_hidden_pages(
     body: HiddenPagesIn,
@@ -209,22 +205,6 @@ async def change_hidden_pages(
     now = await app_settings.hidden_pages()
     await logs.action(account, "admin.setting", f"Hidden sidebar pages: {', '.join(before) or 'none'} -> {', '.join(now) or 'none'}")
     return {"hidden": now}
-
-
-@router.put("/settings/{name}")
-async def change_setting(
-    name: str,
-    body: SettingIn,
-    account: Account = Depends(require_settings_manage),
-    app_settings: SettingsService = Depends(get_settings_service),
-    logs: LogWriter = Depends(get_log_writer),
-) -> dict[str, bool]:
-    """Switches one of the settings every account is held to (see GET /api/settings)."""
-    if name not in BOOLEAN_SETTINGS:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown setting")
-    before = await app_settings.set_bool(name, body.value)
-    await logs.action(account, "admin.setting", f"{name}: {'on' if before else 'off'} -> {'on' if body.value else 'off'}")
-    return {name: body.value}
 
 
 @router.get("/summary")

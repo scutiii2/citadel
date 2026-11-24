@@ -6,7 +6,7 @@ test("every page fits desktop, tablet and mobile in both themes", async ({ page 
   await installFakeApi(page, state);
   for (const scheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
-    for (const [path, title] of [["/overview", "Overview"], ["/capabilities", "Capabilities"], ["/tickets", "Ticket settings"], ["/settings", "Settings"], ["/limits", "Limits"], ["/email", "Email"]] as const) {
+    for (const [path, title] of [["/overview", "Overview"], ["/capabilities", "Capabilities"], ["/tickets", "Ticket settings"], ["/settings", "Settings"], ["/approval", "Tool approval"], ["/limits", "Limits"], ["/email", "Email"]] as const) {
       for (const width of [1280, 768, 375]) {
         await page.setViewportSize({ width, height: 800 });
         await page.goto(path);

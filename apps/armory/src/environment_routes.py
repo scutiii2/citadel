@@ -11,7 +11,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from src import config, environment_settings
-from src.services import app_config, capability_tuning
+from src.services import app_config, capability_tuning, tool_policy
 
 
 def _validator(name: str):
@@ -111,6 +111,26 @@ def install_environment_routes(app: Starlette) -> None:
         body = environment_settings.view(config.settings, config.settings.settings_db_path)
         return JSONResponse({**body, "restart": restart})
 
+    async def get_tool_approval(request: Request) -> JSONResponse:
+        path = config.settings.settings_db_path
+        return JSONResponse({"force_tool_approval": tool_policy.forced(path), "stored": tool_policy.is_stored(path)})
+
+    async def put_tool_approval(request: Request) -> JSONResponse:
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 - malformed JSON is a 400, not a 500
+            body = None
+        value = body.get("value") if isinstance(body, dict) else None
+        if not isinstance(value, bool):
+            return JSONResponse({"error": "body must be {\"value\": true or false}"}, status_code=400)
+        try:
+            before = tool_policy.set_forced(config.settings.settings_db_path, value)
+        except OSError as error:
+            return JSONResponse({"error": f"Could not save the setting ({error.strerror or error})"}, status_code=409)
+        return JSONResponse({"force_tool_approval": value, "before": before})
+
+    app.add_route("/admin/tool-approval", get_tool_approval, methods=["GET"])
+    app.add_route("/admin/tool-approval", put_tool_approval, methods=["PUT"])
     app.add_route("/admin/environment", get_environment, methods=["GET"])
     app.add_route("/admin/environment", put_environment, methods=["PUT"])
     app.add_route("/admin/tuning", get_tuning, methods=["GET"])

@@ -148,6 +148,15 @@ class McpServerInfo:
         body = await self._request("DELETE", f"/admin/tuning/{quote(name, safe='')}", account)
         return body if isinstance(body, dict) else {}
 
+    async def tool_approval(self, account: Account) -> dict[str, Any]:
+        """Armory's switch: `{force_tool_approval}`. Raises when Armory cannot answer."""
+        body = await self._request("GET", "/admin/tool-approval", account)
+        return body if isinstance(body, dict) else {}
+
+    async def set_tool_approval(self, account: Account, value: bool) -> dict[str, Any]:
+        body = await self._request("PUT", "/admin/tool-approval", account, json={"value": value})
+        return body if isinstance(body, dict) else {}
+
     async def email_settings(self, account: Account) -> dict[str, Any]:
         """Armory's SMTP settings; the password is only `has_password`."""
         body = await self._request("GET", "/admin/email", account)

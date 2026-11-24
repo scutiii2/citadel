@@ -53,7 +53,6 @@ const json = (route: Route, body: unknown, status = 200) =>
 
 export async function installFakeApi(page: Page, permissions?: string[]) {
   const api = {
-    settings: { forceToolApproval: false },
     accounts: new Map(ADMIN_ACCOUNTS.map(a => [a.id, { ...a }])),
     roles: new Map(ADMIN_ROLES.map(r => [r.id, { ...r }])),
     unexpected: [] as string[],
@@ -76,15 +75,7 @@ export async function installFakeApi(page: Page, permissions?: string[]) {
       loggedIn = true;
       return json(route, account);
     }
-    if (method === "GET" && path === "/api/settings") {
-      return json(route, { force_tool_approval: api.settings.forceToolApproval });
-    }
     if (method === "GET" && path === "/api/settings/pages") return json(route, { hidden: [] });
-    if (method === "PUT" && path === "/api/admin/settings/force_tool_approval") {
-      const { value } = request.postDataJSON() as { value: boolean };
-      api.settings.forceToolApproval = value;
-      return json(route, { force_tool_approval: value });
-    }
 
     if (method === "GET" && path === "/api/admin/app-config") {
       return json(route, {

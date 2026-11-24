@@ -1,9 +1,7 @@
 """Settings an administrator changes for everyone, kept in the database.
 
-Most settings are yes/no switches listed in `BOOLEAN_SETTINGS` with their
-default. A setting nobody changed has no row and reads as its default. The one
-exception is the list of pages hidden from every sidebar (`hidden_pages`), kept
-as a JSON list because the page names belong to the browser.
+Today that is the list of pages hidden from every sidebar (`hidden_pages`), kept as a JSON list because the page
+names belong to the browser. Tool approval is Armory's rule, not stored here.
 """
 
 from __future__ import annotations
@@ -17,24 +15,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db import utcnow
 from src.models import AppSetting
 
-# Every account's answers ask before each tool runs, whatever its browser sends.
-FORCE_TOOL_APPROVAL = "force_tool_approval"
-
-BOOLEAN_SETTINGS: dict[str, bool] = {FORCE_TOOL_APPROVAL: False}
-
 # Page ids (route paths) the administrator hid from every account's sidebar.
 HIDDEN_PAGES = "hidden_pages"
 # Chat is the home page and Settings holds each account's own preferences: neither can be hidden.
 PROTECTED_PAGES = frozenset({"/", "/settings"})
 MAX_HIDDEN_PAGES = 20
+# Tool approval used to be kept here; Armory owns it now. A row left from then is carried over once (see tool_approval.py).
+LEGACY_FORCE_TOOL_APPROVAL = "force_tool_approval"
 _PAGE_ID = re.compile(r"^/[a-z0-9-]{1,31}$")
 _MAX_STORED = 200  # AppSetting.value is a String(200)
-
-_TRUE, _FALSE = "1", "0"
-
-
-class UnknownSetting(KeyError):
-    """A name that is not in BOOLEAN_SETTINGS."""
 
 
 class InvalidPages(ValueError):
@@ -45,28 +34,16 @@ class SettingsService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def all(self) -> dict[str, bool]:
-        stored = {row.name: row.value for row in await self._session.scalars(select(AppSetting))}
-        return {name: (stored[name] == _TRUE if name in stored else default) for name, default in BOOLEAN_SETTINGS.items()}
+    async def legacy_force_tool_approval(self) -> bool | None:
+        """The old stored switch: None when there is no row."""
+        row = await self._session.get(AppSetting, LEGACY_FORCE_TOOL_APPROVAL)
+        return None if row is None else row.value == "1"
 
-    async def get_bool(self, name: str) -> bool:
-        if name not in BOOLEAN_SETTINGS:
-            raise UnknownSetting(name)
-        row = await self._session.get(AppSetting, name)
-        return BOOLEAN_SETTINGS[name] if row is None else row.value == _TRUE
-
-    async def set_bool(self, name: str, value: bool) -> bool:
-        """Saves the setting and returns what it was before."""
-        before = await self.get_bool(name)
-        row = await self._session.get(AppSetting, name)
-        text = _TRUE if value else _FALSE
-        if row is None:
-            self._session.add(AppSetting(name=name, value=text))
-        else:
-            row.value = text
-            row.updated_at = utcnow()
-        await self._session.commit()
-        return before
+    async def drop_legacy_force_tool_approval(self) -> None:
+        row = await self._session.get(AppSetting, LEGACY_FORCE_TOOL_APPROVAL)
+        if row is not None:
+            await self._session.delete(row)
+            await self._session.commit()
 
     async def hidden_pages(self) -> list[str]:
         row = await self._session.get(AppSetting, HIDDEN_PAGES)
