@@ -251,7 +251,9 @@ async def ask(
     asking = internal_auth.current_requester()
     user = asking.email or asking.username or None
     try:
-        budgets.check(user, _AGENT_ID)  # a used-up daily budget refuses the turn before any model is called
+        # A used-up daily budget refuses the turn before any model is called. The user's budget is checked on the
+        # turn they asked, not on the specialists it delegates to, so a plan that started can finish.
+        budgets.check(user if depth == 0 else None, _AGENT_ID)
         tier_args = {"model_tier": model_tier} if model_tier else {}
         if reasoning_effort:
             tier_args["reasoning_effort"] = reasoning_effort
