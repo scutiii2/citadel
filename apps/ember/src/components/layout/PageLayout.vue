@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionsScope from "./ActionsScope.vue";
 // Shared component copies: apply a fix in every admin app that has a copy.
 defineProps<{
   title: string;
@@ -17,7 +18,7 @@ defineProps<{
           <h2 class="page-title">{{ title }}</h2>
           <p v-if="description" class="page-description">{{ description }}</p>
         </div>
-        <div v-if="$slots.actions" class="page-actions"><slot name="actions" /></div>
+        <div v-if="$slots.actions" class="page-actions"><ActionsScope><slot name="actions" /></ActionsScope></div>
       </header>
       <div v-if="$slots.toolbar" class="page-toolbar"><slot name="toolbar" /></div>
       <slot />

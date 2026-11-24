@@ -17,6 +17,8 @@ defineProps<{
   groups: NavPage[][];
   /** Ember Admin's address, or null when the account may not open it. */
   adminUrl: string | null;
+  /** Where the menu opens: beside the trigger (the rail, default) or under it (the header). */
+  placement?: "side" | "below";
 }>();
 const emit = defineEmits<{ logout: [] }>();
 
@@ -85,7 +87,7 @@ useOutsideClose(root, open, () => close());
 </script>
 
 <template>
-  <div ref="root" class="account-menu" @keydown="onKey">
+  <div ref="root" class="account-menu" :class="{ below: placement === 'below' }" @keydown="onKey">
     <button
       ref="trigger"
       type="button"
@@ -170,6 +172,16 @@ useOutsideClose(root, open, () => close());
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: 0 6px 24px rgb(0 0 0 / 22%);
+}
+.below .account {
+  background: var(--surface);
+  color: var(--text);
+}
+.below .menu {
+  left: auto;
+  right: 0;
+  bottom: auto;
+  top: calc(100% + 6px);
 }
 .email {
   padding: 8px 10px 6px;

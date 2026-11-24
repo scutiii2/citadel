@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
@@ -8,6 +9,7 @@ import { navPreferencesClient, type NavPrefs } from "../../api/navigation/NavPre
 import { settingsClient } from "../../api/navigation/SettingsClient";
 import { NAV_PAGES } from "../../router/pages";
 import { useAuthStore } from "../../stores/auth";
+import AppHeader from "./AppHeader.vue";
 import NavRail from "./NavRail.vue";
 import { ticketsClient } from "../../features/tickets/api/TicketsClient";
 vi.mock("../../features/tickets/api/TicketsClient", () => ({ ticketsClient: { unreadCount: vi.fn(() => Promise.resolve(2)) } }));
@@ -44,7 +46,11 @@ async function setup(account: Account | null) {
       { path: "/login", name: "login", component: stub },
     ],
   });
-  const wrapper = mount(NavRail, { global: { plugins: [pinia, router] } });
+  // As in App.vue: the header (with the account menu) shows for a verified, signed-in account.
+  const Host = defineComponent({
+    render: () => h("div", [auth.account && !auth.needsVerification ? h(AppHeader) : null, h(NavRail)]),
+  });
+  const wrapper = mount(Host, { global: { plugins: [pinia, router] } });
   await flushPromises(); // the arrangement loads first
   return { wrapper, router, auth };
 }
@@ -92,7 +98,8 @@ describe("NavRail", () => {
     // Capabilities, Agents, Usage and Settings sit in the account menu.
     expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Skills", "Shares", "Global", "Generator", "PDF merger", "Media downloader"]);
     for (const link of [...links, ...wrapper.findAll("nav.header a")]) {
-      expect(link.text()).toBe("");
+      // The visible name is a decorative label (shown only while the sidebar is expanded); the link is named by aria-label.
+      expect(link.find(".label").attributes("aria-hidden")).toBe("true");
       expect(link.find("svg").exists()).toBe(true);
     }
   });

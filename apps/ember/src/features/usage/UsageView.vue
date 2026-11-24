@@ -3,6 +3,7 @@ import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { usageClient, type MyUsage, type UsageGroupBy, type UsageRecordRow } from "./api/UsageClient";
 import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
 import ActionButton from "../../components/ui/buttons/ActionButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import LineChart from "../../components/analytics/LineChart.vue";
@@ -192,18 +193,18 @@ onMounted(() => {
 
 <template>
   <PageLayout title="Usage" class="usage-view">
-    <template #actions>
-      <PanelHelp title="Usage">Review your token usage and account limits. Pick a period; Export saves it as a Markdown file.</PanelHelp>
+    <template #toolbar>
       <div class="ranges" role="group" aria-label="Period">
-          <SegmentedControl v-model="range" :options="RANGE_OPTIONS" label="Period" aria-label="Period" />
-          <ActionButton icon="export" class="export" :disabled="!usage" title="Download this period as a Markdown file" @click="exportReport">
-            Export .md
-          </ActionButton>
-        </div>
+        <SegmentedControl v-model="range" :options="RANGE_OPTIONS" label="Period" aria-label="Period" />
+        <PanelHelp title="Usage">Review your token usage and account limits. Pick a period; Export saves it as a Markdown file.</PanelHelp>
+        <ActionButton icon="export" class="export" :disabled="!usage" title="Download this period as a Markdown file" @click="exportReport">
+          Export .md
+        </ActionButton>
+      </div>
     </template>
     <div class="column">
-      <p v-if="error" class="error">error: {{ error }}</p>
-      <p v-else-if="!usage && loading" class="muted">loading ...</p>
+      <StateMessage v-if="error" kind="error" @retry="load">Could not load your usage: {{ error }}</StateMessage>
+      <StateMessage v-else-if="!usage && loading" kind="loading">Loading your usage…</StateMessage>
 
       <template v-if="usage">
         <div class="panel limits">
@@ -238,13 +239,13 @@ onMounted(() => {
 
         <div class="panel activity">
           <div class="panel-head"><h3>Activity</h3><span class="muted small">Per day, UTC</span></div>
-          <p v-if="usage.report.daily.length === 0" class="muted">No usage in this period.</p>
+          <StateMessage v-if="usage.report.daily.length === 0" kind="empty">No usage in this period.</StateMessage>
           <LineChart v-else :series="activitySeries" :lines="ACTIVITY_LINES" bucket="day" label="Token usage" fill :loading="loading" />
 
           <template v-if="year">
             <h4>Last 12 months</h4>
             <UsageHeatmap v-if="year.report.daily.length" :daily="year.report.daily" :today="today" />
-            <p v-else class="muted">No usage in the last 12 months.</p>
+            <StateMessage v-else kind="empty">No usage in the last 12 months.</StateMessage>
             <p class="muted small">Days are UTC days.</p>
           </template>
 
@@ -260,7 +261,7 @@ onMounted(() => {
             <h3>Breakdown</h3>
             <SegmentedControl v-model="groupBy" :options="GROUP_OPTIONS" label="Group by" aria-label="Group usage by" />
           </div>
-          <p v-if="usage.report.groups.length === 0" class="muted">None.</p>
+          <StateMessage v-if="usage.report.groups.length === 0" kind="empty">No usage to break down in this period.</StateMessage>
           <table v-else class="groups">
             <thead>
               <tr><th>{{ groupHeading }}</th><th>Share</th><th class="num">Tokens</th><th class="num">Turns</th><th class="num">Cost</th></tr>
@@ -282,8 +283,8 @@ onMounted(() => {
 
         <div class="panel recent">
           <div class="panel-head"><h3>Recent calls</h3><span class="muted small">Last 100</span></div>
-          <p v-if="recordsFailed" class="muted">Could not load recent calls.</p>
-          <p v-else-if="records.length === 0" class="muted">None.</p>
+          <StateMessage v-if="recordsFailed" kind="empty">Could not load recent calls.</StateMessage>
+          <StateMessage v-else-if="records.length === 0" kind="empty">No calls in this period.</StateMessage>
           <ul v-else class="calls">
             <template v-for="t in turns" :key="t.id">
               <UsageCall v-if="t.rows.length === 1" :record="t.rows[0]!" :currency="usage.report.currency" />
@@ -320,6 +321,19 @@ onMounted(() => {
 <style scoped>
 
 
+.panel :deep(.state) {
+  padding: 4px 0;
+}
+.column :deep(.state button.chip) {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9em;
+  cursor: pointer;
+}
 h3 {
   margin: 0;
   font-size: 1em;
@@ -537,8 +551,5 @@ th {
 }
 .muted {
   color: var(--muted);
-}
-.error {
-  color: var(--danger);
 }
 </style>

@@ -8,6 +8,7 @@ import type { UserExtension } from "../api/UserExtensionsClient";
 import type { ResourceInfo, ToolInfo, ToolRunResult } from "../../../api/types";
 import PageLayout from "../../../components/layout/PageLayout.vue";
 import PanelHelp from "../../../components/ui/panel/PanelHelp.vue";
+import StateMessage from "../../../components/ui/status/StateMessage.vue";
 import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
 import ToolRunDrawer from "../../../components/tools/forms/ToolRunDrawer.vue";
 import ResourceReader from "../components/ResourceReader.vue";
@@ -225,7 +226,7 @@ onActivated(() => { if (canSeePrivate.value) void userExt.refresh(); });
           <button id="caps-tab-extensions" role="tab" aria-controls="caps-catalog" :aria-selected="tab === 'extensions'" :tabindex="tab === 'extensions' ? 0 : -1" @click="pickTab('extensions')" @keydown="tabKey">Extensions</button>
         </div>
         <label class="search-box"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input v-model="query" type="search" :aria-label="tab === 'capabilities' ? 'Search capabilities and tools' : 'Search extensions and tools'" :placeholder="tab === 'capabilities' ? 'Search capabilities and tools…' : 'Search extensions and tools…'" /></label>
-        <p v-if="discoveryError" class="error discovery-error">Tool details unavailable: {{ discoveryError }} <button class="link" @click="load">Retry</button></p>
+        <StateMessage v-if="discoveryError" kind="error" class="discovery-error" @retry="load">Tool details unavailable: {{ discoveryError }}</StateMessage>
         <div class="list-heading"><h3>{{ tab === 'capabilities' ? 'Capabilities' : 'Extensions' }}</h3><PanelHelp title="Capabilities">Your tools and connected services. Pick one to see its tools and resources and to run a tool. Private extensions are yours alone and always ask before a tool runs.</PanelHelp><span>{{ enabledCount }} enabled · {{ tabItems.filter(i => i.kind !== 'other').length }} total</span></div>
         <div id="caps-catalog" ref="catalog" class="catalog" role="tabpanel" :aria-labelledby="`caps-tab-${tab}`" tabindex="0">
           <p v-if="!shown.length" class="notice">{{ query.trim() ? `Nothing matches “${query.trim()}”.` : `No ${tab} are available.` }}</p>

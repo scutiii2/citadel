@@ -11,7 +11,8 @@ test("every page fits desktop, tablet and mobile in both themes and has its help
         await page.setViewportSize({ width, height: 800 });
         await page.goto(path);
         await expect(page.getByRole("heading", { name: title, level: 2 }).first()).toBeVisible();
-        await expect(page.getByRole("button", { name: /^About / }).first()).toBeVisible();
+        // The page's help: the header's Help button on wide screens (or a panel's own icon), the page's icon on narrow ones.
+        await expect(page.getByRole("button", { name: /^(Help$|About )/ }).first()).toBeVisible();
         expect(await page.evaluate<boolean>("document.documentElement.scrollWidth <= window.innerWidth")).toBe(true);
       }
     }

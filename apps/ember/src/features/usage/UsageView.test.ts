@@ -83,7 +83,7 @@ describe("the period buttons", () => {
   it("offers This month first, then 7 days to 12 months, with 30 days chosen", async () => {
     const wrapper = await mountView();
 
-    const buttons = wrapper.findAll(".ranges button").filter((b) => !b.classes().includes("export"));
+    const buttons = wrapper.findAll(".ranges .segmented-control button");
     expect(buttons.map((b) => b.text())).toEqual(["This month", "7 days", "30 days", "90 days", "12 months"]);
     expect(buttons.map((b) => b.attributes("aria-pressed"))).toEqual(["false", "false", "true", "false", "false"]);
   });
@@ -301,11 +301,11 @@ describe("group by", () => {
     expect(wrapper.find("table.groups th").text()).toBe("Gateway");
   });
 
-  it("says None when there are no groups", async () => {
+  it("says there is nothing to break down when there are no groups", async () => {
     const wrapper = await mountView();
 
     expect(wrapper.find("table.groups").exists()).toBe(false);
-    expect(wrapper.find(".breakdown > p.muted").text()).toBe("None.");
+    expect(wrapper.find(".breakdown .state").text()).toBe("No usage to break down in this period.");
   });
 
   it("keeps the heading of the loaded report while the next grouping loads", async () => {
@@ -433,7 +433,7 @@ describe("the recent calls list", () => {
     expect(wrapper.find(".stats").exists()).toBe(true);
     expect(wrapper.find(".calls").exists()).toBe(false);
     expect(wrapper.text()).toContain("Could not load recent calls.");
-    expect(wrapper.text()).not.toMatch(/Recent calls\s*None\./);
+    expect(wrapper.text()).not.toMatch(/Recent calls\s*No calls in this period\./);
   });
 });
 

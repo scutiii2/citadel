@@ -144,9 +144,6 @@ async function changePassword(): Promise<void> {
     title="Account"
     class="account-view"
   >
-    <template #actions>
-      <PanelHelp title="Account">Manage your identity, security and devices. Each card saves on its own: change your email or password, sign out, or forget a remembered device.</PanelHelp>
-    </template>
     <div class="column">
       <div v-if="!account.email_verified" class="banner" role="status">
         <span>Verify your email address to use Ember.</span>
@@ -160,6 +157,7 @@ async function changePassword(): Promise<void> {
       </div>
 
       <div class="card profile">
+        <span class="profile-help"><PanelHelp title="Account">Manage your identity, security and devices. Each card saves on its own: change your email or password, sign out, or forget a remembered device.</PanelHelp></span>
         <div class="identity">
           <div class="avatar" aria-hidden="true">{{ initial }}</div>
           <div class="who">
@@ -573,6 +571,12 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+}
+
+.profile-help {
+  position: absolute;
+  top: 10px;
+  right: 10px;
 }
 
 .profile::before {
