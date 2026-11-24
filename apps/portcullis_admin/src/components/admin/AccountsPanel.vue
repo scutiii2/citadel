@@ -327,7 +327,7 @@ async function confirm(): Promise<void> {
                 <span v-if="!a.is_active" class="account-status disabled"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0" /></svg>disabled</span>
                 <span v-else-if="!a.email_verified" class="account-status unverified"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0" /></svg>unverified</span>
                 <span v-else class="account-status active"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>active</span>
-                <PanelHelp :title="statusOf(a)"><p>{{ STATUS_HELP[statusOf(a)] }}</p></PanelHelp>
+                <PanelHelp v-if="statusOf(a) !== 'active'" :title="statusOf(a)"><p>{{ STATUS_HELP[statusOf(a)] }}</p></PanelHelp>
               </div></td>
             </tr>
           </tbody>

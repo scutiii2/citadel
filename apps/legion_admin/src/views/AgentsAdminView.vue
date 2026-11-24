@@ -318,7 +318,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
               </th>
               <td><div class="state-cell">{{ role }}<PanelHelp :title="role"><p>{{ roleHelp[roleKey(agent)] }}</p></PanelHelp></div></td>
               <td><div class="state-cell"><span class="agent-state" :class="status" data-test="status"><span aria-hidden="true">●</span> {{ statuses[status] }}</span>
-                <PanelHelp :title="statuses[status]"><p>{{ statusHelp[status] }}</p></PanelHelp></div></td>
+                <PanelHelp v-if="status !== 'running'" :title="statuses[status]"><p>{{ statusHelp[status] }}</p></PanelHelp></div></td>
             </tr>
           </tbody>
         </table>

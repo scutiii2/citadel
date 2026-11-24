@@ -50,7 +50,6 @@ scoped by port, so the same portcullis session cookie is sent.
 | Invites (`/admin/invites`) | `invites.manage` |
 | Workspace settings (`/admin/settings`): server settings and the Ember menu (which ember_web pages every account's sidebar shows; nav only) | `settings.manage` |
 | Profile (`/profile`; `/account` redirects here) | any logged-in account |
-| Personal settings (`/settings`) | any logged-in account |
 | Email verification (`/verify-email`) | any logged-in account |
 
 The router and the nav read one list (`src/router/pages.ts`). A user with none

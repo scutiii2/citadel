@@ -13,7 +13,6 @@ const emit = defineEmits<{ logout: []; navigate: [] }>();
     <div class="identity"><strong>{{ username }}</strong><span>{{ email }}</span></div>
     <nav aria-label="Account pages">
       <RouterLink to="/profile" @click="emit('navigate')">Profile</RouterLink>
-      <RouterLink to="/settings" @click="emit('navigate')">Settings</RouterLink>
     </nav>
     <ThemeSelect />
     <button type="button" class="chip logout" @click="emit('logout')">Log out</button>

@@ -170,7 +170,7 @@ onMounted(load);
                 <ActionMessage v-if="rowErrors[c.name]" kind="error" :text="rowErrors[c.name]" data-test="row-error" />
               </th>
               <td><div class="state-cell"><span class="state" :class="state"><span aria-hidden="true">{{ state === "online" ? "●" : "○" }}</span> {{ STATE_LABELS[state] }}</span>
-                <PanelHelp :title="STATE_LABELS[state]"><p>{{ STATE_HELP[state] }}</p></PanelHelp></div></td>
+                <PanelHelp v-if="state !== 'online'" :title="STATE_LABELS[state]"><p>{{ STATE_HELP[state] }}</p></PanelHelp></div></td>
               <td>{{ c.tools.length }}<template v-if="!c.loaded"> · not loaded yet</template></td>
               <td>
                 <div class="controls">

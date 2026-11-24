@@ -43,7 +43,7 @@ export const ADMIN_PAGES: AdminPage[] = [
  * sidebar editor. The router keeps using ADMIN_PAGES, whose order picks the home page. */
 export const ADMIN_NAV_PAGES: AdminPage[] = [...ADMIN_PAGES].sort((a, b) => defaultRank(a) - defaultRank(b));
 
-const EXTRA_TITLES: Record<string, string> = { "/config-issues": "Config issues", "/profile": "Profile", "/settings": "Settings" };
+const EXTRA_TITLES: Record<string, string> = { "/config-issues": "Config issues", "/profile": "Profile" };
 
 /** The heading the header shows for a route path. */
 export const pageTitle = (path: string): string => ADMIN_PAGES.find((page) => page.to === path)?.label ?? EXTRA_TITLES[path] ?? "";

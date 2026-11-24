@@ -19,7 +19,7 @@ async function show(permissions: string[]) {
   vi.spyOn(configIssuesClient, "list").mockResolvedValue([]);
   const auth = useAuthStore();
   auth.account = { id: 1, username: "ada", email: "ada@example.com", email_verified: true, roles: [], permissions };
-  const router = createRouter({ history: createMemoryHistory(), routes: ["/", "/profile", "/settings", "/config-issues"].map((p) => ({ path: p, component: { template: "<div />" } })) });
+  const router = createRouter({ history: createMemoryHistory(), routes: ["/", "/profile", "/config-issues"].map((p) => ({ path: p, component: { template: "<div />" } })) });
   await router.push("/");
   const wrapper = mount(PortcullisHeader, { props: { title: "Accounts", expanded: true }, attachTo: document.body, global: { plugins: [pinia, router] } });
   await flushPromises();
@@ -36,7 +36,7 @@ it("shows the title, toggles the sidebar and keeps theme and logout inside Profi
   expect(wrapper.find(".logout").exists()).toBe(false);
   await wrapper.get('[aria-label="Profile"]').trigger("click");
   expect(wrapper.get(".identity").text()).toContain("ada@example.com");
-  expect(wrapper.findAll(".account-menu nav a").map((a) => a.text())).toEqual(["Profile", "Settings"]);
+  expect(wrapper.findAll(".account-menu nav a").map((a) => a.text())).toEqual(["Profile"]);
   await wrapper.get("select").setValue("light");
   expect(localStorage.getItem("ember_admin.theme")).toBe("light");
   await wrapper.get(".logout").trigger("click");

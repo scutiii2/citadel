@@ -23,7 +23,6 @@ export const router = createRouter({
     { path: "/overview", name: "overview", component: () => import("../views/OverviewView.vue"), meta: { permission: ADMIN_PERMISSIONS } },
     { path: "/profile", name: "profile", component: () => import("../views/ProfileView.vue") },
     { path: "/account", redirect: "/profile" },
-    { path: "/settings", name: "settings", component: () => import("../views/SettingsView.vue") },
     { path: "/verify-email", name: "verify-email", component: () => import("../views/VerifyEmailView.vue") },
     { path: "/config-issues", name: "config-issues", component: () => import("../views/ConfigIssuesView.vue"), meta: { permission: "config.issues.view" } },
     {

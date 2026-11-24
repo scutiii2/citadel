@@ -267,10 +267,10 @@ watch(selectedName, () => { tab.value = "general"; });
               </th>
               <td>
                 <div class="status-cell"><span class="pill" :class="{ ready: draft.saved.ready }"><span aria-hidden="true">{{ draft.saved.ready ? "✓" : "○" }}</span> {{ draft.saved.ready ? "Ready" : "Not ready" }}</span>
-                <PanelHelp :title="draft.saved.ready ? 'Ready' : 'Not ready'"><p>{{ statusHelp(draft.saved) }}</p></PanelHelp></div>
+                <PanelHelp v-if="!draft.saved.ready" title="Not ready"><p>{{ statusHelp(draft.saved) }}</p></PanelHelp></div>
               </td>
               <td><div class="status-cell"><span class="pill" :class="{ on: draft.saved.enabled }">{{ draft.saved.enabled ? "On" : "Off" }}</span>
-                <PanelHelp :title="draft.saved.enabled ? 'On' : 'Off'"><p>{{ enabledHelp(draft.saved.enabled) }}</p></PanelHelp></div></td>
+                <PanelHelp v-if="!draft.saved.enabled" title="Off"><p>{{ enabledHelp(draft.saved.enabled) }}</p></PanelHelp></div></td>
               <td class="count">{{ draft.saved.origins.length }}</td>
               <TestResultCells :id="draft.saved.name" :label="draft.saved.label" :testing="draft.pending === 'test'" :busy="!!draft.pending"
                 :result="draft.result" @test="test(draft)" />
@@ -289,7 +289,7 @@ watch(selectedName, () => { tab.value = "general"; });
           <span class="admin-record-badge big" aria-hidden="true">{{ selected.saved.label.slice(0, 2).toUpperCase() }}</span>
           <div class="summary-copy"><span class="eyebrow">Tool service</span><code>{{ selected.saved.name }}</code></div>
           <span class="pill" :class="{ ready: selected.saved.ready }"><span aria-hidden="true">{{ selected.saved.ready ? "✓" : "○" }}</span> {{ selected.saved.ready ? "Ready" : "Not ready" }}</span>
-          <PanelHelp :title="selected.saved.ready ? 'Ready' : 'Not ready'"><p>{{ statusHelp(selected.saved) }}</p></PanelHelp>
+          <PanelHelp v-if="!selected.saved.ready" title="Not ready"><p>{{ statusHelp(selected.saved) }}</p></PanelHelp>
         </div>
 
         <section class="group">

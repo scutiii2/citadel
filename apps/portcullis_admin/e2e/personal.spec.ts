@@ -36,57 +36,6 @@ test("profile changes a password and forgets a remembered device after confirmat
   expect(state.unexpected).toEqual([]);
 });
 
-test("settings applies theme instantly and saves sidebar drafts for reload", async ({ page }) => {
-  const state = newState();
-  await installFakeApi(page, state);
-  await page.goto("/settings");
-  await page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true }).click();
-  const inviteSwitch = page.getByRole("switch", { name: "Show Invites in the sidebar" });
-  await inviteSwitch.focus();
-  await inviteSwitch.press("Space");
-  await expect(inviteSwitch).not.toBeChecked();
-  const nav = page.getByRole("navigation", { name: "Admin sections" });
-  await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(1);
-  expect(await page.evaluate<string>("document.documentElement.style.colorScheme")).toBe("dark");
-  await page.getByRole("button", { name: "Profile", exact: true }).click();
-  await expect(page.locator(".header-popover select")).toHaveValue("dark");
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Cancel settings changes", exact: true }).click();
-  await page.getByRole("dialog", { name: "Discard unsaved settings?" }).getByRole("button", { name: "Discard changes" }).click();
-  await expect(inviteSwitch).toBeChecked();
-  await expect(page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("group", { name: "settings changes" }).getByRole("button")).toHaveCount(0);
-  await page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true }).click();
-  await inviteSwitch.focus();
-  await inviteSwitch.press("Space");
-  await page.getByRole("button", { name: "Pin Users to the top" }).click();
-  for (const width of [1280, 768, 375]) {
-    await page.setViewportSize({ width, height: 800 });
-    const save = page.getByRole("button", { name: "Save settings changes", exact: true });
-    await expect(save).toBeVisible();
-    const box = (await save.boundingBox())!;
-    expect(box.x + box.width).toBeLessThanOrEqual(width);
-  }
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.getByRole("button", { name: "Save settings changes", exact: true }).click();
-  await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("link").nth(1)).toHaveAttribute("aria-label", "Users");
-  await page.reload();
-  await expect(page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(0);
-  await page.getByLabel("Search settings").fill("theme");
-  await expect(page.getByRole("region", { name: "Sidebar", exact: true })).toHaveCount(0);
-  for (const width of [1280, 768, 375]) {
-    await page.setViewportSize({ width, height: 800 });
-    expect(await page.evaluate<boolean>("document.documentElement.scrollWidth <= innerWidth")).toBe(true);
-    await page.getByRole("button", { name: "Profile", exact: true }).click();
-    await expect(page.locator(".header-popover").getByRole("link", { name: "Profile", exact: true })).toBeVisible();
-    await expect(page.locator(".header-popover").getByRole("link", { name: "Settings", exact: true })).toBeVisible();
-    await page.keyboard.press("Escape");
-  }
-  expect(state.unexpected).toEqual([]);
-});
-
 test("changing email completes verification inside Admin", async ({ page }) => {
   const state = newState();
   await installFakeApi(page, state);
