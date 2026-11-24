@@ -1,7 +1,7 @@
 """Which model gateways may see confidential data.
 
 A gateway is trusted when its entry says `trusted: true`. An entry that does not say defaults by what the
-gateway is: the hosted models the owner picked (Claude, GPT, Gemini, Jev), and every gateway that runs on
+gateway is: the hosted models the owner picked (Claude, GPT, Gemini, NVIDIA, Jev), and every gateway that runs on
 the owner's own machine (Ollama, a Scuti model service, Laya). Anything else, such as a router over free
 tiers, starts untrusted until an admin marks it on the gateway's setup.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-CONVERSATION_DEFAULTS = frozenset({"claude", "gpt", "gemini", "ollama"})
+CONVERSATION_DEFAULTS = frozenset({"claude", "gpt", "gemini", "nvidia", "ollama"})
 DECISION_DEFAULTS = frozenset({"jev", "laya"})
 DECISION_LOCAL_KINDS = frozenset({"ollama", "scuti"})
 

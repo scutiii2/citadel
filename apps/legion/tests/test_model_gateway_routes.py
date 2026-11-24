@@ -78,7 +78,7 @@ def test_a_gateway_cannot_be_untrusted_or_deleted_while_an_agent_depends_on_it(c
 
 def test_presets_say_whether_they_start_trusted(client):
     chat = client.get("/agents/model-gateways/conversation").json()["presets"]
-    assert chat["claude"]["trusted"] and chat["gemini"]["trusted"] and chat["minicpm"]["trusted"]
+    assert chat["claude"]["trusted"] and chat["gemini"]["trusted"] and chat["nvidia"]["trusted"] and chat["minicpm"]["trusted"]
     assert not chat["omniroute"]["trusted"] and not chat["freellmapi"]["trusted"]
     decision = client.get("/agents/model-gateways/decision").json()["presets"]
     assert decision["jev"]["trusted"] and not decision["freellmapi"]["trusted"]
