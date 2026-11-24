@@ -17,7 +17,7 @@ test("production manifest, offline shell, network-only API, and reconnect", asyn
   // Remove API fakes before going offline: otherwise test routing could answer them.
   await page.unrouteAll();
   await context.setOffline(true);
-  await page.goto("/settings");
+  await page.goto("/profile");
   await expect(page.getByText("You’re offline.")).toBeVisible();
   expect(await page.evaluate(async () => {
     try { await fetch('/api/auth/me'); return false; } catch { return true; }
@@ -42,12 +42,10 @@ for (const width of [375, 768]) {
     await expect(page.getByRole("heading", { name: "Overview", level: 1 })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.getByRole("button", { name: "Profile", exact: true }).click();
-    await expect(page.locator(".header-popover").getByRole("link", { name: "Settings", exact: true })).toBeVisible();
-    await page.locator(".header-popover").getByRole("link", { name: "Settings", exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
+    await expect(page.locator(".header-popover").getByRole("link", { name: "Profile", exact: true })).toBeVisible();
+    await expect(page.locator(".header-popover select")).toBeVisible();
+    await page.locator(".header-popover").getByRole("link", { name: "Profile", exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Profile', level: 1 })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.getByRole('searchbox', { name: 'Search settings' }).fill('theme');
-    if (width < 768) await expect(page.getByRole('searchbox', { name: 'Search settings' })).toHaveCSS('font-size', '16px');
-    await expect(page.getByText('Theme', { exact: true }).first()).toBeVisible();
   });
 }

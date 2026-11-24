@@ -59,8 +59,6 @@ it("allows personal pages without workspace permissions", async () => {
   vi.mocked(authClient.me).mockResolvedValue({ id: 4, username: "member", email: "m@example.com", email_verified: true, roles: [], permissions: [] });
   await router.replace({ path: "/profile", force: true });
   expect(router.currentRoute.value.name).toBe("profile");
-  await router.push("/settings");
-  expect(router.currentRoute.value.name).toBe("settings");
 });
 
 it("lets an unverified account recover through Profile and verification", async () => {
