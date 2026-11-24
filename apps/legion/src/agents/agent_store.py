@@ -1,7 +1,7 @@
 """Create, read, update and delete agents for the admin UI.
 
 `agents/<id>.json` is the tracked, shared default. The admin never writes it:
-its edits go to the untracked `.data/agent_overrides.json` (see
+its edits go to the `agent_overrides` table of `.data/settings.db` (see
 agent_spec.overrides_path_for), which replaces an agent's file on this
 machine, so a machine-specific model, cap or enabled switch never shows up in
 git. The supervisor re-reads both and starts, restarts or stops children to
@@ -137,9 +137,8 @@ def delete_agent(agent_id: str, directory: Path = agent_spec.AGENTS_DIR) -> None
         if _effective(agent_id, directory).get("entry") is True:
             raise AgentStoreError(f"{agent_id!r} is the entry agent; make another agent the entry first", 409)
         path.unlink(missing_ok=True)
-        overrides = _read_overrides(directory)
-        if overrides.pop(agent_id, None) is not None:
-            _write_json(agent_spec.overrides_path_for(directory), overrides)
+        if agent_id in _read_overrides(directory):
+            agent_spec.remove_override(directory, agent_id)
 
 
 def reset_agent(agent_id: str, directory: Path = agent_spec.AGENTS_DIR) -> dict[str, Any]:
@@ -156,8 +155,7 @@ def reset_agent(agent_id: str, directory: Path = agent_spec.AGENTS_DIR) -> dict[
             raise AgentStoreError(f"agent {agent_id!r} has no default file to reset to", 409)
         defaults = _read_json(path)
         _validate_change(agent_id, defaults, directory)
-        del overrides[agent_id]
-        _write_json(agent_spec.overrides_path_for(directory), overrides)
+        agent_spec.remove_override(directory, agent_id)
     return {"id": agent_id, **defaults, "overridden": False}
 
 
@@ -187,11 +185,7 @@ def _effective(agent_id: str, directory: Path) -> dict[str, Any]:
 
 
 def _save_override(agent_id: str, data: dict[str, Any], directory: Path) -> None:
-    overrides = _read_overrides(directory)
-    overrides[agent_id] = data
-    target = agent_spec.overrides_path_for(directory)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    _write_json(target, overrides)
+    agent_spec.write_override(directory, agent_id, data)
 
 
 def _path_of(agent_id: str, directory: Path) -> Path:
@@ -208,19 +202,6 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise AgentStoreError(f"{path.name} must contain a JSON object", 500)
     return data
-
-
-def _write_json(path: Path, data: dict[str, Any]) -> None:
-    """Temp file next to the target, then one atomic swap, so the supervisor's
-    watcher never reads half a file. The temp name does not end in .json."""
-    fd, temp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as file:
-            file.write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-        os.replace(temp_name, path)
-    except BaseException:
-        Path(temp_name).unlink(missing_ok=True)
-        raise
 
 
 def _load_spec(agent_id: str, data: dict[str, Any]) -> AgentSpec:

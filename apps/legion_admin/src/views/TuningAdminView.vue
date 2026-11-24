@@ -56,6 +56,15 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    id: "budgets", title: "Budgets", note: "How much one turn may use, and how much one user or agent may use per day. Applies from the next turn.",
+    fields: [
+      { path: "budgets.turn_tokens", label: "Most tokens in one turn", kind: "int", min: 1000, max: 5000000, unit: "tokens", help: "A turn that reaches this many tokens is stopped with a message. An agent file that sets its own limit keeps it." },
+      { path: "budgets.turn_seconds", label: "Longest turn", kind: "int", min: 10, max: 3600, unit: "s", help: "A turn that runs longer than this is stopped with a message. An agent file that sets its own limit keeps it." },
+      { path: "budgets.daily_tokens_per_user", label: "Tokens per user per day", kind: "int", min: 0, max: 1000000000, unit: "tokens", help: "Once a user has used this many tokens since midnight UTC, their new turns are refused until the next day. 0 means no limit." },
+      { path: "budgets.daily_tokens_per_agent", label: "Tokens per agent per day", kind: "int", min: 0, max: 1000000000, unit: "tokens", help: "Once an agent has used this many tokens since midnight UTC, it refuses new turns until the next day. 0 means no limit." },
+    ],
+  },
+  {
     id: "tool_batch", title: "Tool calls", note: "How one answer's tool calls run together. Saved in Legion's settings database; applies from the next round of calls.",
     fields: [
       { path: "tool_batch.parallel", label: "Run read-only tools together", kind: "bool", help: "When the model asks for several read-only tools at once, run them at the same time instead of one after another. Tools that change something, and tools that need approval, always run one at a time. Off runs every call in order." },
@@ -231,7 +240,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
         <section v-for="group in visibleGroups" :key="group.id" class="tuning-group">
           <div class="section-head"><div><h3>{{ group.title }}</h3><p>{{ group.note }}</p></div></div>
         <SettingRow v-for="field in group.fields" :key="field.path" :setting-id="field.path" :label="field.label"
-          :description="`${field.path.startsWith('tool_batch.') ? 'Default' : 'File default'}: ${shownDefault(field)}${field.unit && typeof at(view.defaults, field.path) === 'number' ? ' ' + field.unit : ''}`"
+          :description="`${field.path.startsWith('tool_batch.') || field.path.startsWith('budgets.') ? 'Default' : 'File default'}: ${shownDefault(field)}${field.unit && typeof at(view.defaults, field.path) === 'number' ? ' ' + field.unit : ''}`"
           :data-row="field.path" :data-changed="isChanged(field.path)">
           <template v-if="field.help" #help>{{ helpText(field) }}</template>
           <span v-if="isChanged(field.path) || field.path in draft" class="badge">Changed</span>

@@ -165,6 +165,10 @@ class AgentAdmin:
         """legion's editable tuning: {defaults, overrides, effective}."""
         return await self._request("GET", "/agents/tuning", account)
 
+    async def insights(self, account: Account, days: int) -> dict[str, Any]:
+        """legion's daily counters (routing, confidentiality, batching, tokens) for the last `days` days."""
+        return await self._request("GET", f"/agents/insights?days={int(days)}", account)
+
     async def set_tuning(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
         """Save `changes` (dotted path -> value, None = back to the file's value); returns the new view."""
         return await self._request("PUT", "/agents/tuning", account, json=changes)

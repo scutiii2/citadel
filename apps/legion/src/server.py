@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from dataclasses import replace
+from dataclasses import asdict, replace
 import json
 import logging
 import os
@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager, suppress
 from src.citadel_auth import settings_store, advertised_url
 from src.citadel_auth.treasury import register_instance
 from src.runtime.service_catalog import catalog
-from src.runtime import config_files, connection_probe, outside_origins, treasury_bootstrap, tuning_overrides
+from src.runtime import budgets, config_files, counters, connection_probe, outside_origins, treasury_bootstrap, tuning_overrides
 from src.tools.mcp_client import config as mcp_config
 from typing import Any
 from urllib.parse import urlsplit
@@ -248,7 +248,10 @@ async def ask(
         replace(internal_auth.current_requester(), chat_id=chat_id or ""))
     from src.agents.roles.architect.pipeline import ArchitectError
 
+    asking = internal_auth.current_requester()
+    user = asking.email or asking.username or None
     try:
+        budgets.check(user, _AGENT_ID)  # a used-up daily budget refuses the turn before any model is called
         tier_args = {"model_tier": model_tier} if model_tier else {}
         if reasoning_effort:
             tier_args["reasoning_effort"] = reasoning_effort
@@ -260,8 +263,8 @@ async def ask(
             question, history or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
             disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
-            allow_read_only=allow_read_only, exact_context=exact_context, confidential=confidential,
-            **tier_args, **private_args, **limit_args,
+            allow_read_only=allow_read_only, exact_context=exact_context,
+            **tier_args, **private_args, **limit_args, **({"confidential": True} if confidential else {}),
         )
     except ChatCancelled as error:
         reply = _cancelled_result()
@@ -278,6 +281,8 @@ async def ask(
         started_at=started_at, finished_at=agent_events.now_iso(), delegated_by=delegated_by,
         model_tier=result.model_tier, reasoning_effort=result.reasoning_effort,
     )
+    if result.model_executed:
+        budgets.record(user, _AGENT_ID, result.total_tokens)
     own_rows = [{**own_usage, "request_id": request_id, "depth": depth,
                  "prompt": usage_log.prompt_messages(history or [], question)}] if result.model_executed else []
     if result.model_executed:
@@ -534,6 +539,18 @@ async def servers_delete(request: Request) -> JSONResponse:
     server_id = request.path_params["server_id"]
     await asyncio.to_thread(settings_store.delete, config_files.SETTINGS_DB, "servers", server_id)
     return JSONResponse({"deleted": server_id, "applies": "next start"})
+
+
+@mcp.custom_route("/agents/insights", methods=["GET"])
+async def insights_get(request: Request) -> JSONResponse:
+    """Daily counters of the last `days` days (1 to 30): routing, confidentiality, batching and tokens per user and agent."""
+    try:
+        days = int(request.query_params.get("days", "7"))
+    except ValueError:
+        days = 7
+    days = min(max(days, 1), 30)
+    return JSONResponse({"days": days, "history": await asyncio.to_thread(counters.history, days),
+                         "budgets": asdict(budgets.current())})
 
 
 @mcp.custom_route("/agents/tuning", methods=["GET"])

@@ -12,7 +12,7 @@ from typing import Any
 import sqlite3
 
 from src.citadel_auth import settings_store
-from src.gateway import trust
+from src.gateway import sealing, trust
 from src.gateway.shared import MAX_TOKEN, valid_url as _valid_url
 from src.gateway.conversation.contract import TIERS
 from src.gateway.conversation.gateways.base import CAPABILITIES
@@ -43,7 +43,7 @@ ENV_REF = re.compile(r"env:([A-Z][A-Z0-9_]{0,63})")
 
 def resolve(entry: dict[str, Any]) -> dict[str, Any]:
     """Copy of entry with each secret field of the form env:NAME replaced by that environment variable ("" when unset)."""
-    out = dict(entry)
+    out = sealing.unseal_fields(entry, SECRETS)
     for field in SECRETS:
         if isinstance(value := out.get(field), str) and (ref := ENV_REF.fullmatch(value)):
             out[field] = os.environ.get(ref.group(1), "")
@@ -90,7 +90,7 @@ class GatewayStore:
             raise ValueError("The provider must be anthropic, openai or scuti.")
         with self._lock:
             entry = self._entry(gid, provider, data)
-            settings_store.put(self._path, self._table, gid, entry)
+            settings_store.put(self._path, self._table, gid, sealing.seal_fields(entry, SECRETS))
         return self._public(gid, entry)
 
     def draft(self, gid: Any, data: Any) -> dict[str, Any]:
@@ -103,7 +103,7 @@ class GatewayStore:
     def _entry(self, gid: str, provider: str, data: dict[str, Any]) -> dict[str, Any]:
         gateways = self._read()
         old = gateways.get(gid, {}) if gateways.get(gid, {}).get("provider") == provider else {}
-        return self._clean(provider, data, old)
+        return self._clean(provider, data, sealing.unseal_fields(old, SECRETS))
 
     @staticmethod
     def _clean(provider: str, data: dict[str, Any], old: dict[str, Any]) -> dict[str, Any]:
@@ -195,6 +195,17 @@ class GatewayStore:
         if (trusted := trust.clean(data, old)) is not None:
             entry["trusted"] = trusted
         return entry
+
+    def seal_rows(self) -> int:
+        """Encrypt every secret still stored as plain text (rows from before secrets were sealed). Returns how many rows changed."""
+        changed = 0
+        with self._lock:
+            for gid, entry in self._read().items():
+                sealed = sealing.seal_fields(entry, SECRETS)
+                if sealed != entry:
+                    settings_store.put(self._path, self._table, gid, sealed)
+                    changed += 1
+        return changed
 
     def delete(self, gid: str) -> bool:
         with self._lock:

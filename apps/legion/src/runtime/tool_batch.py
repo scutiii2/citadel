@@ -18,7 +18,7 @@ from typing import Any
 
 from src.providers.base_provider import OnEvent, ToolCallRecord, dispatch_with_progress, step_event
 from src.providers.turn_guard import TurnGuard
-from src.runtime import approvals, questions, run_tools, tool_batch_settings
+from src.runtime import approvals, counters, questions, run_tools, tool_batch_settings
 from src.tools.mcp_client.mcp_upstream import NumberedFailureText, is_read_only_builtin
 
 
@@ -72,6 +72,8 @@ class ToolRound:
             while end < len(calls) and self._can_overlap(calls[end]):
                 end += 1
             if end - index >= 2:
+                counters.add("batch.parallel_groups")
+                counters.add("batch.parallel_calls", end - index)
                 outcomes += await self._run_group(calls[index:end])
                 index = end
             else:
@@ -170,5 +172,8 @@ class ToolRound:
                 status[step.id] = "done" if outcome.ok else "failed"
                 texts[step.id] = outcome.text
         self.results.update({step.id: texts[step.id] for step in steps if status[step.id] == "done"})
+        counters.add("batch.run_tools")
+        counters.add("batch.run_tools_steps", len(steps))
+        counters.add("batch.run_tools_failed_steps", sum(1 for step in steps if status[step.id] != "done"))
         return Outcome(run_tools.reply(steps, status, texts), all(status[step.id] == "done" for step in steps),
                        run_tools.summary(steps, status))

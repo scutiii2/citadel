@@ -32,6 +32,7 @@ const unavailable = (value: number | null) => canManage.value && !!error.value &
 const descriptions: Record<string, string> = {
   "/agents": "Create agents, set their models and tools, and see which are running.",
   "/connections": "Model gateways and the MCP servers agents can use.",
+  "/insights": "What the Router, the confidentiality check and tool batching did, and the tokens used today.",
   "/tuning": "Response-limit ceilings that cap what any agent may ask for.",
 };
 function detail(path: string): string {

@@ -40,5 +40,5 @@ it("shows a failed count as unavailable and fetches nothing without agents.manag
   const tuningOnly = await show(["tuning.manage"]);
   expect(list).not.toHaveBeenCalled();
   expect(tuningOnly.find(".stats").exists()).toBe(false);
-  expect(tuningOnly.findAll(".destination").map((d) => d.get("h3").text())).toEqual(["Tuning"]);
+  expect(tuningOnly.findAll(".destination").map((d) => d.get("h3").text())).toEqual(["Insights", "Tuning"]);
 });

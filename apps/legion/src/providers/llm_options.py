@@ -57,7 +57,10 @@ class LlmOptions:
         """A fresh budget and call history for each turn, never cached."""
         from src.providers.turn_guard import TurnGuard
 
-        return TurnGuard(self._llm.max_turn_tokens or 100_000, self._llm.max_turn_seconds or 300)
+        from src.runtime import budgets
+
+        limits = budgets.current()
+        return TurnGuard(self._llm.max_turn_tokens or limits.turn_tokens, self._llm.max_turn_seconds or limits.turn_seconds)
 
     def _effort(self) -> str:
         return _effort_override.get() or self._llm.reasoning_effort

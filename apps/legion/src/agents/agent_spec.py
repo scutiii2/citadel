@@ -17,12 +17,13 @@ import json
 import math
 import os
 import re
+import sqlite3
 from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlsplit, urlunsplit
-from src.citadel_auth import data_dir
+from src.citadel_auth import data_dir, settings_store
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -274,14 +275,52 @@ def _agent_url(check: _Checker, data: dict[str, Any]) -> str | None:
 
 
 def overrides_path_for(directory: Path) -> Path:
-    """Where the admin's edits to the agent files in `directory` live: the
-    untracked `.data/agent_overrides.json` of the project (`{id: <whole agent
-    file>}`). A tracked agents/<id>.json is the shared default; an entry here
-    replaces it on this machine. Any other folder (tests) keeps its own
-    overrides inside it, in a subfolder the `*.json` scan never matches."""
+    """The settings database that holds the admin's edits to the agent files in `directory`: Legion's own
+    `.data/settings.db`, table `agent_overrides` (`{id: <whole agent file>}`). A tracked agents/<id>.json is the shared
+    default; a row here replaces it on this machine. Any other folder (tests) keeps its own database inside it, in a
+    subfolder the `*.json` scan never matches."""
     if directory == AGENTS_DIR:
-        return data_dir(AGENTS_DIR.parent) / "agent_overrides.json"
-    return directory / ".overrides" / "agent_overrides.json"
+        return data_dir(AGENTS_DIR.parent) / "settings.db"
+    return directory / ".overrides" / "settings.db"
+
+
+OVERRIDES_TABLE = "agent_overrides"
+LEGACY_OVERRIDES_FILE = "agent_overrides.json"
+_migrated_overrides: set[Path] = set()
+
+
+def _migrate_overrides(db: Path) -> None:
+    """Once per process: copy the rows of an older `agent_overrides.json` next to `db` into the table (a row already
+    there wins), then rename the file to `.migrated`. It is never deleted."""
+    if db in _migrated_overrides:
+        return
+    _migrated_overrides.add(db)
+    legacy = db.with_name(LEGACY_OVERRIDES_FILE)
+    if not legacy.is_file():
+        return
+    try:
+        data = json.loads(legacy.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return
+        stored = settings_store.read_all(db, OVERRIDES_TABLE)
+        for agent_id, entry in data.items():
+            if isinstance(entry, dict) and agent_id not in stored:
+                settings_store.put(db, OVERRIDES_TABLE, agent_id, entry)
+        legacy.rename(legacy.with_name(LEGACY_OVERRIDES_FILE + ".migrated"))
+    except (OSError, ValueError, sqlite3.Error):
+        _migrated_overrides.discard(db)  # try again at the next read
+
+
+def write_override(directory: Path, agent_id: str, data: dict[str, Any]) -> None:
+    db = overrides_path_for(directory)
+    _migrate_overrides(db)
+    settings_store.put(db, OVERRIDES_TABLE, agent_id, data)
+
+
+def remove_override(directory: Path, agent_id: str) -> None:
+    db = overrides_path_for(directory)
+    _migrate_overrides(db)
+    settings_store.delete(db, OVERRIDES_TABLE, agent_id)
 
 
 def upgrade_legacy(data: dict[str, Any]) -> dict[str, Any]:
@@ -300,16 +339,15 @@ def upgrade_legacy(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def read_overrides(directory: Path) -> dict[str, dict[str, Any]]:
-    """The overrides for `directory`; {} when there is no file."""
-    path = overrides_path_for(directory)
+    """The overrides for `directory`; {} when there are none."""
+    db = overrides_path_for(directory)
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    except (OSError, ValueError) as error:
-        raise AgentSpecError(f"{path}: cannot be read as JSON ({error})") from error
-    if not isinstance(data, dict) or not all(isinstance(entry, dict) for entry in data.values()):
-        raise AgentSpecError(f"{path}: must be an object of agent objects")
+        _migrate_overrides(db)
+        data = settings_store.read_all(db, OVERRIDES_TABLE)
+    except (OSError, ValueError, sqlite3.Error) as error:
+        raise AgentSpecError(f"{db}: cannot be read ({error})") from error
+    if not all(isinstance(entry, dict) for entry in data.values()):
+        raise AgentSpecError(f"{db}: agent_overrides must hold agent objects")
     # Overrides predate required roles: no legacy field meant a specialist.
     return {key: {"role": "specialist", **upgrade_legacy(entry)} for key, entry in data.items()}
 

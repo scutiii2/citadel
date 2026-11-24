@@ -69,6 +69,13 @@ for _field, _rule in {
     _add(rf"tool_batch\.{_field}", _rule)  # the executor's limits (tool_batch_settings.py)
 
 
+for _field, _rule in {
+    "turn_tokens": Rule("int", 1_000, 5_000_000), "turn_seconds": Rule("int", 10, 3_600),
+    "daily_tokens_per_user": Rule("int", 0, 1_000_000_000), "daily_tokens_per_agent": Rule("int", 0, 1_000_000_000),
+}.items():
+    _add(rf"budgets\.{_field}", _rule)  # token budgets (budgets.py)
+
+
 def _rule_for(path: str) -> Rule:
     for pattern, rule in _RULES:
         if pattern.fullmatch(path):
@@ -135,8 +142,9 @@ def _migrate(path: Path) -> None:
         _migrated.discard(path)
 
 
-def load(path: Path = PATH) -> dict[str, Any]:
+def load(path: Path | None = None) -> dict[str, Any]:
     """What the admin set. An unreadable store is empty; a bad entry is skipped and logged."""
+    path = path or PATH
     try:
         _migrate(path)
         data = settings_store.read_all(path, TABLE)
@@ -178,9 +186,10 @@ def validate(changes: dict[str, Any]) -> None:
             check(key, value)
 
 
-def save(changes: dict[str, Any], path: Path = PATH) -> dict[str, Any]:
+def save(changes: dict[str, Any], path: Path | None = None) -> dict[str, Any]:
     """Apply `changes` (dotted path -> value; None = back to the file's value) to the table.
     Raises TuningError before writing if any change is bad."""
+    path = path or PATH
     validate(changes)
     _migrate(path)
     for key, value in changes.items():

@@ -49,6 +49,7 @@ def chat_service() -> ChatService:
     with _lock:
         if _chat is None:
             _chat_store = ChatStore(_database(), "conversation_gateways")
+            _chat_store.seal_rows()
             _chat = ChatService(_chat_store, ChatSettings())
         return _chat
 
@@ -58,6 +59,7 @@ def decision_service() -> DecisionService:
     with _lock:
         if _decision is None:
             _decision_store = DecisionStore(_database(), "decision_gateways")
+            _decision_store.seal_rows()
             _decision = DecisionService(_decision_store, DecisionSettings())
         return _decision
 
