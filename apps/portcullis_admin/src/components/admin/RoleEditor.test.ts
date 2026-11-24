@@ -104,8 +104,8 @@ describe("RoleEditor", () => {
 
   it("shows the error and the Saved chip only without an error", () => {
     expect(editor(MEMBER, { error: "That would remove your own admin access" }).get(".error").text()).toBe("That would remove your own admin access");
-    expect(editor(MEMBER, { saved: true }).get(".chip.saved").text()).toBe("Saved");
-    expect(editor(MEMBER, { saved: true, error: "boom" }).find(".chip.saved").exists()).toBe(false);
+    expect(editor(MEMBER, { saved: true }).get(".action-message.ok").text()).toBe("Saved");
+    expect(editor(MEMBER, { saved: true, error: "boom" }).find(".action-message.ok").exists()).toBe(false);
   });
 
   it("shows roles read-only without roles.manage", () => {

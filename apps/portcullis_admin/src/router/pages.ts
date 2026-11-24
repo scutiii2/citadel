@@ -16,7 +16,7 @@ export const ADMIN_PERMISSIONS = ["accounts.view", "accounts.manage", "accounts.
 /** Administration destinations share their permission rules with nested routes. */
 export const ADMIN_SECTIONS: AdminPage[] = [
   { to: "/overview", label: "Overview", icon: ["m3 10 9-7 9 7v11h-7v-7h-4v7H3z"], permission: ADMIN_PERMISSIONS },
-  { to: "/admin/accounts", label: "Accounts", icon: ["M3 21v-3a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v3M20 21v-3a5 5 0 0 0-3-4", "M13.5 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0"], permission: ["accounts.view", "accounts.manage", "accounts.delete", "roles.assign"] },
+  { to: "/admin/accounts", label: "Users", icon: ["M3 21v-3a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v3M20 21v-3a5 5 0 0 0-3-4", "M13.5 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0"], permission: ["accounts.view", "accounts.manage", "accounts.delete", "roles.assign"] },
   { to: "/admin/roles", label: "Roles & permissions", icon: ["M12 3 3 7v5c0 5 5 8 9 10 4-2 9-5 9-10V7zM8 12l3 3 5-6"], permission: ["roles.view", "roles.manage", "roles.assign"] },
   { to: "/admin/invites", label: "Invites", icon: ["M3 5h18v14H3zM3 5l9 8 9-8"], permission: "invites.manage" },
   { to: "/admin/settings", label: "Workspace settings", icon: ["M4 6h3M11 6h9M4 12h9M17 12h3M4 18h5M13 18h7", "M11 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0M17 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0M13 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0"], permission: "settings.manage" },

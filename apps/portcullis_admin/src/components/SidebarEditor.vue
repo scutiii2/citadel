@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./admin/ActionMessage.vue";
 // The Settings page's "Sidebar" card: one row per page the account may open, in
 // the order the rail shows them (pinned first). Drag a row, or use the arrows,
 // to reorder; pin keeps a page at the top; the switch shows or hides it in the
@@ -112,7 +113,7 @@ function onDragStart(event: DragEvent, id: string): void {
       :modified="modified"
       @reset="reset"
     />
-    <p v-if="navPrefs.error && !props.modelValue" class="error" role="alert">{{ navPrefs.error }}</p>
+    <ActionMessage v-if="navPrefs.error && !props.modelValue" kind="error" :text="navPrefs.error" />
     <ul class="rows" aria-label="Sidebar pages" @dragleave="onListDragLeave">
       <template v-for="(row, i) in rows" :key="row.page.to">
       <li

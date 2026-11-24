@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
@@ -82,7 +83,7 @@ const showSidebar = computed(() => matches("sidebar pages order pin hide navigat
         </div>
       </header>
       <div class="settings-body">
-        <p v-if="navPrefs.error" class="error" role="alert">{{ navPrefs.error }}</p>
+        <ActionMessage v-if="navPrefs.error" kind="error" :text="navPrefs.error" />
         <section v-if="showTheme" aria-label="Appearance">
           <h3>Appearance</h3>
           <p class="lede">Applies at once and is saved on this device.</p>

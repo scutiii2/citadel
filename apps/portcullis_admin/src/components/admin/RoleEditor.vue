@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed, reactive, ref, watch } from "vue";
 import type { AdminAccount, PermissionInfo, Role, RoleChanges } from "../../api/AdminClient";
 import { useAuthStore } from "../../stores/auth";
@@ -99,14 +100,14 @@ const groups = computed(() => {
         <li v-if="role.is_protected" class="protected"><span class="badge">protected</span><PanelHelp title="Protected role"><p>This role always holds every permission and can't be renamed or deleted.</p></PanelHelp></li>
       </ul>
     </header>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <ActionMessage v-if="error" kind="error" :text="error" />
     <p v-if="role.is_protected && editing" class="muted note">This role always holds every permission and can't be renamed or deleted.</p>
     <p v-else-if="!role.is_protected && !canManage" class="muted note">Read-only. Editing requires role management access and every permission held by this role.</p>
     <p v-if="!role.is_protected && editing" class="impact">Changes apply to {{ role.account_count }} {{ role.account_count === 1 ? "user" : "users" }} when you save.</p>
     <p class="apply muted" role="status">
       <span v-if="editing">Changes are a draft until you save.</span>
       <span v-if="busy">Saving…</span>
-      <span v-if="saved && !error && !dirty" class="chip saved">Saved</span>
+      <ActionMessage v-if="saved && !error && !dirty" kind="ok" text="Saved" />
     </p>
 
     <label class="permission-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="search" type="search" placeholder="Find a permission" aria-label="Find a permission" /></label>
@@ -126,19 +127,19 @@ const groups = computed(() => {
     <p v-if="!groups.length" class="muted">No permissions match your search.</p>
 
     <section v-if="canViewAccounts" class="affected-section">
-      <h4>Affected accounts</h4>
-      <button v-if="!affected.accounts && !affected.loading" type="button" class="small" :disabled="busy" @click="emit('showAccounts')">View affected accounts</button>
+      <h4>Affected users</h4>
+      <button v-if="!affected.accounts && !affected.loading" type="button" class="small" :disabled="busy" @click="emit('showAccounts')">View affected users</button>
       <p v-if="affected.loading" role="status" class="muted">Loading accounts…</p>
-      <template v-else-if="affected.error"><p class="error" role="alert">{{ affected.error }}</p><button type="button" class="small" @click="emit('showAccounts')">Retry</button></template>
+      <template v-else-if="affected.error"><ActionMessage kind="error" :text="affected.error" /><button type="button" class="small" @click="emit('showAccounts')">Retry</button></template>
       <template v-else-if="affected.accounts">
-        <p class="muted">{{ affected.accounts.length }} {{ affected.accounts.length === 1 ? "account holds" : "accounts hold" }} this role.</p>
+        <p class="muted">{{ affected.accounts.length }} {{ affected.accounts.length === 1 ? "user holds" : "users hold" }} this role.</p>
         <ul class="affected-accounts"><li v-for="account in affected.accounts" :key="account.id"><strong>{{ account.username }}</strong><span>{{ account.email }}</span><small>{{ account.is_active ? "Active" : "Disabled" }} · {{ account.email_verified ? "Verified" : "Unverified" }}</small></li></ul>
       </template>
     </section>
 
     <section v-if="!role.is_protected && canManage && !editing" class="danger-zone">
       <h4>Danger zone</h4>
-      <p class="muted description">Accounts holding this role lose its permissions. This can't be undone.</p>
+      <p class="muted description">Users holding this role lose its permissions. This can't be undone.</p>
       <button type="button" class="small danger" :disabled="busy" @click="emit('remove')">Delete role</button>
     </section>
   </div>

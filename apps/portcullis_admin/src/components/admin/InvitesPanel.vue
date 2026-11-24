@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { adminClient, type Invite } from "../../api/AdminClient";
 import { errorMessage, formatUtc } from "../../utils/errors";
@@ -131,12 +132,12 @@ onMounted(loadInvites);
       <header class="admin-panel-head">
         <h2 id="invite-roster">Open invites</h2>
         <div class="admin-panel-tools">
-          <PanelHelp title="Open invites"><p>Invitations that have been sent and not used yet. Open one to copy its link or revoke it.</p><p>Invites work once and expire after 7 days. New accounts receive the configured default role.</p></PanelHelp>
+          <PanelHelp title="Open invites"><p>Invitations that have been sent and not used yet. Open one to copy its link or revoke it.</p><p>Invites work once and expire after 7 days. New users receive the configured default role.</p></PanelHelp>
           <button type="button" class="admin-icon accent" data-test="invite-member" aria-label="Invite member" title="Invite member" @click="openCreate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19 8v6M16 11h6" /></svg></button>
           <AdminSearch ref="searchField" v-model="search" label="Search invites" />
         </div>
       </header>
-      <p v-if="listError" class="admin-panel-text error" role="alert">{{ listError }} <button type="button" class="chip" @click="loadInvites">Retry</button></p>
+      <ActionMessage v-if="listError" kind="error" :text="listError" class="admin-panel-text"><button type="button" class="chip" @click="loadInvites">Retry</button></ActionMessage>
       <p v-else-if="loading" class="admin-panel-text muted" role="status">Loading invites…</p>
       <p v-else-if="!invites.length" class="admin-panel-text muted">No open invites.</p>
       <p v-else-if="!visible.length" class="admin-panel-text muted">No invites match your search. <button type="button" class="chip" @click="search = ''; searchField?.focus()">Clear search</button></p>
@@ -163,7 +164,7 @@ onMounted(loadInvites);
           <dt>Created</dt><dd>{{ formatUtc(selected.created_at) }}</dd>
           <dt>Expires</dt><dd>{{ formatUtc(selected.expires_at) }}</dd>
         </dl>
-        <p v-if="revokeError" class="error" role="alert">{{ revokeError }}</p>
+        <ActionMessage v-if="revokeError" kind="error" :text="revokeError" />
         <section class="danger-zone">
           <h4>Danger zone</h4>
           <p class="muted">Revoking stops the invite's code from working. This can't be undone.</p>
@@ -179,12 +180,12 @@ onMounted(loadInvites);
         <input id="invite-member-email" ref="emailInput" v-model="inviteeEmail" type="email" required :disabled="creating" />
         <p v-if="emailStatus.kind === 'checking'" class="muted" role="status">Checking email availability…</p>
         <template v-else-if="emailStatus.kind === 'blocked'">
-          <p class="error" role="alert">{{ emailStatus.reason }}</p>
+          <ActionMessage kind="error" :text="emailStatus.reason" />
           <button type="button" class="chip" @click="checkEmailStatus">Check again</button>
         </template>
-        <p v-if="createError" class="error" role="alert">{{ createError }}</p>
+        <ActionMessage v-if="createError" kind="error" :text="createError" />
       </form>
-      <p v-if="sentTo" class="created" role="status">Invitation sent to {{ sentTo }}.</p>
+      <ActionMessage v-if="sentTo" kind="ok" :text="`Invitation sent to ${sentTo}.`" class="created" />
       <template #footer>
         <button type="button" class="chip" :disabled="creating" @click="createOpen = false">Close</button>
         <button type="submit" form="invite-create" class="primary" :disabled="!canSend" :aria-busy="creating">{{ creating ? "Sending ..." : "Send invite" }}</button>
@@ -208,7 +209,7 @@ onMounted(loadInvites);
 .invites-panel { min-width: 0; }
 .admin-records tbody tr.selected { background: var(--surface); }
 .admin-editor { max-width: none; }
-.created { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius-lg); background: var(--surface); }
+.created { margin-top: 14px; }
 .count { border-top: 1px solid var(--border); font-size: 0.8rem; }
 .danger-zone { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
 .danger-zone h4 { margin: 0 0 8px; font-size: 0.85em; }

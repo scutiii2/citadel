@@ -161,7 +161,8 @@ describe("InvitesPanel", () => {
     await wrapper.get("form").trigger("submit");
     await flushPromises();
 
-    expect(wrapper.get("#invite-create .error").text()).toBe("Email could not be sent.");
+    expect(wrapper.get("#invite-create .error").text()).toContain("Email could not be sent.");
+    expect(wrapper.get("#invite-create .error .code").text()).toBe("503");
     expect(emailField(wrapper).element.value).toBe("member@example.com");
     expect(submit(wrapper).attributes("disabled")).toBeUndefined();
     expect(wrapper.emitted("changed")).toBeUndefined();

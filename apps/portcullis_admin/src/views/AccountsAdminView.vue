@@ -17,7 +17,7 @@ function updateFilters(next: { q: string; status: AccountStatus }): void {
 </script>
 
 <template>
-  <PageLayout class="admin-panel" title="Accounts" wide>
+  <PageLayout class="admin-panel" title="Users" wide>
     <AccountsPanel :filters="filters" @filter="updateFilters" />
   </PageLayout>
 </template>

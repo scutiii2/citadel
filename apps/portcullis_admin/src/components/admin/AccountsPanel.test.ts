@@ -103,7 +103,7 @@ describe("AccountsPanel roster", () => {
     await wrapper.get('input[type="search"]').setValue("MARIA@mail");
     expect(wrapper.findAll("tbody tr")).toHaveLength(1);
     await wrapper.get('input[type="search"]').setValue("zzz");
-    expect(wrapper.text()).toContain("No accounts match your search.");
+    expect(wrapper.text()).toContain("No users match your search.");
     expect(client.listAccounts).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
@@ -161,9 +161,9 @@ describe("AccountsPanel drawer", () => {
     const wrapper = await panel();
     expect(drawer(wrapper).exists()).toBe(false);
     await open(wrapper, "maria");
-    expect(wrapper.get('dialog[aria-label="Account maria"]').attributes("open")).toBeDefined();
+    expect(wrapper.get('dialog[aria-label="User maria"]').attributes("open")).toBeDefined();
     expect(drawer(wrapper).text()).toContain("maria@mail.com");
-    await wrapper.get('dialog[aria-label="Account maria"] button[aria-label="Close"]').trigger("click");
+    await wrapper.get('dialog[aria-label="User maria"] button[aria-label="Close"]').trigger("click");
     expect(drawer(wrapper).exists()).toBe(false);
     wrapper.unmount();
   });
@@ -171,8 +171,8 @@ describe("AccountsPanel drawer", () => {
   it("shows every assigned role, and No roles for an empty set", async () => {
     const wrapper = await panel();
     await open(wrapper, "duo");
-    expect(drawer(wrapper).findAll(".roles-section .chip").map((c) => c.text())).toEqual(["Member", "Support"]);
-    await wrapper.get('dialog[aria-label="Account duo"] button[aria-label="Close"]').trigger("click");
+    expect(drawer(wrapper).findAll(".roles-section .role-name").map((c) => c.text())).toEqual(["Member", "Support"]);
+    await wrapper.get('dialog[aria-label="User duo"] button[aria-label="Close"]').trigger("click");
     await open(wrapper, "li");
     expect(drawer(wrapper).find(".roles-section").text()).toContain("No roles");
     wrapper.unmount();
@@ -182,7 +182,7 @@ describe("AccountsPanel drawer", () => {
     const wrapper = await panel();
     await open(wrapper, "admin");
     expect(wrapper.find('[data-test="edit"]').exists()).toBe(false);
-    expect(drawer(wrapper).text()).toContain("protected admin account");
+    expect(drawer(wrapper).text()).toContain("protected admin user");
     expect(drawer(wrapper).find('input[role="switch"]').exists()).toBe(false);
     wrapper.unmount();
   });
@@ -281,8 +281,8 @@ describe("AccountsPanel drawer", () => {
     await open(wrapper, "maria");
     const toggle = drawer(wrapper).get('input[role="switch"]');
     await toggle.setValue(!(toggle.element as HTMLInputElement).checked);
-    expect(ask(wrapper, "Disable account").props("message")).toContain("Disable 'maria'?");
-    await ask(wrapper, "Disable account").vm.$emit("close");
+    expect(ask(wrapper, "Disable user").props("message")).toContain("Disable 'maria'?");
+    await ask(wrapper, "Disable user").vm.$emit("close");
     expect(wrapper.findAllComponents(ConfirmModal).some((c) => c.props("open"))).toBe(false);
     expect(client.updateAccount).not.toHaveBeenCalled();
     wrapper.unmount();
@@ -294,7 +294,7 @@ describe("AccountsPanel drawer", () => {
     await open(wrapper, "maria");
     const toggle = drawer(wrapper).get('input[role="switch"]');
     await toggle.setValue(false);
-    await ask(wrapper, "Disable account").vm.$emit("confirm");
+    await ask(wrapper, "Disable user").vm.$emit("confirm");
     await flushPromises();
     expect(client.updateAccount).toHaveBeenCalledWith(2, { is_active: false });
     expect(rowFor(wrapper, "maria").text()).toContain("disabled");
@@ -310,9 +310,9 @@ describe("AccountsPanel drawer", () => {
     client.deleteAccount.mockResolvedValue(undefined);
     const wrapper = await panel();
     await open(wrapper, "maria");
-    await clickIn(drawer(wrapper), "Delete account");
-    expect(ask(wrapper, "Delete account").props("requireText")).toBe("maria");
-    await ask(wrapper, "Delete account").vm.$emit("confirm");
+    await clickIn(drawer(wrapper), "Delete user");
+    expect(ask(wrapper, "Delete user").props("requireText")).toBe("maria");
+    await ask(wrapper, "Delete user").vm.$emit("confirm");
     await flushPromises();
     expect(client.deleteAccount).toHaveBeenCalledWith(2);
     expect(wrapper.findAll("tbody tr")).toHaveLength(3);

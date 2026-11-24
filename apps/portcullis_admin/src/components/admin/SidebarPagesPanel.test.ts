@@ -49,12 +49,12 @@ describe("SidebarPagesPanel", () => {
     expect(checked(wrapper, "Agents")).toBe(false);
   });
 
-  it("says the setting hides the page from the sidebar for every account", async () => {
+  it("says the setting hides the page from the sidebar for every user", async () => {
     const wrapper = await panel();
 
-    expect(wrapper.text()).toContain("Applies to all accounts");
+    expect(wrapper.text()).toContain("Applies to all users");
     await wrapper.get('[data-test="panel-help"]').trigger("click");
-    expect(document.body.textContent).toContain("remove its button from every account");
+    expect(document.body.textContent).toContain("remove its button from every user");
     expect(document.body.textContent).toContain("still opens");
   });
 
@@ -66,7 +66,7 @@ describe("SidebarPagesPanel", () => {
 
     expect(client.setPages).not.toHaveBeenCalled();
     expect(wrapper.get(".unsaved").text()).toContain("unsaved change");
-    expect(wrapper.get(".unsaved").text()).toContain("every account");
+    expect(wrapper.get(".unsaved").text()).toContain("every user");
   });
 
   it("saves the hidden ids on Save, then shows Saved", async () => {
@@ -79,7 +79,7 @@ describe("SidebarPagesPanel", () => {
 
     expect(client.setPages).toHaveBeenCalledWith(["/agents", "/usage"]);
     expect(hasSave(wrapper)).toBe(false);
-    expect(wrapper.get(".chip.saved").text()).toBe("Saved");
+    expect(wrapper.get(".action-message.ok").text()).toBe("Saved");
   });
 
   it("confirms before dropping the draft on Cancel, without saving", async () => {
@@ -136,7 +136,7 @@ describe("SidebarPagesPanel", () => {
 
     expect(wrapper.text()).toContain("Missing permission: settings.manage");
     expect(hasSave(wrapper)).toBe(true);
-    expect(wrapper.find(".chip.saved").exists()).toBe(false);
+    expect(wrapper.find(".action-message.ok").exists()).toBe(false);
   });
 
   it("searches the rows but keeps hidden edits in the saved payload", async () => {

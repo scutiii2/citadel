@@ -44,7 +44,7 @@ test("the sidebar collapses behind the header toggle on mobile and the profile m
   await page.getByRole("button", { name: "Profile", exact: true }).click();
   await expect(page.locator(".header-popover select")).toHaveValue("dark");
   await page.keyboard.press("Escape");
-  await nav.getByRole("link", { name: "Accounts", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Accounts", level: 1 })).toBeVisible();
+  await nav.getByRole("link", { name: "Users", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Users", level: 1 })).toBeVisible();
   expect(state.unexpected).toEqual([]);
 });
