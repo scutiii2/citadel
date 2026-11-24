@@ -77,7 +77,7 @@ def test_availability_respects_the_feature_strategy(monkeypatch, chosen, expecte
 
 
 def test_tuning_edit_refreshes_settings_reader(monkeypatch, tmp_path):
-    overlay = tmp_path / "overlay.json"
+    overlay = tmp_path / "overlay.db"
     base = {"classifier": {"timeout_seconds": 3}}
     def read(*args, **kwargs):
         return tuning_overrides.apply(base, overlay)["classifier"]

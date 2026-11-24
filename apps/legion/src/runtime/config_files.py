@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from src.citadel_auth import data_dir
-from src.runtime import tuning_overrides
+from src.runtime import tool_batch_settings, tuning_overrides
 
 CONFIGS_DIR = Path(__file__).resolve().parent.parent.parent / "configs"
 
@@ -22,6 +22,11 @@ SETTINGS_DB = data_dir(CONFIGS_DIR.parent) / "settings.db"
 _REQUIRED = object()
 
 
+def _overrides_db(path: Path) -> Path:
+    """The settings database holding the admin's tuning edits for this tuning file (a test's file has its own)."""
+    return tuning_overrides.PATH if path == TUNING_PATH else path.with_name("settings.db")
+
+
 def read_section(path: Path, section: str, default: Any = _REQUIRED) -> Any:
     """`section` of the JSON object in `path`. Raises ValueError if the file is
     not an object or the section is absent and no `default` was given."""
@@ -29,8 +34,7 @@ def read_section(path: Path, section: str, default: Any = _REQUIRED) -> Any:
     if not isinstance(raw, dict):
         raise ValueError(f"{path.name} must be an object")
     if path.name == TUNING_PATH.name:
-        overlay = tuning_overrides.PATH if path == TUNING_PATH else path.with_name(tuning_overrides.OVERLAY_NAME)
-        raw = tuning_overrides.apply(raw, overlay)
+        raw = tuning_overrides.apply(raw, _overrides_db(path))
     if section not in raw:
         if default is _REQUIRED:
             raise ValueError(f"{path.name} must contain a '{section}' section")
@@ -50,19 +54,18 @@ def _editable(raw: dict[str, Any]) -> dict[str, Any]:
             if isinstance(value, dict):
                 section[feature] = {k: value.get(k, getattr(defaults, k)) for k in ("strategy", "min_confidence")}
         out["classifier"] = section
+    out["tool_batch"] = {**tool_batch_settings.DEFAULTS, **(raw["tool_batch"] if isinstance(raw.get("tool_batch"), dict) else {})}
     return out
 
 
-def tuning_view(path: Path = TUNING_PATH, db: Path | None = None) -> dict[str, Any]:
+def tuning_view(path: Path = TUNING_PATH) -> dict[str, Any]:
     """What the admin page shows: the file's editable values, the admin's changes, and the two merged."""
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"{path.name} must be an object")
-    from src.runtime import tool_batch_settings  # imports this module, so not at the top
-
-    overlay = tuning_overrides.PATH if path == TUNING_PATH else path.with_name(tuning_overrides.OVERLAY_NAME)
-    batch = tool_batch_settings.overrides(db)  # kept in the settings database, not in the overlay file
-    defaults = {**_editable(raw), "tool_batch": dict(tool_batch_settings.DEFAULTS)}
-    effective = {**_editable(tuning_overrides.apply(raw, overlay)),
-                 "tool_batch": {**tool_batch_settings.DEFAULTS, **{k[len(tool_batch_settings.PREFIX):]: v for k, v in batch.items()}}}
-    return {"defaults": defaults, "overrides": {**tuning_overrides.load(overlay), **batch}, "effective": effective}
+    overlay = _overrides_db(path)
+    return {
+        "defaults": _editable(raw),
+        "overrides": tuning_overrides.load(overlay),
+        "effective": _editable(tuning_overrides.apply(raw, overlay)),
+    }

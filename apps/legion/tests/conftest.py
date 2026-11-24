@@ -60,11 +60,12 @@ def _default_classifier_settings(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _isolated_tool_batch_settings(monkeypatch, tmp_path):
-    """The tool-call settings come from an empty per-test database, never the developer's settings.db."""
-    from src.runtime import tool_batch_settings
+def _isolated_tuning_overrides(monkeypatch, tmp_path):
+    """The admin's tuning edits (tool-call limits included) come from an empty per-test database, never the developer's settings.db."""
+    from src.runtime import tool_batch_settings, tuning_overrides
 
-    monkeypatch.setattr(tool_batch_settings, "SETTINGS_DB", tmp_path / "tool_batch.db")
+    monkeypatch.setattr(tuning_overrides, "PATH", tmp_path / "tuning.db")
+    monkeypatch.setattr(tuning_overrides, "_migrated", set())
     monkeypatch.setattr(tool_batch_settings, "_cache", None)
 
 

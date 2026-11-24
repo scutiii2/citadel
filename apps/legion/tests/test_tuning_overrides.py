@@ -1,11 +1,12 @@
 # apps/legion/tests/test_tuning_overrides.py
-"""The admin overlay over config_tuning.json."""
+"""The admin's tuning edits, kept in the settings database, over config_tuning.json."""
 
 import json
 from pathlib import Path
 
 import pytest
 
+from src.citadel_auth import settings_store
 from src.runtime import config_files, tuning_overrides
 from src.runtime.tuning_overrides import TuningError
 
@@ -15,12 +16,12 @@ def tuning(tmp_path):
     path = tmp_path / "config_tuning.json"
     examples = Path(config_files.__file__).resolve().parents[2] / "configs"
     path.write_bytes((examples / "config_tuning.json").read_bytes())
-    return path, tmp_path / tuning_overrides.OVERLAY_NAME
+    return path, tmp_path / "settings.db"
 
 
 def test_apply_sets_nested_value_and_leaves_base_alone(tuning):
     _, overlay = tuning
-    overlay.write_text(json.dumps({"token_limits.default.max_tool_rounds": 20}), encoding="utf-8")
+    settings_store.put(overlay, "tuning", "token_limits.default.max_tool_rounds", 20)
     base = {"token_limits": {"default": {"max_tool_rounds": 15}}}
     merged = tuning_overrides.apply(base, overlay)
     assert merged["token_limits"]["default"]["max_tool_rounds"] == 20
@@ -51,7 +52,7 @@ def test_save_rejects_bad_changes(tuning, path, value):
     _, overlay = tuning
     with pytest.raises(TuningError):
         tuning_overrides.save({path: value}, overlay)
-    assert not overlay.exists()
+    assert tuning_overrides.load(overlay) == {}
 
 
 def test_save_rejects_unknown_path_on_reset(tuning):
@@ -62,13 +63,14 @@ def test_save_rejects_unknown_path_on_reset(tuning):
 
 def test_invalid_entry_in_the_file_is_ignored(tuning):
     _, overlay = tuning
-    overlay.write_text(json.dumps({"token_limits.default.max_tool_rounds": 999, "classifier.auto_tier.strategy": "both"}), encoding="utf-8")
+    settings_store.put(overlay, "tuning", "token_limits.default.max_tool_rounds", 999)
+    settings_store.put(overlay, "tuning", "classifier.auto_tier.strategy", "both")
     assert tuning_overrides.load(overlay) == {"classifier.auto_tier.strategy": "both"}
 
 
-def test_unreadable_overlay_is_empty(tuning):
+def test_unreadable_store_is_empty(tuning):
     _, overlay = tuning
-    overlay.write_text("{not json", encoding="utf-8")
+    overlay.write_text("not a database", encoding="utf-8")
     assert tuning_overrides.load(overlay) == {}
 
 
@@ -167,23 +169,8 @@ def test_an_admin_edit_reaches_token_limits_after_poll(tuning, monkeypatch):
 
 
 
-def test_save_preserves_a_persistent_overlay_symlink(tuning, tmp_path):
-    _, overlay = tuning
-    target = tmp_path / ".data" / "admin_tuning_overrides.json"
-    target.parent.mkdir()
-    overlay.symlink_to(target)
-    tuning_overrides.save({"classifier.auto_tier.strategy": "both"}, overlay)
-    assert overlay.is_symlink()
-    assert json.loads(target.read_text(encoding="utf-8")) == {"classifier.auto_tier.strategy": "both"}
-    # Another container's configs link can read the same retained volume file.
-    recreated = tmp_path / "recreated" / tuning_overrides.OVERLAY_NAME
-    recreated.parent.mkdir()
-    recreated.symlink_to(target)
-    assert tuning_overrides.load(recreated) == {"classifier.auto_tier.strategy": "both"}
-
-
 @pytest.mark.parametrize("body", ["{not json", "[]"])
-def test_malformed_overlay_is_logged_and_ignored(tuning, caplog, body):
+def test_an_unreadable_store_is_logged_and_ignored(tuning, caplog, body):
     _, overlay = tuning
     overlay.write_text(body, encoding="utf-8")
     assert tuning_overrides.load(overlay) == {}
@@ -192,7 +179,7 @@ def test_malformed_overlay_is_logged_and_ignored(tuning, caplog, body):
 
 @pytest.mark.parametrize("feature", ["auto_tier", "auto_route"])
 def test_strategy_enum_saves_valid_value_and_rejects_invalid_without_writing(tmp_path, feature):
-    path = tmp_path / "overlay.json"
+    path = tmp_path / "overlay.db"
     key = f"classifier.{feature}.strategy"
     tuning_overrides.save({key: "laya-only"}, path)
     assert tuning_overrides.load(path) == {key: "laya-only"}

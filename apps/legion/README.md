@@ -371,7 +371,7 @@ built-in tool that declares `readOnlyHint`. Any other call (a write, a delegatio
 one by one. Results go back to the model in the model's call order. The turn guard checks every call of the
 round before the first one runs.
 
-These limits are settings in Legion's settings database (table `tool_batch` in `settings.db`), edited on the
+These limits are settings in Legion's settings database (table `tuning` in `settings.db`, like every other Tuning edit), edited on the
 Tuning page of the admin app under "Tool calls" (`tuning.manage`), and read again at the next round of calls.
 They are saved through `PUT /agents/tuning` with the paths below; no config file or environment variable holds
 them. A missing row means the default.

@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager, suppress
 from src.citadel_auth import settings_store, advertised_url
 from src.citadel_auth.treasury import register_instance
 from src.runtime.service_catalog import catalog
-from src.runtime import config_files, connection_probe, outside_origins, tool_batch_settings, treasury_bootstrap, tuning_overrides
+from src.runtime import config_files, connection_probe, outside_origins, treasury_bootstrap, tuning_overrides
 from src.tools.mcp_client import config as mcp_config
 from typing import Any
 from urllib.parse import urlsplit
@@ -546,13 +546,8 @@ async def tuning_put(request: Request) -> JSONResponse:
     changes = await _json_object(request)
     if changes is None:
         return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
-    # The tool-call settings live in the settings database; the rest in the overlay file.
-    batch = {path: value for path, value in changes.items() if tool_batch_settings.is_ours(path)}
-    rest = {path: value for path, value in changes.items() if path not in batch}
     try:
-        tool_batch_settings.validate(batch)  # before either store is written
-        await asyncio.to_thread(tuning_overrides.save, rest, _tuning_overlay())
-        await asyncio.to_thread(tool_batch_settings.save, batch)
+        await asyncio.to_thread(tuning_overrides.save, changes, _tuning_overlay())
     except tuning_overrides.TuningError as error:
         return JSONResponse({"error": str(error)}, status_code=400)
     tuning_overrides.poll(_tuning_overlay())

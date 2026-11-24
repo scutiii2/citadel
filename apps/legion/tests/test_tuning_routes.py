@@ -16,7 +16,7 @@ def client(tmp_path, monkeypatch):
     examples = Path(config_files.__file__).resolve().parents[2] / "configs"
     path.write_bytes((examples / "config_tuning.json").read_bytes())
     monkeypatch.setattr(config_files, "TUNING_PATH", path)
-    monkeypatch.setattr(tuning_overrides, "PATH", tmp_path / tuning_overrides.OVERLAY_NAME)
+    monkeypatch.setattr(tuning_overrides, "PATH", tmp_path / "settings.db")
     monkeypatch.setattr(tuning_overrides, "_seen", None)
     return TestClient(server.mcp.streamable_http_app())
 
@@ -55,13 +55,12 @@ def test_put_refuses_a_body_that_is_not_an_object(client):
     assert client.put("/agents/tuning", json=[1]).status_code == 400
 
 
-def test_tool_call_settings_are_saved_in_the_settings_database_not_the_overlay_file(client, tmp_path):
+def test_tool_call_settings_are_saved_with_the_other_tuning_edits(client):
     response = client.put("/agents/tuning", json={"tool_batch.max_parallel": 4, "token_limits.default.max_tool_rounds": 20})
     body = response.json()
     assert response.status_code == 200
     assert body["overrides"] == {"token_limits.default.max_tool_rounds": 20, "tool_batch.max_parallel": 4}
     assert body["effective"]["tool_batch"]["max_parallel"] == 4 and body["defaults"]["tool_batch"]["max_parallel"] == 8
-    assert "tool_batch" not in (tmp_path / tuning_overrides.OVERLAY_NAME).read_text(encoding="utf-8")
     assert client.put("/agents/tuning", json={"tool_batch.max_parallel": None}).json()["overrides"] == {"token_limits.default.max_tool_rounds": 20}
 
 
