@@ -36,6 +36,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MAX_CRASHES = 5
 CRASH_WINDOW_SECONDS = 300.0
 BACKOFF_CAP_SECONDS = 60.0
+RETRY_FAILED_SECONDS = 120.0  # a child left stopped by repeated crashes is started again after this long
 STOP_GRACE_SECONDS = 10.0
 WATCH_POLL_SECONDS = 2.0  # how often agents/ is rescanned for added, changed or removed files
 LINE_LIMIT = 1024 * 1024  # longest child output line relayed whole
@@ -101,6 +102,7 @@ class AgentProcess:
     ) -> None:
         self.spec = spec
         self.failed = False
+        self.failed_at = 0.0
         self._command_for = command_for
         self._deregister = deregister
         self._out = out
@@ -125,6 +127,7 @@ class AgentProcess:
             delay = self._policy.record()
             if delay is None:
                 self.failed = True
+                self.failed_at = time.monotonic()
                 self._out(f"[supervisor] {self.spec.id} crashed {MAX_CRASHES} times in 5 minutes - not restarting")
                 return
             self._out(f"[supervisor] {self.spec.id} {what} - restarting in {delay:g}s")
@@ -303,6 +306,18 @@ class Supervisor:
                 self._tasks[spec.id] = asyncio.create_task(child.run())
         self._out("[supervisor] shared files changed - restarted every agent")
 
+    async def _retry_failed(self) -> None:
+        """A child left stopped after repeated crashes gets a fresh start now and then. Its agent file may be
+        unchanged while what it needed (a model gateway saved on the Model gateways page) was fixed meanwhile."""
+        for child in list(self._children):
+            if child.failed and time.monotonic() - child.failed_at >= RETRY_FAILED_SECONDS:
+                spec = child.spec
+                await self._stop_child(child)
+                fresh = self._new_child(spec)
+                self._children.append(fresh)
+                self._tasks[spec.id] = asyncio.create_task(fresh.run())
+                self._out(f"[supervisor] retrying {spec.id} after it was left stopped")
+
     async def _reconcile(self) -> None:
         signature = await asyncio.to_thread(self._signature)
         if signature != self._restart_sig:
@@ -316,6 +331,7 @@ class Supervisor:
                 self._out(f"[supervisor] agent files invalid, keeping what runs: {error}")
             return
         self._last_error = ""
+        await self._retry_failed()
         if wanted == self._specs:
             return
         old = {spec.id: spec for spec in self._specs}
