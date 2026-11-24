@@ -28,8 +28,7 @@ def _summary(result, chosen, tier, roster, spec):
     return text
 
 
-async def route_turn(question, history, on_event, request_id, depth, explicit_tier=None, agent=True):
-    """`agent=False` asks for the model tier only: plan mode never hands a turn to a specialist."""
+async def route_turn(question, history, on_event, request_id, depth, explicit_tier=None):
     spec = agent_spec.current()
     if depth or not spec.entry or not spec.orchestrator or spec.internal_role:
         return None, None, ""
@@ -52,7 +51,7 @@ async def route_turn(question, history, on_event, request_id, depth, explicit_ti
         tiers=[RouteTier(tier=t.tier, id=t.id, use_for=t.use_for) for t in model_tiers.own_tiers()])
     request = RouteRequest(subject=subject, candidates=[candidate(e) for e in roster], entry=entry,
         explicit_tier=explicit_tier, request_id=request_id or uuid4().hex,
-        choose_agent=agent and not approvals.current().needs_approval(delegation.TOOL_NAME),
+        choose_agent=not approvals.current().needs_approval(delegation.TOOL_NAME),
         choose_tier=not explicit_tier and not (history and not brief and len(question.strip()) < 20))
     step_id = f"routing-{uuid4().hex[:8]}"
     if on_event:

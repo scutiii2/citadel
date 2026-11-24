@@ -379,8 +379,8 @@ escalate light to standard to heavy; writes are never retried automatically.
 Automatic memory and skill searches still run before the model. Skill recall
 omits its `stronghold__tool_skill_mark` instruction for the orchestrator; the runtime does not
 mark skills. The runtime fills the existing checklist when its agent/chat
-toggles allow it. The orchestrator never hands a turn to a specialist through the router; the router is still asked
-for the model tier of Ember's planner call. The code architect ships enabled and Ember plans through it.
+toggles allow it. The router is asked first, also for the orchestrator: a settled pick sends the turn straight to that
+specialist and Ember's planner does not run; an unsure or failed Router leaves Ember to plan, with the model tier the router chose. The code architect ships enabled and Ember plans through it.
 Operations has no pipeline yet.
 
 Specialist activity streams to the orchestrator's caller as `agent_start`,

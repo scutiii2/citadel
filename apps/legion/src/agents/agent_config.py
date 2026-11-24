@@ -179,7 +179,7 @@ async def run_chat(
     """
     history = validate_history(history)
     spec = agent_spec.current()
-    plan_mode = spec.orchestrator  # the orchestrator always plans; it never answers or delegates directly
+    plan_mode = spec.orchestrator  # the orchestrator plans unless the Router settles on one specialist first
     requester = internal_auth.current_requester()
     private = private_turn.PrivateTurn.from_raw(private_extensions, requester.email or requester.username)
     # Validated before anything is registered: a bad mode must not start a turn.
@@ -221,9 +221,10 @@ async def run_chat(
             await mcp_upstream.prefetch_private(private)
         # A confident classifier pick sends the question straight to a specialist, and this
         # agent's own model never runs (agents/auto_route.py; off unless configured).
-        # In plan mode the Router only picks the planner's model tier; the plan runner hands work to specialists.
+        # A settled Router pick answers the turn through that specialist, plan mode or not; otherwise it
+        # only picks the model tier of this agent's own call (the planner's, for the orchestrator).
         routed, routed_tier, auto_note = await router_routing.route_turn(
-            question, history, on_event, request_id, depth, model_tier, agent=not plan_mode)
+            question, history, on_event, request_id, depth, model_tier)
         if routed is not None:
             routed.delegated_usage = delegated_usage
             return routed
