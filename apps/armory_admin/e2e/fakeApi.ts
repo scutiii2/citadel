@@ -8,7 +8,7 @@ export const ACCOUNT = {
   email: "root@example.com",
   email_verified: true,
   roles: ["Administrator"],
-  permissions: ["capabilities.manage", "tickets.manage"],
+  permissions: ["capabilities.manage", "tickets.manage", "settings.manage"],
 };
 
 const capability = (name: string, over: Record<string, unknown> = {}) =>
@@ -64,6 +64,7 @@ export async function installFakeApi(page: Page, state: FakeState): Promise<void
       if (pathname === "/api/armory-environment") return json(route, ENVIRONMENT);
       if (pathname === "/api/armory-tuning") return json(route, LIMITS);
       if (pathname === "/api/armory-email") return json(route, EMAIL);
+      if (pathname === "/api/armory-tool-approval") return json(route, { force_tool_approval: false });
     }
     state.unexpected.push(`${method} ${pathname}`);
     return json(route, { detail: "unexpected request" }, 500);

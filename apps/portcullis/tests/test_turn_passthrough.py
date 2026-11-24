@@ -7,7 +7,6 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from src.services.settings_service import FORCE_TOOL_APPROVAL
 from tests.conftest import FakeEmailSender
 from tests.test_admin import login, make_member
 from tests.test_registration import as_admin
@@ -19,7 +18,7 @@ def last_start(upstream) -> dict:
 
 
 def force(client: TestClient, on: bool = True) -> None:
-    assert client.put(f"/api/admin/settings/{FORCE_TOOL_APPROVAL}", json={"value": on}).status_code == 200
+    assert client.put("/api/armory-tool-approval", json={"value": on}).status_code == 200
 
 
 def action_log(client: TestClient) -> str:

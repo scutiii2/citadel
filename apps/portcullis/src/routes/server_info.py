@@ -22,7 +22,7 @@ from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
 
 from src.config import Settings
 from src.deps import get_log_writer, get_server_tools, get_settings, require_any_permission, require_permission
@@ -30,7 +30,7 @@ from src.models import Account
 from src.services.caller import Caller
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo, McpServerRefused, McpServerUnavailable, is_server_path
-from src.services.permissions import (TOOLS_VIEW, CAPABILITIES_MANAGE, FILES_UPLOAD, FILES_DOWNLOAD)
+from src.services.permissions import (TOOLS_VIEW, CAPABILITIES_MANAGE, FILES_UPLOAD, FILES_DOWNLOAD, SETTINGS_MANAGE)
 from src.services.server_tools import ServerTools, ServerUnavailable
 
 router = APIRouter(prefix="/api", tags=["server-info"])
@@ -326,6 +326,33 @@ async def reset_armory_tuning(
     result = await _call(info.reset_tuning(account, name))
     await logs.action(account, "mcp.tuning", f"Reset {name} limits to the defaults")
     return result
+
+
+require_settings_manage = require_permission(SETTINGS_MANAGE)
+
+
+class ToolApprovalIn(BaseModel):
+    value: StrictBool
+
+
+@router.get("/armory-tool-approval")
+async def armory_tool_approval(account: Account = Depends(require_settings_manage), info: McpServerInfo = Depends(get_server_info)) -> Any:
+    """Armory's switch for requiring approval before every tool run."""
+    return await _call(info.tool_approval(account))
+
+
+@router.put("/armory-tool-approval")
+async def set_armory_tool_approval(
+    body: ToolApprovalIn,
+    account: Account = Depends(require_settings_manage),
+    info: McpServerInfo = Depends(get_server_info),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Armory keeps the switch; every answer started after this one uses it."""
+    result = await _call(info.set_tool_approval(account, body.value))
+    before = result.get("before") is True
+    await logs.action(account, "admin.setting", f"force_tool_approval: {'on' if before else 'off'} -> {'on' if body.value else 'off'}")
+    return {"force_tool_approval": body.value}
 
 
 @router.get("/armory-email")

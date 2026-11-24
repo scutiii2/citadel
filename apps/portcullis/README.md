@@ -299,8 +299,8 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `GET` | `/api/account/devices` | cookie | Devices this account logged in from, most recent first: `[{id, label, user_agent, ip_subnet, first_seen_at, last_seen_at, current}]`. |
 | `DELETE` | `/api/account/devices/{id}` | cookie | `204`; its next login counts as a new device again. `404` unknown or another account's. |
 | `POST` | `/api/admin/invites` | `invites.manage` | `{invitee_email}` -> `201 {id, invitee_email, delivery_method, created_at, expires_at}`. The code is delivered by email. `503` if email is unavailable or delivery fails. |
-| `PUT` | `/api/admin/settings/{name}` | `settings.manage` | `{value: true\|false}` -> `{name: value}`. Switches a setting everyone is held to; the only one is `force_tool_approval`. `404` unknown name, `422` for a non-boolean value. Logged as `admin.setting` with the old and new value. |
-| `GET` | `/api/settings` | any logged-in account | `{force_tool_approval}`: what the administrator requires of everyone. |
+| `GET`, `PUT` | `/api/armory-tool-approval` | `settings.manage` | Armory's switch for requiring approval before every tool run: `GET` -> `{force_tool_approval}`, `PUT {value: true\|false}` -> `{force_tool_approval}` (`422` for a non-boolean, `502` if Armory cannot answer). Armory stores it; the change is logged as `admin.setting` with the old and new value. |
+| `GET` | `/api/settings` | any logged-in account | `{force_tool_approval}`: what the administrator requires of everyone, read from Armory. If Armory does not answer it says `true`. A switch left in `app_settings` from before Armory owned it is sent to Armory once, then dropped. |
 | `GET` | `/api/settings/pages` | any logged-in account | `{hidden: ["/usage", ...]}`: pages the administrator hid from every sidebar. |
 | `PUT` | `/api/admin/settings/pages` | `settings.manage` | `{hidden: [...]}` -> `{hidden: [...]}`. Hides pages from every account's sidebar (nav only: they still open by URL). Ids look like `/usage`, at most 20, repeats dropped; `/` and `/settings` cannot be hidden. `400` for a bad id or a list too long to store, `422` for a bad body. Logged as `admin.setting`. |
 | `POST` | `/api/admin/servers/lookup` | `agents.manage` | Sends `{address}` to Legion for a read-only Treasury catalog lookup. |
@@ -640,8 +640,8 @@ operation verifies Portcullis's requester token, including per-tool MCP metadata
   At most 3 running answers per account, kept in Stronghold's memory (run one replica); a
   Stronghold stop saves a running answer as interrupted.
 - **What only Portcullis decides** (the `trusted` block of `POST /api/chats/{id}/turns`, filled here
-  and overwriting anything the browser sends): `forced_approval` (`force_tool_approval` in
-  `app_settings`, switched by an admin with `PUT /api/admin/settings/force_tool_approval`),
+  and overwriting anything the browser sends): `forced_approval` (Armory's `force_tool_approval`, read for each
+  start and approval and switched by an admin with `PUT /api/armory-tool-approval`; `true` when Armory does not answer),
   `tools_execute` (the account's `tools.execute` permission), and no extension list (the turn body carries none). Stronghold's defaults
   are the safe side: approval forced, no tool execution, no extensions, no auto-save.
   Typed commands (`/tool`) call Armory directly with no agent and are not affected.

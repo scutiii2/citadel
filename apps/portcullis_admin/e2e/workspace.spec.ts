@@ -59,55 +59,6 @@ test("an administrator deletes an account from the Danger zone by typing its nam
   expect(api.unexpected).toEqual([]);
 });
 
-test("an administrator saves tool approval through the reserved icon slots", async ({ page }) => {
-  const api = await installFakeApi(page);
-  await logInAdmin(page);
-  await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Workspace settings', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/settings/);
-
-  const approval = page.getByRole("switch", { name: "Require approval for every tool" });
-  const actions = page.getByRole("group", { name: "tool approval changes" });
-  const cancel = actions.getByRole("button", { name: "Cancel tool approval changes" });
-  const save = actions.getByRole("button", { name: "Save tool approval changes" });
-  const panel = page.locator("section.admin-panel-card").filter({ has: page.getByRole("heading", { name: "Tool approval", exact: true }) });
-  await expect(panel.getByText("Applies to all users", { exact: true })).toBeVisible();
-  await expect(actions.getByRole("button")).toHaveCount(0);
-
-  // Flipping it is only a draft: the panel says who it reaches, and nothing is sent.
-  await flipSwitch(page, "Require approval for every tool");
-  await expect(panel.locator(".unsaved")).toContainText("Turning it on applies to every user");
-  expect(api.settings.forceToolApproval).toBe(false);
-
-  // Cancel asks, and dismissing the question keeps the draft.
-  await cancel.click();
-  const discard = page.getByRole("dialog", { name: "Discard unsaved change?" });
-  await discard.getByRole("button", { name: "Cancel" }).click();
-  await expect(approval).toBeChecked();
-  await cancel.click();
-  await discard.getByRole("button", { name: "Discard change" }).click();
-  await expect(actions.getByRole("button")).toHaveCount(0);
-  await expect(approval).not.toBeChecked();
-  await expect(panel.getByRole("searchbox", { name: "Search tool approval" })).toBeFocused();
-  expect(api.settings.forceToolApproval).toBe(false);
-
-  // Save sends it, and the setting then counts as modified.
-  await flipSwitch(page, "Require approval for every tool");
-  await save.click();
-  await expect.poll(() => api.settings.forceToolApproval).toBe(true);
-  await expect(actions.getByRole("button")).toHaveCount(0);
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-
-  // Back to default is a draft too, until it is saved.
-  await page.getByRole("button", { name: "Back to default" }).click();
-  await expect(panel.locator(".unsaved")).toContainText("Turning it off applies to every user");
-  expect(api.settings.forceToolApproval).toBe(true);
-  await save.click();
-  await expect.poll(() => api.settings.forceToolApproval).toBe(false);
-
-  // The fake knew every request the page made.
-  expect(api.unexpected).toEqual([]);
-});
-
 test("deleting a role: one that accounts hold needs its name typed, an unused one does not", async ({ page }) => {
   const api = await installFakeApi(page);
   await logInAdmin(page);

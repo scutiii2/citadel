@@ -178,3 +178,16 @@ def test_reset_puts_the_defaults_back(client, live):
     media = reset.json()["media_downloader"]
     assert media["limits"]["max_file_mb"] == 500 and media["stored"] is False
     assert client.delete("/admin/tuning/nothing").status_code == 400
+
+
+def test_tool_approval_is_off_until_switched_and_only_takes_a_boolean(client):
+    assert client.get("/admin/tool-approval").json() == {"force_tool_approval": False, "stored": False}
+
+    on = client.put("/admin/tool-approval", json={"value": True})
+    assert on.json() == {"force_tool_approval": True, "before": False}
+    assert client.get("/admin/tool-approval").json() == {"force_tool_approval": True, "stored": True}
+
+    for bad in ({"value": "yes"}, {"value": 1}, {}, [True]):
+        assert client.put("/admin/tool-approval", json=bad).status_code == 400
+    assert client.get("/admin/tool-approval").json() == {"force_tool_approval": True, "stored": True}
+    assert client.put("/admin/tool-approval", json={"value": False}).json()["before"] is True

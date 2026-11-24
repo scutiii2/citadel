@@ -48,7 +48,7 @@ scoped by port, so the same portcullis session cookie is sent.
 | Accounts (`/admin/accounts`) | any of `accounts.view`, `accounts.manage`, `accounts.delete`, `roles.assign` |
 | Roles & permissions (`/admin/roles`) | any of `roles.view`, `roles.manage`, `roles.assign` |
 | Invites (`/admin/invites`) | `invites.manage` |
-| Workspace settings (`/admin/settings`): tool approval, Triage strategy, and Sidebar pages (which ember_web pages every account's sidebar shows; nav only) | `settings.manage` |
+| Workspace settings (`/admin/settings`): server settings and the Ember menu (which ember_web pages every account's sidebar shows; nav only) | `settings.manage` |
 | Profile (`/profile`; `/account` redirects here) | any logged-in account |
 | Personal settings (`/settings`) | any logged-in account |
 | Email verification (`/verify-email`) | any logged-in account |

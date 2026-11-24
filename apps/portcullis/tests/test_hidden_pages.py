@@ -93,7 +93,7 @@ def test_the_change_is_logged(client: TestClient) -> None:
     assert any(line.startswith("Hidden sidebar pages") and "/usage" in line for line in lines)
 
 
-def test_the_boolean_settings_list_is_unchanged(client: TestClient) -> None:
+def test_the_settings_list_is_only_the_tool_approval_switch(client: TestClient) -> None:
     as_admin(client)
     hide(client, ["/usage"])
 

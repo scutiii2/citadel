@@ -30,6 +30,12 @@ export const ARMORY_PAGES: ArmoryPage[] = [
     permission: "capabilities.manage",
   },
   {
+    to: "/approval",
+    label: "Tool approval",
+    icon: ["M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6z", "m9 12 2 2 4-4"],
+    permission: "settings.manage",
+  },
+  {
     to: "/limits",
     label: "Limits",
     icon: ["m12 14 4-4", "M3.34 19a10 10 0 1 1 17.32 0"],

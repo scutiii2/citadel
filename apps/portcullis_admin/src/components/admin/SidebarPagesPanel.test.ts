@@ -5,7 +5,7 @@ import { settingsClient } from "../../api/SettingsClient";
 import ConfirmModal from "./ConfirmModal.vue";
 import SidebarPagesPanel from "./SidebarPagesPanel.vue";
 
-vi.mock("../../api/SettingsClient", () => ({ settingsClient: { get: vi.fn(), set: vi.fn(), pages: vi.fn(), setPages: vi.fn() } }));
+vi.mock("../../api/SettingsClient", () => ({ settingsClient: { pages: vi.fn(), setPages: vi.fn() } }));
 
 const client = vi.mocked(settingsClient);
 

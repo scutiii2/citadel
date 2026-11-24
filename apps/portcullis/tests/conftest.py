@@ -152,6 +152,10 @@ class FakeUpstream:
     agents_fake: bool = True  # False: `handler` answers /account-agents too (pass-through tests)
     private: dict = field(default_factory=lambda: {"items": [], "skipped": []})
     private_status: int = 200
+    # Armory's tool approval switch (`/admin/tool-approval`); `armory_switch_status` other than 200 makes it fail.
+    force_tool_approval: bool = False
+    armory_switch_status: int = 200
+    armory_switch_stored: bool = False
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         await request.aread()
@@ -166,6 +170,15 @@ class FakeUpstream:
             return self.chats.respond(request)
         if self.agents_fake and request.url.path == "/account-agents" and request.method == "GET":
             return httpx.Response(self.agents_status, json={"disabled": self.disabled_agents})
+        if request.url.path == "/admin/tool-approval":
+            if self.armory_switch_status != 200:
+                return httpx.Response(self.armory_switch_status, json={"error": "fake failure"})
+            before = self.force_tool_approval
+            if request.method == "PUT":
+                self.force_tool_approval = json.loads(request.content)["value"]
+                self.armory_switch_stored = True
+            return httpx.Response(200, json={"force_tool_approval": self.force_tool_approval, "before": before,
+                                             "stored": self.armory_switch_stored})
         if request.url.path == "/user-extensions/for-turn":
             return httpx.Response(self.private_status, json=self.private)
         if request.url.path.startswith("/brains/writable/"):
