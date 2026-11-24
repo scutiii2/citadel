@@ -1,4 +1,4 @@
-# Stack: portcullis_admin / legion_admin / armory_admin / stronghold_admin / treasury_admin -> portcullis -> armory / legion / treasury / stronghold; legion runs the model gateways itself; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
+# Stack: ember (browser app) / portcullis_admin / legion_admin / armory_admin / stronghold_admin / treasury_admin -> portcullis -> armory / legion / treasury / stronghold; legion runs the model gateways itself; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
 # Start:  docker compose up -d --build
 # Per-service Ed25519 identities are created on first start. Public trust is shared read-only
 # with peers; private identities remain in their own volumes. Per-app secrets load when present.
@@ -167,6 +167,17 @@ services:
       - trust_portcullis:/trust/portcullis:rw
       - ${CITADEL_DATA_DIR:-./.data}/legion:/agent_data:ro
     depends_on: [armory, legion, treasury, stronghold]
+    networks: [core]
+
+  ember:
+    build: ./apps/ember
+    restart: unless-stopped
+    environment:
+      FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports:
+      - "${EMBER_BIND:-0.0.0.0}:26502:80"
+    depends_on: [portcullis]
     networks: [core]
 
   portcullis_admin:
