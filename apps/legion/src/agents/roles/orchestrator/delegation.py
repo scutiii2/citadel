@@ -35,7 +35,7 @@ from src.citadel_auth import ServiceAuth
 from src.agents import agent_events, agent_registry, agent_spec
 from src.agents.roles.orchestrator import plan
 
-from src.runtime import approvals, internal_auth, tool_filter
+from src.runtime import approvals, confidentiality, internal_auth, tool_filter
 from src.agents.agent_spec import REASONING_EFFORTS, TIERS, RosterEntry
 from src.providers import cancellation
 
@@ -284,6 +284,8 @@ def call(
             arguments["plan_lean"] = False
         if _caveman.get():
             arguments["caveman"] = True
+        if confidentiality.current():
+            arguments["confidential"] = True  # sent only when set, like caveman
         if model_tier:
             arguments["model_tier"] = model_tier
         if reasoning_effort:

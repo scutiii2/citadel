@@ -12,6 +12,15 @@ from src.runtime.config_files import TUNING_PATH, read_section
 from src.providers import cooldown
 from src.providers.gateway_client import GatewayCallError
 
+class NoTrustedGateway(Exception):
+    """A request holds confidential data and none of the agent's trusted gateways can take it. Never retried
+    on an untrusted gateway; the message is safe to show."""
+
+    def __init__(self) -> None:
+        super().__init__("This request holds confidential data, and none of this agent's trusted gateways is available, "
+                         "so it was not sent. Try again later or mark a gateway as trusted.")
+
+
 class FailureKind(StrEnum):
     rate_limit = "rate_limit"
     quota = "quota"
@@ -84,6 +93,8 @@ class GatewayRoute:
     has_credentials: Callable[[str], bool]
     switches: list[SwitchInfo] = field(default_factory=list)
     _index: int = 0
+    # Set once the turn holds confidential data: only a gateway this says is trusted may be used.
+    trusted_only: Callable[[str], bool] | None = None
 
     @classmethod
     def for_turn(cls, provider: str, primary: str, fallbacks: Iterable[str],
@@ -93,6 +104,24 @@ class GatewayRoute:
                       if has_credentials(name) and not cooldown.is_in_cooldown(cooldown.gateway_key(provider, name))), 0)
         return cls(provider, candidates, candidates[index], has_credentials, _index=index)
 
+    def _usable(self, name: str) -> bool:
+        return (self.has_credentials(name) and not cooldown.is_in_cooldown(cooldown.gateway_key(self.provider, name))
+                and (self.trusted_only is None or self.trusted_only(name)))
+
+    def require_trusted(self, is_trusted: Callable[[str], bool]) -> SwitchInfo | None:
+        """From now on use only trusted gateways. Moves to the first usable trusted candidate when the current one
+        is not trusted (the switch to report, else None); raises NoTrustedGateway when there is none."""
+        self.trusted_only = is_trusted
+        if self._usable(self.current):
+            return None
+        for index, name in enumerate(self.candidates):
+            if self._usable(name):
+                switch = SwitchInfo(self.current, name, "confidential")
+                self.current, self._index = name, index
+                self.switches.append(switch)
+                return switch
+        raise NoTrustedGateway()
+
     def advance(self, error: Exception) -> SwitchInfo | None:
         kind = classify(error)
         if kind is None:
@@ -100,7 +129,7 @@ class GatewayRoute:
         cooldown.start_cooldown(cooldown.gateway_key(self.provider, self.current), cooldown_seconds(kind, error))
         for index in range(self._index + 1, len(self.candidates)):
             name = self.candidates[index]
-            if not self.has_credentials(name) or cooldown.is_in_cooldown(cooldown.gateway_key(self.provider, name)):
+            if not self._usable(name):
                 continue
             switch = SwitchInfo(self.current, name, kind.value)
             self.current, self._index = name, index

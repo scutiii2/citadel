@@ -10,7 +10,8 @@
     "max_tier": "standard",
     "max_effort": "low",
     "fallback_gateways": [
-      "openrouter"
+      "openrouter",
+      "claude"
     ]
   },
   "persona": "You are a careful operations engineer for the Docker apps on this host.",

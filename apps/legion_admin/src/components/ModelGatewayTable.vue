@@ -11,6 +11,7 @@ import ConnectionTestCells from "./ConnectionTestCells.vue";
 import FieldLabel from "./FieldLabel.vue";
 import FormTabs from "./admin/FormTabs.vue";
 import PasswordInput from "./PasswordInput.vue";
+import ToggleSwitch from "./ToggleSwitch.vue";
 import { errorMessage } from "../utils/errors";
 
 const props = defineProps<{ kind: ModelGatewayKind; title: string; help: string }>();
@@ -36,6 +37,7 @@ const auth = ref("key");
 const model = ref("");
 const api = ref("chat");
 const timeout = ref(0);
+const trusted = ref(false);
 const TIERS = ["light", "standard", "heavy", "extreme"] as const;
 const tiers = ref<Record<string, string>>({});
 const notes = ref<Record<string, string>>({});
@@ -131,6 +133,7 @@ function fill(source: Record<string, unknown>) {
   model.value = String(source.model ?? "");
   api.value = String(source.api ?? "chat");
   timeout.value = Number(source.timeout_s ?? 0);
+  trusted.value = source.trusted === true;
   values.value = {};
   secrets.value = {};
   const models = source.models && typeof source.models === "object" ? source.models as Record<string, unknown> : {};
@@ -138,7 +141,7 @@ function fill(source: Record<string, unknown>) {
   const described = source.descriptions && typeof source.descriptions === "object" ? source.descriptions as Record<string, unknown> : {};
   notes.value = Object.fromEntries(TIERS.map((tier) => [tier, String(described[tier] ?? "")]));
   for (const [name, , secret] of fields.value) if (!secret) values.value[name] = String(source[name] ?? "");
-  const known = new Set([typeKey.value, "auth", "model", "models", "descriptions", "api", "timeout_s", ...fields.value.map(([name]) => name)]);
+  const known = new Set([typeKey.value, "auth", "model", "models", "descriptions", "api", "timeout_s", "trusted", ...fields.value.map(([name]) => name)]);
   extra.value = Object.fromEntries(Object.entries(source).filter(([name]) => !known.has(name) && !name.startsWith("has_") && name !== "id" && name !== "reachable" && name !== "streams" && name !== "images" && name !== "types"));
 }
 
@@ -200,6 +203,7 @@ const entry = computed(() => {
   if (needsModel.value) body.models = Object.fromEntries(TIERS.map((tier) => [tier, (tiers.value[tier] ?? "").trim()]).filter(([, name]) => name));
   if (needsModel.value) body.descriptions = Object.fromEntries(TIERS.map((tier) => [tier, (notes.value[tier] ?? "").trim()]).filter(([, text]) => text));
   if (timeout.value) body.timeout_s = timeout.value;
+  body.trusted = trusted.value;
   for (const [name, , secret] of fields.value) {
     if (secret) { if (secrets.value[name]) body[name] = secrets.value[name]; } else body[name] = (values.value[name] ?? "").trim();
   }
@@ -331,6 +335,9 @@ onMounted(load);
                 <div>
                   <button type="button" class="admin-row-button" aria-haspopup="dialog" @click="show(row)">{{ row.id }}</button>
                   <p v-if="row.label">{{ row.label }}</p>
+                  <p class="trust" :class="{ on: row.trusted }" :data-test="`trust-${row.id}`">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path v-if="row.trusted" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.500-7-10V6z M9 12l2 2 4-4" /><path v-else d="M12 3l7 3v5c0 4.500-3 8-7 10-4-2-7-5.500-7-10V6z" /></svg>{{ row.trusted ? "Trusted" : "Not trusted" }}
+                  </p>
                 </div>
               </div>
             </th>
@@ -396,6 +403,8 @@ onMounted(load);
           <FieldLabel :for="`${kind}-timeout`" title="Time allowed" :help="['How many seconds one request may take before Legion gives up on it.', 'Zero uses the gateway default.']">Time allowed (seconds)</FieldLabel>
           <input :id="`${kind}-timeout`" v-model.number="timeout" type="number" min="0" max="1800" :disabled="saving" :aria-describedby="`${kind}-timeout-help`" />
           <p :id="`${kind}-timeout-help`" class="hint">0 uses the gateway's default.</p>
+          <FieldLabel :for="`${kind}-trusted`" title="Trusted" :help="['Marks this gateway as safe for confidential data: passwords, personal identifiers, private messages and documents.', 'When a request holds such data, Legion uses only trusted gateways. Every agent keeps at least one trusted gateway, so the last one cannot be switched off.']">Trusted for confidential data</FieldLabel>
+          <ToggleSwitch :id="`${kind}-trusted`" data-test="trusted" :checked="trusted" :disabled="saving" @change="trusted = ($event.target as HTMLInputElement).checked">{{ trusted ? "Trusted" : "Not trusted" }}</ToggleSwitch>
         </section>
         <section v-if="needsModel" v-show="tab === 'models'" :id="`${kind}-panel-models`" class="pane" role="tabpanel" :aria-labelledby="`${kind}-tab-models`">
           <p v-if="modelsUrl" class="hint"><a :href="modelsUrl" target="_blank" rel="noopener noreferrer" data-test="models-link">Browse the model list for this provider</a> to find the ids to enter below.</p>
@@ -426,6 +435,7 @@ onMounted(load);
           <template v-if="selected.label && selected.label !== selected.id"><dt>Label</dt><dd>{{ selected.label }}</dd></template>
           <template v-if="selected.auth"><dt>Authentication</dt><dd>{{ selected.auth }}</dd></template>
           <template v-if="selected.timeout_s"><dt>Timeout</dt><dd>{{ selected.timeout_s }} seconds</dd></template>
+          <dt>Trusted</dt><dd>{{ selected.trusted ? "Yes: may see confidential data" : "No: never sees confidential data" }}</dd>
           <dt>Reachable</dt><dd>{{ selected.reachable === undefined ? "Not checked" : selected.reachable ? "Yes" : "No" }}</dd>
         </dl>
         <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
@@ -448,6 +458,9 @@ onMounted(load);
 <style scoped>
 .admin-panel-card { margin-bottom: 14px; }
 .kind { margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
+.trust { display: flex; align-items: center; gap: 4px; margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
+.trust.on { color: var(--success); }
+.trust svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .pane { display: grid; gap: 6px; min-width: 0; }
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .pair > div { display: grid; gap: 6px; min-width: 0; }

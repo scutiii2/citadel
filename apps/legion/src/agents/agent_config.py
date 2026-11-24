@@ -22,7 +22,7 @@ from src.agents.roles.orchestrator import auto_route, delegation, memory_recall,
 from src.agents.roles.router import router_routing
 from src.agents.roles.orchestrator import plan as plan_policy
 
-from src.runtime import approvals, internal_auth, questions, tool_filter, tuning_overrides
+from src.runtime import approvals, confidentiality, internal_auth, questions, tool_filter, tuning_overrides
 from src.tools.private_extensions import turn as private_turn
 from src.agents import auto_tier
 from src.providers import context_breakdown, llm_config, llm_options, model_tiers, token_limits
@@ -128,6 +128,7 @@ async def run_chat(
     exact_context: bool = False,
     limits: dict[str, int] | None = None,
     delegated_by: str | None = None,
+    confidential: bool = False,
 ) -> ChatResult:
     """Run a chat completion request through the configured provider.
 
@@ -202,9 +203,12 @@ async def run_chat(
     exact_token = context_breakdown.bind_exact(exact_context)
     effort_token = llm_options.bind_effort(effort.effort)
     limits_token = token_limits.bind_user_limits(limits)
+    confidential_token = confidentiality.bind(confidential)
     try:
         if cancellation.is_cancelled(request_id):
             raise ChatCancelled()
+        # What could reach an untrusted gateway is checked first: confidential text goes only to trusted ones.
+        await confidentiality.protect_turn(question + _last_assistant_text(history), request_id)
         if getattr(spec, "role", None) == "architect":
             from src.agents.roles.architect import pipeline
 
@@ -277,6 +281,7 @@ async def run_chat(
             skill_reflection.schedule(question, result, request_id)
         return result
     finally:
+        confidentiality.reset(confidential_token)
         token_limits.reset_user_limits(limits_token)
         llm_options.reset_effort(effort_token)
         context_breakdown.reset_exact(exact_token)
@@ -292,12 +297,21 @@ async def run_chat(
         cancellation.reset_request(request_token)
 
 
+def _last_assistant_text(history: list[dict[str, Any]]) -> str:
+    """The assistant's last message, clipped: a short follow-up ("yes, send it") means what that message was about."""
+    for message in reversed(history):
+        if message.get("role") == "assistant" and isinstance(message.get("content"), str):
+            return "\n\n" + message["content"][-1500:]
+    return ""
+
+
 def run_interpret(text: str) -> ChatResult:
     """A single non-agentic completion - see llm/anthropic_provider.py's
     run_interpret. Unlike run_chat, this never registers/clears
     cancellation: it's always one call, not a multi-round loop a user
     could need to interrupt mid-way."""
     model = model_tiers.clamp_default(MODEL, getattr(_PROVIDER_MODULE, "DEFAULT_MODEL", None), agent_spec.current().id).model
+    confidentiality.protect_text_sync(text)
     return _PROVIDER_MODULE.run_interpret(text, model)
 
 

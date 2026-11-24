@@ -14,6 +14,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from src import gateway
+from src.gateway import trust
 from src.gateway.conversation.errors import GatewayError
 from src.gateway.decision.errors import GatewayError as DecisionGatewayError
 from src.gateway.conversation.presets import PRESETS as CONVERSATION_PRESETS
@@ -70,6 +71,22 @@ def _with_tiers(presets: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]
     return result
 
 
+async def _agents_needing(gateway_id: str) -> list[str]:
+    """Enabled agents that would have no trusted gateway left without this one (it is trusted now, or they could not
+    be saved)."""
+    from src.agents import agent_store
+    from src.providers import gateway_client
+
+    if not await asyncio.to_thread(gateway_client.is_trusted, gateway_id):
+        return []
+    return await asyncio.to_thread(agent_store.agents_losing_trust, gateway_id)
+
+
+def _needs_message(agents: list[str]) -> str:
+    return ("Every agent needs at least one trusted gateway. This is the only one of " + ", ".join(agents)
+            + ": give them another trusted gateway first.")
+
+
 def _forget() -> None:
     from src.providers import gateway_client
     from src.providers.decision import gateway_client as decision_client
@@ -86,9 +103,11 @@ def register(mcp: FastMCP) -> None:
             return JSONResponse({"error": "unknown gateway"}, status_code=404)
         rows = await gateway.call(parts[0].gateways())
         if kind == "conversation":
-            return JSONResponse({"gateways": rows, "form": CONVERSATION_FORM, "presets": _with_tiers(CONVERSATION_PRESETS)})
+            presets = {key: {**preset, "trusted": trust.conversation(key, preset)} for key, preset in _with_tiers(CONVERSATION_PRESETS).items()}
+            return JSONResponse({"gateways": rows, "form": CONVERSATION_FORM, "presets": presets})
+        presets = {key: {**preset, "trusted": trust.decision(key, preset)} for key, preset in DECISION_PRESETS.items()}
         return JSONResponse({"gateways": rows, "kinds": {k: DECISION_FORM[k] for k in DECISION_KINDS},
-                             "presets": DECISION_PRESETS, "model_lists": MODEL_LISTS})
+                             "presets": presets, "model_lists": MODEL_LISTS})
 
     @mcp.custom_route("/agents/model-gateways/{kind}/{gateway_id}", methods=["PUT", "DELETE"])
     async def entry(request: Request) -> JSONResponse:
@@ -96,6 +115,8 @@ def register(mcp: FastMCP) -> None:
             return JSONResponse({"error": "unknown gateway"}, status_code=404)
         store, gid = parts[1], request.path_params["gateway_id"]
         if request.method == "DELETE":
+            if request.path_params["kind"] == "conversation" and (agents := await _agents_needing(gid)):
+                return JSONResponse({"error": _needs_message(agents)}, status_code=409)
             deleted = await asyncio.to_thread(store.delete, gid)
             _forget()
             return JSONResponse({"ok": True} if deleted else {"error": "No such gateway."}, status_code=200 if deleted else 404)
@@ -103,6 +124,9 @@ def register(mcp: FastMCP) -> None:
             data: Any = await request.json()
         except ValueError:
             data = None
+        if request.path_params["kind"] == "conversation" and isinstance(data, dict) and data.get("trusted") is False:
+            if agents := await _agents_needing(gid):
+                return JSONResponse({"error": _needs_message(agents)}, status_code=409)
         try:
             saved = await asyncio.to_thread(store.put, gid, data)
         except ValueError as error:

@@ -63,3 +63,22 @@ def test_a_failed_test_names_the_real_cause_not_502(client):
     answer = client.post("/agents/model-gateways/conversation/new/test", json=entry).json()
     assert answer["ok"] is False and answer["code"] == "NET"
     assert "could not be reached" in answer["message"]
+
+
+def test_a_gateway_cannot_be_untrusted_or_deleted_while_an_agent_depends_on_it(client):
+    claude = {"provider": "anthropic", "api_key": "k", "model": "claude-sonnet-5-5"}
+    assert client.put("/agents/model-gateways/conversation/claude", json=claude).json()["trusted"] is True
+    refused = client.put("/agents/model-gateways/conversation/claude", json={**claude, "trusted": False})
+    assert refused.status_code == 409 and "at least one trusted gateway" in refused.json()["error"]
+    assert client.delete("/agents/model-gateways/conversation/claude").status_code == 409
+    other = {"provider": "openai", "base_url": "http://host.docker.internal:29652/v1", "model": "m"}
+    assert client.put("/agents/model-gateways/conversation/freellmapi", json={**other, "trusted": True}).json()["trusted"] is True
+    assert client.put("/agents/model-gateways/conversation/freellmapi", json={**other, "trusted": False}).status_code == 200
+
+
+def test_presets_say_whether_they_start_trusted(client):
+    chat = client.get("/agents/model-gateways/conversation").json()["presets"]
+    assert chat["claude"]["trusted"] and chat["gemini"]["trusted"] and chat["minicpm"]["trusted"]
+    assert not chat["omniroute"]["trusted"] and not chat["freellmapi"]["trusted"]
+    decision = client.get("/agents/model-gateways/decision").json()["presets"]
+    assert decision["jev"]["trusted"] and not decision["freellmapi"]["trusted"]

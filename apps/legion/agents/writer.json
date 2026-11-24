@@ -6,6 +6,7 @@
   "llm": {
     "provider": "anthropic",
     "gateway": "omniroute",
+    "fallback_gateways": ["claude"],
     "temperature": 0.5,
     "max_tool_rounds": 1,
     "min_tier": "standard"

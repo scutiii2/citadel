@@ -241,6 +241,7 @@ def _validate_change(agent_id: str, data: dict[str, Any], directory: Path) -> Ag
         raise AgentStoreError("the agent must be a JSON object")
     spec = _load_spec(agent_id, data)
     _check_gateway(spec)
+    _check_trusted(spec)
     others = _other_specs(agent_id, directory)
     if spec.enabled and spec.internal_role == "router" and any(
         o.enabled and o.internal_role == "router" for o in others
@@ -278,6 +279,42 @@ def _check_gateway(spec: AgentSpec) -> None:
             raise AgentStoreError(
                 f"{spec.id}.json: llm.fallback_gateways[{index}].gateway {choice.gateway!r} "
                 f"is not a {spec.llm.provider} gateway in gateways/")
+
+
+def _gateway_names(spec: AgentSpec) -> list[str]:
+    """The gateways an agent may use, in order: its own, then its fallbacks. A decision agent has none."""
+    if spec.llm.provider == "decision":
+        return []
+    return [spec.llm.gateway or agent_spec.default_gateway(spec.llm.provider), *(c.gateway for c in spec.llm.fallback_gateways)]
+
+
+def _check_trusted(spec: AgentSpec) -> None:
+    """An enabled agent always has a trusted gateway, so confidential data has somewhere to go."""
+    from src.providers import gateway_client
+
+    names = _gateway_names(spec)
+    if spec.enabled and names and not any(gateway_client.is_trusted(name) for name in names):
+        raise AgentStoreError(
+            f"{spec.id}.json: none of its gateways ({', '.join(names)}) is trusted; mark one as trusted on the "
+            "Model gateways page or add a trusted gateway to llm.fallback_gateways", 409)
+
+
+def agents_losing_trust(gateway_id: str, directory: Path = agent_spec.AGENTS_DIR) -> list[str]:
+    """Enabled agents whose only trusted gateway is `gateway_id`: they would have none if it stopped being trusted
+    or were deleted."""
+    from src.providers import gateway_client
+
+    lost = []
+    for agent_id in _ids(directory):
+        try:
+            spec = _load_spec(agent_id, _effective(agent_id, directory))
+        except AgentStoreError:
+            continue
+        names = _gateway_names(spec)
+        if spec.enabled and gateway_id in names and not any(
+                name != gateway_id and gateway_client.is_trusted(name) for name in names):
+            lost.append(agent_id)
+    return lost
 
 
 def _other_specs(agent_id: str, directory: Path) -> list[AgentSpec]:

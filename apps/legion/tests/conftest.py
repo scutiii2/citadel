@@ -70,6 +70,17 @@ def _isolated_tuning_overrides(monkeypatch, tmp_path):
 
 
 @pytest.fixture(autouse=True)
+def _no_confidential_check(monkeypatch):
+    """Tests do not call the Jev checker (and its fail-closed answer): every request counts as public unless a test
+    patches is_confidential itself. tests/test_confidentiality.py keeps a reference to the real function."""
+    from unittest.mock import AsyncMock
+
+    from src.runtime import confidentiality
+
+    monkeypatch.setattr(confidentiality, "is_confidential", AsyncMock(return_value=False))
+
+
+@pytest.fixture(autouse=True)
 def _isolated_gateway_database(monkeypatch, tmp_path):
     """Gateway entries come from an empty per-test database, never the developer's real settings.db."""
     from src import gateway

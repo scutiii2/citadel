@@ -12,6 +12,7 @@ from typing import Any
 import sqlite3
 
 from src.citadel_auth import settings_store
+from src.gateway import trust
 from src.gateway.shared import MAX_TOKEN, valid_url as _valid_url
 from src.gateway.conversation.contract import TIERS
 from src.gateway.conversation.gateways.base import CAPABILITIES
@@ -71,7 +72,7 @@ class GatewayStore:
 
     @staticmethod
     def _public(gid: str, entry: dict[str, Any]) -> dict[str, Any]:
-        out = {"id": gid, **{k: v for k, v in entry.items() if k not in SECRETS}}
+        out = {"id": gid, **{k: v for k, v in entry.items() if k not in SECRETS}, "trusted": trust.conversation(gid, entry)}
         resolved = resolve(entry)
         for secret, flag in SECRETS.items():
             if any(secret == f[0] for variant in PROVIDERS.get(entry.get("provider", ""), {}).values() for f in variant):
@@ -191,6 +192,8 @@ class GatewayStore:
             if not isinstance(caps, dict) or set(caps) - set(CAPABILITIES) or not all(isinstance(v, bool) for v in caps.values()):
                 raise ValueError("The capabilities are true or false for: " + ", ".join(CAPABILITIES) + ".")
             entry["capabilities"] = caps
+        if (trusted := trust.clean(data, old)) is not None:
+            entry["trusted"] = trusted
         return entry
 
     def delete(self, gid: str) -> bool:

@@ -23,7 +23,7 @@ from src.agents.roles.orchestrator import ask_user, delegation, plan, plan_runne
 from src.providers.gateway_failover import GatewayRoute, classify
 
 from src.runtime import approvals, questions
-from src.runtime import run_tools
+from src.runtime import confidentiality, run_tools
 from src.runtime.tool_batch import Call, ToolRound
 from src.runtime.chat_history import validate_history
 
@@ -279,6 +279,10 @@ def _prompt_tokens(usage: Any) -> int:
 
 
 def _route_for_turn() -> GatewayRoute:
+    return confidentiality.route_for_turn(_open_route())
+
+
+def _open_route() -> GatewayRoute:
     return GatewayRoute.for_turn(PROVIDER_ID, _Anthropic._gateway_name(),
                                  (choice.gateway for choice in agent_spec.current().llm.fallback_gateways),
                                  lambda gateway: has_api_key(gateway))
@@ -494,6 +498,14 @@ async def run_chat(
                 outcomes = await runner.run([Call(block.id, block.name, block.input) for block in blocks])
                 if planning and planning.closed:
                     schemas = []
+                    system, tools = _cached_request(system_prompt, schemas) if use_cache else (system_prompt, schemas)
+                if switch := await confidentiality.protect_round(route, [o.text for o in outcomes], request_id):
+                    if on_event:
+                        await on_event(step_event("gateway_switch", **switch.as_dict()))
+                    messages = _strip_thinking(messages)
+                    client = _get_client(route.current)
+                    model_name = _model_for_route(route, model)
+                    use_cache = _prompt_cache_enabled(route.current)
                     system, tools = _cached_request(system_prompt, schemas) if use_cache else (system_prompt, schemas)
                 tool_results = [{"type": "tool_result", "tool_use_id": block.id, "content": outcome.text}
                                 for block, outcome in zip(blocks, outcomes)]
