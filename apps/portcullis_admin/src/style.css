@@ -113,6 +113,9 @@ button[aria-busy="true"]::before {
   animation: ember-busy 0.7s linear infinite;
 }
 @keyframes ember-busy { to { transform: rotate(360deg); } }
+/* An icon-only button shows the spinner instead of its icon, not beside it. */
+.admin-icon[aria-busy="true"] > svg { display: none; }
+.admin-icon[aria-busy="true"]::before { margin-right: 0; }
 
 :focus-visible {
   outline: 2px solid var(--accent);
