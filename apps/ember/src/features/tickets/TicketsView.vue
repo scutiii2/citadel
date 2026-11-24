@@ -282,15 +282,15 @@ async function reopenTicket(): Promise<void> {
   <PageLayout title="Tickets" class="tickets info-content" :class="{ 'thread-open': detailOpen }" wide fill>
     <template #actions>
       <BackButton v-if="detailOpen" @click="dismiss">All tickets</BackButton>
-      <PanelHelp title="Tickets">Report an issue, share an idea, or follow a support reply. Only your own tickets appear here.</PanelHelp>
-      <button type="button" class="admin-icon accent new-ticket" aria-label="New ticket" title="New ticket" @click="startNew">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-      </button>
     </template>
     <template #toolbar>
       <div class="list-controls">
         <SearchField v-model="search" class="search-control" label="Search ticket titles" placeholder="Search your ticket titles…" />
         <label class="sort-control"><span class="sr-only">Sort</span><select v-model="sort" aria-label="Sort tickets"><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select><svg class="sort-chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></label>
+        <PanelHelp title="Tickets">Report an issue, share an idea, or follow a support reply. Only your own tickets appear here.</PanelHelp>
+        <button type="button" class="admin-icon accent new-ticket" aria-label="New ticket" title="New ticket" @click="startNew">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
       </div>
       <SegmentedControl class="status-filters" v-model="filter" :options="filterOptions" aria-label="Ticket status" />
     </template>
@@ -378,8 +378,8 @@ async function reopenTicket(): Promise<void> {
 </template>
 
 <style scoped>
-.list-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.search-control { flex: 1; }
+.list-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+.search-control { flex: 1 1 200px; }
 .sort-control { position: relative; display: block; min-width: 0; }
 .tickets .sort-control select { max-width: 200px; appearance: none; padding: 10px 34px 10px 16px; border: 1px solid var(--border); border-radius: var(--radius-full); background: transparent; font-size: .8em; color: var(--muted); cursor: pointer; }
 .tickets .sort-control select:hover { color: var(--text); border-color: var(--muted); }

@@ -83,7 +83,7 @@ describe("the period buttons", () => {
   it("offers This month first, then 7 days to 12 months, with 30 days chosen", async () => {
     const wrapper = await mountView();
 
-    const buttons = wrapper.findAll(".ranges button").filter((b) => !b.classes().includes("export"));
+    const buttons = wrapper.findAll(".ranges .segmented-control button");
     expect(buttons.map((b) => b.text())).toEqual(["This month", "7 days", "30 days", "90 days", "12 months"]);
     expect(buttons.map((b) => b.attributes("aria-pressed"))).toEqual(["false", "false", "true", "false", "false"]);
   });

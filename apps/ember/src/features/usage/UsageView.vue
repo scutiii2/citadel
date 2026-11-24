@@ -193,12 +193,10 @@ onMounted(() => {
 
 <template>
   <PageLayout title="Usage" class="usage-view">
-    <template #actions>
-      <PanelHelp title="Usage">Review your token usage and account limits. Pick a period; Export saves it as a Markdown file.</PanelHelp>
-    </template>
     <template #toolbar>
       <div class="ranges" role="group" aria-label="Period">
         <SegmentedControl v-model="range" :options="RANGE_OPTIONS" label="Period" aria-label="Period" />
+        <PanelHelp title="Usage">Review your token usage and account limits. Pick a period; Export saves it as a Markdown file.</PanelHelp>
         <ActionButton icon="export" class="export" :disabled="!usage" title="Download this period as a Markdown file" @click="exportReport">
           Export .md
         </ActionButton>
