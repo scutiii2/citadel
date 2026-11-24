@@ -7,7 +7,7 @@ import PanelHelp from "../components/admin/PanelHelp.vue";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import DraftActions from "../components/admin/DraftActions.vue";
 import { useDraftPanel } from "../composables/useDraftPanel";
-import SettingRow from "../components/SettingRow.vue";
+import FieldLabel from "../components/admin/FieldLabel.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { tuningClient, type TuningChanges, type TuningView } from "../api/TuningClient";
@@ -109,6 +109,13 @@ function helpText(field: Field): string {
   return `${field.help} Allowed: ${field.min?.toLocaleString()} to ${field.max?.toLocaleString()}${unit}.`;
 }
 
+/** The line under a field: where its default comes from, and what it is. */
+function defaultText(field: Field): string {
+  const own = field.path.startsWith("tool_batch.") || field.path.startsWith("budgets.");
+  const unit = field.unit && typeof at(view.value?.defaults, field.path) === "number" ? ` ${field.unit}` : "";
+  return `${own ? "Default" : "File default"}: ${shownDefault(field)}${unit}`;
+}
+
 /** The default as text; a switch reads On or Off. */
 function shownDefault(field: Field): string {
   const value = at(view.value?.defaults, field.path);
@@ -125,10 +132,6 @@ function at(source: Record<string, unknown> | undefined, path: string): number |
   }
   return typeof node === "number" || typeof node === "boolean" || typeof node === "string" ? node : undefined;
 }
-
-/** How many of a group's settings differ from the file, or are edited now. */
-const changedIn = (group: Group): number => group.fields.filter((field) => isChanged(field.path) || field.path in draft.value).length;
-const jump = (id: string): void => document.getElementById(`group-${id}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
 
 const dirty = computed(() => Object.keys(draft.value).length > 0);
 const { discardOpen, keepFocus, answerDiscard: closeDiscard } = useDraftPanel(dirty, searchField);
@@ -241,33 +244,37 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
       <template v-else>
         <p v-if="!visibleGroups.length" class="admin-panel-text muted">No settings match your search. <button type="button" class="small" @click="search = ''; searchField?.focus()">Clear search</button></p>
         <ActionMessage v-if="saveError && !invalidPath" kind="error" :text="saveError" class="admin-panel-text" />
-        <div v-if="visibleGroups.length" class="tuning-layout">
-        <nav class="tuning-index" aria-label="Setting groups">
-          <button v-for="group in visibleGroups" :key="group.id" type="button" class="index-link" :data-test="`jump-${group.id}`" @click="jump(group.id)">
-            <span>{{ group.title }}</span>
-            <span v-if="changedIn(group)" class="count" :aria-label="`${changedIn(group)} changed`">{{ changedIn(group) }}</span>
-          </button>
-        </nav>
-        <div class="tuning-groups">
-        <section v-for="group in visibleGroups" :id="`group-${group.id}`" :key="group.id" class="tuning-group" :aria-labelledby="`group-${group.id}-title`">
-          <header class="group-head"><h3 :id="`group-${group.id}-title`">{{ group.title }}</h3><p>{{ group.note }}</p></header>
-        <SettingRow v-for="field in group.fields" :key="field.path" :setting-id="field.path" :label="field.label"
-          :description="`${field.path.startsWith('tool_batch.') || field.path.startsWith('budgets.') ? 'Default' : 'File default'}: ${shownDefault(field)}${field.unit && typeof at(view.defaults, field.path) === 'number' ? ' ' + field.unit : ''}`"
-          :data-row="field.path" :data-changed="isChanged(field.path)">
-          <template v-if="field.help" #help>{{ helpText(field) }}</template>
-          <span v-if="isChanged(field.path) || field.path in draft" class="badge">Changed</span>
-          <button v-if="isChanged(field.path) && draft[field.path] !== null" type="button" class="small" data-test="reset" :disabled="saving" :aria-label="`Reset ${field.label}`" @click="reset(field)">Reset</button>
-          <ToggleSwitch v-if="field.kind === 'bool'" :id="field.path" :data-path="field.path" :aria-label="field.label" :checked="shown(field) === true" :disabled="saving"
-            @change="edit(field, ($event.target as HTMLInputElement).checked)" />
-          <select v-else-if="field.kind === 'enum'" :id="field.path" :data-path="field.path" :aria-label="field.label" :value="shown(field)" :disabled="saving"
-            @change="edit(field, ($event.target as HTMLSelectElement).value)"><option v-for="option in field.options" :key="option" :value="option">{{ option }}</option></select>
-          <input v-else :id="field.path" :data-path="field.path" :aria-label="field.label" type="number" :aria-invalid="invalidPath === field.path || undefined" :aria-describedby="invalidPath === field.path ? `${field.path}-error` : undefined" :min="field.min" :max="field.max" :step="field.kind === 'int' ? 1 : 'any'" :value="shown(field)" :disabled="saving"
-            @input="edit(field, ($event.target as HTMLInputElement).value)" />
-          <span v-if="field.unit" class="muted unit">{{ field.unit }}</span>
-          <span v-if="invalidPath === field.path" :id="`${field.path}-error`" class="error" role="alert">{{ saveError }}</span>
-        </SettingRow>
-        </section>
-        </div>
+        <div v-if="visibleGroups.length" class="fields">
+        <fieldset v-for="group in visibleGroups" :key="group.id" class="group" :data-group="group.id">
+          <legend>{{ group.title }}</legend>
+          <p class="lede">{{ group.note }}</p>
+          <div class="grid">
+            <template v-for="field in group.fields" :key="field.path">
+              <div v-if="field.kind === 'bool'" class="field toggle-field" :data-row="field.path" :data-changed="isChanged(field.path)">
+                <div class="toggle-row">
+                  <ToggleSwitch :id="field.path" :data-path="field.path" :aria-label="field.label" :checked="shown(field) === true" :disabled="saving"
+                    @change="edit(field, ($event.target as HTMLInputElement).checked)">{{ field.label }}</ToggleSwitch>
+                  <FieldLabel bare :title="field.label">{{ helpText(field) }}</FieldLabel>
+                </div>
+                <p class="hint">{{ defaultText(field) }}<span v-if="isChanged(field.path) || field.path in draft" class="badge">Changed</span>
+                  <button v-if="isChanged(field.path) && draft[field.path] !== null" type="button" class="chip" data-test="reset" :disabled="saving" :aria-label="`Reset ${field.label}`" @click="reset(field)">Reset</button></p>
+              </div>
+              <div v-else class="field" :data-row="field.path" :data-changed="isChanged(field.path)">
+                <FieldLabel :for="field.path" :title="field.label">{{ helpText(field) }}</FieldLabel>
+                <div class="control">
+                  <select v-if="field.kind === 'enum'" :id="field.path" :data-path="field.path" :aria-label="field.label" :value="shown(field)" :disabled="saving"
+                    @change="edit(field, ($event.target as HTMLSelectElement).value)"><option v-for="option in field.options" :key="option" :value="option">{{ option }}</option></select>
+                  <input v-else :id="field.path" :data-path="field.path" :aria-label="field.label" type="number" :aria-invalid="invalidPath === field.path || undefined" :aria-describedby="invalidPath === field.path ? `${field.path}-error` : undefined" :min="field.min" :max="field.max" :step="field.kind === 'int' ? 1 : 'any'" :value="shown(field)" :disabled="saving"
+                    @input="edit(field, ($event.target as HTMLInputElement).value)" />
+                  <span v-if="field.unit" class="unit">{{ field.unit }}</span>
+                </div>
+                <p class="hint">{{ defaultText(field) }}<span v-if="isChanged(field.path) || field.path in draft" class="badge">Changed</span>
+                  <button v-if="isChanged(field.path) && draft[field.path] !== null" type="button" class="chip" data-test="reset" :disabled="saving" :aria-label="`Reset ${field.label}`" @click="reset(field)">Reset</button></p>
+                <span v-if="invalidPath === field.path" :id="`${field.path}-error`" class="error" role="alert">{{ saveError }}</span>
+              </div>
+            </template>
+          </div>
+        </fieldset>
         </div>
       </template>
     </section>
@@ -276,22 +283,16 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
 </template>
 
 <style scoped>
-input[type="number"], select { width: 10em; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; font-variant-numeric: tabular-nums; }
-input[type="number"]:hover, select:hover { border-color: var(--muted); }
-.unit { min-width: 4.5em; font-size: 0.85rem; }
-.tuning-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 20px; padding: 16px; align-items: start; }
-.tuning-index { position: sticky; top: 0; display: flex; flex-direction: column; gap: 2px; }
-.index-link { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 0; border-radius: var(--radius-md); color: var(--muted); background: none; font: inherit; text-align: left; cursor: pointer; }
-.index-link:hover, .index-link:focus-visible { color: var(--text); background: var(--surface); }
-.count { min-width: 20px; padding: 0 6px; border-radius: var(--radius-full); color: var(--accent-contrast); background: var(--accent); font-size: 0.75rem; text-align: center; }
-.tuning-groups { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.tuning-group { padding: 4px 16px 8px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); scroll-margin-top: 8px; }
-.group-head { padding: 12px 0 8px; border-bottom: 1px solid var(--border); }
-.group-head h3 { margin: 0; font-size: 1rem; }
-.group-head p { margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; }
-@media (max-width: 767px) {
-  .tuning-layout { grid-template-columns: minmax(0, 1fr); padding: 12px; }
-  .tuning-index { position: static; flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
-  .index-link { flex: none; border: 1px solid var(--border); white-space: nowrap; }
-}
+.fields { display: grid; gap: 14px; padding: 16px; }
+.group { display: grid; gap: 14px; margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.group legend { padding: 0 6px; font-size: 0.95em; font-weight: 600; }
+.lede { margin: -6px 0 0; font-size: 0.85em; color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 18px; }
+.field { display: grid; gap: 4px; min-width: 0; align-content: start; }
+.control { display: flex; align-items: center; gap: 8px; }
+.control > input, .control > select { flex: 1; width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; font-variant-numeric: tabular-nums; }
+.unit { flex: none; color: var(--muted); font-size: 0.85em; }
+.toggle-row { display: flex; align-items: center; gap: 4px; }
+.hint { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; font-size: 0.8em; color: var(--muted); }
+.error { color: var(--danger); font-size: 0.85em; }
 </style>
