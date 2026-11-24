@@ -53,14 +53,15 @@ changes on the Tuning and Prompts pages is runtime state, kept in
   it on clean shutdown, so never edit it by hand. Not tracked: it is in
   of `.data/`; created on first start.
 
-## tuning_overrides.json
+## Tuning edits (settings database)
 
-Lives at `.data/legion/tuning_overrides.json`. Written by the admin Tuning page (stronghold_admin), not by hand. It holds only what an admin
-changed, as flat dotted paths such as `"token_limits.default.max_tool_rounds": 20`, and is
-merged over `config_tuning.json` when that file is read. Delete a line (or reset it on the page)
+Stored in the `tuning` table of `.data/legion/settings.db`. Written by the admin Tuning page (legion_admin), not by hand. It holds only what an admin
+changed, as flat dotted paths such as `token_limits.default.max_tool_rounds` = 20, and is
+merged over `config_tuning.json` when that file is read. Reset a value on the page
 to go back to the file's value. Keys that are not
 listed in `src/runtime/tuning_overrides.py` stay file-only, including feature enable flags and tier mappings.
 Each agent process notices a change at the start of its next turn; no restart is needed.
-In Docker the `.data/legion` folder is bind-mounted, so the overlay survives container recreation.
+In Docker the `.data/legion` folder is bind-mounted, so the edits survive container recreation.
+An older `.data/legion/tuning_overrides.json` is read into the table once and renamed to `tuning_overrides.json.migrated`.
 
 Treasury bootstrap address lives in tracked `configs/config_app.json` as `treasury_url`; `TREASURY_URL` overrides it. Legion entry agents register their base address in Treasury’s catalog. Treasury Admin, Services controls address pins; Legion Admin no longer edits Treasury’s address.
