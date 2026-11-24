@@ -130,6 +130,8 @@ class GatewayStore:
             if (strategy := text("strategy", "The strategy", False, 60)) is not None:
                 entry["strategy"] = strategy
             window = data.get("window", old.get("window"))
+            if isinstance(window, str):  # the admin form sends every field as text; empty means the default
+                window = int(window.strip()) if window.strip().isdigit() else (None if not window.strip() else window)
             if window is not None:
                 if isinstance(window, bool) or not isinstance(window, int) or not 16 <= window <= 8192:
                     raise ValueError("The window must be a whole number from 16 to 8192.")
