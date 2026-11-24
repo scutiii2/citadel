@@ -44,7 +44,7 @@ def upstream(monkeypatch):
 
 def listed(allow=(), deny=(), enabled=()):
     with patch.object(mcp_upstream.agent_spec, "current", return_value=agent(allow, deny)):
-        return [t.name for t in mcp_upstream.list_tools(list(enabled))]
+        return [t.name for t in mcp_upstream.list_tools()]
 
 
 def test_allows_explicitly_needs_a_matching_allow_glob():
@@ -84,9 +84,9 @@ def test_a_tool_the_user_switched_off_is_not_offered(upstream, monkeypatch):
 def test_shared_extensions_uses_the_connection_then_falls_back_to_armory(upstream, monkeypatch):
     shared = agent_spec.load_file(Path(__file__).resolve().parents[1] / "agents" / "shared-extensions.json")
     monkeypatch.setattr(agent_spec, "current", lambda: shared)
-    assert [tool.name for tool in mcp_upstream.list_tools(["bard"])] == ["bard__tool_bard_speak"]
+    assert [tool.name for tool in mcp_upstream.list_tools()] == ["bard__tool_bard_speak"]
     monkeypatch.setattr(mcp_upstream.client, "list_tools", lambda: CATALOG[:3])
-    assert [tool.name for tool in mcp_upstream.list_tools(["bard"])] == ["main__bard__tool_bard_speak"]
+    assert [tool.name for tool in mcp_upstream.list_tools()] == ["main__bard__tool_bard_speak"]
 
 
 def test_no_tool_is_blocked_outside_a_turn():

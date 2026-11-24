@@ -7,7 +7,7 @@ from src.agents import agent_routing, agent_spec
 from src.agents.roles.orchestrator import auto_route, context_summarizer, delegation
 from src.agents.roles.router import router_client
 from src.agents.roles.router.router_contract import RouteCandidate, RouteRequest, RouteTier
-from src.runtime import approvals
+from src.runtime import approvals, counters
 from src.providers import cancellation, model_tiers
 from src.providers.base_provider import ChatCancelled, ChatResult, ToolCallRecord, dispatch_with_progress, step_event
 
@@ -68,6 +68,12 @@ async def route_turn(question, history, on_event, request_id, depth, explicit_ti
         delegation.record_usage(rows)
     tier = result.model_tier if result and request.choose_tier and not result.size.uncertain else None
     chosen = result.agent.choice if result else None
+    counters.add("router.turns")
+    if result is None:
+        counters.add("router.unavailable")
+    else:
+        counters.add("router.agent_uncertain" if result.agent.uncertain or chosen in (None, "none") else "router.agent_picked")
+        counters.add("router.tier." + (tier or "none"))
     if on_event:
         await on_event(step_event("step_end", id=step_id, ok=True,
             result=_summary(result, chosen, tier, roster, spec) if result else "Using default routing"))
@@ -85,6 +91,7 @@ async def route_turn(question, history, on_event, request_id, depth, explicit_ti
         return None, None, ""
     if tier and tier not in {t.tier for t in target.tiers}:
         tier = None
+    counters.add("router.dispatched")
     arguments = {"agent_id": target.id, "question": auto_route._handoff(question, history)}
     if selected_tier := explicit_tier or tier:
         arguments["model_tier"] = selected_tier

@@ -13,7 +13,7 @@ def store(tmp_path):
 def test_put_returns_public_entry_without_secrets(store, tmp_path):
     entry = store.put("jev", {"kind": "typesafe", "api_key": "sk-secret", "model": "jev-latest"})
     assert entry == {"id": "jev", "kind": "typesafe", "url": "https://api.typesafe.ai/v1/systemone",
-                     "model": "jev-latest", "timeout_s": 60, "has_api_key": True}
+                     "model": "jev-latest", "timeout_s": 60, "has_api_key": True, "trusted": True}
     assert "sk-secret" not in json.dumps(store.public())
     assert store.all()["jev"]["api_key"] == "sk-secret"
     assert (tmp_path / "gateways.json").exists()

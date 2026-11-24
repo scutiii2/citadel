@@ -68,3 +68,16 @@ def test_a_bad_tool_call_setting_saves_nothing_in_either_store(client):
     response = client.put("/agents/tuning", json={"token_limits.default.max_tool_rounds": 20, "tool_batch.max_parallel": 99})
     assert response.status_code == 400 and "max_parallel" in response.json()["error"]
     assert client.get("/agents/tuning").json()["overrides"] == {}
+
+
+def test_budgets_are_tuning_edits_and_the_insights_route_lists_the_counters(client):
+    from src.runtime import counters
+
+    body = client.put("/agents/tuning", json={"budgets.daily_tokens_per_user": 5000, "budgets.turn_seconds": 120}).json()
+    assert body["effective"]["budgets"] == {"turn_tokens": 100000, "turn_seconds": 120, "daily_tokens_per_user": 5000, "daily_tokens_per_agent": 0}
+    assert client.put("/agents/tuning", json={"budgets.turn_seconds": 5}).status_code == 400
+    counters.add("router.turns", 3)
+    insight = client.get("/agents/insights?days=2").json()
+    assert insight["days"] == 2 and insight["budgets"]["daily_tokens_per_user"] == 5000
+    assert list(insight["history"].values())[0]["router.turns"] == 3
+    assert client.get("/agents/insights?days=999").json()["days"] == 30

@@ -64,8 +64,14 @@ def _isolated_tuning_overrides(monkeypatch, tmp_path):
     """The admin's tuning edits (tool-call limits included) come from an empty per-test database, never the developer's settings.db."""
     from src.runtime import tool_batch_settings, tuning_overrides
 
+    from src.gateway import sealing
     from src.providers import cooldown
+    from src.runtime import counters
 
+    monkeypatch.setattr(counters, "DB", tmp_path / "stats.db")
+    monkeypatch.setattr(sealing, "KEY_FILE", tmp_path / "secret.key")
+    monkeypatch.delenv("LEGION_SECRET_KEY", raising=False)
+    sealing.reset()
     monkeypatch.setattr(cooldown, "DB", tmp_path / "cooldowns.db")
     monkeypatch.setattr(cooldown, "_synced_at", float("-inf"))
     monkeypatch.setattr(tuning_overrides, "PATH", tmp_path / "tuning.db")
@@ -82,6 +88,20 @@ def _no_confidential_check(monkeypatch):
     from src.runtime import confidentiality
 
     monkeypatch.setattr(confidentiality, "is_confidential", AsyncMock(return_value=False))
+
+
+@pytest.fixture(autouse=True)
+def _fresh_tuning_caches():
+    """The readers of config_tuning.json cache what they parsed. A test that points one at its own file must not leave
+    that behind for the next test, whatever order the files run in."""
+    from src.providers import gateway_failover, token_limits
+    from src.providers.decision import settings
+
+    for reset in (token_limits.reset_cache, gateway_failover.reset_cache, settings.reset_cache):
+        reset()
+    yield
+    for reset in (token_limits.reset_cache, gateway_failover.reset_cache, settings.reset_cache):
+        reset()
 
 
 @pytest.fixture(autouse=True)

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from src.citadel_auth import data_dir
-from src.runtime import tool_batch_settings, tuning_overrides
+from src.runtime import budgets, tool_batch_settings, tuning_overrides
 
 CONFIGS_DIR = Path(__file__).resolve().parent.parent.parent / "configs"
 
@@ -54,6 +54,7 @@ def _editable(raw: dict[str, Any]) -> dict[str, Any]:
             if isinstance(value, dict):
                 section[feature] = {k: value.get(k, getattr(defaults, k)) for k in ("strategy", "min_confidence")}
         out["classifier"] = section
+    out["budgets"] = {**budgets.DEFAULTS, **(raw["budgets"] if isinstance(raw.get("budgets"), dict) else {})}
     out["tool_batch"] = {**tool_batch_settings.DEFAULTS, **(raw["tool_batch"] if isinstance(raw.get("tool_batch"), dict) else {})}
     return out
 

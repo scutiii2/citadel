@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from src.deps import get_log_writer, require_permission
@@ -31,6 +31,15 @@ class TuningChangesIn(BaseModel):
 @router.get("")
 async def read_tuning(account: Account = Depends(require_tuning_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
     return await _call(admin.tuning(account))
+
+
+@router.get("/insights")
+async def read_insights(
+    days: int = Query(7, ge=1, le=30),
+    account: Account = Depends(require_tuning_manage), admin: AgentAdmin = Depends(get_agent_admin),
+) -> Any:
+    """Daily counters for the Insights page: routing, confidentiality, batching and tokens per user and agent."""
+    return await _call(admin.insights(account, days))
 
 
 @router.put("")

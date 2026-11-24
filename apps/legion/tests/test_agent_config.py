@@ -560,7 +560,7 @@ def _recall_chat(monkeypatch, recall_calls, cancel_first=False):
 
     reloaded = importlib.reload(agent_config)
     spec = SimpleNamespace(id="ember", entry=False, orchestrator=False, internal_role=None,
-        memory_recall=True, skill_recall=False, skill_learning=False, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None))
+        memory_recall=True, skill_recall=False, skill_learning=False, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None, provider="decision", strategy="jev-only"))
     monkeypatch.setattr(reloaded.agent_spec, "current", lambda: spec)
 
     async def fake_recall(question, on_event=None):
@@ -730,6 +730,7 @@ def test_run_interpret_runs_on_the_clamped_default_model(monkeypatch):
     ))
     monkeypatch.setattr(agent_config.model_tiers, "clamp_default", lambda m, d, a: SimpleNamespace(model="haiku"))
     monkeypatch.setattr(agent_config.agent_spec, "current", lambda: SimpleNamespace(id="ember"))
+    monkeypatch.setattr(agent_config.confidentiality, "has_untrusted_gateway", lambda: False)
     agent_config.run_interpret("text")
     assert seen["model"] == "haiku"
 

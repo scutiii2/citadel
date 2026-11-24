@@ -35,7 +35,7 @@ def test_legacy_flags_upgrade_to_a_role(tmp_path):
 
 def test_stored_override_without_role_is_a_specialist(tmp_path):
     (tmp_path / "a.json").write_text(json.dumps({**BASE, "role": "specialist"}), encoding="utf-8")
-    overrides = agent_spec.overrides_path_for(tmp_path)
+    overrides = agent_spec.overrides_path_for(tmp_path).with_name("agent_overrides.json")  # the older file: read in once
     overrides.parent.mkdir(parents=True)
     overrides.write_text(json.dumps({"a": {**BASE, "orchestrator": True, "entry": True}, "b": dict(BASE)}), encoding="utf-8")
     assert agent_spec.load_file(tmp_path / "a.json").role == "orchestrator"

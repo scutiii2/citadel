@@ -70,3 +70,13 @@ def test_a_member_without_the_permission_is_refused(client, upstream: FakeUpstre
     login(client, "alice")
     assert client.get("/api/admin/tuning").status_code == 403
     assert client.put("/api/admin/tuning", json={"changes": {}}).status_code == 403
+
+
+def test_insights_are_forwarded_with_a_day_count_and_need_tuning_manage(client, upstream: FakeUpstream) -> None:
+    body = {"days": 3, "history": {"2026-11-24": {"router.turns": 2}}, "budgets": {"turn_tokens": 100000}}
+    upstream.handler = lambda request: httpx.Response(200, json=body) if request.url.path == "/agents/insights" else httpx.Response(404)
+    assert client.get("/api/admin/tuning/insights").status_code in (401, 403)
+    as_admin(client)
+    assert client.get("/api/admin/tuning/insights", params={"days": 3}).json() == body
+    assert upstream.requests[-1].url.query == b"days=3"
+    assert client.get("/api/admin/tuning/insights", params={"days": 99}).status_code == 422

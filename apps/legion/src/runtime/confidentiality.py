@@ -16,7 +16,8 @@ import anyio
 
 from src.agents import agent_registry, agent_spec
 from src.providers import gateway_client
-from src.providers.gateway_failover import GatewayRoute, SwitchInfo
+from src.providers.gateway_failover import GatewayRoute, NoTrustedGateway, SwitchInfo
+from src.runtime import counters
 
 AGENT_ID = "confidentiality-checker"
 TIMEOUT_SECONDS = 8
@@ -49,9 +50,10 @@ def reset(token: Token) -> None:
     _confidential.reset(token)
 
 
-def mark() -> None:
-    """The rest of this turn, and every agent it delegates to, is confidential."""
+def mark(reason: str = "check") -> None:
+    """The rest of this turn, and every agent it delegates to, is confidential. `reason` is only counted."""
     _confidential.set(True)
+    counters.add(f"confidential.marked.{reason}")
 
 
 def _excerpt(text: str) -> str:
@@ -80,9 +82,14 @@ async def is_confidential(text: str, request_id: str | None = None) -> bool:
                 "delegated_by": agent_spec.current().id,
             })
         verdict = json.loads(result["response"])["answers"]["verdict"]
-        return verdict["choice"] != "public" or bool(verdict.get("uncertain"))
+        counters.add("confidential.checks")
+        unsure = bool(verdict.get("uncertain"))
+        if unsure:
+            counters.add("confidential.unsure")
+        return verdict["choice"] != "public" or unsure
     except Exception:
         # Never log the text or a provider error: both may carry the data being checked.
+        counters.add("confidential.failed_closed")
         return True
 
 
@@ -119,7 +126,7 @@ async def protect_turn(text: str, request_id: str | None = None) -> None:
 def route_for_turn(route: GatewayRoute) -> GatewayRoute:
     """`route`, moved to a trusted gateway when the turn is confidential. Raises NoTrustedGateway when none can take it."""
     if _confidential.get():
-        route.require_trusted(gateway_client.is_trusted)
+        _require(route)
     return route
 
 
@@ -131,8 +138,8 @@ async def protect_round(route: GatewayRoute, results: list[str], request_id: str
             return None
         if not await is_confidential("\n\n".join(results), request_id):
             return None
-        mark()
-    return route.require_trusted(gateway_client.is_trusted)
+        mark("tool_result")
+    return _require(route)
 
 
 def protect_text_sync(text: str) -> None:
@@ -142,3 +149,14 @@ def protect_text_sync(text: str) -> None:
         asyncio.get_running_loop()
     except RuntimeError:
         asyncio.run(protect_turn(text))
+
+
+def _require(route: GatewayRoute) -> SwitchInfo | None:
+    try:
+        switch = route.require_trusted(gateway_client.is_trusted)
+    except NoTrustedGateway:
+        counters.add("confidential.refused")
+        raise
+    if switch:
+        counters.add("confidential.switches")
+    return switch

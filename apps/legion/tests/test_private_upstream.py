@@ -66,20 +66,20 @@ def bound(pool):
 
 
 def test_the_bound_turns_tools_join_the_catalog(bound):
-    names = [t.name for t in mcp_upstream.list_tools([])]
+    names = [t.name for t in mcp_upstream.list_tools()]
 
     assert names == ["u_notes__search"]
 
 
 def test_no_bound_turn_means_no_private_tools(pool):
-    assert mcp_upstream.list_tools([]) == []
+    assert mcp_upstream.list_tools() == []
 
 
 def test_the_agents_tool_scope_applies_to_private_tools(bound):
     scope = MagicMock()
     scope.tools.allows.side_effect = lambda name: not name.startswith("u_")
     with patch.object(mcp_upstream.agent_spec, "current", return_value=scope):
-        assert mcp_upstream.list_tools([]) == []
+        assert mcp_upstream.list_tools() == []
 
 
 def test_a_private_call_goes_to_the_pool_with_the_turns_account(bound, pool):

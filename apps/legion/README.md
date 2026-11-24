@@ -71,7 +71,7 @@ Agent strategies are `laya-only`, `jev-only` and `both`; see
 Each agent is defined by one file, `agents/<id>.json`. The file
 name stem is the agent id (`^[a-z0-9][a-z0-9-]{0,62}$`). `agents/` is
 tracked in Git as shared defaults. Admin edits go to the local
-`.data/agent_overrides.json`; create or copy a tracked file for a shared change. Unknown keys are an error, so
+the `agent_overrides` table of `.data/settings.db`; create or copy a tracked file for a shared change. Unknown keys are an error, so
 typos are caught at startup.
 
 Anthropic and OpenAI turns default to a 100,000-token budget and a 300-second
@@ -286,7 +286,7 @@ Copy-Item apps\garrison\configs\config_*.json apps\legion\configs\
 
 Then recreate the virtual environment with `uv sync` (see Setup) and point any local
 `portcullis` `config_app.json` `agents_registry_path` at `../../legion/.data/agent_registry.json`.
-Stored agent overrides in `.data/agent_overrides.json` that still use `orchestrator` or
+Stored agent overrides (the `agent_overrides` table of `.data/settings.db`) that still use `orchestrator` or
 `internal_role` are upgraded to `role` when loaded.
 
 ## Running on another machine
@@ -477,6 +477,20 @@ FreeLLMAPI, Bedrock and Vertex, start untrusted until an admin marks them. Code:
 - **Not covered:** text that only appears after the last tool result of a turn; the check reads at most 4,000
   characters (start and end) of what it is given. FreeLLMAPI's decision gateway is listed on the page but no strategy
   asks it.
+
+## Secrets, budgets and insights
+
+- **Gateway secrets are encrypted** in `settings.db` (`enc:v1:...`, Fernet; `src/gateway/sealing.py`). The key is
+  `LEGION_SECRET_KEY`, or else a key file `secret.key` in the data folder that Legion makes on first use. Back it up
+  apart from `settings.db`: together they open the secrets. Plain-text rows from before are encrypted when the gateway
+  stores open. A key that no longer fits reads as "no key" on the page; enter the key again.
+- **Budgets** (Tuning page, `budgets.*` rows): `turn_tokens` and `turn_seconds` replace the fixed 100,000 tokens and 300
+  seconds for an agent whose file sets none; `daily_tokens_per_user` and `daily_tokens_per_agent` (0 = no limit) refuse
+  a new turn once the user's or the agent's total for the UTC day is used up. Counted in `.data/stats.db` when a turn ends
+  (`src/runtime/budgets.py`), so one turn may pass its limit by what was already running.
+- **Insights** page (Tuning permission): daily counters from `stats.db` (`src/runtime/counters.py`, kept 35 days) for the
+  Router, the confidentiality check, parallel calls and `run_tools`, plus today's tokens per user and agent.
+  `GET /agents/insights?days=`.
 
 ## Gateway health
 
@@ -780,7 +794,7 @@ Agent files give each instance its own id, so any number of same-provider agents
 ## Project layout
 
 - **`agents/*.json`** - tracked default agent definitions; admin UI changes go
-  to the untracked `.data/agent_overrides.json` instead. See [`agents/README.md`](agents/README.md).
+  to the `agent_overrides` table of `.data/settings.db` instead (an older `.data/agent_overrides.json` is read in once and renamed `.migrated`). See [`agents/README.md`](agents/README.md).
 - **`gateways/<provider>/*.json`** - tracked individual gateway presets,
   read directly. See [`gateways/README.md`](gateways/README.md).
 - **`configs/*.json`** - structured settings, mostly gitignored. See

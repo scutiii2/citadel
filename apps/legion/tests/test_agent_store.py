@@ -22,7 +22,7 @@ def folder(tmp_path):
 
 
 def _overrides(folder):
-    return json.loads((folder / ".overrides" / "agent_overrides.json").read_text())
+    return agent_spec.read_overrides(folder)
 
 
 def test_create_writes_an_override_and_lists_it(folder):
@@ -162,3 +162,15 @@ def test_saved_only_catalog_lists_just_the_gateways_that_are_set_up(tmp_path, mo
     assert catalog["openai"] == [{"id": "mine", "label": "Mine", "model": "x", "tiers": []}]
     assert sorted(g["id"] for g in catalog["decision"]) == ["freellmapi", "laya"]
     assert "sekret-value" not in json.dumps(catalog)
+
+
+def test_overrides_live_in_the_settings_database_and_an_older_file_is_read_in_once(folder):
+    legacy = agent_spec.overrides_path_for(folder).with_name("agent_overrides.json")
+    legacy.parent.mkdir(exist_ok=True)
+    legacy.write_text(json.dumps({"calc": _cfg(9103)}), encoding="utf-8")
+    assert agent_store.get_agent("calc", folder)["port"] == 9103
+    assert not legacy.exists() and legacy.with_name("agent_overrides.json.migrated").exists()
+    agent_store.update_agent("calc", _cfg(9104), folder)
+    assert agent_spec.read_overrides(folder)["calc"]["port"] == 9104
+    agent_store.delete_agent("calc", folder)
+    assert "calc" not in agent_spec.read_overrides(folder)
