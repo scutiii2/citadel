@@ -290,7 +290,7 @@ async function reopenTicket(): Promise<void> {
     <template #toolbar>
       <div class="list-controls">
         <SearchField v-model="search" class="search-control" label="Search ticket titles" placeholder="Search your ticket titles…" />
-        <label class="sort-control"><span class="sr-only">Sort</span><select v-model="sort" aria-label="Sort tickets"><option value="newest">Recently updated</option><option value="oldest">Oldest update first</option></select></label>
+        <label class="sort-control"><span class="sr-only">Sort</span><select v-model="sort" aria-label="Sort tickets"><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select><svg class="sort-chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></label>
       </div>
       <SegmentedControl class="status-filters" v-model="filter" :options="filterOptions" aria-label="Ticket status" />
     </template>
@@ -380,8 +380,10 @@ async function reopenTicket(): Promise<void> {
 <style scoped>
 .list-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .search-control { flex: 1; }
-.sort-control { min-width: 0; }
-.tickets .sort-control select { max-width: 180px; padding: 10px; font-size: .8em; color: var(--muted); }
+.sort-control { position: relative; display: block; min-width: 0; }
+.tickets .sort-control select { max-width: 200px; appearance: none; padding: 10px 34px 10px 16px; border: 1px solid var(--border); border-radius: var(--radius-full); background: transparent; font-size: .8em; color: var(--muted); cursor: pointer; }
+.tickets .sort-control select:hover { color: var(--text); border-color: var(--muted); }
+.sort-chevron { position: absolute; top: 50%; right: 14px; translate: 0 -50%; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .status-filters :deep(.segmented) { flex-wrap: wrap; gap: 6px; border: 0; padding: 0; border-radius: 0; background: transparent; overflow: visible; }
 .status-filters :deep(button.segment) { padding: 6px 12px; border: 1px solid var(--border); font-size: .75em; }
 .status-filters :deep(button.segment.active) { border-color: var(--accent); }
@@ -446,7 +448,8 @@ button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12
   .tickets.thread-open :deep(.page-head-copy), .tickets.thread-open :deep(.page-toolbar) { display: none; }
   .tickets.thread-open :deep(.page-actions) { flex: 1; justify-content: space-between; align-items: center; }
   .list-controls { gap: 8px; }
-  .tickets .sort-control select { max-width: 135px; padding-inline: 7px; min-height: 44px; }
+  .tickets .sort-control select { max-width: 150px; padding-inline: 12px 30px; min-height: 44px; }
+  .sort-chevron { right: 11px; }
   .status-filters :deep(button.segment) { min-height: 44px; padding-inline: 9px; }
   .ticket-browser { border-right: 0; padding: 16px 12px; }
   .ticket-workspace.reading .ticket-browser, .ticket-workspace:not(.reading) .placeholder { display: none; }

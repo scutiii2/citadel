@@ -301,11 +301,11 @@ describe("group by", () => {
     expect(wrapper.find("table.groups th").text()).toBe("Gateway");
   });
 
-  it("says None when there are no groups", async () => {
+  it("says there is nothing to break down when there are no groups", async () => {
     const wrapper = await mountView();
 
     expect(wrapper.find("table.groups").exists()).toBe(false);
-    expect(wrapper.find(".breakdown > p.muted").text()).toBe("None.");
+    expect(wrapper.find(".breakdown .state").text()).toBe("No usage to break down in this period.");
   });
 
   it("keeps the heading of the loaded report while the next grouping loads", async () => {
@@ -433,7 +433,7 @@ describe("the recent calls list", () => {
     expect(wrapper.find(".stats").exists()).toBe(true);
     expect(wrapper.find(".calls").exists()).toBe(false);
     expect(wrapper.text()).toContain("Could not load recent calls.");
-    expect(wrapper.text()).not.toMatch(/Recent calls\s*None\./);
+    expect(wrapper.text()).not.toMatch(/Recent calls\s*No calls in this period\./);
   });
 });
 
