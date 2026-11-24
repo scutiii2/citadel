@@ -42,3 +42,32 @@ def test_the_turn_limits_come_from_tuning_unless_the_agent_file_sets_its_own():
     tuning_overrides.save({"budgets.turn_tokens": 5000, "budgets.turn_seconds": 90})
     guard = options.turn_guard()
     assert (guard.max_tokens, guard.max_seconds) == (5000, 40)
+
+
+def test_ask_refuses_a_used_up_user_budget_only_on_the_turn_the_user_asked():
+    import asyncio
+    from dataclasses import replace
+    from unittest.mock import patch
+
+    from src import server
+    from src.providers.base_provider import ChatResult
+    from src.runtime import internal_auth
+
+    tuning_overrides.save({"budgets.daily_tokens_per_user": 100})
+    counters.add(budgets.user_key("ann@example.com"), 500)
+
+    async def fake_run_chat(question, history, request_id, depth, **kwargs):
+        return ChatResult(response="done")
+
+    async def ask(depth):
+        with patch("src.server.agent_config.run_chat", new=fake_run_chat), \
+             patch("src.server.agent_config.status", return_value={"model": "m", "context_window": 1000}):
+            token = internal_auth.bind_requester(replace(internal_auth.current_requester(), email="ann@example.com"))
+            try:
+                return await server.ask("q", depth=depth)
+            finally:
+                internal_auth.reset_requester(token)
+
+    with pytest.raises(budgets.BudgetUsed):
+        asyncio.run(ask(0))
+    assert asyncio.run(ask(1))["response"] == "done"  # a specialist of a plan that already started

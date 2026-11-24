@@ -54,39 +54,38 @@ def test_allows_explicitly_needs_a_matching_allow_glob():
     assert ToolScope(("bard__*",), ("*x",)).allows_explicitly("bard__x") is False
 
 
-def test_an_agent_without_an_allow_list_sees_main_tools_only(upstream):
-    assert listed() == ["main__tool_ticket_create"]
+def test_an_agent_without_an_allow_list_sees_every_main_tool_and_no_connection(upstream):
+    # Armory's own tools, proxied extensions included, are open to every agent; a connection never is.
+    assert listed() == ["main__tool_ticket_create", "main__bard__tool_bard_speak", "main__scribe__tool_x"]
 
 
-def test_an_allow_glob_offers_a_connections_tools_without_an_enabled_extension(upstream):
-    assert listed(allow=("bard__*", "lens__*")) == ["bard__tool_bard_speak", "lens__tool_ocr"]
+def test_an_allow_glob_offers_a_connections_tools(upstream):
+    names = listed(allow=("bard__*", "lens__*"))
+    assert "bard__tool_bard_speak" in names and "lens__tool_ocr" in names
+    assert "main__tool_ticket_create" not in names  # an allow list also narrows the main tools
 
 
 def test_deny_wins_over_allow(upstream):
     assert listed(allow=("bard__*",), deny=("*speak",)) == []
 
 
-def test_the_connection_replaces_the_proxied_extension_of_the_same_name(upstream):
-    # main__bard__tool_bard_speak would match bard__* too; only the Legion connection's tool is offered.
-    assert listed(allow=("bard__*",), enabled=["bard"]) == ["bard__tool_bard_speak"]
-
-
-def test_a_proxied_extension_without_a_connection_is_unchanged(upstream):
-    assert listed(enabled=["scribe"]) == ["main__tool_ticket_create", "main__scribe__tool_x"]
-    assert listed(enabled=[]) == ["main__tool_ticket_create"]
+def test_a_connection_is_offered_beside_a_proxied_extension_of_the_same_name(upstream):
+    # Nothing merges the two any more: main__bard__* and bard__* both match bard__*.
+    assert listed(allow=("bard__*",)) == ["main__bard__tool_bard_speak", "bard__tool_bard_speak"]
 
 
 def test_a_tool_the_user_switched_off_is_not_offered(upstream, monkeypatch):
     monkeypatch.setattr(mcp_upstream.tool_filter, "is_blocked", lambda name: name == "lens__tool_ocr")
-    assert listed(allow=("bard__*", "lens__*")) == ["bard__tool_bard_speak"]
+    names = listed(allow=("bard__*", "lens__*"))
+    assert "lens__tool_ocr" not in names and "bard__tool_bard_speak" in names
 
 
-def test_shared_extensions_uses_the_connection_then_falls_back_to_armory(upstream, monkeypatch):
+def test_shared_extensions_offers_the_connection_and_the_armory_extension(upstream, monkeypatch):
     shared = agent_spec.load_file(Path(__file__).resolve().parents[1] / "agents" / "shared-extensions.json")
     monkeypatch.setattr(agent_spec, "current", lambda: shared)
-    assert [tool.name for tool in mcp_upstream.list_tools()] == ["bard__tool_bard_speak"]
-    monkeypatch.setattr(mcp_upstream.client, "list_tools", lambda: CATALOG[:3])
-    assert [tool.name for tool in mcp_upstream.list_tools()] == ["main__bard__tool_bard_speak"]
+    assert "bard__tool_bard_speak" in [tool.name for tool in mcp_upstream.list_tools()]
+    monkeypatch.setattr(mcp_upstream.client, "list_tools", lambda: CATALOG[:3])  # no connection: Armory's copy is still there
+    assert "main__bard__tool_bard_speak" in [tool.name for tool in mcp_upstream.list_tools()]
 
 
 def test_no_tool_is_blocked_outside_a_turn():
