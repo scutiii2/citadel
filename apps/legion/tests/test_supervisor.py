@@ -71,6 +71,35 @@ def test_crashing_child_is_prefixed_deregistered_restarted_then_failed(tmp_path)
     assert "off" not in deregistered[2:]
 
 
+def test_a_child_left_stopped_is_started_again_after_a_while(tmp_path):
+    lines = []
+
+    async def no_sleep(seconds):
+        return None
+
+    async def scenario():
+        sup = supervisor.Supervisor(
+            [_spec("calc", tmp_path=tmp_path)],
+            command_for=lambda spec: [sys.executable, "-c", "raise SystemExit(3)"],
+            deregister=lambda agent_id: None, out=lines.append, sleep=no_sleep,
+            policy_factory=lambda: supervisor.CrashPolicy(max_crashes=1),
+            publish=lambda specs: None, prune=lambda ids: [],
+        )
+        first = sup._children[0]
+        sup._tasks["calc"] = asyncio.create_task(first.run())
+        await sup._tasks["calc"]
+        assert first.failed
+        await sup._retry_failed()  # too soon: nothing happens
+        assert sup._children[0] is first
+        first.failed_at -= supervisor.RETRY_FAILED_SECONDS
+        await sup._retry_failed()
+        assert sup._children[0] is not first
+        await asyncio.gather(sup._tasks["calc"])
+
+    asyncio.run(asyncio.wait_for(scenario(), timeout=30))
+    assert "[supervisor] retrying calc after it was left stopped" in lines
+
+
 def test_stop_terminates_a_running_child_quickly(tmp_path):
     lines = []
 
