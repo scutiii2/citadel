@@ -60,6 +60,15 @@ def _default_classifier_settings(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolated_tool_batch_settings(monkeypatch, tmp_path):
+    """The tool-call settings come from an empty per-test database, never the developer's settings.db."""
+    from src.runtime import tool_batch_settings
+
+    monkeypatch.setattr(tool_batch_settings, "SETTINGS_DB", tmp_path / "tool_batch.db")
+    monkeypatch.setattr(tool_batch_settings, "_cache", None)
+
+
+@pytest.fixture(autouse=True)
 def _isolated_gateway_database(monkeypatch, tmp_path):
     """Gateway entries come from an empty per-test database, never the developer's real settings.db."""
     from src import gateway

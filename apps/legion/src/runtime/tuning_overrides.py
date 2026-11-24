@@ -42,6 +42,9 @@ def _add(pattern: str, rule: Rule) -> None:
     _RULES.append((re.compile(pattern), rule))
 
 
+add_rule = _add  # for settings kept elsewhere (tool_batch_settings.py) that share these checks
+
+
 for _field, _rule in {
     "max_output_tokens": Rule("int", 1, 200_000),
     "max_context_tokens": Rule("int", 1_000, 2_000_000),

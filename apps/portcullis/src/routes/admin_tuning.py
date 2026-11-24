@@ -1,7 +1,7 @@
 # apps/portcullis/src/routes/admin_tuning.py
 """/api/admin/tuning: legion's runtime tuning (token limits, failover, classifier).
 
-Needs tuning.manage. legion validates and stores the edit in its overlay file; each
+Needs tuning.manage. legion validates and stores the edit (in its overlay file, or in its settings database for `tool_batch.*`); each
 agent applies it at the start of its next turn. Every change is written to the activity log."""
 
 from __future__ import annotations

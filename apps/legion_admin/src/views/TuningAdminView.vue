@@ -55,6 +55,17 @@ const GROUPS: Group[] = [
       { path: "classifier.max_input_chars", label: "Max input characters", kind: "int", min: 1, max: 1000000, help: "The most characters of a request given to the helper to decide on." },
     ],
   },
+  {
+    id: "tool_batch", title: "Tool calls", note: "How one answer's tool calls run together. Saved in Legion's settings database; applies from the next round of calls.",
+    fields: [
+      { path: "tool_batch.parallel", label: "Run read-only tools together", kind: "bool", help: "When the model asks for several read-only tools at once, run them at the same time instead of one after another. Tools that change something, and tools that need approval, always run one at a time. Off runs every call in order." },
+      { path: "tool_batch.max_parallel", label: "Most calls at the same time", kind: "int", min: 1, max: 16, help: "The most tool calls that run together in one round. More are started as the first ones finish." },
+      { path: "tool_batch.batch_tool", label: "Offer the batch tool", kind: "bool", help: "Give specialists the run_tools tool, which runs several tool calls in one step and passes results from one call to the next. Off hides it; the tool-call rules above still apply." },
+      { path: "tool_batch.max_steps", label: "Most steps in one batch", kind: "int", min: 2, max: 20, help: "The most tool calls one run_tools call may hold. A longer list is refused." },
+      { path: "tool_batch.max_result_chars", label: "Largest result per step", kind: "int", min: 1000, max: 100000, unit: "characters", help: "Longest result the model gets back for one step of a batch. A longer result is cut and marked." },
+      { path: "tool_batch.max_total_chars", label: "Largest reply for a batch", kind: "int", min: 5000, max: 200000, unit: "characters", help: "Longest reply, in all, the model gets back for one batch. Results past it are cut." },
+    ],
+  },
   ...(["auto_tier", "auto_route"] as const).map((feature): Group => ({
     id: feature, title: feature === "auto_tier" ? "Automatic model tier" : "Automatic specialist routing",
     note: "Gateway strategy and confidence for this feature. Enable the feature in its configuration file.",
@@ -84,9 +95,16 @@ const visibleGroups = computed(() => {
 /** The popover text: what the field does, then the values it takes. */
 function helpText(field: Field): string {
   if (!field.help) return "";
-  if (field.kind === "enum") return field.help;
+  if (field.kind === "enum" || field.kind === "bool") return field.help;
   const unit = field.unit ? ` ${field.unit === "s" ? "seconds" : field.unit}` : "";
   return `${field.help} Allowed: ${field.min?.toLocaleString()} to ${field.max?.toLocaleString()}${unit}.`;
+}
+
+/** The default as text; a switch reads On or Off. */
+function shownDefault(field: Field): string {
+  const value = at(view.value?.defaults, field.path);
+  if (typeof value === "boolean") return value ? "On" : "Off";
+  return String(value ?? "Not set");
 }
 
 /** Reads `a.b.c` out of a nested object. */
@@ -213,7 +231,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
         <section v-for="group in visibleGroups" :key="group.id" class="tuning-group">
           <div class="section-head"><div><h3>{{ group.title }}</h3><p>{{ group.note }}</p></div></div>
         <SettingRow v-for="field in group.fields" :key="field.path" :setting-id="field.path" :label="field.label"
-          :description="`File default: ${at(view.defaults, field.path) ?? 'Not set'}${field.unit ? ' ' + field.unit : ''}`"
+          :description="`${field.path.startsWith('tool_batch.') ? 'Default' : 'File default'}: ${shownDefault(field)}${field.unit && typeof at(view.defaults, field.path) === 'number' ? ' ' + field.unit : ''}`"
           :data-row="field.path" :data-changed="isChanged(field.path)">
           <template v-if="field.help" #help>{{ helpText(field) }}</template>
           <span v-if="isChanged(field.path) || field.path in draft" class="badge">Changed</span>

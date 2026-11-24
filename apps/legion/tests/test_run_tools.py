@@ -4,7 +4,7 @@ import threading
 
 import pytest
 
-from src.runtime import run_tools, tool_batch
+from src.runtime import run_tools, tool_batch, tool_batch_settings
 from src.runtime.tool_batch import Call
 from tests.test_tool_batch import make_round, read_only  # noqa: F401 - the fixture marks read_* as read-only
 
@@ -121,6 +121,6 @@ def test_without_batch_tools_the_call_is_an_ordinary_unknown_tool():
 
 
 def test_a_big_result_is_cut_and_marked():
-    runner, _, _ = batch_round(lambda *a: "x" * (run_tools.MAX_RESULT_CHARS + 10))
+    runner, _, _ = batch_round(lambda *a: "x" * (tool_batch_settings.DEFAULTS["max_result_chars"] + 10))
     row = json.loads(run(runner, [step("a")]).text)["steps"]["a"]
-    assert row["truncated"] and len(row["result"]) == run_tools.MAX_RESULT_CHARS
+    assert row["truncated"] and len(row["result"]) == tool_batch_settings.DEFAULTS["max_result_chars"]

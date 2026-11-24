@@ -53,3 +53,19 @@ def test_put_refuses_a_bad_change_and_saves_nothing(client):
 
 def test_put_refuses_a_body_that_is_not_an_object(client):
     assert client.put("/agents/tuning", json=[1]).status_code == 400
+
+
+def test_tool_call_settings_are_saved_in_the_settings_database_not_the_overlay_file(client, tmp_path):
+    response = client.put("/agents/tuning", json={"tool_batch.max_parallel": 4, "token_limits.default.max_tool_rounds": 20})
+    body = response.json()
+    assert response.status_code == 200
+    assert body["overrides"] == {"token_limits.default.max_tool_rounds": 20, "tool_batch.max_parallel": 4}
+    assert body["effective"]["tool_batch"]["max_parallel"] == 4 and body["defaults"]["tool_batch"]["max_parallel"] == 8
+    assert "tool_batch" not in (tmp_path / tuning_overrides.OVERLAY_NAME).read_text(encoding="utf-8")
+    assert client.put("/agents/tuning", json={"tool_batch.max_parallel": None}).json()["overrides"] == {"token_limits.default.max_tool_rounds": 20}
+
+
+def test_a_bad_tool_call_setting_saves_nothing_in_either_store(client):
+    response = client.put("/agents/tuning", json={"token_limits.default.max_tool_rounds": 20, "tool_batch.max_parallel": 99})
+    assert response.status_code == 400 and "max_parallel" in response.json()["error"]
+    assert client.get("/agents/tuning").json()["overrides"] == {}

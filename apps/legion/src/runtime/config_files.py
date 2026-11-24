@@ -53,14 +53,16 @@ def _editable(raw: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def tuning_view(path: Path = TUNING_PATH) -> dict[str, Any]:
+def tuning_view(path: Path = TUNING_PATH, db: Path | None = None) -> dict[str, Any]:
     """What the admin page shows: the file's editable values, the admin's changes, and the two merged."""
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"{path.name} must be an object")
+    from src.runtime import tool_batch_settings  # imports this module, so not at the top
+
     overlay = tuning_overrides.PATH if path == TUNING_PATH else path.with_name(tuning_overrides.OVERLAY_NAME)
-    return {
-        "defaults": _editable(raw),
-        "overrides": tuning_overrides.load(overlay),
-        "effective": _editable(tuning_overrides.apply(raw, overlay)),
-    }
+    batch = tool_batch_settings.overrides(db)  # kept in the settings database, not in the overlay file
+    defaults = {**_editable(raw), "tool_batch": dict(tool_batch_settings.DEFAULTS)}
+    effective = {**_editable(tuning_overrides.apply(raw, overlay)),
+                 "tool_batch": {**tool_batch_settings.DEFAULTS, **{k[len(tool_batch_settings.PREFIX):]: v for k, v in batch.items()}}}
+    return {"defaults": defaults, "overrides": {**tuning_overrides.load(overlay), **batch}, "effective": effective}
