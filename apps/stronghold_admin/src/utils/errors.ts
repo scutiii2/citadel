@@ -1,5 +1,8 @@
+import { ApiError } from "../api/http";
+
 /** Display text for anything a `catch` receives. */
 export function errorMessage(err: unknown): string {
+  if (err instanceof ApiError) return `[${err.status}] ${err.message}`;
   return err instanceof Error ? err.message : String(err);
 }
 

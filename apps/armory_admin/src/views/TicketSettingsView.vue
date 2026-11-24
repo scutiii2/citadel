@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FieldLabel from "../components/admin/FieldLabel.vue";
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { ticketSettingsClient } from "../api/TicketSettingsClient";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
@@ -106,7 +108,7 @@ function discard() {
     </template>
     <p v-if="loading" class="note muted" role="status">Loading…</p>
     <form v-else class="form" data-test="form" @submit.prevent="save">
-      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" class="note" />
       <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
       <p v-if="problem && dirty" class="note muted" data-test="problem">{{ problem }}</p>
       <section v-show="panel?.matches('Tags', ...tags.map((row) => row.name + ' ' + row.description))" class="group" aria-labelledby="tags-title">
@@ -125,30 +127,32 @@ function discard() {
         </div>
       </section>
 
-      <section v-show="panel?.matches('Limits', 'Tickets Laya may file per hour', 'Hours a ticket counts as recent')" class="group" aria-labelledby="limits-title">
+      <section v-show="panel?.matches('Limits', 'Tickets Laya may file per hour', 'Hours a ticket counts as recent')" class="group fields" aria-labelledby="limits-title">
         <h3 id="limits-title">Limits</h3>
+        <p class="lede">How many tickets Laya may file by itself, and how long a ticket counts as recent.</p>
         <div class="field">
-          <label for="cap">Tickets Laya may file per hour</label>
+          <FieldLabel title="Tickets Laya may file per hour" for="cap">The most tickets Laya may file on its own in one hour. Past it, Laya stops filing until the limit allows more. Whole number, at least 1.</FieldLabel>
           <input id="cap" v-model.number="autoHourlyCap" type="number" min="1" step="1" :disabled="saving" data-test="cap" />
         </div>
         <div class="field">
-          <label for="recent">Hours a ticket counts as recent</label>
+          <FieldLabel title="Hours a ticket counts as recent" for="recent">How many hours back a ticket still counts as recent. Whole number, at least 1.</FieldLabel>
           <input id="recent" v-model.number="recentHours" type="number" min="1" step="1" :disabled="saving" data-test="recent" />
         </div>
       </section>
 
-      <section v-show="panel?.matches('Laya', 'Least confidence to act', 'Similar tickets to compare', 'Seconds to wait for Laya')" class="group" aria-labelledby="laya-title">
+      <section v-show="panel?.matches('Laya', 'Least confidence to act', 'Similar tickets to compare', 'Seconds to wait for Laya')" class="group fields" aria-labelledby="laya-title">
         <h3 id="laya-title">Laya</h3>
+        <p class="lede">How Laya compares a new ticket with the tickets already filed.</p>
         <div class="field">
-          <label for="confidence">Least confidence to act (0 to 1)</label>
+          <FieldLabel title="Least confidence to act (0 to 1)" for="confidence">How sure Laya must be before it acts on a ticket. Above 0 and at most 1.</FieldLabel>
           <input id="confidence" v-model.number="minConfidence" type="number" min="0.01" max="1" step="0.01" :disabled="saving" data-test="confidence" />
         </div>
         <div class="field">
-          <label for="candidates">Similar tickets to compare (1 to 10)</label>
+          <FieldLabel title="Similar tickets to compare (1 to 10)" for="candidates">How many existing tickets Laya compares a new ticket with. Whole number, 1 to 10.</FieldLabel>
           <input id="candidates" v-model.number="candidates" type="number" min="1" max="10" step="1" :disabled="saving" data-test="candidates" />
         </div>
         <div class="field">
-          <label for="timeout">Seconds to wait for Laya</label>
+          <FieldLabel title="Seconds to wait for Laya" for="timeout">How long to wait for Laya's answer. Above 0.</FieldLabel>
           <input id="timeout" v-model.number="timeoutSeconds" type="number" min="1" step="1" :disabled="saving" data-test="timeout" />
         </div>
       </section>
@@ -172,4 +176,7 @@ function discard() {
   .tag { grid-template-columns: minmax(0, 1fr) auto; }
   .tag .desc { grid-column: 1 / -1; grid-row: 2; }
 }
+.group.fields { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); max-width: none; align-items: start; }
+.group.fields > h3, .group.fields > .lede { grid-column: 1 / -1; }
+.lede { margin: -8px 0 0; color: var(--muted); font-size: 0.9em; }
 </style>

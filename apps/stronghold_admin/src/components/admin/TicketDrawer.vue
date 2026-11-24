@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed, ref, watch } from "vue";
 import type { AdminTicket, TicketChanges, TicketPriority, TicketStatus } from "../../api/TicketsAdminClient";
 import {
@@ -97,8 +98,8 @@ function send(): void {
       </button>
     </header>
 
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="notice" class="notice" role="status">{{ notice }}</p>
+    <ActionMessage v-if="error" kind="error" :text="error" />
+    <ActionMessage v-if="notice" kind="ok" :text="notice" />
 
     <p class="text">{{ ticket.description }}</p>
 

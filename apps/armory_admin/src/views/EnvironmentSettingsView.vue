@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PanelHelp from "../components/admin/PanelHelp.vue";
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref } from "vue";
 import { environmentClient, type EnvironmentChanges, type EnvironmentSetting } from "../api/EnvironmentClient";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
@@ -19,6 +21,14 @@ const error = ref("");
 const notice = ref("");
 const search = ref("");
 const panel = ref<InstanceType<typeof SettingsPanel>>();
+
+/** One line under each group's title. A group without an entry shows none. */
+const GROUP_LEDES: Record<string, string> = {
+  "PDF and video links": "The public addresses and signing keys behind the download links.",
+  "Web research and scraping": "The keys and address for the web search and page scraping tools.",
+  "Services Armory calls": "Which Treasury instance and connection Armory's database tools use.",
+  "Folders the read-only tools look at": "Where the read-only tools may read files.",
+};
 
 const groups = computed(() => {
   const byGroup = new Map<string, EnvironmentSetting[]>();
@@ -108,18 +118,22 @@ function discard() {
     </template>
     <p v-if="loading" class="note muted" role="status">Loading…</p>
     <form v-else class="form" data-test="form" @submit.prevent="save">
-      <p v-if="error" class="note error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" class="note" />
       <p v-if="notice" class="note muted" role="status" data-test="notice">{{ notice }}</p>
-      <section v-for="[group, rows] in groups" v-show="rows.some((setting) => panel?.matches(group, setting.label, setting.field, setting.help))" :key="group" class="group" :aria-labelledby="`g-${group}`">
+      <section v-for="[group, rows] in groups" v-show="rows.some((setting) => panel?.matches(group, setting.label, setting.field, setting.help))" :key="group" class="group fields" :aria-labelledby="`g-${group}`">
         <h3 :id="`g-${group}`">{{ group }}</h3>
+        <p v-if="GROUP_LEDES[group]" class="lede">{{ GROUP_LEDES[group] }}</p>
         <div v-for="setting in rows" v-show="panel?.matches(group, setting.label, setting.field, setting.help)" :key="setting.field" class="field" :data-test="`row-${setting.field}`">
-          <label :for="`f-${setting.field}`">
-            {{ setting.label }}
-            <span v-if="setting.restart" class="tag">after restart</span>
-            <span v-if="setting.stored || resets.has(setting.field)" class="tag" :class="{ gone: resets.has(setting.field) }">
-              {{ resets.has(setting.field) ? "back to default" : "set here" }}
-            </span>
-          </label>
+          <span class="label-line">
+            <label :for="`f-${setting.field}`">
+              {{ setting.label }}
+              <span v-if="setting.restart" class="tag">after restart</span>
+              <span v-if="setting.stored || resets.has(setting.field)" class="tag" :class="{ gone: resets.has(setting.field) }">
+                {{ resets.has(setting.field) ? "back to default" : "set here" }}
+              </span>
+            </label>
+            <PanelHelp v-if="setting.help" :title="setting.label">{{ setting.help }}</PanelHelp>
+          </span>
           <ToggleSwitch
             v-if="setting.kind === 'bool'"
             :id="`f-${setting.field}`"
@@ -150,7 +164,6 @@ function discard() {
             data-test="input"
             @input="edit(setting, ($event.target as HTMLInputElement).value)"
           />
-          <p v-if="setting.help" class="help">{{ setting.help }}</p>
           <div v-if="setting.stored && !pending(setting)" class="inline">
             <button type="button" class="chip" :disabled="saving" data-test="reset" @click="reset(setting)">Use the default</button>
           </div>
@@ -176,4 +189,10 @@ function discard() {
 .tag.gone { border-color: var(--accent); color: var(--text); }
 .help { margin: 0; font-size: 0.85em; color: var(--muted); }
 .inline { display: flex; }
+.label-line { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.label-line :deep(.admin-icon) { width: 28px; height: 28px; }
+.label-line :deep(.admin-icon svg) { width: 15px; height: 15px; }
+.group.fields { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); max-width: none; align-items: start; }
+.group.fields > h3, .group.fields > .lede { grid-column: 1 / -1; }
+.lede { margin: -8px 0 0; color: var(--muted); font-size: 0.9em; }
 </style>

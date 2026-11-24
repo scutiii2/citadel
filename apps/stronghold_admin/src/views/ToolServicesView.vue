@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { toolServicesClient, type ToolSaveBody, type ToolService, type ToolTestResult } from "../api/ToolServicesClient";
 import AdminSearch from "../components/admin/AdminSearch.vue";
@@ -251,7 +252,7 @@ watch(selectedName, () => { tab.value = "general"; });
         </div>
       </header>
       <p v-if="loading" class="admin-panel-text muted" role="status">Loading…</p>
-      <p v-else-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button class="chip" type="button" @click="load">Retry</button></p>
+      <ActionMessage v-else-if="loadError" kind="error" :text="loadError" class="admin-panel-text"><button class="chip" type="button" @click="load">Retry</button></ActionMessage>
       <p v-else-if="!visible.length" class="admin-panel-text muted">No tool services match. <button v-if="search || filter !== 'all'" type="button" class="chip" @click="search = ''; filter = 'all'; searchField?.focus()">Clear filters</button></p>
       <div v-else class="admin-table-scroll" role="region" aria-labelledby="tool-services-title" tabindex="0">
         <table class="admin-records">
@@ -342,7 +343,7 @@ watch(selectedName, () => { tab.value = "general"; });
               @blur="check(selected, row)"
             />
             <p v-if="row.checking" class="help" role="status">Checking Treasury…</p>
-            <p v-if="row.error" :id="'address-error-' + row.key" class="error" role="alert">{{ row.error }}</p>
+            <ActionMessage v-if="row.error" kind="error" :text="row.error" :id="'address-error-' + row.key" />
           </div>
           <div v-if="row.found === false || row.name" class="field">
             <label :for="'service-name-' + row.key">Outside service name</label>
@@ -377,7 +378,7 @@ watch(selectedName, () => { tab.value = "general"; });
         </div>
         </section>
         </section>
-        <p v-if="selected.error" class="error" role="alert">{{ selected.error }}</p>
+        <ActionMessage v-if="selected.error" kind="error" :text="selected.error" />
         <p v-if="selected.notice" class="help" role="status">{{ selected.notice }}</p>
         <div v-if="selected.result" class="result" :class="selected.result.ok ? 'ok' : 'bad'" data-test="test-result" role="status">
           <strong>{{ selected.result.ok ? "Connected" : "Test failed" }}</strong>

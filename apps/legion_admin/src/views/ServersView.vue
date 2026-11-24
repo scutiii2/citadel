@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { agentsAdminClient, type McpServer } from "../api/AgentsAdminClient";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
@@ -273,7 +274,7 @@ watch(editing, () => { tab.value = "general"; });
         <AdminSearch ref="searchField" v-model="search" label="Search MCP servers" />
       </div>
     </header>
-    <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button type="button" class="chip" @click="load">Retry</button></p>
+    <ActionMessage v-if="loadError" kind="error" :text="loadError" class="admin-panel-text"><button type="button" class="chip" @click="load">Retry</button></ActionMessage>
     <p v-if="!loaded && loading" class="admin-panel-text muted" role="status">Loading servers…</p>
     <p v-else-if="loaded && !rows.length" class="admin-panel-text muted" data-test="empty">
       {{ Object.keys(servers).length ? 'No servers match your search.' : 'No MCP servers configured.' }}
@@ -383,7 +384,7 @@ watch(editing, () => { tab.value = "general"; });
         Set a connection token header and value to use address overrides.
       </p>
       </section>
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" />
     </form>
     <div v-else-if="selectedServer" class="admin-details">
       <h3>{{ selectedServer.label }}</h3>
@@ -412,7 +413,7 @@ watch(editing, () => { tab.value = "general"; });
           : "None" }}</dd>
       </dl>
       <p class="muted">{{ notice || "Changes take effect at Legion’s next start." }}</p>
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <ActionMessage v-if="error" kind="error" :text="error" />
       <button class="danger" type="button" data-test="remove" :disabled="saving" @click="removing = selected">Remove server</button>
     </div>
     <template v-if="editing !== null" #footer>

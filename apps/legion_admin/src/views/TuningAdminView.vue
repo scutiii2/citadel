@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "../components/admin/ActionMessage.vue";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
 import AdminSearch from "../components/admin/AdminSearch.vue";
@@ -21,6 +22,8 @@ interface Field {
   kind: "int" | "number" | "bool" | "enum";
   options?: string[];
   unit?: string;
+  /** What the value does; the allowed range is added from `min` and `max`. */
+  help?: string;
   min?: number;
   max?: number;
 }
@@ -32,32 +35,32 @@ const GROUPS: Group[] = [
   {
     id: "limits", title: "Token limits", note: "The default for every provider. A user can set a lower value of their own for output and tool rounds.",
     fields: [
-      { path: "token_limits.default.max_output_tokens", label: "Max output tokens", kind: "int", min: 1, max: 200000 },
-      { path: "token_limits.default.max_context_tokens", label: "Max context tokens", kind: "int", min: 1000, max: 2000000 },
-      { path: "token_limits.default.max_tool_rounds", label: "Max tool rounds", kind: "int", min: 1, max: 100 },
+      { path: "token_limits.default.max_output_tokens", label: "Max output tokens", kind: "int", min: 1, max: 200000, help: "The most tokens a model may write in one reply. This is the default for every provider; a user can set a lower value of their own." },
+      { path: "token_limits.default.max_context_tokens", label: "Max context tokens", kind: "int", min: 1000, max: 2000000, help: "The most tokens of conversation Legion may use in one request to a model. This is the default for every provider." },
+      { path: "token_limits.default.max_tool_rounds", label: "Max tool rounds", kind: "int", min: 1, max: 100, help: "How many times one answer may call tools and read their results before it must answer. A user can set a lower value of their own." },
     ],
   },
   {
     id: "failover", title: "Gateway failover", note: "How long a failing gateway is skipped before it is tried again.",
     fields: [
-      { path: "gateway_failover.quota_cooldown_seconds", label: "After a quota error", kind: "number", unit: "s", min: 0, max: 604800 },
-      { path: "gateway_failover.auth_cooldown_seconds", label: "After an auth error", kind: "number", unit: "s", min: 0, max: 604800 },
-      { path: "gateway_failover.unavailable_cooldown_seconds", label: "After an outage", kind: "number", unit: "s", min: 0, max: 604800 },
+      { path: "gateway_failover.quota_cooldown_seconds", label: "After a quota error", kind: "number", unit: "s", min: 0, max: 604800, help: "How long a gateway is skipped after it answers that its quota is used up. Legion tries the next gateway meanwhile. A restart clears all cooldowns." },
+      { path: "gateway_failover.auth_cooldown_seconds", label: "After an auth error", kind: "number", unit: "s", min: 0, max: 604800, help: "How long a gateway is skipped after it refuses the key or login. Legion tries the next gateway meanwhile. A restart clears all cooldowns." },
+      { path: "gateway_failover.unavailable_cooldown_seconds", label: "After an outage", kind: "number", unit: "s", min: 0, max: 604800, help: "How long a gateway is skipped after it cannot be reached. Legion tries the next gateway meanwhile. A restart clears all cooldowns." },
     ],
   },
   {
     id: "classifier", title: "Classifier", note: "Timeout and input limits for automatic routing and tier decisions.",
     fields: [
-      { path: "classifier.timeout_seconds", label: "Timeout", kind: "number", unit: "s", min: 0.1, max: 60 },
-      { path: "classifier.max_input_chars", label: "Max input characters", kind: "int", min: 1, max: 1000000 },
+      { path: "classifier.timeout_seconds", label: "Timeout", kind: "number", unit: "s", min: 0.1, max: 60, help: "How long Legion waits for the helper's decision (automatic tier and specialist routing) before it gives up on it." },
+      { path: "classifier.max_input_chars", label: "Max input characters", kind: "int", min: 1, max: 1000000, help: "The most characters of a request given to the helper to decide on." },
     ],
   },
   ...(["auto_tier", "auto_route"] as const).map((feature): Group => ({
     id: feature, title: feature === "auto_tier" ? "Automatic model tier" : "Automatic specialist routing",
     note: "Gateway strategy and confidence for this feature. Enable the feature in its configuration file.",
     fields: [
-      { path: `classifier.${feature}.strategy`, label: "Decision strategy", kind: "enum", options: STRATEGIES },
-      { path: `classifier.${feature}.min_confidence`, label: "Minimum confidence", kind: "int", min: 0, max: 100, unit: "%" },
+      { path: `classifier.${feature}.strategy`, label: "Decision strategy", kind: "enum", options: STRATEGIES, help: "Which helper decides. laya-only asks Laya alone, jev-only asks Jev alone, both asks both (the default)." },
+      { path: `classifier.${feature}.min_confidence`, label: "Minimum confidence", kind: "int", min: 0, max: 100, unit: "%", help: "How sure the helper must be before its decision is used, as a percentage. Below it, Legion does not use the decision." },
     ],
   })),
 ];
@@ -77,6 +80,14 @@ const visibleGroups = computed(() => {
     fields: group.fields.filter((field) => [group.title, group.note, field.label, field.path].some((text) => text.toLowerCase().includes(query))),
   })).filter((group) => group.fields.length);
 });
+
+/** The popover text: what the field does, then the values it takes. */
+function helpText(field: Field): string {
+  if (!field.help) return "";
+  if (field.kind === "enum") return field.help;
+  const unit = field.unit ? ` ${field.unit === "s" ? "seconds" : field.unit}` : "";
+  return `${field.help} Allowed: ${field.min?.toLocaleString()} to ${field.max?.toLocaleString()}${unit}.`;
+}
 
 /** Reads `a.b.c` out of a nested object. */
 function at(source: Record<string, unknown> | undefined, path: string): number | boolean | string | undefined {
@@ -194,16 +205,17 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
           <AdminSearch ref="searchField" v-model="search" label="Search settings" />
         </div>
       </header>
-      <p v-if="loadError" class="admin-panel-text error" role="alert">{{ loadError }} <button type="button" class="small" @click="load">Retry</button></p>
+      <ActionMessage v-if="loadError" kind="error" :text="loadError" class="admin-panel-text"><button type="button" class="small" @click="load">Retry</button></ActionMessage>
       <p v-else-if="!view" class="admin-panel-text muted" role="status">Loading tuning…</p>
       <template v-else>
         <p v-if="!visibleGroups.length" class="admin-panel-text muted">No settings match your search. <button type="button" class="small" @click="search = ''; searchField?.focus()">Clear search</button></p>
-        <p v-if="saveError && !invalidPath" class="admin-panel-text error" role="alert">{{ saveError }}</p>
+        <ActionMessage v-if="saveError && !invalidPath" kind="error" :text="saveError" class="admin-panel-text" />
         <section v-for="group in visibleGroups" :key="group.id" class="tuning-group">
           <div class="section-head"><div><h3>{{ group.title }}</h3><p>{{ group.note }}</p></div></div>
         <SettingRow v-for="field in group.fields" :key="field.path" :setting-id="field.path" :label="field.label"
           :description="`File default: ${at(view.defaults, field.path) ?? 'Not set'}${field.unit ? ' ' + field.unit : ''}`"
           :data-row="field.path" :data-changed="isChanged(field.path)">
+          <template v-if="field.help" #help>{{ helpText(field) }}</template>
           <span v-if="isChanged(field.path) || field.path in draft" class="badge">Changed</span>
           <button v-if="isChanged(field.path) && draft[field.path] !== null" type="button" class="small" data-test="reset" :disabled="saving" :aria-label="`Reset ${field.label}`" @click="reset(field)">Reset</button>
           <ToggleSwitch v-if="field.kind === 'bool'" :id="field.path" :data-path="field.path" :aria-label="field.label" :checked="shown(field) === true" :disabled="saving"

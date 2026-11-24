@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import {
   ticketsAdminClient,
@@ -304,9 +305,9 @@ function setPinned(group: TicketGroup, event: Event): void {
     </p>
     <p v-if="mode === 'board' && boardTickets.length >= 500" class="muted limit-note">Showing the latest 500 matching tickets. Filter by priority or tag to narrow the board.</p>
 
-    <p v-if="loadError" class="error" role="alert">Could not load tickets: {{ loadError }}</p>
-    <p v-if="actionError && !selected" class="error" role="alert">{{ actionError }}</p>
-    <p v-if="notice && !selected" class="notice" role="status">{{ notice }}</p>
+    <ActionMessage v-if="loadError" kind="error" :text="`Could not load tickets: ${loadError}`" />
+    <ActionMessage v-if="actionError && !selected" kind="error" :text="actionError" />
+    <ActionMessage v-if="notice && !selected" kind="ok" :text="notice" />
 
     <p v-if="loading" class="muted loading" role="status">Loading tickets…</p>
     <TicketBoard v-if="mode === 'board'" :tickets="visibleTickets" :groups="groups" :busy="busy || loading" :status-filter="status" @select="select" @status="changeBoardStatus" />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActionMessage from "./ActionMessage.vue";
 import { computed } from "vue";
 import type { AgentFile, AgentStatus, AgentTier, LiveAgent } from "../../api/AgentsAdminClient";
 
@@ -74,7 +75,7 @@ const sections = computed(() => [
       <span v-if="agent.entry" class="tag entry-tag">Entry</span>
       <span v-if="agent.role === 'orchestrator'" class="tag">Orchestrator</span>
     </div>
-    <p v-if="agent.error" class="problem" role="alert">{{ agent.error }}</p>
+    <ActionMessage v-if="agent.error" kind="error" :text="agent.error" />
     <template v-else>
       <p class="focus">{{ agent.focus || "No description." }}</p>
       <p v-if="agent.role === 'router'" class="focus">
