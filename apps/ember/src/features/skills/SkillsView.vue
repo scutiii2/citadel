@@ -9,7 +9,7 @@ import SearchField from "../../components/ui/lists/SearchField.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import DangerZone from "../../components/ui/status/DangerZone.vue";
 import CharacterCount from "../../components/ui/status/CharacterCount.vue";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import ShareDialog, { type ShareTarget } from "../sharing/components/ShareDialog.vue";
 import { useDeleteConfirm } from "../../composables/useDeleteConfirm";
 import { useListLoad } from "../../composables/useListLoad";

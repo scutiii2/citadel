@@ -7,7 +7,7 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import PageLayout from '../../components/layout/PageLayout.vue'
 import ActionButton from '../../components/ui/buttons/ActionButton.vue'
-import RecordDrawer from '../../components/ui/panel/RecordDrawer.vue'
+import { RecordDrawer } from "@citadel/ui"
 import SegmentedControl from '../../components/ui/forms/SegmentedControl.vue'
 import DropZone from './components/DropZone.vue'
 import SourceList from './components/SourceList.vue'

@@ -3,7 +3,7 @@ import { computed, onUnmounted, reactive, ref, watch } from "vue";
 import type { UserExtension } from "../api/UserExtensionsClient";
 import { useUserExtensionsStore } from "../stores/userExtensions";
 import { errorMessage } from "../../../utils/errors";
-import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
+import { RecordDrawer } from "@citadel/ui";
 
 /** Adds a private extension (`extension` null) or edits one. Saved headers are
  * secrets ember_api never sends back, so an edit lists their names only and

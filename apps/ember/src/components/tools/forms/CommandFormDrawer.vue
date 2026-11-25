@@ -3,7 +3,7 @@ import { computed } from "vue";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
 import type { JsonSchema } from "../../../api/types";
 import { commandText } from "../../../utils/tools/toolSchema";
-import RecordDrawer from "../../ui/panel/RecordDrawer.vue";
+import { RecordDrawer } from "@citadel/ui";
 import ToolRunForm from "./ToolRunForm.vue";
 
 /** Fills a slash command's parameters from a form (port of chat_app's

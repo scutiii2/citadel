@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import DangerZone from "../../../components/ui/status/DangerZone.vue";
 // One uploaded file: page range (PDF) or fit (image), rotate, copy ID, remove.
-import CopyButton from '../../../components/ui/buttons/CopyButton.vue'
+import { CopyButton } from "@citadel/ui"
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
 import { ref, watch } from 'vue'
 import type { Fit } from '../api/pdfMergerTypes'

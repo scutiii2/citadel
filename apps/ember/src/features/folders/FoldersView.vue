@@ -2,8 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import "../../components/layout/infoPage.css";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import CopyButton from "../../components/ui/buttons/CopyButton.vue";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { CopyButton } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
 import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";

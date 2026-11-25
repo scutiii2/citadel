@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { isDesktop, mediaUrl } from "../../utils/server";
 import type { AttachmentBlock } from "../../utils/content/attachments";
 import { useAuthStore } from "../../stores/auth";
-import BaseModal from "../ui/dialogs/BaseModal.vue";
+import { BaseModal } from "@citadel/ui";
 
 const props = defineProps<{ attachment: AttachmentBlock }>();
 const auth = useAuthStore();

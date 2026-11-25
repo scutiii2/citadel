@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
+import { RecordDrawer } from "@citadel/ui";
 import { useAuthStore } from "../../../stores/auth";
 import { errorMessage } from "../../../utils/errors";
 import { formatUtc } from "../../../utils/time";

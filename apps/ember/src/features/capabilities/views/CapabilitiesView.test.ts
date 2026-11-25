@@ -6,7 +6,7 @@ import type { Account } from "../../../api/auth/AuthClient";
 import type { CapabilityInfo } from "../../../api/tools/CommandsClient";
 import type { UserExtension } from "../api/UserExtensionsClient";
 import type { ResourceInfo, ToolInfo } from "../../../api/types";
-import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import { useAuthStore } from "../../../stores/auth";
 import CapabilitiesView from "./CapabilitiesView.vue";
 

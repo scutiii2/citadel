@@ -2,7 +2,7 @@
 import { storeToRefs } from "pinia";
 import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from "vue";
 import EmberLogo from "../../../components/layout/EmberLogo.vue";
-import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import ChatHeader from "../components/ChatHeader.vue";
 import ChatInput from "../components/ChatInput.vue";
 import ApprovalModePicker from "../components/ApprovalModePicker.vue";

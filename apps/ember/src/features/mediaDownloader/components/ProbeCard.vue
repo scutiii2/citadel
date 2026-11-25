@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
-import CopyButton from '../../../components/ui/buttons/CopyButton.vue'
+import { CopyButton } from "@citadel/ui"
 import SegmentedControl from '../../../components/ui/forms/SegmentedControl.vue'
 import type { ProbeResult } from '../api/MediaDownloaderTypes'
 import { formatBytes } from '../../../utils/format'

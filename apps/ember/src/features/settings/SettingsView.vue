@@ -3,7 +3,7 @@ import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, ref, useTemplateRef, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import { DraftActions } from "@citadel/ui";
 import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import { checked } from "../../utils/browser/dom";

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { isApiStatus } from "../../../api/http";
-import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
-import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
+import { RecordDrawer } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
 import CharacterCount from "../../../components/ui/status/CharacterCount.vue";
 import DangerZone from "../../../components/ui/status/DangerZone.vue";
 import { useAuthStore } from "../../../stores/auth";

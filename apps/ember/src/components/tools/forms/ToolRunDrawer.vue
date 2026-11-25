@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { useAuthStore } from "../../../stores/auth";
 import type { ToolInfo, ToolRunResult } from "../../../api/types";
-import RecordDrawer from "../../ui/panel/RecordDrawer.vue";
+import { RecordDrawer } from "@citadel/ui";
 import ToolResultPanel from "../ToolResultPanel.vue";
 import ToolRunForm from "./ToolRunForm.vue";
-import CopyButton from "../../ui/buttons/CopyButton.vue";
+import { CopyButton } from "@citadel/ui";
 
 /** A tool's details in a drawer: its description, the form for its parameters
  * to run it, and the last result. Open while `tool` is set; the parent holds

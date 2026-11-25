@@ -4,7 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import "../../components/layout/infoPage.css";
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import { ApiError } from "../../api/http";
 import { useAuthStore } from "../../stores/auth";

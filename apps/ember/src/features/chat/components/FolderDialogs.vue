@@ -4,7 +4,7 @@ import { FOLDER_NAME_MAX, type ChatFolder } from "../api/FoldersClient";
 import { useFoldersStore } from "../stores/folders";
 import { errorMessage } from "../../../utils/errors";
 import { plural } from "../../../utils/format";
-import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
+import { BaseModal } from "@citadel/ui";
 import { DeleteButton } from "@citadel/ui";
 
 // The folder dialogs of the chat page (new, rename, delete), driven from the

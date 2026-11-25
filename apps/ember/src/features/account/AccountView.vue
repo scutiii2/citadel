@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import PasswordInput from "../../components/ui/forms/PasswordInput.vue";
+import { PasswordInput } from "@citadel/ui";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { authClient, type KnownDevice } from "../../api/auth/AuthClient";
 import ActionButton from "../../components/ui/buttons/ActionButton.vue";
 import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import { THEME_LABELS, useTheme } from "../../composables/useTheme";
 import { visiblePages } from "../../router/pages";
 import { usePageVisibilityStore } from "../../stores/navigation/pageVisibility";

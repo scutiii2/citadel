@@ -13,7 +13,7 @@ import { ToggleSwitch } from "@citadel/ui";
 import ToolRunDrawer from "../../../components/tools/forms/ToolRunDrawer.vue";
 import ResourceReader from "../components/ResourceReader.vue";
 import UserExtensionDrawer from "../components/UserExtensionDrawer.vue";
-import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import { useAuthStore } from "../../../stores/auth";
 import { useUserExtensionsStore } from "../stores/userExtensions";
 import { groupTools } from "../utils/capabilityGroups";

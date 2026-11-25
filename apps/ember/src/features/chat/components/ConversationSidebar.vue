@@ -7,7 +7,7 @@ import type { Conversation } from "../../../api/types";
 import { chatMenuItems, folderMenuItems, parseChatChoice } from "../utils/chatMenu";
 import { dropOps, type DropTarget } from "../utils/chatDrop";
 import { buildLayout } from "../utils/chatSections";
-import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import ChatRow from "./ChatRow.vue";
 import ChatSection from "./ChatSection.vue";
 import PopupMenu from "../../../components/ui/menus/PopupMenu.vue";

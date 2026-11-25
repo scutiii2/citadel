@@ -7,7 +7,7 @@ export type ShareTarget =
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
+import { RecordDrawer } from "@citadel/ui";
 import { useAuthStore } from "../../../stores/auth";
 import { errorMessage } from "../../../utils/errors";
 import { SHARE_NAME_MAX, type NewShare, type Recipient, type Share } from "../api/SharingClient";

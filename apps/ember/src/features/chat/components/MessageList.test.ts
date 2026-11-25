@@ -6,7 +6,7 @@ import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "../stores/chat";
 import { useEntryAgentStore } from "../stores/entryAgent";
 import { withAttachments } from "../../../utils/content/attachments";
-import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import MessageList from "./MessageList.vue";
 
 // <AgentActivity> reads the chat store, which loads chats when it starts.

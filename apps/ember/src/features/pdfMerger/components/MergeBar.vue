@@ -2,8 +2,8 @@
 import WavyProgress from "../../../components/ui/status/WavyProgress.vue";
 // Merge summary, progress, result and the merge button.
 import { computed, ref } from 'vue'
-import ConfirmModal from '../../../components/ui/dialogs/ConfirmModal.vue'
-import CopyButton from '../../../components/ui/buttons/CopyButton.vue'
+import { ConfirmModal } from "@citadel/ui"
+import { CopyButton } from "@citadel/ui"
 import DownloadCards from '../../../components/content/DownloadCards.vue'
 import ElapsedTime from '../../../components/ui/status/ElapsedTime.vue'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
