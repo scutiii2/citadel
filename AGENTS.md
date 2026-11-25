@@ -13,3 +13,5 @@ For UI work in `apps/ember` (the Windows app) or any admin app (`portcullis_admi
 
 ## No reduced motion
 Never add a reduced-motion setting, a `prefers-reduced-motion` media query or a reduced-motion test, in any app or doc. Animations always play. Remove one if found in code you touch. Repeats across every skill and plan: do not write it back in.
+
+- Shared UI lives in `libs/citadel_ui` (`@citadel/ui`) and is the real source for every frontend, Ember included. Use an existing component, composable or style from there; if none applies, create it there and export it from `src/index.ts`, not in the app. Ember is not in the pnpm workspace yet, so its local copies of library components move to the library as you touch them.
