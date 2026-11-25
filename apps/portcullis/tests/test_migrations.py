@@ -17,8 +17,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0030"
-NEXT = "0031"
+HEAD = "0031"
+NEXT = "0032"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -35,8 +35,15 @@ def drop_log_prompts(conn: sqlite3.Connection) -> None:
     drop_second_brain(conn)
 
 
+def drop_shared_folders(conn: sqlite3.Connection) -> None:
+    """Undo migration 0031 on a database built from the current models."""
+    conn.execute("DROP TABLE IF EXISTS shared_folder_files")
+    conn.execute("DROP TABLE IF EXISTS shared_folders")
+
+
 def drop_second_brain(conn: sqlite3.Connection) -> None:
     """Undo the chat option on model-built databases rewound before 0024."""
+    drop_shared_folders(conn)
     drop_triage_strategy(conn)
     if "second_brain_scope" in {row[1] for row in conn.execute("PRAGMA table_info(chats)")}:
         conn.execute("ALTER TABLE chats DROP COLUMN second_brain_scope")
@@ -229,10 +236,13 @@ def test_0030_renames_the_seeded_power_user_role_and_reverses(tmp_path: Path) ->
 
     assert run_with(make_database(tmp_path)) == "upgraded"
     after = _roles(path)
-    # same id, permissions and holders under the new name
+    # same id, permissions and holders under the new name (0031 gives chat roles folders.use again on the way up)
+    def kept(role):
+        return (role[2] - {"folders.use"}, role[3])
+
     assert after["Tool Services Manager"][0] == before["Power User"][0]
-    assert after["Tool Services Manager"][2:] == before["Power User"][2:]
-    assert after["Operator"][2:] == before["Operator"][2:]
+    assert kept(after["Tool Services Manager"]) == kept(before["Power User"])
+    assert kept(after["Operator"]) == kept(before["Operator"])
 
 
 def test_0030_leaves_an_edited_power_user_role_alone(tmp_path: Path) -> None:
@@ -647,7 +657,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*", "0025*", "0026*", "0027*", "0028*", "0029*", "0030*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*", "0025*", "0026*", "0027*", "0028*", "0029*", "0030*", "0031*"))
         calls: list[int] = []
 
         async def backup() -> None:

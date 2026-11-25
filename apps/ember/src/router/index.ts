@@ -102,6 +102,12 @@ export const router = createRouter({
       meta: { permission: "tickets.create" },
     },
     {
+      path: "/folders",
+      name: "folders",
+      component: () => import("../features/folders/FoldersView.vue"),
+      meta: { permission: "folders.use" },
+    },
+    {
       path: "/settings",
       name: "settings",
       component: () => import("../features/settings/SettingsView.vue"),
@@ -127,6 +133,12 @@ export const router = createRouter({
       path: "/shared/:token",
       name: "shared",
       component: () => import("../features/chat/views/SharedChatView.vue"),
+      meta: { public: true },
+    },
+    {
+      path: "/folder/:token",
+      name: "shared-folder",
+      component: () => import("../features/folders/SharedFolderView.vue"),
       meta: { public: true },
     },
     { path: "/:pathMatch(.*)*", redirect: "/" },

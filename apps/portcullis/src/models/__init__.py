@@ -13,6 +13,7 @@ from src.models.otp import EmailVerificationCode, InviteCode
 from src.models.outside_client import OutsideClient, OutsideClientEvent
 from src.models.role import Permission, Role
 from src.models.shared_chat import SharedChat
+from src.models.shared_folder import SharedFolder, SharedFolderFile
 from src.models.traffic_bucket import TrafficBucket
 from src.models.ticket_activity import AccountTicketSeen, TicketStaffActivity
 from src.models.usage import UsageRecord
@@ -34,6 +35,8 @@ __all__ = [
     "Permission",
     "Role",
     "SharedChat",
+    "SharedFolder",
+    "SharedFolderFile",
     "TrafficBucket",
     "TicketStaffActivity",
     "UsageRecord",

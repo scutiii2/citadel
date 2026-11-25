@@ -147,17 +147,14 @@ Optional follow-up features, not implemented:
 
 **Revisit when**: the fresh Citadel stack works on the box. Related: "Move Treasury out of Citadel into its own stack", which needs the same shared network.
 
-## Temporary file folders shared by link (added 2026-11-25)
+## Temporary file folders shared by link: built 2026-11-25, verify on the box
 
-**Context**: An Ember user opens a temporary folder and shares its link with people who do not log in. The owner has full control; guests can only download and add files.
+**Done**: Portcullis `routes/shared_folders.py` and `services/shared_folder_service.py` (tables `shared_folders`, `shared_folder_files`, migration 0031, permission `folders.use`), Ember pages `/folders` (owner) and `/folder/:token` (public), `client_max_body_size 100m` in `apps/ember/nginx.conf`. Caps: 100 MB per file, 500 MB and 50 files per folder, 3 open folders and 1 GB per account.
 
-- **Folder**: created by the owner in Ember. Pruning time set at creation, 1 hour at most. The folder is deleted at creation time + pruning time. Adding or removing files never moves the countdown.
-- **Files**: 100 MB at most per file. Guests download and add, never remove. Only the owner removes files, or the whole folder.
-- **Link**: unguessable token in the URL; guest routes need no login. Public routes live in `portcullis` (new `routes/`), the owner's page in `apps/ember`; files stored on a volume.
-- **Open design points**: cap on total folder size and file count (anonymous upload is an abuse risk); rate limit per link; serve downloads as `attachment` with `application/octet-stream`; a sweeper task that deletes expired folders, also at startup; owner can revoke the link early; check how the public URL (Tailscale) exposes guest routes while the rest stays private.
-- **Not an Armory capability**: capabilities are agent tools. This is an Ember page plus Portcullis routes, so apply `portcullis-feature-scaffold` and `ember-feature-scaffold`.
-
-**Revisit when**: user wants it built. Brainstorm the limits and storage first.
+**Still to check by hand** (nothing run in a browser or on the box):
+- Rebuild `ember` and `portcullis` on Zima; check a 100 MB upload through the Tailscale URL (any proxy in front needs a 100 MB body limit too).
+- Roles other than those holding `chat.share` do not get `folders.use`; grant it in Portcullis Admin if wanted.
+- Two uploads at the same moment can pass a folder cap by one file each (shortcut noted in the service).
 
 ## Encrypted anonymous meeting room (added 2026-11-25)
 
