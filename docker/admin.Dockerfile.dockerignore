@@ -6,7 +6,7 @@
 .data
 .worktrees
 releases
-apps/ember
+apps/ember/src-tauri
 apps/armory
 apps/legion
 apps/portcullis
