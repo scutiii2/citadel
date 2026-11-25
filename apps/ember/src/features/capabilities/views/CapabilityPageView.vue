@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PageLayout from "../../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { capabilityPagesClient, type GuiPageSpec } from "../../../api/tools/CapabilityPagesClient";

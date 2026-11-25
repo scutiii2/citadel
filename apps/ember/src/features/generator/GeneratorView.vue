@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PanelHelp } from "@citadel/ui";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import "@citadel/ui/infoPage.css";
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { McpServerClient } from "../../api/tools/McpServerClient";

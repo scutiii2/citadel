@@ -6,7 +6,7 @@ import { commandsClient, type CapabilityInfo } from "../../../api/tools/Commands
 import { McpServerClient } from "../../../api/tools/McpServerClient";
 import type { UserExtension } from "../api/UserExtensionsClient";
 import type { ResourceInfo, ToolInfo, ToolRunResult } from "../../../api/types";
-import PageLayout from "../../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { PanelHelp } from "@citadel/ui";
 import StateMessage from "../../../components/ui/status/StateMessage.vue";
 import { ToggleSwitch } from "@citadel/ui";

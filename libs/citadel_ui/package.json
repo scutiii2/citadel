@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./base.css": "./src/styles/base.css",
     "./admin.css": "./src/styles/admin.css",
-    "./infoPage.css": "./src/styles/infoPage.css"
+    "./infoPage.css": "./src/styles/infoPage.css",
+    "./pageLayout.css": "./src/styles/pageLayout.css"
   },
   "scripts": {
     "build": "vue-tsc --noEmit",

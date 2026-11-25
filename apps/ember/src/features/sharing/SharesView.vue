@@ -2,7 +2,7 @@
 import { PanelHelp } from "@citadel/ui";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import "@citadel/ui/infoPage.css";
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { ConfirmModal } from "@citadel/ui";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import { useAuthStore } from "../../stores/auth";

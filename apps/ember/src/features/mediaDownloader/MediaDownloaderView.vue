@@ -4,7 +4,7 @@ import { useNarrow } from "../../composables/useNarrow";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
-import PageLayout from '../../components/layout/PageLayout.vue'
+import { PageLayout } from "@citadel/ui"
 import ActionButton from '../../components/ui/buttons/ActionButton.vue'
 import DangerZone from "../../components/ui/status/DangerZone.vue";
 import RetentionNote from "../../components/ui/status/RetentionNote.vue";

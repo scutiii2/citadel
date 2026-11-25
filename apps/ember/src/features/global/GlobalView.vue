@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PanelHelp } from "@citadel/ui";
 import { computed, ref, watch } from "vue";
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import { useAuthStore } from "../../stores/auth";
 import { GLOBAL_NOTICE } from "./api/GlobalClient";

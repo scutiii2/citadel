@@ -110,10 +110,8 @@ Routes import their feature views directly. Preserve view filenames because
 `App.vue` uses component names for `KeepAlive`. Page-layout checks discover
 views recursively, and radius checks cover every feature and shared component.
 
-Ember Admin imports `components/layout/PwaStatus.vue` and
-`components/layout/pageLayout.css` directly from this app. Update those consumers
-when moving either file. Other shared components have copies in Admin; keep
-behavior and design fixes consistent between the apps.
+Shared components, composables and styles (PageLayout, pageLayout.css, infoPage.css, buttons, dialogs)
+live in `libs/citadel_ui` and are imported from `@citadel/ui`; change them there.
 
 Run `pnpm run build`, `pnpm test`, and `pnpm run test:e2e` from `apps/ember` after
 restructuring. Check Admin too when changing its shared imports.
