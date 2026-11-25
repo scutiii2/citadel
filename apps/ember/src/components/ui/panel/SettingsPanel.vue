@@ -2,9 +2,9 @@
 import { ref, toRef, useId } from "vue";
 import { useDraftPanel } from "../../../composables/useDraftPanel";
 import PageLayout from "../../layout/PageLayout.vue";
-import AdminSearch from "./AdminSearch.vue";
+import { AdminSearch } from "@citadel/ui";
 import ConfirmModal from "../dialogs/ConfirmModal.vue";
-import DraftActions from "./DraftActions.vue";
+import { DraftActions } from "@citadel/ui";
 import PanelHelp from "./PanelHelp.vue";
 import "./admin.css";
 

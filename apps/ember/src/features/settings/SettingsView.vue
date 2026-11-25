@@ -4,7 +4,7 @@ import { computed, onMounted, ref, useTemplateRef, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
-import DraftActions from "../../components/ui/panel/DraftActions.vue";
+import { DraftActions } from "@citadel/ui";
 import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
 import { checked } from "../../utils/browser/dom";
 import { errorMessage } from "../../utils/errors";
@@ -22,7 +22,7 @@ import { adoptLimits, emptyLimitsState, limitsDirty, limitsPayload } from "./uti
 import ResponseLimits from "./components/ResponseLimits.vue";
 import SidebarEditor from "./components/SidebarEditor.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
-import ToggleSwitch from "../../components/ui/forms/ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 import { requestCompletionPermission } from "../chat/composables/useCompletionNotify";
 import { DEFAULT_THEME, useTheme, type Theme } from "../../composables/useTheme";
 import { useAuthStore } from "../../stores/auth";

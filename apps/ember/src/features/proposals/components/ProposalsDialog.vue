@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
 import StateMessage from "../../../components/ui/status/StateMessage.vue";
 import { useAuthStore } from "../../../stores/auth";

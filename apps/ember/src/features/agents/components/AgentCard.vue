@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AgentListing, AgentStatus } from "../api/AgentsClient";
 import AgentLlm from "./AgentLlm.vue";
-import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 
 /** One agent on the Agents page: name, id, role badges, what it is for, its
  * provider / gateway / model, and whether it is running. The card opens a dialog with the full description. The status is an icon and a word, never colour alone. */

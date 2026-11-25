@@ -9,8 +9,8 @@ import { onBeforeRouteLeave } from "vue-router";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import CopyButton from "../../components/ui/buttons/CopyButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
-import ToggleSwitch from "../../components/ui/forms/ToggleSwitch.vue";
-import RangeSlider from "../../components/ui/forms/RangeSlider.vue";
+import { ToggleSwitch } from "@citadel/ui";
+import { RangeSlider } from "@citadel/ui";
 import { checked } from "../../utils/browser/dom";
 import { errorMessage } from "../../utils/errors";
 
