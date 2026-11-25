@@ -3,14 +3,13 @@ import { describe, expect, it } from "vitest";
 import DeleteButton from "./DeleteButton.vue";
 
 describe("DeleteButton", () => {
-  it("is not pinned or collapsed when busy flips while it is hidden (a closed dialog)", async () => {
-    // jsdom has no layout, so offsetWidth is 0 like a button inside a closed dialog.
+  it("keeps its label in place and sets no inline size while busy (the CSS swaps it for a spinner)", async () => {
     const wrapper = mount(DeleteButton, { props: { label: "Delete", busy: false } });
     await wrapper.setProps({ busy: true });
-    await wrapper.setProps({ busy: false });
 
     const button = wrapper.get("button");
-    expect(button.classes()).not.toContain("collapsed");
+    expect(button.attributes("aria-busy")).toBe("true");
+    expect(wrapper.get(".label").text()).toBe("Delete");
     expect((button.element as HTMLButtonElement).style.width).toBe("");
   });
 
