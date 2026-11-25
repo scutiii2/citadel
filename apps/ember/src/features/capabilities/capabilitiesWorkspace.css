@@ -9,7 +9,7 @@
 .search-box { display: flex; align-items: center; flex-shrink: 0; gap: 10px; min-height: 44px; margin-bottom: 20px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .search-box svg { flex-shrink: 0; width: 18px; height: 18px; color: var(--muted); }
 .search-box input { width: 100%; min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: .85em; }
-.search-box:focus-within { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 2px; }
+.search-box:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .search-box input:focus-visible { outline: none; }
 .list-heading, .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .list-heading { flex-shrink: 0; margin: 0 8px 10px; }

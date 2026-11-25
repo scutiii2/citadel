@@ -195,8 +195,8 @@ input {
   background: var(--bg);
   font: inherit;
 }
-input:focus {
-  border-color: var(--accent);
+input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .headers {
   display: grid;

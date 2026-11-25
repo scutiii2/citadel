@@ -103,6 +103,6 @@ function onKeydown(event: KeyboardEvent): void {
 }
 .tab:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 </style>

@@ -667,8 +667,8 @@ watch(
   font: inherit;
   font-size: 0.9em;
 }
-.search input:focus {
-  border-color: var(--accent);
+.search input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .hit {
   align-items: flex-start;

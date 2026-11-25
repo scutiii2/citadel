@@ -270,7 +270,7 @@ nav a.current {
 }
 :focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 /* The page name, beside the icon, on hover or keyboard focus. */

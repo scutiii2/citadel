@@ -165,7 +165,7 @@ const groups = computed(() => {
 .permissions li > .toggle { order: 1; flex-shrink: 0; }
 .permission-label { display: block; font-size: 0.9em; font-weight: 500; }
 .permission-search { display: flex; align-items: center; gap: 10px; margin: 16px 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
-.permission-search:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
+.permission-search:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .permission-search svg { width: 17px; height: 17px; color: var(--muted); flex-shrink: 0; }
 .permission-search input { width: 100%; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-size: 0.85em; }
 .permission-group { margin-top: 10px; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }

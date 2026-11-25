@@ -758,7 +758,7 @@ button.dictation.ending { color: var(--danger); }
   background: var(--surface);
 }
 .box:focus-within {
-  border-color: var(--accent);
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 /* A file is being dragged over: dashed and tinted, so it reads as a drop target and not as focus. */
 .box.dragging {

@@ -42,9 +42,7 @@ const visible = ref(false);
   background: var(--bg);
 }
 .password-field .password-control input:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .password-control button {
   position: absolute;

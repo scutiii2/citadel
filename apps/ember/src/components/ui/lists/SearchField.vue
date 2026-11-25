@@ -18,13 +18,13 @@ const model = defineModel<string>({ required: true });
 
 <style scoped>
 .search-field { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); }
-.search-field:focus-within { border-color: var(--accent); }
+.search-field:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .search-field svg { flex-shrink: 0; width: 16px; height: 16px; stroke: var(--muted); }
-.search-field input { flex: 1; min-width: 0; width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); font: inherit; font-size: .9em; }
+.search-field input { outline: none; flex: 1; min-width: 0; width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); font: inherit; font-size: .9em; }
 .search-field > :slotted(button) { flex-shrink: 0; }
 @media (max-width: 767px) {
   .search-field { min-height: 44px; }
-  .search-field input { font-size: max(1em, 16px); }
+  .search-field input { outline: none; font-size: max(1em, 16px); }
   .search-field > :slotted(button) { min-height: 44px; }
 }
 </style>

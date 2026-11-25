@@ -60,7 +60,7 @@ defineEmits<{ back: []; submit: [] }>();
 .editor-scroll:not(.pane-scroll) { overflow-y: auto; scrollbar-gutter: stable; }
 .actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 28px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg); }
 .actions .primary { min-width: 76px; min-height: 40px; }
-.list-editor :is(button, summary, input, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.list-editor :is(button, summary, input, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 900px) and (min-width: 768px) { .list-editor { --workspace-columns: 220px minmax(0, 1fr); } .actions { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .list-editor.editing .list-pane, .list-editor:not(.editing) .placeholder { display: none; }

@@ -53,7 +53,10 @@ A nested corner is `calc(outer - padding)`. An element flush to an edge is squar
 
 **Motion** - 0.15s ease for hover and state, 0.18s for sliding thumbs; animations always play, so never add a reduced-motion setting or `prefers-reduced-motion` media query. Animation follows state; it never delays or replaces the action.
 
-**Focus** - `:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }` on every interactive element. Never `outline: none` without a replacement.
+**Focus** (ruling) - one ring everywhere, the same as the button ring: `outline: 2px solid var(--accent); outline-offset: 2px`, drawn by `:focus-visible`, distinct from the border and never clipped. A text field shows the ring, not an accent border (do not change `border-color` on focus). Never `outline: none` without a replacement.
+- **One ring per control.** A box that holds an input (search box, composer, permission search, any field with an icon or a button inside) draws the ring on the box with `:focus-within` and sets `outline: none` on the inner input. Never a ring on the box and a second on the input, and never a ring plus an accent border.
+- **Offset 2px, not 1 or 3.** Use a negative offset (`-2px`) only for an item inside a track or list that clips its overflow (segmented control segments, filter chips, tabs in a strip, sidebar links, table rows); say why in a comment. Elsewhere give the container padding instead of insetting the ring.
+- **Hit area.** The ring wraps the full touch target (44 px on touch), not the glyph.
 
 ## Interaction rules
 

@@ -65,9 +65,8 @@ h1 {
   font-weight: normal;
   background: var(--bg);
 }
-.card :deep(input:focus) {
-  outline: none;
-  border-color: var(--accent);
+.card :deep(input:focus-visible) {
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .card :deep(.primary) {
   margin-top: 4px;

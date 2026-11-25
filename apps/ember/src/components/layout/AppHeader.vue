@@ -103,6 +103,6 @@ const title = computed(() => {
 .mark { width: 22px; height: 22px; }
 .page-name { min-width: 0; margin: 0; padding-inline-start: 10px; border-inline-start: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.88rem; font-weight: 600; color: var(--text); }
 .header-controls { display: flex; gap: 4px; margin-inline-start: auto; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 767px) { .app-header { display: none; } }
 </style>

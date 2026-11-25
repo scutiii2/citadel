@@ -132,7 +132,7 @@ const groups = computed(() => {
 <style scoped>
 a { color: inherit; text-decoration: none; }
 svg { width: 24px; height: 24px; flex-shrink: 0; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 
 .identity { display: flex; gap: 9px; align-items: center; font-size: 0.85em; color: var(--muted); min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
