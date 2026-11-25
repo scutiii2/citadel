@@ -51,7 +51,7 @@ async function upload(event: Event): Promise<void> {
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <input ref="picker" type="file" multiple hidden :disabled="busy" aria-label="Add files" @change="upload" />
     <button type="button" class="pill-btn primary add" :disabled="busy" :aria-busy="busy" @click="picker?.click()">
-      {{ busy ? "Uploading …" : "Add files" }}
+      Add files
     </button>
     <p class="muted hint">Up to {{ formatBytes(maxFileBytes) }} per file. Anyone with the link can add and download files; only the owner can remove them.</p>
   </div>

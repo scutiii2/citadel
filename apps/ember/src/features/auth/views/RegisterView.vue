@@ -61,7 +61,7 @@ async function submit(): Promise<void> {
       <p id="invite-email-hint" class="notice">Use the email address the invite was sent to.</p>
       <PasswordInput label="Password" v-model="form.password" autocomplete="new-password" minlength="8" required />
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <button class="primary" :disabled="busy" :aria-busy="busy">{{ busy ? "Creating ..." : "Create account" }}</button>
+      <button class="primary" :disabled="busy" :aria-busy="busy">Create account</button>
     </form>
     <template #footer>Already registered? <RouterLink to="/login">Log in</RouterLink></template>
   </AuthCard>

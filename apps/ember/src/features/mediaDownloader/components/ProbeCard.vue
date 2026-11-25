@@ -39,7 +39,7 @@ const blockedOptions = computed(() => props.result.options.filter(o => o.blocked
       </ul>
       <div class="download-line">
         <p class="selected-format muted small"><template v-if="selectedOption">{{ selectedOption.label }}<span v-if="selectedOption.estimated_bytes !== null"> · ~{{ formatBytes(selectedOption.estimated_bytes) }}</span></template><template v-else>Choose an available format.</template></p>
-        <ActionButton labelled icon="export" class="primary" :aria-busy="busy" :disabled="!selectedOption || busy" @click="$emit('download')">{{ busy ? 'Starting...' : 'Download' }}</ActionButton>
+        <ActionButton labelled icon="export" class="primary" :aria-busy="busy" :disabled="!selectedOption || busy" @click="$emit('download')">Download</ActionButton>
       </div>
     </div>
   </section>

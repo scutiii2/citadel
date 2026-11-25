@@ -166,7 +166,7 @@ async function save(): Promise<void> {
     </form>
     <template #footer>
       <button type="button" class="pill-btn ghost" :disabled="saving" @click="drawer?.requestCancel()">Cancel</button>
-      <button type="submit" form="extension-form" class="pill-btn primary" :disabled="saving" :aria-busy="saving">{{ saving ? "Saving ..." : editing ? "Save" : "Add" }}</button>
+      <button type="submit" form="extension-form" class="pill-btn primary" :disabled="saving" :aria-busy="saving">{{ editing ? "Save" : "Add" }}</button>
     </template>
   </RecordDrawer>
 </template>

@@ -9,7 +9,7 @@ const views = readdirSync(features, { recursive: true })
   .filter((name): name is string => typeof name === "string" && name.endsWith("View.vue"));
 const EXEMPT = new Set([
   "ChatView.vue", "LoginView.vue", "ConnectView.vue", "RegisterView.vue", "VerifyEmailView.vue",
-  "NoAccessView.vue", "SharedChatView.vue",
+  "NoAccessView.vue", "SharedChatView.vue", "SharedFolderView.vue",
 ]);
 
 describe("page layouts", () => {

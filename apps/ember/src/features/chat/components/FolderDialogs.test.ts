@@ -127,8 +127,8 @@ describe("busy and reopen", () => {
     await flushPromises();
     button("Save").click();
     await flushPromises();
-    expect(button("Saving …").hasAttribute("disabled")).toBe(true);
-    button("Saving …").click(); // disabled while busy
+    expect(button("Save").hasAttribute("disabled")).toBe(true);
+    button("Save").click(); // disabled while busy
     dialog()!.dispatchEvent(new Event("cancel", { cancelable: true })); // Esc
     await flushPromises();
     expect(client.create).toHaveBeenCalledTimes(1);
@@ -364,12 +364,12 @@ describe("a save that outlives its dialog", () => {
     await type("Another");
     button("Save").click();
     await flushPromises();
-    expect(button("Saving …").hasAttribute("disabled")).toBe(true);
+    expect(button("Save").hasAttribute("disabled")).toBe(true);
 
     settle.reject(new ApiError(409, "A folder with that name already exists"));
     await flushPromises();
     expect(dialog()?.querySelector('[role="alert"]')).toBeNull();
-    expect(button("Saving …").hasAttribute("disabled")).toBe(true); // still busy with its own save
+    expect(button("Save").hasAttribute("disabled")).toBe(true); // still busy with its own save
     settleRename(folder(2, "Another"));
     await flushPromises();
     expect(dialog()).toBeNull();

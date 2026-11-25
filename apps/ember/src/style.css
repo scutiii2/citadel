@@ -82,22 +82,27 @@ input {
   color: inherit;
 }
 
+/* A busy button keeps its exact size. Its label and icon stay in the layout but are hidden, and one
+ * spinner sits centred over them, so the row never jumps and the old icon never shows beside the spinner.
+ * Keep the label the same while busy (do not swap it for "Saving..."): a longer text would resize the button. */
+:where(button[aria-busy="true"]) { position: relative; }
+button[aria-busy="true"] { -webkit-text-fill-color: transparent; }
+button[aria-busy="true"] svg { visibility: hidden; }
 button[aria-busy="true"]::before {
   content: "";
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  margin-right: 6px;
-  vertical-align: middle;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: var(--radius-full);
   animation: ember-busy 0.7s linear infinite;
 }
 @keyframes ember-busy { to { transform: rotate(360deg); } }
-/* An icon-only button shows the spinner instead of its icon, not beside it. */
-.admin-icon[aria-busy="true"] > svg { display: none; }
-.admin-icon[aria-busy="true"]::before { margin-right: 0; }
 
 /* A quiet text button inside a dialog or popover ("Edit", "Retry"); add `danger` for a destructive one. */
 .link-btn {

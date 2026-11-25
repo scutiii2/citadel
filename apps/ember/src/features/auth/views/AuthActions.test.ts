@@ -20,7 +20,8 @@ for (const [name, view, action] of [["login", LoginView, "login"], ["registratio
   await w.get("form").trigger("submit");
   expect(auth[action]).toHaveBeenCalledOnce();
   expect(w.findAll("form button.primary").at(-1)!.attributes("aria-busy")).toBe("true");
-  expect(w.findAll("form button.primary").at(-1)!.text()).toMatch(/Logging|Creating|Verifying/);
+  // The label stays put while busy (the spinner replaces it in CSS), so the button never resizes.
+  expect(w.findAll("form button.primary").at(-1)!.text()).not.toMatch(/Logging|Creating|Verifying/);
   reject(new Error("Try again")); await flushPromises();
   expect(w.get('[role="alert"]').text()).toBe("Try again");
   expect(w.findAll("form button.primary").at(-1)!.attributes("aria-busy")).toBe("false");

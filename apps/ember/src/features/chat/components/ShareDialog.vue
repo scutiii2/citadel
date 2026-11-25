@@ -127,7 +127,7 @@ const hasLinks = computed(() => links.value.length > 0);
         </select>
       </label>
       <button type="submit" class="pill-btn primary" :aria-busy="creating" :disabled="creating || !chatId">
-        {{ creating ? "Creating …" : "Create link" }}
+        Create link
       </button>
     </form>
 

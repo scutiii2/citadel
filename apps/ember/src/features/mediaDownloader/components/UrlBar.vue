@@ -14,7 +14,7 @@ defineEmits<{ 'update:modelValue': [value: string]; check: [] }>()
       autofocus
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />
-    <ActionButton labelled icon="verify" type="submit" :aria-busy="loading" :disabled="!canCheck">{{ loading ? 'Checking...' : 'Check' }}</ActionButton>
+    <ActionButton labelled icon="verify" type="submit" :aria-busy="loading" :disabled="!canCheck">Check</ActionButton>
   </form>
 </template>
 

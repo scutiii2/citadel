@@ -19,6 +19,7 @@ for (const width of [1280, 910, 768, 375]) test(`the Temp folders page creates a
     const request = route.request();
     if (request.method() === "POST") {
       const body = request.postDataJSON() as { name: string; minutes: number };
+      await new Promise((resolve) => setTimeout(resolve, 600)); // long enough to look at the busy button
       posted.push(body);
       folders.push({
         id: 1, name: body.name, token: "t".repeat(43), created_at: "2026-11-25T10:00:00Z",
@@ -35,7 +36,15 @@ for (const width of [1280, 910, 768, 375]) test(`the Temp folders page creates a
   await page.getByLabel("Folder name").fill("Trip");
   await page.getByRole("button", { name: "15 min" }).click();
   await expect(create).toBeEnabled();
+  const idle = (await create.boundingBox())!;
   await create.click();
+  // A busy text button keeps its size; the label hides and one spinner shows (global rule in style.css).
+  await expect(create).toHaveAttribute("aria-busy", "true");
+  const busy = (await create.boundingBox())!;
+  expect([busy.width, busy.height]).toEqual([idle.width, idle.height]);
+  expect(await create.evaluate((el) => el.ownerDocument.defaultView!.getComputedStyle(el).webkitTextFillColor)).toBe("rgba(0, 0, 0, 0)");
+  expect(await create.evaluate((el) => el.ownerDocument.defaultView!.getComputedStyle(el, "::before").animationName)).toBe("ember-busy");
+  if (process.env.PROBE_SHOT2) await create.screenshot({ path: process.env.PROBE_SHOT2 });
 
   await expect(page.getByRole("region", { name: "Trip" })).toBeVisible();
   // The create flipped the page's busy flag while the closed confirm dialog held its Delete button: it must still open full size.

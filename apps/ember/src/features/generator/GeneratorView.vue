@@ -347,8 +347,6 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 .generate-footer { grid-area: footer; margin: 0 24px 20px; padding-top: 18px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .generate-footer p { color: var(--muted); font-size: .75em; margin: 0; }
 .generator .primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: .85em; padding: 10px 18px; min-height: 44px; }
-.primary[aria-busy=true]::before { content: ''; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); animation: generator-spin .7s linear infinite; }
-@keyframes generator-spin { to { transform: rotate(360deg); } }
 .error { font-size: .85em; overflow-wrap: anywhere; }
 :is(button,input,select):focus-visible, .result-buttons :deep(button.copy:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .field input[type="range"] {

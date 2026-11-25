@@ -457,7 +457,7 @@ onMounted(load);
         </section>
       </div>
       <template v-if="editing" #footer>
-        <button type="button" class="chip" :disabled="saving || testing" data-test="test-draft" title="Check the connection before saving" @click="testDraft">{{ testing ? "Testing…" : "Test" }}</button>
+        <button type="button" class="chip" :disabled="saving || testing" data-test="test-draft" :aria-busy="testing" title="Check the connection before saving" @click="testDraft">Test</button>
         <button type="button" class="chip" :disabled="saving" data-test="cancel-edit" @click="drawer?.requestCancel()">Cancel</button>
         <button type="submit" :form="`${kind}-editor`" class="primary" data-test="save" :disabled="saving || !type" :aria-busy="saving">Save</button>
       </template>

@@ -437,8 +437,6 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 .send-reply { min-width: 76px; min-height: 40px; }
 .notice { max-height: 20%; overflow: auto; scrollbar-gutter: stable; }
 .tickets button:focus-visible, .tickets input:focus-visible, .tickets select:focus-visible, .tickets textarea:focus-visible, .conversation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: ticket-spin .7s linear infinite; }
-@keyframes ticket-spin { to { transform: rotate(360deg); } }
 @media (max-width: 1000px) and (min-width: 768px) { .ticket-workspace { --workspace-columns: 240px minmax(0, 1fr); } .conversation { padding: 22px; } .detail-head, .reply { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .tickets :deep(.page-column) { padding: 20px 16px 12px; }

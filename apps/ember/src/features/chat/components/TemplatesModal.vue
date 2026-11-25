@@ -123,7 +123,7 @@ function onCancel(): void {
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
         <button type="button" class="pill-btn ghost" @click="requestDeparture('back')" :disabled="saving">Back</button>
-        <button type="submit" class="pill-btn primary" :aria-busy="saving" :disabled="!canSave">{{ saving ? "Saving …" : "Save" }}</button>
+        <button type="submit" class="pill-btn primary" :aria-busy="saving" :disabled="!canSave">Save</button>
       </div>
     </form>
 
