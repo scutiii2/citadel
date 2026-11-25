@@ -2,7 +2,7 @@
 import { PanelHelp } from "@citadel/ui";
 import { computed, nextTick, ref, watch } from "vue";
 import { matchesWords } from "../../utils/search";
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";

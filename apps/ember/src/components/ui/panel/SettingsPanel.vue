@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, toRef, useId } from "vue";
 import { useDraftPanel } from "../../../composables/useDraftPanel";
-import PageLayout from "../../layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { AdminSearch } from "@citadel/ui";
 import { ConfirmModal } from "@citadel/ui";
 import { DraftActions } from "@citadel/ui";

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { PanelHelp } from "@citadel/ui";
 import { StatTile } from "@citadel/ui";
 import { commandsClient } from "../../api/tools/CommandsClient";

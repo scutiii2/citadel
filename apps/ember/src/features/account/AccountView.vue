@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PasswordInput } from "@citadel/ui";
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { authClient, type KnownDevice } from "../../api/auth/AuthClient";

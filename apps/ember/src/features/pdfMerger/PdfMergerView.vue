@@ -5,7 +5,7 @@ import RetentionNote from "../../components/ui/status/RetentionNote.vue";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
-import PageLayout from '../../components/layout/PageLayout.vue'
+import { PageLayout } from "@citadel/ui"
 import ActionButton from '../../components/ui/buttons/ActionButton.vue'
 import { RecordDrawer } from "@citadel/ui"
 import SegmentedControl from '../../components/ui/forms/SegmentedControl.vue'

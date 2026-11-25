@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { usageClient, type MyUsage, type UsageGroupBy, type UsageRecordRow } from "./api/UsageClient";
 import { PanelHelp } from "@citadel/ui";

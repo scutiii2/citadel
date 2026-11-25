@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import "@citadel/ui/infoPage.css";
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { CopyButton } from "@citadel/ui";
 import { ConfirmModal } from "@citadel/ui";
 import { PanelHelp } from "@citadel/ui";

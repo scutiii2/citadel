@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { computed, onMounted, ref, useTemplateRef, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";

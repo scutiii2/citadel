@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { usePolling } from "../../composables/time/usePolling";
 import { accountAgentsClient, agentsClient, type AgentListing } from "./api/AgentsClient";

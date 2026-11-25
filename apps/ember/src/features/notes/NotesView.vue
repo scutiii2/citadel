@@ -3,7 +3,7 @@ import { PanelHelp } from "@citadel/ui";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import "@citadel/ui/infoPage.css";
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { ConfirmModal } from "@citadel/ui";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import { ApiError } from "../../api/http";

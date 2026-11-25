@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
-import PageLayout from "../../components/layout/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
