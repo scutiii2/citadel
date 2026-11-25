@@ -33,6 +33,12 @@ for (const width of [1280, 910, 768, 375]) test(`the Temp folders page creates a
   await create.click();
 
   await expect(page.getByRole("region", { name: "Trip" })).toBeVisible();
+  // The create flipped the page's busy flag while the closed confirm dialog held its Delete button: it must still open full size.
+  await page.getByRole("button", { name: "Delete folder" }).click();
+  const confirm = page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true });
+  await expect(confirm).toBeVisible();
+  expect((await confirm.boundingBox())!.width).toBeGreaterThan(50);
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
   expect(posted).toEqual([{ name: "Trip", minutes: 15 }]);
   expect(state.unexpected).toEqual([]);
 });
