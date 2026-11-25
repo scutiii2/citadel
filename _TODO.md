@@ -146,3 +146,29 @@ Optional follow-up features, not implemented:
 - **Rollback**: put the old `citadel_core` block back and run `docker compose up -d` in that service. The old network stays until Citadel is torn down.
 
 **Revisit when**: the fresh Citadel stack works on the box. Related: "Move Treasury out of Citadel into its own stack", which needs the same shared network.
+
+## Temporary file folders shared by link (added 2026-11-25)
+
+**Context**: An Ember user opens a temporary folder and shares its link with people who do not log in. The owner has full control; guests can only download and add files.
+
+- **Folder**: created by the owner in Ember. Pruning time set at creation, 1 hour at most. The folder is deleted at creation time + pruning time. Adding or removing files never moves the countdown.
+- **Files**: 100 MB at most per file. Guests download and add, never remove. Only the owner removes files, or the whole folder.
+- **Link**: unguessable token in the URL; guest routes need no login. Public routes live in `portcullis` (new `routes/`), the owner's page in `apps/ember`; files stored on a volume.
+- **Open design points**: cap on total folder size and file count (anonymous upload is an abuse risk); rate limit per link; serve downloads as `attachment` with `application/octet-stream`; a sweeper task that deletes expired folders, also at startup; owner can revoke the link early; check how the public URL (Tailscale) exposes guest routes while the rest stays private.
+- **Not an Armory capability**: capabilities are agent tools. This is an Ember page plus Portcullis routes, so apply `portcullis-feature-scaffold` and `ember-feature-scaffold`.
+
+**Revisit when**: user wants it built. Brainstorm the limits and storage first.
+
+## Encrypted anonymous meeting room (added 2026-11-25)
+
+**Context**: An Ember user (the host) creates a text-only meeting room and sends the generated link to a guest. The guest does not log in and shows as "anonymous".
+
+- **Length**: the host sets 30 minutes up to 1 hour; the room closes then.
+- **Encryption**: end-to-end. The key sits in the link's `#fragment`, so the server never sees it; the server relays ciphertext only (WebCrypto AES-GCM).
+- **Never saved**: conversations are never stored anywhere: no database, no disk, no logs, no chat history, no memory or Brain note, no usage record of message text. The relay holds ciphertext in memory only while it forwards it, and closes the room's state at expiry. Access logs and error logs must not carry message bodies or the link's `#key`. A test must check that no message text reaches disk or a log.
+- **No history**: the server stores no messages. A guest who refreshes loses everything before the refresh; it cannot be recovered. Keep the guest's name/slot so a refresh can rejoin.
+- **Message prune**: the host sets a maximum prune time for messages (10 seconds up to 5 minutes); only the host can change it. Each message, from host or guest, can get its own prune time up to that maximum; the message disappears from every screen at that time. The server rejects a longer time.
+- **Limits to state in the UI**: prune and "no history" only bind honest clients; a guest can screenshot or copy a message. Text only, no files. Cap message length and rate.
+- **Build**: WebSocket (or SSE plus POST) relay in `portcullis`, kept in memory with the room timer; check nginx upgrade headers for the public path. Host page in `apps/ember`, guest page served without login.
+
+**Revisit when**: user wants it built. Brainstorm after the temporary-folder item, since both need public guest routes.
