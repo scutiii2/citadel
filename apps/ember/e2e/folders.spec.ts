@@ -38,6 +38,10 @@ for (const width of [1280, 910, 768, 375]) test(`the Temp folders page creates a
   const confirm = page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true });
   await expect(confirm).toBeVisible();
   expect((await confirm.boundingBox())!.width).toBeGreaterThan(50);
+  // The bin icon sits left of the label, not on top of it (a page-wide .danger rule once reset the padding).
+  const bin = (await confirm.locator(".bin").boundingBox())!;
+  const label = (await confirm.locator(".label").boundingBox())!;
+  expect(bin.x + bin.width).toBeLessThanOrEqual(label.x + 1);
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
   expect(posted).toEqual([{ name: "Trip", minutes: 15 }]);
   expect(state.unexpected).toEqual([]);
