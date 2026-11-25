@@ -70,6 +70,13 @@ A nested corner is `calc(outer - padding)`. An element flush to an edge is squar
   - **Danger** (red outline, red text): a destructive trigger. The confirm button in its dialog is red filled. Never bare when it is the only way to delete.
   - **Bare** (no outline, no fill; only a label or an icon; hover/focus shows a `--surface` tint): use it only for a quiet, repeated or dense action: row and table actions, toolbar and header icons, nav and tabs, "Back", "Show more", links inside text. A bare text button takes the accent colour or an underline so it still reads as clickable, and a bare icon has a tooltip and `aria-label`.
   - Never bare: the main action, the only button in an empty state, anything that spends money, deletes or sends. Hit area stays 44px on touch even when nothing is drawn.
+- **Button behaviour** (ruling, from the ui-button-design checklist):
+  - **Hit area:** 44 x 44 px on touch even when the drawn button is smaller (`min-height: 44px` under `pointer: coarse` is in `base.css`). Keep the area clear of neighbouring controls.
+  - **Name:** the label says the action and its object ("Create folder", not "Submit"). An icon-only button has an accessible name (`aria-label`, or a visually hidden label).
+  - **One primary per action group**, and the other actions are outlined or bare.
+  - **Loading:** same width and height, one request, `aria-busy`, and the action stays identifiable to a screen reader (see Busy state).
+  - **Focus:** a visible `:focus-visible` ring, not clipped by `overflow`. Use a native `<button>` so Enter and Space work. A wrapper may drop the inner input's outline only if `:focus-within` draws one.
+  - **Disabled:** show why and what to do next in text beside the button ("Name your workspace first"), not only in a tooltip. A button that is always clickable and explains the problem on press is also fine.
 - **Confirmations:** never the browser's `confirm()`. Use an in-app modal; friction scales with severity. Severe actions (delete account, delete something in use, delete all) require typing the name or phrase (`requireText`) before the confirm button enables. Destructive buttons are red-outlined pills and sit in a red-tinted **Danger zone** block, last in the form.
 - **Settings:** browser-only preferences apply instantly. Server settings stay in a draft until Save. In admin panels, follow the shared dirty-only Save slot or drawer footer pattern. A setting that differs from its default shows an accent dot and its own reset button.
 - **Busy state:** disable the control, set `aria-busy`, show progress on the control itself (spinner ring, drawn globally for `button[aria-busy="true"]` in ember, so no per-component copy); ignore clicks while busy.
