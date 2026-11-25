@@ -112,7 +112,7 @@ async function save(unpin = false) {
       </div>
     </section>
 
-    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected ? `Service ${selected.name}` : 'Service details'" editable :editing="editing" :busy="busy"
+    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected ? `Service ${selected.name}` : 'Service details'" editable :editing="editing" :busy="busy" :note="editing && !draft.trim() ? 'Enter the address first.' : ''"
       save-label="Pin address" :fallback-focus="() => searchField?.focus()" @edit="edit" @discard="editing = false" @save="save()" @close="close">
       <div v-if="selected" class="admin-details">
         <dl>

@@ -82,18 +82,18 @@ const overrideNeedsConnectionToken = computed(() =>
   addressRows.value.some((row) => row.token || row.overrideSet) &&
   !(headerName.value.trim() && (headerValue.value || hadHeader.value)),
 );
-const valid = computed(
-  () =>
-    /^[a-z0-9][a-z0-9_-]{0,62}$/.test(id.value) &&
-    label.value.trim() !== "" &&
-    !overrideNeedsConnectionToken.value &&
-    (transport.value === "stdio"
-      ? command.value.trim() !== ""
-      : mode.value === "direct"
-        ? url.value.trim() !== ""
-        : addressRows.value.length > 0 &&
-          addressRows.value.every((row) => row.address.trim() !== "" && (row.found === true || (row.found === false && row.name.trim() !== "")))),
-);
+/** What stops Save, in words for the drawer footer; empty when the form can be saved. */
+const invalidReason = computed(() => {
+  if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(id.value)) return "Give the server an id: lowercase letters, digits, - or _.";
+  if (label.value.trim() === "") return "Enter a name for the server.";
+  if (overrideNeedsConnectionToken.value) return "Add a connection token for the override.";
+  if (transport.value === "stdio") return command.value.trim() === "" ? "Enter the command to run." : "";
+  if (mode.value === "direct") return url.value.trim() === "" ? "Enter the server address." : "";
+  const complete = addressRows.value.length > 0 &&
+    addressRows.value.every((row) => row.address.trim() !== "" && (row.found === true || (row.found === false && row.name.trim() !== "")));
+  return complete ? "" : "Fill in every address, and name any that were not found.";
+});
+const valid = computed(() => invalidReason.value === "");
 
 async function load() {
   loading.value = true;
@@ -301,7 +301,7 @@ watch(editing, () => { tab.value = "general"; });
     <p v-if="notice" class="admin-panel-text muted" role="status" data-test="notice">{{ notice }}</p>
 
     <RecordDrawer ref="drawer" :open="selected !== null" :title="selected === '' ? 'Add server' : 'Server details'"
-      :editable="!!selectedServer" :editing="editing !== null" :busy="saving" :fallback-focus="() => searchField?.focus()"
+      :editable="!!selectedServer" :editing="editing !== null" :busy="saving" :note="editing !== null ? invalidReason : ''" :fallback-focus="() => searchField?.focus()"
       @edit="selected && open(selected)" @discard="discard" @close="close" @save="save">
     <form v-if="editing !== null" id="mcp-server-editor" class="admin-editor" data-test="form" @submit.prevent="submit">
       <FormTabs v-model="tab" :items="tabItems" prefix="server" label="Server settings" />

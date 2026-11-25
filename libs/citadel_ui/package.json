@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./base.css": "./src/styles/base.css",
-    "./admin.css": "./src/styles/admin.css"
+    "./admin.css": "./src/styles/admin.css",
+    "./infoPage.css": "./src/styles/infoPage.css"
   },
   "scripts": {
     "build": "vue-tsc --noEmit",
@@ -17,6 +18,7 @@
     "vue": "^3.5.42"
   },
   "devDependencies": {
+    "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.5.1",
     "@vue/tsconfig": "^0.9.1",

@@ -90,7 +90,7 @@ const ACTIVITY_LINES = [{ id: "tokens", label: "Tokens", color: "var(--accent)" 
                   {{ tokens(w.v.used) }}<template v-if="w.v.limit"> / {{ tokens(w.v.limit) }}</template> tokens
                 </span>
               </div>
-              <div v-if="w.v.limit" class="bar" role="progressbar" :aria-valuenow="percent(w.v)" aria-valuemin="0" aria-valuemax="100">
+              <div v-if="w.v.limit" class="bar" role="progressbar" :aria-label="`Usage, last ${w.key}`" :aria-valuenow="percent(w.v)" aria-valuemin="0" aria-valuemax="100">
                 <span :class="{ full: percent(w.v) >= 90 }" :style="{ width: `${percent(w.v)}%` }" />
               </div>
               <p v-else class="muted small">No limit.</p>

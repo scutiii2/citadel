@@ -14,7 +14,7 @@ it("reveals and hides the same password, preserving native form attributes and e
   await wrapper.get("button").trigger("click");
   expect(input.attributes("type")).toBe("text");
   expect(input.element.value).toBe("initial-password");
-  expect(wrapper.get("button").attributes("aria-label")).toBe("Hide password");
+  expect(wrapper.get("button").attributes("aria-label")).toBe("Show password");
   expect(wrapper.get("button").attributes("aria-pressed")).toBe("true");
   await input.setValue("edited-password");
   expect(wrapper.emitted("update:modelValue")?.[0]).toEqual(["edited-password"]);

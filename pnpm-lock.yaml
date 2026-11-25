@@ -164,6 +164,8 @@ settings:
 
 importers:
 
+  .: {}
+
   apps/armory_admin:
     dependencies:
       '@cfworker/json-schema':
@@ -411,6 +413,9 @@ importers:
 
   libs/citadel_ui:
     devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.19.2
       '@vitejs/plugin-vue':
         specifier: ^6.0.8
         version: 6.0.11(vite@8.3.8(@types/node@24.19.2)(terser@5.51.4))(vue@3.5.46(typescript@6.0.3))

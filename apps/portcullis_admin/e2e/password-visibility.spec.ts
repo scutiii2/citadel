@@ -10,7 +10,7 @@ test("admin login can show and hide the password without submitting", async ({ p
   await page.getByRole("button", { name: "Show password", exact: true }).click();
   await expect(password).toHaveAttribute("type", "text");
   await expect(password).toHaveValue(PASSWORD);
-  await page.getByRole("button", { name: "Hide password", exact: true }).press("Enter");
+  await page.getByRole("button", { name: "Show password", exact: true }).press("Enter");
   await expect(password).toHaveAttribute("type", "password");
   await expect(password).toHaveValue(PASSWORD);
   await expect(page).toHaveURL(/\/login/);

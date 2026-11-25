@@ -380,7 +380,7 @@ useChatShortcuts({
       type="button"
       :class="['collapse', { collapsed: sidebarCollapsed }]"
       :title="sidebarCollapsed ? 'Show chat list' : 'Hide chat list'"
-      :aria-label="sidebarCollapsed ? 'Show chat list' : 'Hide chat list'"
+      aria-label="Chat list"
       :aria-expanded="!sidebarCollapsed"
       @click="toggleSidebar"
     >

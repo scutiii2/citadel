@@ -10,6 +10,7 @@ import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import CopyButton from "../../components/ui/buttons/CopyButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import ToggleSwitch from "../../components/ui/forms/ToggleSwitch.vue";
+import RangeSlider from "../../components/ui/forms/RangeSlider.vue";
 import { checked } from "../../utils/browser/dom";
 import { errorMessage } from "../../utils/errors";
 
@@ -99,11 +100,6 @@ const shown = computed(() => {
   if (!revealed.value) return "•".repeat(Math.min(r.value.length, 32));
   return tab.value === "totp" ? r.value.replace(/(\d{3})(?=\d)/g, "$1 ") : r.value;
 });
-
-/** Filled-track percentage for a range input, set as the `--fill` custom property. */
-function fill(value: number, min: number, max: number): Record<string, string> {
-  return { "--fill": `${((value - min) / (max - min)) * 100}%` };
-}
 
 /** The form button: a fresh value starts hidden again. */
 function generate(): void {
@@ -253,7 +249,7 @@ onBeforeUnmount(() => {
           <div id="generator-options" class="options-body">
             <template v-if="tab === 'password'">
             <label class="field">Length: {{ options.password.length }}
-              <input v-model.number="options.password.length" type="range" min="8" max="128" :style="fill(options.password.length, 8, 128)" />
+              <RangeSlider v-model="options.password.length" :min="8" :max="128" />
             </label>
             <ToggleSwitch small :checked="options.password.use_upper" @change="options.password.use_upper = checked($event)">Uppercase A-Z</ToggleSwitch>
             <ToggleSwitch small :checked="options.password.use_lower" @change="options.password.use_lower = checked($event)">Lowercase a-z</ToggleSwitch>
@@ -264,7 +260,7 @@ onBeforeUnmount(() => {
           </template>
           <template v-else-if="tab === 'passphrase'">
             <label class="field">Words: {{ options.passphrase.words }}
-              <input v-model.number="options.passphrase.words" type="range" min="3" max="12" :style="fill(options.passphrase.words, 3, 12)" />
+              <RangeSlider v-model="options.passphrase.words" :min="3" :max="12" />
             </label>
             <label class="field">Separator
               <input v-model="options.passphrase.separator" type="text" maxlength="3" aria-label="Separator" />
@@ -274,7 +270,7 @@ onBeforeUnmount(() => {
           </template>
           <template v-else-if="tab === 'pin'">
             <label class="field">Digits: {{ options.pin.length }}
-              <input v-model.number="options.pin.length" type="range" min="4" max="12" :style="fill(options.pin.length, 4, 12)" />
+              <RangeSlider v-model="options.pin.length" :min="4" :max="12" />
             </label>
           </template>
           <template v-else-if="tab === 'totp-secret'">
@@ -304,7 +300,7 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </div>
-      <footer class="generate-footer"><p>Generated values aren't saved.</p><button type="submit" class="primary" :disabled="!canRun" :aria-busy="busy"><svg class="line-icon" v-if="!busy" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 7M4 12l2 7a8 8 0 0 0 13-2" /></svg>{{ generateLabel }}</button></footer>
+      <footer class="generate-footer"><p>Generated values aren't saved.</p><p v-if="!busy && tab === 'password' && !characterTypes" class="disabled-reason" role="status">Choose at least one kind of character.</p><p v-else-if="!busy && tab === 'totp' && !options.totp.secret.trim()" class="disabled-reason" role="status">Enter the secret first.</p><button type="submit" class="primary" :disabled="!canRun" :aria-busy="busy"><svg class="line-icon" v-if="!busy" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 7M4 12l2 7a8 8 0 0 0 13-2" /></svg>{{ generateLabel }}</button></footer>
     </WorkspaceLayout>
     <ConfirmModal :open="leaving !== null" title="Discard the generated value?" :message="`Generated values are not stored. Leaving this ${leaving?.page ? 'page' : 'tab'} removes the one you made, so copy it first if you still need it.`" confirm-label="Discard and leave" @confirm="answerLeave(true)" @close="answerLeave(false)" />
   </PageLayout>
@@ -349,45 +345,6 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 .generator .primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: .85em; padding: 10px 18px; min-height: 44px; }
 .error { font-size: .85em; overflow-wrap: anywhere; }
 :is(button,input,select):focus-visible, .result-buttons :deep(button.copy:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-.field input[type="range"] {
-  --fill: 0%;
-  width: 100%;
-  height: 20px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  appearance: none;
-  cursor: pointer;
-}
-.field input[type="range"]::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(to right, var(--accent) var(--fill), var(--border) var(--fill));
-}
-.field input[type="range"]::-moz-range-track {
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(to right, var(--accent) var(--fill), var(--border) var(--fill));
-}
-.field input[type="range"]::-webkit-slider-thumb {
-  width: 18px;
-  height: 18px;
-  margin-top: -6px;
-  border: 2px solid var(--accent);
-  border-radius: var(--radius-full);
-  background: var(--surface);
-  appearance: none;
-}
-.field input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--accent);
-  border-radius: var(--radius-full);
-  background: var(--surface);
-}
-.field input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.field input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 
 @media (max-width: 1050px) and (min-width: 768px) {
   .generator-workspace { --workspace-columns: minmax(0, 1fr) 250px; }

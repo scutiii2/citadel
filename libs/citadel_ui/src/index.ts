@@ -6,6 +6,7 @@ export { default as PageLayout } from "./components/PageLayout.vue";
 export { default as PasswordInput } from "./components/PasswordInput.vue";
 export { default as ThemeSelect } from "./components/ThemeSelect.vue";
 export { default as ToggleSwitch } from "./components/ToggleSwitch.vue";
+export { default as RangeSlider } from "./components/RangeSlider.vue";
 export { default as ActionMessage } from "./components/admin/ActionMessage.vue";
 export { default as AdminSearch } from "./components/admin/AdminSearch.vue";
 export { default as ConfirmModal } from "./components/admin/ConfirmModal.vue";

@@ -566,7 +566,7 @@ legend { margin-bottom: 10px; }
 .prompt-text { max-height: 280px; margin: 0; padding: 10px 12px; overflow: auto; scrollbar-gutter: stable; border-radius: var(--radius-md); background: var(--code-bg); color: var(--text); font-family: var(--mono); font-size: 0.8em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .unsaved { margin-right: auto; color: var(--muted); font-size: 0.8em; }
 .unsaved::first-letter { color: var(--accent); }
-.primary { padding: 6px 16px; border: none; border-radius: var(--radius-md); cursor: pointer; font: inherit; font-weight: 600; color: var(--accent-contrast); background: var(--accent); }
+.primary { padding: 6px 16px; border: none; border-radius: var(--radius-full); cursor: pointer; font: inherit; font-weight: 600; color: var(--accent-contrast); background: var(--accent); }
 .primary:disabled, .cancel:disabled { opacity: 0.6; cursor: default; }
 .error { margin: 0; color: var(--danger); }
 :is(button, input, select, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -231,7 +231,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
     </section>
 
     <RecordDrawer ref="drawer" :open="selected !== null" :title="selected ? `Role ${selected.name}` : 'Role details'"
-      :editable="canEdit" :editing="editing" :busy="busy" :fallback-focus="() => searchField?.focus()"
+      :editable="canEdit" :editing="editing" :busy="busy" :note="editing && selected && !roleEditor?.valid ? 'Name the role first.' : ''" :fallback-focus="() => searchField?.focus()"
       @edit="editing = true; actionError = ''" @close="closeDrawer" @discard="discardEdit" @save="saveRole">
       <RoleEditor v-if="selected" ref="roleEditor" :role="selected" :permissions="permissions" :busy="busy" :error="actionError" :editing="editing"
         :saved="saved" :affected="affected" @dirty="dirty = $event; if ($event) saved = false" @show-accounts="showAccounts" @remove="pendingDelete = selected" />
@@ -241,7 +241,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
       </template>
     </RecordDrawer>
 
-    <RecordDrawer ref="createDrawer" :open="creating" title="New role" :editing="true" :busy="newRole.saving" :fallback-focus="() => searchField?.focus()" save-label="Create role"
+    <RecordDrawer ref="createDrawer" :open="creating" title="New role" :editing="true" :busy="newRole.saving" :note="newRole.name.trim() === '' ? 'Name the role first.' : ''" :fallback-focus="() => searchField?.focus()" save-label="Create role"
       @close="creating = false" @discard="creating = false" @save="createRole">
       <form id="role-create" class="create admin-editor" @submit.prevent>
         <label>Name<input v-model="newRole.name" type="text" maxlength="80" required :disabled="newRole.saving" /></label>

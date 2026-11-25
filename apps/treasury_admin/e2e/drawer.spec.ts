@@ -18,7 +18,7 @@ test("the drawer expands, scrolls its own body, keeps the footer reachable and d
     await drawer.getByRole("button", { name: "Expand drawer" }).click();
     const wide = (await drawer.boundingBox())!.width;
     expect(Math.abs(wide - (width < 768 ? width : Math.max(normal, width * 0.9)))).toBeLessThanOrEqual(2);
-    await drawer.getByRole("button", { name: "Restore drawer size" }).click();
+    await drawer.getByRole("button", { name: "Expand drawer" }).click();
     expect((await drawer.boundingBox())!.width).toBe(normal);
   }
   await drawer.getByLabel("Pool size (optional)", { exact: true }).fill("4");

@@ -5,7 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import TicketsPanel from "../components/admin/TicketsPanel.vue";
 import type { TicketFilterState } from "../utils/ticketFormat";
 import "@citadel/ui/admin.css";
-import "../components/infoPage.css";
+import "@citadel/ui/infoPage.css";
 
 const STATUSES = ["open", "in_progress", "resolved", "closed"] as const;
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;

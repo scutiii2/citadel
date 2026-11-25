@@ -121,6 +121,7 @@ function onCancel(): void {
       </label>
       <small class="count">{{ body.length.toLocaleString() }} / {{ TEMPLATE_BODY_MAX.toLocaleString() }}</small>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="!name.trim() || !body.trim()" class="disabled-reason" role="status">Add a name and the prompt text.</p>
       <div class="buttons">
         <button type="button" class="pill-btn ghost" @click="requestDeparture('back')" :disabled="saving">Back</button>
         <button type="submit" class="pill-btn primary" :aria-busy="saving" :disabled="!canSave">Save</button>

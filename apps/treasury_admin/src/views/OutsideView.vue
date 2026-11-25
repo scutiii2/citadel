@@ -152,6 +152,8 @@ async function remove() {
             spellcheck="false"
           />
           <ActionMessage v-if="error?.serviceId === selected.service_id" kind="error" :text="error.message" :id="'error-' + selected.service_id" />
+          <p v-if="!busy && !drafts[selected.service_id]?.trim()" class="disabled-reason">Enter a new name.</p>
+          <p v-else-if="!busy && drafts[selected.service_id]?.trim() === selected.name" class="disabled-reason">That is already the name.</p>
           <button type="submit" class="primary" :disabled="busy || !drafts[selected.service_id]?.trim() || drafts[selected.service_id]?.trim() === selected.name" :aria-busy="renaming === selected.service_id">Rename</button>
         </form>
         <ActionMessage v-if="error && !error.serviceId && !error.deleteId" kind="error" :text="error.message" />

@@ -23,7 +23,7 @@ it("toggles navigation and keeps theme and logout inside Profile", async () => {
   const { auth, global } = await setup(["agents.manage"]);
   const logout = vi.spyOn(auth, "logout").mockResolvedValue();
   const wrapper = mount(LegionHeader, { props: { title: "Agents", expanded: true }, global });
-  await wrapper.get('[aria-label="Collapse sidebar"]').trigger("click");
+  await wrapper.get('[aria-label="Sidebar"]').trigger("click");
   expect(wrapper.emitted("toggle")).toHaveLength(1);
   expect(wrapper.get("h1").text()).toBe("Agents");
   expect(wrapper.find("select").exists()).toBe(false);

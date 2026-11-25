@@ -137,6 +137,7 @@ async function confirmDelete(): Promise<void> {
         <input ref="nameInput" v-model="name" type="text" :maxlength="FOLDER_NAME_MAX" autocomplete="off" />
       </label>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="!name.trim()" class="disabled-reason" role="status">Name the folder first.</p>
       <div class="buttons">
         <button type="button" class="ghost" @click="requestClose">Cancel</button>
         <button type="submit" class="primary" :aria-busy="busy" :disabled="!canSave">Save</button>

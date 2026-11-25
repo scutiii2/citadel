@@ -87,7 +87,7 @@ defineExpose({ clearDraft: (): void => { draft.value = ""; } });
         <li v-for="item in view.items" :key="item.id" data-test="stack-item">
           <button
             type="button" class="icon-btn" :class="{ on: item.pinned }" data-test="pin" :aria-pressed="item.pinned"
-            :aria-label="item.pinned ? 'Unpin item' : 'Pin item'" :disabled="busy" @click="emit('pin', item.id, !item.pinned)"
+            aria-label="Pin item" :disabled="busy" @click="emit('pin', item.id, !item.pinned)"
           >
             <svg class="line-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M10 2l4 4-3 1-2 3-3-3 3-2zM6 10l-3 3" /></svg>
           </button>

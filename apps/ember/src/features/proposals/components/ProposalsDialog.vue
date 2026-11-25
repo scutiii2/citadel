@@ -155,6 +155,7 @@ function decline(): void {
         </template>
         <p v-if="error" class="error problem" role="alert"><svg class="line-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 11.5h-13zM8 6.5v3M8 11.5v.5" /></svg> {{ error }}</p>
       </template>
+      <p v-if="chosen && detail && !title.trim()" class="disabled-reason" role="status">Give it a title first.</p>
       <div class="buttons">
         <button v-if="chosen" ref="backButton" type="button" class="pill-btn ghost" :disabled="busy" @click="back">Back</button>
         <button type="button" class="pill-btn ghost" :disabled="busy" @click="close">Close</button>

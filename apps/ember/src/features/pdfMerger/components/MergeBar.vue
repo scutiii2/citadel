@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WavyProgress from "../../../components/ui/status/WavyProgress.vue";
 // Merge summary, progress, result and the merge button.
 import { computed, ref } from 'vue'
 import ConfirmModal from '../../../components/ui/dialogs/ConfirmModal.vue'
@@ -36,7 +37,7 @@ const percent = computed(() =>
         Merging… {{ plan.progress.done }} of {{ plan.progress.total }} pages
         <ElapsedTime :since="plan.startedAt" />
         <ActionButton icon="close" @click="cancelOpen = true">Cancel merge</ActionButton>
-        <progress :value="percent" max="100" />
+        <WavyProgress label="Merge progress" :value="percent" />
       </template>
       <template v-else-if="plan.status === 'done' && plan.result">
         Done · {{ plan.result.name }} ({{ formatBytes(plan.result.size) }})

@@ -150,10 +150,22 @@ function hasAddresses(draft: Draft): boolean {
   return draft.saved.origins.length > 0 || draft.addresses.length > 1 || draft.addresses.some((row) => !!row.address.trim());
 }
 
+/** What stops Save, in words for the drawer footer; empty when it can be saved (or nothing changed). */
+function saveBlocker(draft: Draft): string {
+  if (!hasAddresses(draft)) return "";
+  for (const row of draft.addresses) {
+    if (!row.address.trim()) return "Fill in every address, or remove the empty one.";
+    if (row.checking) return "Checking an address ...";
+    if (row.error) return "Fix the address error shown.";
+    if (row.found === false && !row.name.trim()) return "Name the service that was not found.";
+    if (row.found !== true && row.found !== false) return "Check every address first.";
+  }
+  return "";
+}
+
 function canSave(draft: Draft): boolean {
   if (!hasAddresses(draft)) return draft.enabled !== draft.saved.enabled || !!draft.token;
-  return draft.addresses.every((row) => !!row.address.trim() && !row.checking && !row.error
-    && (row.found === true || (row.found === false && !!row.name.trim())));
+  return saveBlocker(draft) === "";
 }
 
 async function save(draft: Draft) {
@@ -280,7 +292,7 @@ watch(selectedName, () => { tab.value = "general"; });
       </div>
     </section>
 
-    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected?.saved.label ?? 'Tool service'" :editing="!!selected && isDirty(selected)" :busy="!!selected?.pending"
+    <RecordDrawer ref="drawer" :open="selected !== null" :title="selected?.saved.label ?? 'Tool service'" :editing="!!selected && isDirty(selected)" :busy="!!selected?.pending" :note="selected && isDirty(selected) ? saveBlocker(selected) : ''"
       :fallback-focus="() => searchField?.focus()" @discard="selected && discard(selected)" @save="selected && save(selected)" @close="closeDrawer">
       <form v-if="selected" class="service" :aria-label="selected.saved.label" :data-test="'service-' + selected.saved.name" @submit.prevent="drawer?.requestSave()">
         <FormTabs v-model="tab" :items="tabItems" prefix="tool" label="Service settings" />

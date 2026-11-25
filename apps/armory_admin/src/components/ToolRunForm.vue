@@ -4,7 +4,7 @@ import { useAuthStore } from "../stores/auth";
 import { commandsClient, type ParamOption } from "../api/CommandsClient";
 import type { JsonSchema } from "../api/types";
 import { errorMessage } from "../utils/errors";
-import { ToggleSwitch } from "@citadel/ui";
+import { RangeSlider, ToggleSwitch } from "@citadel/ui";
 import { buildArgs, fieldsFromSchema, initialValues, type FieldValues, type ToolField } from "../utils/toolSchema";
 
 /** A form for one tool's parameters, from its JSON Schema (Tools page and
@@ -268,10 +268,10 @@ function inputType(field: ToolField): string {
           :placeholder="f.widget === 'json' ? 'JSON' : ''"
         />
         <div v-else-if="f.widget === 'range'" class="range-row">
-          <input
+          <RangeSlider
             :id="fieldId(f.name)" :aria-invalid="!!errors[f.name]" :aria-describedby="describedBy(f)"
             v-model="values[f.name] as string"
-            type="range"
+            class="grow"
             :step="f.step ?? (f.kind === 'integer' ? 1 : 'any')"
             :min="f.min"
             :max="f.max"
@@ -301,6 +301,7 @@ function inputType(field: ToolField): string {
       <small :id="`${fieldId(f.name)}-description`" v-if="f.description" class="hint">{{ f.description }}</small>
     </div>
 
+    <p v-if="!live && !auth.hasPermission('tools.execute')" class="hint" role="status">You need the tools.execute permission to run tools. Ask an administrator.</p>
     <button v-if="!live" type="submit" class="run" :disabled="running || uploading || !auth.hasPermission('tools.execute')">
       {{ running ? "Running ..." : uploading ? "Uploading ..." : submitLabel }}
     </button>
@@ -346,9 +347,6 @@ textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg);
-}
-input[type="range"] {
-  padding: 0;
 }
 textarea {
   font-family: var(--mono);
@@ -420,9 +418,8 @@ textarea:focus {
   align-items: center;
   gap: 10px;
 }
-.range-row input[type="range"] {
+.range-row .grow {
   flex: 1;
-  accent-color: var(--accent);
 }
 .readout {
   min-width: 2.5em;

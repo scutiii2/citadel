@@ -125,6 +125,8 @@ function reject(): void {
         <p v-if="problem" id="global-review-folder-problem" class="error" role="alert"><span class="warning" aria-hidden="true">⚠</span> {{ problem }}</p>
       </template>
       <p v-if="error" class="error" role="alert"><span class="warning" aria-hidden="true">⚠</span> {{ error }}</p>
+      <p v-if="detail && !decided && !title.trim()" class="disabled-reason" role="status">Give it a title first.</p>
+      <p v-else-if="detail && !decided && title.trim().length > titleLimit" class="disabled-reason" role="status">The title is too long: {{ titleLimit }} characters at most.</p>
       <div class="buttons">
         <button type="button" class="pill-btn ghost" :disabled="busy" @click="close">Close</button>
         <template v-if="!decided">

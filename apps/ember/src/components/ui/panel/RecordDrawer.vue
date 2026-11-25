@@ -73,7 +73,7 @@ defineExpose({ requestSave, requestCancel: () => requestClose(false) });
       <button v-if="editable && !editing" ref="editButton" type="button" class="admin-icon" aria-label="Edit" title="Edit" data-test="edit" @click="emit('edit')">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5m-15 9 1-5L16 3l5 5L10 19l-6 1z" /></svg>
       </button>
-      <button type="button" class="admin-icon" :aria-label="expanded ? 'Restore drawer size' : 'Expand drawer'" :aria-pressed="expanded" @click="expanded = !expanded">
+      <button type="button" class="admin-icon" aria-label="Expand drawer" :aria-pressed="expanded" @click="expanded = !expanded">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="expanded ? 'M8 3v5H3m13-5v5h5M3 16h5v5m13-5h-5v5' : 'M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5'" /></svg>
       </button>
     </div>

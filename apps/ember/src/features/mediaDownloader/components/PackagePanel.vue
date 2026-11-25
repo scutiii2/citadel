@@ -3,6 +3,7 @@ import DangerZone from "../../../components/ui/status/DangerZone.vue";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
+import WavyProgress from '../../../components/ui/status/WavyProgress.vue'
 import ConfirmModal from '../../../components/ui/dialogs/ConfirmModal.vue'
 import DownloadCards from '../../../components/content/DownloadCards.vue'
 import type { ProbeResult } from '../api/MediaDownloaderTypes'
@@ -88,7 +89,7 @@ async function confirmAction() {
       </div>
       <div v-else class="result">
         <p class="muted">This package is locked. Create a new group to add more media.</p>
-        <progress v-if="!['done', 'error'].includes(group.state)" :value="group.status?.percent ?? undefined" max="100" :aria-label="`${group.name} download progress`" />
+        <WavyProgress v-if="!['done', 'error'].includes(group.state)" class="package-progress" :value="group.status?.percent ?? null" :label="`${group.name} download progress`" />
         <p v-if="group.status?.error" class="error" role="alert">{{ group.status.error.message }}</p>
         <p v-if="group.state === 'done' && group.items.some(item => item.state === 'error')" class="muted">ZIP ready with the successful files. Failed links are shown above.</p>
         <DownloadCards v-if="group.status?.file" :downloads="[{ filename: group.status.file.name, bytes: group.status.file.size, href: group.status.file.download_url, label: 'ZIP' }]" />
@@ -126,6 +127,5 @@ small { display: block; }
 .group { background: var(--bg); padding: 18px; }
 .items li { padding: 12px 0; border-bottom: 1px solid var(--border); }
 .items li .grow { min-width: 0; }
-progress { width: 100%; accent-color: var(--accent); }
 @media (max-width: 767px) { .create-group { align-items: stretch; flex-direction: column; } }
 </style>

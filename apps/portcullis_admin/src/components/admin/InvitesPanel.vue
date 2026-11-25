@@ -40,10 +40,15 @@ const visible = computed(() => {
   const query = search.value.trim().toLowerCase();
   return invites.value.filter((i) => [i.invitee_email ?? "", i.delivery_method].some((text) => text.toLowerCase().includes(query)));
 });
-const canSend = computed(() => (
-  emailStatus.value.kind === "ready" && !creating.value
-  && inviteeEmail.value.trim() !== "" && emailInput.value?.validity.valid === true
-));
+/** What stops Send, in words for the drawer footer; empty when an invitation can go out. */
+const sendBlocker = computed(() => {
+  const status = emailStatus.value;
+  if (status.kind === "checking") return "Checking that email sending is set up ...";
+  if (status.kind === "blocked") return status.reason;
+  if (inviteeEmail.value.trim() === "") return "Enter the new member's email address.";
+  return emailInput.value?.validity.valid === true ? "" : "Enter a valid email address.";
+});
+const canSend = computed(() => sendBlocker.value === "" && !creating.value);
 
 async function checkEmailStatus(): Promise<void> {
   const check = ++emailCheck;
@@ -173,7 +178,7 @@ onMounted(loadInvites);
       </div>
     </RecordDrawer>
 
-    <RecordDrawer :open="createOpen" title="Invite member" :editing="inviteeEmail.trim() !== ''" :busy="creating" :fallback-focus="() => searchField?.focus()" @close="createOpen = false" @discard="inviteeEmail = ''">
+    <RecordDrawer :open="createOpen" title="Invite member" :editing="inviteeEmail.trim() !== ''" :busy="creating" :note="sendBlocker" :fallback-focus="() => searchField?.focus()" @close="createOpen = false" @discard="inviteeEmail = ''">
       <p class="muted">We email a one-time code. It works for 7 days. The person must register with this email address.</p>
       <form id="invite-create" class="admin-editor" @submit.prevent="createInvite">
         <label for="invite-member-email">Email of the new member</label>

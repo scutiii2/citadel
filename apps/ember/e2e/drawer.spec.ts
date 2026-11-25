@@ -16,7 +16,7 @@ test("the drawer expands, scrolls its own body and returns focus to the opener",
     await drawer.getByRole("button", { name: "Expand drawer" }).click();
     const wide = (await drawer.boundingBox())!.width;
     expect(Math.abs(wide - (width < 768 ? width : Math.max(normal, width * 0.9)))).toBeLessThanOrEqual(2);
-    await drawer.getByRole("button", { name: "Restore drawer size" }).click();
+    await drawer.getByRole("button", { name: "Expand drawer" }).click();
     expect((await drawer.boundingBox())!.width).toBe(normal);
   }
   await drawer.getByRole("button", { name: "Close", exact: true }).click();

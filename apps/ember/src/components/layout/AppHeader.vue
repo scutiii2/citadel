@@ -60,7 +60,7 @@ const title = computed(() => {
       aria-controls="app-sidebar"
       :aria-expanded="expanded"
       :title="expanded ? 'Collapse sidebar' : 'Expand sidebar'"
-      :aria-label="expanded ? 'Collapse sidebar' : 'Expand sidebar'"
+      aria-label="Sidebar"
       @click="toggle"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M9 5v14" /></svg>

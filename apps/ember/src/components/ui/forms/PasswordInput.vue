@@ -15,7 +15,7 @@ const visible = ref(false);
       <input v-bind="$attrs" :id="id ?? inputId" v-model="model" :type="visible ? 'text' : 'password'" :disabled="disabled" />
       <button
         type="button"
-        :aria-label="visible ? 'Hide password' : 'Show password'"
+        aria-label="Show password"
         :aria-pressed="visible"
         :aria-controls="id ?? inputId"
         :disabled="disabled"
