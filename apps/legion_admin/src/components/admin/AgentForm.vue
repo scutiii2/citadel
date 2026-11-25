@@ -4,7 +4,7 @@ import { computed, ref, watch } from "vue";
 import type { AgentConfig, AgentFile, ProviderCatalog } from "../../api/AgentsAdminClient";
 import { ToggleSwitch } from "@citadel/ui";
 import FormTabs from "./FormTabs.vue";
-import SettingRow from "../SettingRow.vue";
+import { SettingRow } from "@citadel/ui";
 import AgentGatewayList, { type GatewayRow } from "./AgentGatewayList.vue";
 import RouterPolicyForm from "./RouterPolicyForm.vue";
 import ToolScopePicker from "./ToolScopePicker.vue";

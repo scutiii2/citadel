@@ -7,7 +7,7 @@ import type { ToolInfo, ToolRunResult } from "../api/types";
 import { useAuthStore } from "../stores/auth";
 import { errorMessage } from "../utils/errors";
 import { commandsByTool } from "../utils/toolCommands";
-import CopyButton from "./CopyButton.vue";
+import { CopyButton } from "@citadel/ui";
 import { RecordDrawer } from "@citadel/ui";
 import ToolRunForm from "./ToolRunForm.vue";
 import "@citadel/ui/admin.css";

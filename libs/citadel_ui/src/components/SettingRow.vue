@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PanelHelp from "./admin/PanelHelp.vue";
 /** One setting on the Settings page: its name and description on the left, its
  * control (the default slot) on the right. A setting that differs from its
  * default (`modified`) gets an accent dot and a reset button; the parent owns
@@ -14,6 +15,7 @@ const emit = defineEmits<{ reset: [] }>();
         <span v-if="modified" class="dot" aria-hidden="true" />
         <span>{{ label }}</span>
         <span v-if="modified" class="sr-only">(changed from the default)</span>
+        <PanelHelp v-if="$slots.help" :title="label"><slot name="help" /></PanelHelp>
       </div>
       <p v-if="description" class="description">{{ description }}</p>
     </div>

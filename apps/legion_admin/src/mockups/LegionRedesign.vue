@@ -4,7 +4,7 @@ import type { AgentStatus } from "../api/AgentsAdminClient";
 import { BaseModal } from "@citadel/ui";
 import { ConfirmModal } from "@citadel/ui";
 import { PageLayout } from "@citadel/ui";
-import SettingRow from "../components/SettingRow.vue";
+import { SettingRow } from "@citadel/ui";
 import { ToggleSwitch } from "@citadel/ui";
 import type { Theme } from "@citadel/ui";
 import { LEGION_PAGES } from "../router/pages";
