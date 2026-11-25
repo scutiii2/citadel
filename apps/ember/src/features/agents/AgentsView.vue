@@ -5,7 +5,7 @@ import { usePolling } from "../../composables/time/usePolling";
 import { accountAgentsClient, agentsClient, type AgentListing } from "./api/AgentsClient";
 import AgentCard from "./components/AgentCard.vue";
 import AgentLlm from "./components/AgentLlm.vue";
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import { RecordDrawer } from "@citadel/ui";
 import SearchField from "../../components/ui/lists/SearchField.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";

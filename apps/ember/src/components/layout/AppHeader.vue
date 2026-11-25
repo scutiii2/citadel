@@ -4,7 +4,7 @@
 // Narrow screens use the bottom bar instead, so this is hidden there.
 import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
-import { useHeaderHelp } from "../../composables/useHeaderHelp";
+import { useHeaderHelp } from "@citadel/ui";
 import AccountMenu from "./AccountMenu.vue";
 import EmberLogo from "./EmberLogo.vue";
 import { useSidebar } from "../../composables/useSidebar";

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ActionsScope from "./ActionsScope.vue";
+import { ActionsScope } from "@citadel/ui";
 // Shared component copies: apply a fix in every admin app that has a copy.
 defineProps<{
   title: string;

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import "../../components/layout/infoPage.css";
+import "@citadel/ui/infoPage.css";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { CopyButton } from "@citadel/ui";
 import { ConfirmModal } from "@citadel/ui";
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import { useAuthStore } from "../../stores/auth";

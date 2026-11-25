@@ -8,7 +8,7 @@ import { tuningClient } from "../../api/navigation/TuningClient";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
 import { settingsClient } from "../../api/navigation/SettingsClient";
 import { useAuthStore } from "../../stores/auth";
-import { useTheme } from "../../composables/useTheme";
+import { useTheme } from "@citadel/ui";
 import SettingsView from "./SettingsView.vue";
 
 vi.mock("../../api/navigation/TuningClient", () => ({ tuningClient: {

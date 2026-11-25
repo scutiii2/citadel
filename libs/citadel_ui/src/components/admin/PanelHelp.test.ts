@@ -1,4 +1,7 @@
 import { mount } from "@vue/test-utils";
+import { h, nextTick } from "vue";
+import ActionsScope from "../ActionsScope.vue";
+import { useHeaderHelp } from "../../composables/useHeaderHelp";
 import { describe, expect, it } from "vitest";
 import PanelHelp from "./PanelHelp.vue";
 
@@ -31,5 +34,21 @@ describe("PanelHelp", () => {
     await wrapper.vm.$nextTick();
     expect(document.body.textContent).not.toContain("What it is for.");
     wrapper.unmount();
+  });
+
+  it("hands a page-level help to the header Help button on wide screens", async () => {
+    const help = useHeaderHelp();
+    help.ready.value = true;
+    const wrapper = mount({ render: () => h(ActionsScope, null, { default: () => h(PanelHelp, { title: "Tickets" }, { default: () => "Page text." }) }) }, { attachTo: document.body });
+    await nextTick();
+    expect(wrapper.find('[data-test="panel-help"]').exists()).toBe(false);
+    expect(help.count.value).toBe(1);
+    help.open.value = true;
+    await nextTick();
+    expect(document.body.textContent).toContain("Page text.");
+    wrapper.unmount();
+    expect(help.count.value).toBe(0);
+    help.ready.value = false;
+    help.open.value = false;
   });
 });

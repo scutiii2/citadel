@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import { computed, ref, watch } from "vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";

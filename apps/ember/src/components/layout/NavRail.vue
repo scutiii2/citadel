@@ -9,7 +9,7 @@ import { RouterLink, useRoute } from "vue-router";
 import AccountMenu from "./AccountMenu.vue";
 import EmberLogo from "./EmberLogo.vue";
 import { usePolling } from "../../composables/time/usePolling";
-import { THEME_LABELS, useTheme } from "../../composables/useTheme";
+import { THEME_LABELS, useTheme } from "@citadel/ui";
 import ThemeIcon from "./ThemeIcon.vue";
 import { OVERVIEW_ICON, PROFILE_ICON, visiblePages } from "../../router/pages";
 import { usePageVisibilityStore } from "../../stores/navigation/pageVisibility";

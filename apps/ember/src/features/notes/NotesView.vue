@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import "../../components/layout/infoPage.css";
+import "@citadel/ui/infoPage.css";
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { ConfirmModal } from "@citadel/ui";

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import { computed, nextTick, ref, watch } from "vue";
 import { matchesWords } from "../../utils/search";
 import PageLayout from "../../components/layout/PageLayout.vue";
@@ -15,7 +15,7 @@ import { useDeleteConfirm } from "../../composables/useDeleteConfirm";
 import { useListLoad } from "../../composables/useListLoad";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { growOnResize, growToContent } from "../../utils/browser/autoGrow";
-import "../../components/layout/infoPage.css";
+import "@citadel/ui/infoPage.css";
 import { errorMessage } from "../../utils/errors";
 import { SKILL_LIMITS, skillsClient, type Skill, type SkillStatus, type SkillText } from "./api/SkillsClient";
 

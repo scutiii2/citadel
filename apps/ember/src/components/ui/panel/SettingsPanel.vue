@@ -5,7 +5,7 @@ import PageLayout from "../../layout/PageLayout.vue";
 import { AdminSearch } from "@citadel/ui";
 import { ConfirmModal } from "@citadel/ui";
 import { DraftActions } from "@citadel/ui";
-import PanelHelp from "./PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import "./admin.css";
 
 /** A settings page as one admin panel: the header holds the help popover, the Cancel and Save icons (only while

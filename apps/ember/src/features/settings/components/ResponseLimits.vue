@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import SettingRow from "../../../components/ui/forms/SettingRow.vue";
+import { SettingRow } from "@citadel/ui";
 import { computed, onMounted, reactive, ref } from "vue";
 import { tuningClient, type AccountLimits } from "../../../api/navigation/TuningClient";
 import { adoptLimits, emptyLimitsState, limitsDirty, limitsPayload, type ResponseLimitsState } from "../utils/responseLimits";

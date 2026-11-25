@@ -2,6 +2,8 @@ import { ref } from "vue";
 
 export type Theme = "system" | "light" | "dark";
 
+export const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
+
 /** Each app saves its theme under its own key; `initTheme(key)` sets it. */
 const DEFAULT_STORAGE_KEY = "ember_admin.theme";
 let storageKey = DEFAULT_STORAGE_KEY;

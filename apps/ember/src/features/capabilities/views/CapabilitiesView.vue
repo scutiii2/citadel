@@ -7,7 +7,7 @@ import { McpServerClient } from "../../../api/tools/McpServerClient";
 import type { UserExtension } from "../api/UserExtensionsClient";
 import type { ResourceInfo, ToolInfo, ToolRunResult } from "../../../api/types";
 import PageLayout from "../../../components/layout/PageLayout.vue";
-import PanelHelp from "../../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import StateMessage from "../../../components/ui/status/StateMessage.vue";
 import { ToggleSwitch } from "@citadel/ui";
 import ToolRunDrawer from "../../../components/tools/forms/ToolRunDrawer.vue";

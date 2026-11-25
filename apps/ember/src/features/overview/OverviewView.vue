@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PageLayout from "../../components/layout/PageLayout.vue";
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import { StatTile } from "@citadel/ui";
 import { commandsClient } from "../../api/tools/CommandsClient";
 import { agentsClient } from "../agents/api/AgentsClient";

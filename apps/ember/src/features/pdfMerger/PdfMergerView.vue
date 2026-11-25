@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import { useNarrow } from "../../composables/useNarrow";
 import RetentionNote from "../../components/ui/status/RetentionNote.vue";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
