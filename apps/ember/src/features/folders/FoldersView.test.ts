@@ -30,16 +30,24 @@ describe("FoldersView", () => {
     client.create.mockResolvedValue({} as never);
     const wrapper = await setup();
     const button = wrapper.get("form.new button[type=submit]");
-    expect(button.attributes("disabled")).toBeDefined();
+    expect(button.attributes("disabled")).toBeUndefined();
 
     await wrapper.get("form.new input").setValue("Trip");
     await wrapper.findAll("button.segment").find((b) => b.text() === "15 min")!.trigger("click");
-    expect(button.attributes("disabled")).toBeUndefined();
     await wrapper.get("form.new").trigger("submit");
     await flushPromises();
 
     expect(client.create).toHaveBeenCalledWith("Trip", 15);
     expect(client.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("names an unnamed folder Folder", async () => {
+    client.create.mockResolvedValue({} as never);
+    const wrapper = await setup();
+    await wrapper.get("form.new").trigger("submit");
+    await flushPromises();
+
+    expect(client.create).toHaveBeenCalledWith("Folder", 60);
   });
 
   it("shows the server's reason when creating fails", async () => {
