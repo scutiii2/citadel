@@ -41,7 +41,9 @@ function aimLetters(): void {
 
 async function collapse(): Promise<void> {
   const el = button.value;
-  if (!el) return;
+  // A button inside a closed dialog has no size (`busy` can flip for another action while it is
+  // hidden): measuring it would pin it to 0 px for good, so only the visible one animates.
+  if (!el || !el.offsetWidth) return;
   fullWidth = el.offsetWidth;
   el.style.width = `${fullWidth}px`;
   aimLetters();
@@ -54,7 +56,13 @@ async function collapse(): Promise<void> {
 function expand(): void {
   const el = button.value;
   if (!el) return;
+  const wasCollapsed = collapsed.value;
   collapsed.value = false;
+  // Hidden again (the dialog closed mid-request): no transition will end, so let the label size it.
+  if (!wasCollapsed || !fullWidth || !el.offsetWidth) {
+    el.style.width = "";
+    return;
+  }
   el.style.width = `${fullWidth}px`;
 }
 
