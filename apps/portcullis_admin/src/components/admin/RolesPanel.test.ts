@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { adminClient, type PermissionInfo, type Role } from "../../api/AdminClient";
 import { ApiError } from "../../api/http";
 import { useAuthStore } from "../../stores/auth";
-import ConfirmModal from "./ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import RolesPanel from "./RolesPanel.vue";
 
 vi.mock("../../api/AdminClient", () => ({

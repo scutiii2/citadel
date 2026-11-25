@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import ActionMessage from "./admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { appConfigClient, type AppConfig, type AppConfigChanges } from "../api/AppConfigClient";
-import { useDraftPanel } from "../composables/useDraftPanel";
+import { useDraftPanel } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
-import AdminSearch from "./admin/AdminSearch.vue";
-import FieldLabel from "./admin/FieldLabel.vue";
-import PanelHelp from "./admin/PanelHelp.vue";
-import ConfirmModal from "./admin/ConfirmModal.vue";
-import ToggleSwitch from "./ToggleSwitch.vue";
-import DraftActions from "./admin/DraftActions.vue";
-import "./admin/admin.css";
+import { AdminSearch } from "@citadel/ui";
+import { FieldLabel } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { ToggleSwitch } from "@citadel/ui";
+import { DraftActions } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 
 /** Sessions, new accounts, login protection and backups. Saved in Portcullis's database; Portcullis reads them when it
  * starts, so a change is used from its next start. Where Portcullis listens, its cookie and the other services'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AuthCard from "../components/AuthCard.vue";
+import { AuthCard } from "@citadel/ui";
 import { RouterLink } from "vue-router";
 </script>
 

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, ref, watch } from "vue";
 import { agentsAdminClient, type SharedPrompts } from "../../api/AgentsAdminClient";
 import { errorMessage } from "../../utils/errors";
-import ConfirmModal from "./ConfirmModal.vue";
-import RecordDrawer from "./RecordDrawer.vue";
+import { ConfirmModal } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
 
 /** The prompt text every agent shares. Each text shows the built-in default
  * it falls back to; a text that differs has a dot and its own reset. Saving

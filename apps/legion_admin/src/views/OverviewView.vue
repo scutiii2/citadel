@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { agentsAdminClient } from "../api/AgentsAdminClient";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import StatTile from "../components/admin/StatTile.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { PanelHelp } from "@citadel/ui";
+import { StatTile } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { canOpen, LEGION_PAGES } from "../router/pages";
 import { useAuthStore } from "../stores/auth";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 /** The home page: live counts of agents and MCP servers, an alert for offline agents, and shortcuts to each page.
  * A count the server could not give is "unavailable", never zero. */

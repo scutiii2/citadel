@@ -42,6 +42,10 @@ DEPLOY_PATHS = [
     "apps/armory_admin",
     "apps/stronghold_admin",
     "apps/treasury_admin",
+    "libs/citadel_ui",
+    "package.json",
+    "pnpm-workspace.yaml",
+    "pnpm-lock.yaml",
     "docs/deployment.md",
     "tools/setup_env.py",
 ]

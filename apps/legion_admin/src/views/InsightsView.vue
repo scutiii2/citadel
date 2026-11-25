@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { tuningClient, type InsightsView } from "../api/TuningClient";
-import ActionMessage from "../components/admin/ActionMessage.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import StatTile from "../components/admin/StatTile.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { ActionMessage } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { StatTile } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 /** What Legion's routing, confidentiality check and tool batching did over the last days, from the daily counters. */
 const days = ref(7);

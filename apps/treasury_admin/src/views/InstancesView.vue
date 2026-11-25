@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { treasuryAdminClient, type TreasuryInstance, type TreasuryView } from "../api/TreasuryAdminClient";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import RecordDrawer from "../components/admin/RecordDrawer.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { useNoticesStore } from "../stores/notices";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 /** The databases Treasury serves: a read-only roster. Each service registers its own instance, so this page only
  * shows them; the connections they use are on the Connections page. */

@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import FieldLabel from "../components/admin/FieldLabel.vue";
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { FieldLabel } from "@citadel/ui";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { treasuryAdminClient, type CacheDefaults, type ConnectionRow, type ConnectionSpec, type ConnectionsView } from "../api/TreasuryAdminClient";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import DraftActions from "../components/admin/DraftActions.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import { AdminSearch } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { DraftActions } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
 import FormTabs from "../components/admin/FormTabs.vue";
-import StatusFilters from "../components/admin/StatusFilters.vue";
-import PageLayout from "../components/PageLayout.vue";
-import ToggleSwitch from "../components/ToggleSwitch.vue";
-import { useDraftPanel } from "../composables/useDraftPanel";
+import { StatusFilters } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
+import { ToggleSwitch } from "@citadel/ui";
+import { useDraftPanel } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 /** The databases Treasury keeps data in. Four local SQLite files are built in so the stack works on a new install;
  * what is saved here replaces or adds to them. A new connection is offered to the instances at once, a changed or

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { brainSettingsClient } from "../api/BrainSettingsClient";
@@ -8,14 +8,14 @@ import { ticketsAdminClient } from "../api/TicketsAdminClient";
 import { toolServicesClient } from "../api/ToolServicesClient";
 import { usageClient } from "../api/UsageClient";
 import { usageSettingsClient } from "../api/UsageSettingsClient";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import StatTile from "../components/admin/StatTile.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { PanelHelp } from "@citadel/ui";
+import { StatTile } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { LOG_PERMISSIONS, STRONGHOLD_PAGES } from "../router/pages";
 import { useAuthStore } from "../stores/auth";
 import { useNoticesStore } from "../stores/notices";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 /** The home page: live counts for what Stronghold holds, an alert while Stronghold does not answer, and shortcuts
  * to each page. A count that could not be loaded is "Unavailable", never zero. */

@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { treasuryAdminClient, type OutsideGroup, type OutsideOrigin, type OutsideView } from "../api/TreasuryAdminClient";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import RecordDrawer from "../components/admin/RecordDrawer.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { AdminSearch } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 type Target = { group: OutsideGroup; origin?: OutsideOrigin };
 type ViewError = { message: string; serviceId?: string; deleteId?: string };

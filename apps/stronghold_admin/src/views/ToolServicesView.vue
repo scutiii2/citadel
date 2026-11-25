@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { toolServicesClient, type ToolSaveBody, type ToolService, type ToolTestResult } from "../api/ToolServicesClient";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import { AdminSearch } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
 import FormTabs from "../components/admin/FormTabs.vue";
-import StatusFilters from "../components/admin/StatusFilters.vue";
+import { StatusFilters } from "@citadel/ui";
 import TestResultCells from "../components/TestResultCells.vue";
-import PageLayout from "../components/PageLayout.vue";
-import PasswordInput from "../components/PasswordInput.vue";
-import ToggleSwitch from "../components/ToggleSwitch.vue";
+import { PageLayout } from "@citadel/ui";
+import { PasswordInput } from "@citadel/ui";
+import { ToggleSwitch } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 interface AddressRow {
   key: number;

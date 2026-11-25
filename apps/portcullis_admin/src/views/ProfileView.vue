@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
-import PasswordInput from "../components/PasswordInput.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { ActionMessage } from "@citadel/ui";
+import { PasswordInput } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { authClient, type KnownDevice } from "../api/AuthClient";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import "../components/admin/admin.css";
+import { ConfirmModal } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 import { useAuthStore } from "../stores/auth";
 import { errorMessage, formatUtc } from "../utils/errors";
 

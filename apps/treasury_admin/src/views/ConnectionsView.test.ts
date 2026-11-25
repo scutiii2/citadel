@@ -1,7 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { treasuryAdminClient, type ConnectionsView } from "../api/TreasuryAdminClient";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import ConnectionsViewPage from "./ConnectionsView.vue";
 
 const VIEW: ConnectionsView = {

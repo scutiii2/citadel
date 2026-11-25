@@ -1,0 +1,4 @@
+# One pnpm workspace: the shared UI package and the five admin apps. Ember keeps its own project for now.
+packages:
+  - libs/citadel_ui
+  - apps/*_admin

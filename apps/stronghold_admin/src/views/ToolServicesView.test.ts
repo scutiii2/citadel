@@ -1,8 +1,8 @@
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { toolServicesClient, type ToolService } from "../api/ToolServicesClient";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import PasswordInput from "../components/PasswordInput.vue";
+import { ConfirmModal } from "@citadel/ui";
+import { PasswordInput } from "@citadel/ui";
 import ToolServicesView from "./ToolServicesView.vue";
 
 const address = "http://bard:29400";

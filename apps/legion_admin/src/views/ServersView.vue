@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { agentsAdminClient, type McpServer } from "../api/AgentsAdminClient";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import { ConfirmModal } from "@citadel/ui";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
 import FormTabs from "../components/admin/FormTabs.vue";
 import ConnectionTestCells from "../components/ConnectionTestCells.vue";
-import PasswordInput from "../components/PasswordInput.vue";
+import { PasswordInput } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
 
 /** The MCP servers Legion's agents use as tools. Saved in Legion's database; a change applies at Legion's next start.

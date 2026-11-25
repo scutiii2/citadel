@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { PanelHelp } from "@citadel/ui";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { environmentClient, type EnvironmentChanges, type EnvironmentSetting } from "../api/EnvironmentClient";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
-import PasswordInput from "../components/PasswordInput.vue";
-import ToggleSwitch from "../components/ToggleSwitch.vue";
+import { PasswordInput } from "@citadel/ui";
+import { ToggleSwitch } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
 
 /** The deployment values of Armory (addresses, link keys, folders). Saved in Armory's database, so a change

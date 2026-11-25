@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useNoticesStore } from "../stores/notices";
-import ThemeSelect from "./ThemeSelect.vue";
+import { ThemeSelect } from "@citadel/ui";
 
 /** The compact full-width header: sidebar toggle, identity, page title, and Notifications, Help and Profile. */
 defineProps<{ title: string; expanded: boolean }>();

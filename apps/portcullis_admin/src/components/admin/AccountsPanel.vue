@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import {
@@ -11,12 +11,12 @@ import {
 import { useAuthStore } from "../../stores/auth";
 import { errorMessage } from "../../utils/errors";
 import AccountDrawer, { type AccountDraft } from "./AccountDrawer.vue";
-import AdminSearch from "./AdminSearch.vue";
-import PanelHelp from "./PanelHelp.vue";
-import ConfirmModal from "./ConfirmModal.vue";
-import RecordDrawer from "./RecordDrawer.vue";
-import StatusFilters from "./StatusFilters.vue";
-import "./admin.css";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
+import { StatusFilters } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 
 /** The account roster: a status filter and a local search over username, email and role names, a
  * row that opens the account in a drawer, and a staged edit (profile fields plus role choices by ID)

@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { settingsClient } from "../../api/SettingsClient";
-import { useDraftPanel } from "../../composables/useDraftPanel";
+import { useDraftPanel } from "@citadel/ui";
 import { EMBER_WEB_PAGES } from "../../utils/emberWebPages";
 import { errorMessage } from "../../utils/errors";
-import ToggleSwitch from "../ToggleSwitch.vue";
-import AdminSearch from "./AdminSearch.vue";
-import FieldLabel from "./FieldLabel.vue";
-import PanelHelp from "./PanelHelp.vue";
-import ConfirmModal from "./ConfirmModal.vue";
-import DraftActions from "./DraftActions.vue";
-import "./admin.css";
+import { ToggleSwitch } from "@citadel/ui";
+import { AdminSearch } from "@citadel/ui";
+import { FieldLabel } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { DraftActions } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 
 /** Which ember_web pages every user's sidebar shows. Hiding is nav only: a hidden page still opens
  * by its address. A flip is a draft until Save; search only filters the rows, the draft stays mounted. */

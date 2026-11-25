@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/http";
 import { settingsClient } from "../../api/SettingsClient";
-import ConfirmModal from "./ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import SidebarPagesPanel from "./SidebarPagesPanel.vue";
 
 vi.mock("../../api/SettingsClient", () => ({ settingsClient: { pages: vi.fn(), setPages: vi.fn() } }));

@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { agentsAdminClient } from "../api/AgentsAdminClient";
-import ThemeSelect from "./ThemeSelect.vue";
+import { ThemeSelect } from "@citadel/ui";
 import { useAuthStore } from "../stores/auth";
 
 defineProps<{ title: string; expanded: boolean }>();

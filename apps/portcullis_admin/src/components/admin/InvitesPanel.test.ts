@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { adminClient, type Invite } from "../../api/AdminClient";
 import { ApiError } from "../../api/http";
-import ConfirmModal from "./ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import InvitesPanel from "./InvitesPanel.vue";
 
 vi.mock("../../api/AdminClient", () => ({

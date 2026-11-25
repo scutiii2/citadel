@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import PageLayout from "../components/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { logsClient, type AnalyticsRange, type AnalyticsReport, type LogActor, type LogKind } from "../api/LogsClient";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
 import ActivityChart from "../components/analytics/ActivityChart.vue";
 import BarList from "../components/analytics/BarList.vue";
 import HourHeatmap from "../components/analytics/HourHeatmap.vue";
 import KindStatTile from "../components/analytics/KindStatTile.vue";
 import TrafficPanel from "../components/analytics/TrafficPanel.vue";
 import "../components/infoPage.css";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 import LogEntries from "../components/LogEntries.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
 import { LOG_PERMISSIONS } from "../router/pages";

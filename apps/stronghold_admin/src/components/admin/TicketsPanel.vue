@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref, watch } from "vue";
 import {
   ticketsAdminClient,
@@ -19,13 +19,13 @@ import {
   type TicketFilterState,
 } from "../../utils/ticketFormat";
 import SegmentedControl from "../SegmentedControl.vue";
-import AdminSearch from "./AdminSearch.vue";
-import PanelHelp from "./PanelHelp.vue";
-import ToggleSwitch from "../ToggleSwitch.vue";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { ToggleSwitch } from "@citadel/ui";
 import TicketDrawer from "./TicketDrawer.vue";
 import TicketBoard from "./TicketBoard.vue";
-import BaseModal from "../BaseModal.vue";
-import "./admin.css";
+import { BaseModal } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 
 /** Staff triage: a status board, groups of related reports, uncertain matches
  * for review, and the ticket drawer. Changes display server-confirmed state. */

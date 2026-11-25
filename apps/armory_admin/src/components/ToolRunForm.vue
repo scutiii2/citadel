@@ -4,7 +4,7 @@ import { useAuthStore } from "../stores/auth";
 import { commandsClient, type ParamOption } from "../api/CommandsClient";
 import type { JsonSchema } from "../api/types";
 import { errorMessage } from "../utils/errors";
-import ToggleSwitch from "./ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 import { buildArgs, fieldsFromSchema, initialValues, type FieldValues, type ToolField } from "../utils/toolSchema";
 
 /** A form for one tool's parameters, from its JSON Schema (Tools page and

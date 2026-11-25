@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import ToggleSwitch from "../ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 import type { CapabilityInfo } from "../../api/CommandsClient";
 
 /** Picks the built-in capabilities an agent may call. It edits the same comma-separated

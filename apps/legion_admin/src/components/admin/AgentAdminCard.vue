@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed } from "vue";
 import type { AgentFile, AgentStatus, AgentTier, LiveAgent } from "../../api/AgentsAdminClient";
 

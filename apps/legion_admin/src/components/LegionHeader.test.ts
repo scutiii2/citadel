@@ -4,7 +4,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import { expect, it, vi } from "vitest";
 import { agentsAdminClient } from "../api/AgentsAdminClient";
 import { useAuthStore } from "../stores/auth";
-import { useTheme } from "../composables/useTheme";
+import { useTheme } from "@citadel/ui";
 import LegionHeader from "./LegionHeader.vue";
 import LegionNav from "./LegionNav.vue";
 

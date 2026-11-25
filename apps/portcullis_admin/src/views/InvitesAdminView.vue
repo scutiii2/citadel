@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PageLayout from "../components/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import InvitesPanel from "../components/admin/InvitesPanel.vue";

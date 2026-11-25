@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { adminClient, type AdminAccount, type PermissionInfo, type Role } from "../../api/AdminClient";
 import { useAuthStore } from "../../stores/auth";
 import { errorMessage } from "../../utils/errors";
-import AdminSearch from "./AdminSearch.vue";
-import PanelHelp from "./PanelHelp.vue";
-import ConfirmModal from "./ConfirmModal.vue";
-import RecordDrawer from "./RecordDrawer.vue";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
 import RoleEditor from "./RoleEditor.vue";
-import "./admin.css";
+import "@citadel/ui/admin.css";
 
 /** The role roster: a searchable list whose rows open the role in a drawer for details and editing.
  * Creation opens in the same drawer. The draft lives in `RoleEditor`; this panel asks before saving or

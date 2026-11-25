@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, ref, watch } from "vue";
 import type { AgentConfig, AgentFile, ProviderCatalog } from "../../api/AgentsAdminClient";
-import ToggleSwitch from "../ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 import FormTabs from "./FormTabs.vue";
 import SettingRow from "../SettingRow.vue";
 import AgentGatewayList, { type GatewayRow } from "./AgentGatewayList.vue";

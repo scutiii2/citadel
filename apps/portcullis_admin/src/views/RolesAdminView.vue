@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PageLayout from "../components/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { onBeforeRouteLeave } from "vue-router";
 import { ref } from "vue";
 import RolesPanel from "../components/admin/RolesPanel.vue";

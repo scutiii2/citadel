@@ -182,8 +182,9 @@ services:
 
   portcullis_admin:
     build:
-      context: ./apps
-      dockerfile: portcullis_admin/Dockerfile
+      context: .
+      dockerfile: docker/admin.Dockerfile
+      args: { APP: portcullis_admin }
     restart: unless-stopped
     environment:
       FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
@@ -193,7 +194,10 @@ services:
     networks: [core]
 
   legion_admin:
-    build: ./apps/legion_admin
+    build:
+      context: .
+      dockerfile: docker/admin.Dockerfile
+      args: { APP: legion_admin }
     restart: unless-stopped
     environment:
       FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
@@ -203,7 +207,10 @@ services:
     networks: [core]
 
   armory_admin:
-    build: ./apps/armory_admin
+    build:
+      context: .
+      dockerfile: docker/admin.Dockerfile
+      args: { APP: armory_admin }
     restart: unless-stopped
     environment:
       FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
@@ -213,7 +220,10 @@ services:
     networks: [core]
 
   stronghold_admin:
-    build: ./apps/stronghold_admin
+    build:
+      context: .
+      dockerfile: docker/admin.Dockerfile
+      args: { APP: stronghold_admin }
     restart: unless-stopped
     environment:
       FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
@@ -223,7 +233,10 @@ services:
     networks: [core]
 
   treasury_admin:
-    build: ./apps/treasury_admin
+    build:
+      context: .
+      dockerfile: docker/admin.Dockerfile
+      args: { APP: treasury_admin }
     restart: unless-stopped
     environment:
       FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"

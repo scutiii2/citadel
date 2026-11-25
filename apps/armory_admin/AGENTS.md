@@ -5,7 +5,7 @@ Project note: `Brain/Projects/armory_admin.md` in the Obsidian vault (`../../../
 Vue 3 + TypeScript admin app for Armory. All API calls go through Portcullis. Its pages check `capabilities.manage` (Ticket settings: `tickets.manage`; Tool approval: `settings.manage`). Pages: Overview (counts and shortcuts), Capabilities, Ticket settings, Settings, Tool approval, Limits, Email. See [Armory settings](../armory/docs/settings.md) for the other pages and their storage.
 
 ## Rules
-- Code is copied between the admin apps, not shared. Nothing here imports from another app. Apply a fix to a shared component (PageLayout, ToggleSwitch, BaseModal, ThemeSelect, AdminSearch, RecordDrawer, StatusFilters, DraftActions, PanelHelp, StatTile, SettingsPanel...) in every admin app that has a copy.
+- Shared UI lives in `libs/citadel_ui` (`@citadel/ui`, a pnpm workspace package): PageLayout, ToggleSwitch, BaseModal, ConfirmModal, ThemeSelect, AdminSearch, RecordDrawer, StatusFilters, DraftActions, `useTheme`, base styles (`@citadel/ui/base.css`), `admin.css`. Fix it there once; every admin app picks it up on its next build. Keep app-specific code in the app. Run `pnpm install` at the Citadel root, not inside an app.
 - Add a page: one entry in `src/router/pages.ts`, one route in `src/router/index.ts` with `meta.permission`, one view.
 - Anything opened from a panel opens in a `RecordDrawer`; only `ConfirmModal` stays modal.
 - Every panel header carries a `PanelHelp` icon first among its tools: a click opens a popover saying what the panel is for. Actions in a panel header are icon buttons (`admin-icon`, `accent` for the primary one) with an accessible name.

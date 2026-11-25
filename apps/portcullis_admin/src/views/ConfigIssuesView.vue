@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { ActionMessage } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import type { ConfigIssue, ConfigIssueSeverity } from "../api/ConfigIssuesClient";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import StatusFilters from "../components/admin/StatusFilters.vue";
-import "../components/admin/admin.css";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { StatusFilters } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 import { useAuthStore } from "../stores/auth";
 import { useConfigIssuesStore } from "../stores/configIssues";
-import { adminAppUrl } from "../utils/siblings";
+import { adminAppUrl } from "@citadel/ui";
 
 /** Problems in portcullis's config and secret files. File and key names only, never secret values.
  * The page opens only while there are issues; a check that succeeds and finds none leaves for the home

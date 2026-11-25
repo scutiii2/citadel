@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { ActionMessage } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { capabilitiesAdminClient, type CapabilityStatus } from "../api/CapabilitiesAdminClient";
 import { commandsClient } from "../api/CommandsClient";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import StatusFilters from "../components/admin/StatusFilters.vue";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { StatusFilters } from "@citadel/ui";
 import CapabilityDrawer from "../components/CapabilityDrawer.vue";
-import ToggleSwitch from "../components/ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 import { useNoticesStore } from "../stores/notices";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 const notices = useNoticesStore();
 const capabilities = ref<CapabilityStatus[]>([]);

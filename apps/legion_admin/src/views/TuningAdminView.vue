@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import DraftActions from "../components/admin/DraftActions.vue";
-import { useDraftPanel } from "../composables/useDraftPanel";
-import FieldLabel from "../components/admin/FieldLabel.vue";
-import ToggleSwitch from "../components/ToggleSwitch.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { DraftActions } from "@citadel/ui";
+import { useDraftPanel } from "@citadel/ui";
+import { FieldLabel } from "@citadel/ui";
+import { ToggleSwitch } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { tuningClient, type TuningChanges, type TuningView } from "../api/TuningClient";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 /** One editable value: where it lives in config_tuning.json, how to label it, and its bounds
  * (the same ones legion enforces; legion's answer is what the page shows on a refusal). */

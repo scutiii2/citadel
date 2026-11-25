@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { configIssuesClient } from "../api/ConfigIssuesClient";
-import { useTheme } from "../composables/useTheme";
+import { useTheme } from "@citadel/ui";
 import { useAuthStore } from "../stores/auth";
 import { useConfigIssuesStore } from "../stores/configIssues";
 import PortcullisHeader from "./PortcullisHeader.vue";

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AuthCard from "../components/AuthCard.vue";
+import { AuthCard } from "@citadel/ui";
 import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();

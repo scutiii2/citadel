@@ -1,0 +1,30 @@
+{
+  "name": "@citadel/ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Components, composables and base styles shared by the Citadel admin apps. Consumed as source: each app's Vite build compiles it.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./base.css": "./src/styles/base.css",
+    "./admin.css": "./src/styles/admin.css"
+  },
+  "scripts": {
+    "build": "vue-tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.42"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/test-utils": "^2.5.1",
+    "@vue/tsconfig": "^0.9.1",
+    "jsdom": "^29.1.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.2",
+    "vue": "^3.5.42",
+    "vue-tsc": "^3.3.11"
+  }
+}

@@ -6,7 +6,7 @@ import { adminClient, type AdminAccount, type Role } from "../../api/AdminClient
 import { ApiError } from "../../api/http";
 import { useAuthStore } from "../../stores/auth";
 import AccountsPanel from "./AccountsPanel.vue";
-import ConfirmModal from "./ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 
 vi.mock("../../api/AdminClient", () => ({
   adminClient: {

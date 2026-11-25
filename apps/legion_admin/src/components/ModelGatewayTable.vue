@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import ActionMessage from "./admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { agentsAdminClient } from "../api/AgentsAdminClient";
 import type { ModelGatewayField, ModelGatewayKind, ModelGatewayList, ModelGatewayRow } from "../api/AgentsAdminClient";
-import AdminSearch from "./admin/AdminSearch.vue";
-import ConfirmModal from "./admin/ConfirmModal.vue";
-import PanelHelp from "./admin/PanelHelp.vue";
-import RecordDrawer from "./admin/RecordDrawer.vue";
+import { AdminSearch } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
 import ConnectionTestCells from "./ConnectionTestCells.vue";
 import FieldLabel from "./FieldLabel.vue";
 import FormTabs from "./admin/FormTabs.vue";
-import PasswordInput from "./PasswordInput.vue";
-import ToggleSwitch from "./ToggleSwitch.vue";
+import { PasswordInput } from "@citadel/ui";
+import { ToggleSwitch } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
 
 const props = defineProps<{ kind: ModelGatewayKind; title: string; help: string }>();

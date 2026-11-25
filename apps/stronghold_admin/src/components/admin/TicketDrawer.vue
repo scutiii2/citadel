@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, ref, watch } from "vue";
 import type { AdminTicket, TicketChanges, TicketPriority, TicketStatus } from "../../api/TicketsAdminClient";
 import {
@@ -11,7 +11,7 @@ import {
   TYPE_LABELS,
   formatTicketTime,
 } from "../../utils/ticketFormat";
-import "./admin.css";
+import "@citadel/ui/admin.css";
 
 /** One ticket for staff: details, the reporter's context (unverified), status,
  * priority, assignee, tags, group, and the thread. It only shows state and

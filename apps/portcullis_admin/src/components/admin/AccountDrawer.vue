@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, ref } from "vue";
 import type { AdminAccount, Role, RoleRef } from "../../api/AdminClient";
 import { useAuthStore } from "../../stores/auth";
 import { formatUtc } from "../../utils/errors";
-import ToggleSwitch from "../ToggleSwitch.vue";
-import "./admin.css";
+import { ToggleSwitch } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 
 /** The body of the account drawer: every assigned role (or "No roles"), and while editing the
  * staged profile fields and role choices, kept by role ID. It only reports what the admin chose:

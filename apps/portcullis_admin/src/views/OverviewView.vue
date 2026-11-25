@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
-import PageLayout from "../components/PageLayout.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
+import { ActionMessage } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { adminClient, type AdminSummary } from "../api/AdminClient";
@@ -9,8 +9,8 @@ import { ADMIN_NAV_PAGES, CONFIG_ISSUES_ICON } from "../router/pages";
 import { useAuthStore } from "../stores/auth";
 import { useConfigIssuesStore } from "../stores/configIssues";
 import { errorMessage } from "../utils/errors";
-import StatTile from "../components/admin/StatTile.vue";
-import "../components/admin/admin.css";
+import { StatTile } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 import "../components/admin/adminPages.css";
 
 const auth = useAuthStore();

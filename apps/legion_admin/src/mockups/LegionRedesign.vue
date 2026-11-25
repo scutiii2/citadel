@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
 import type { AgentStatus } from "../api/AgentsAdminClient";
-import BaseModal from "../components/BaseModal.vue";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { BaseModal } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import SettingRow from "../components/SettingRow.vue";
-import ToggleSwitch from "../components/ToggleSwitch.vue";
-import type { Theme } from "../composables/useTheme";
+import { ToggleSwitch } from "@citadel/ui";
+import type { Theme } from "@citadel/ui";
 import { LEGION_PAGES } from "../router/pages";
-import { ADMIN_APPS, adminAppUrl } from "../utils/siblings";
+import { ADMIN_APPS, adminAppUrl } from "@citadel/ui";
 import PanelSearch from "./PanelSearch.vue";
 
 interface Agent {

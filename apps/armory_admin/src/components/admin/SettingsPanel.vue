@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, toRef, useId } from "vue";
-import { useDraftPanel } from "../../composables/useDraftPanel";
-import PageLayout from "../PageLayout.vue";
-import AdminSearch from "./AdminSearch.vue";
-import ConfirmModal from "./ConfirmModal.vue";
-import DraftActions from "./DraftActions.vue";
-import PanelHelp from "./PanelHelp.vue";
-import "./admin.css";
+import { useDraftPanel } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
+import { AdminSearch } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { DraftActions } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 
 /** A settings page as one admin panel: the header holds the help popover, the Cancel and Save icons (only while
  * the draft differs from what is saved) and a search. The body is the page's sections; a section hides itself
