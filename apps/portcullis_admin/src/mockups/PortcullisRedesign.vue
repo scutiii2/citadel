@@ -3,7 +3,7 @@ import { computed, nextTick, reactive, ref } from "vue";
 import { BaseModal } from "@citadel/ui";
 import EmberLogo from "../components/EmberLogo.vue";
 import { PageLayout } from "@citadel/ui";
-import SettingRow from "../components/SettingRow.vue";
+import { SettingRow } from "@citadel/ui";
 import { ToggleSwitch } from "@citadel/ui";
 import { ConfirmModal } from "@citadel/ui";
 import { ADMIN_APPS, adminAppUrl } from "@citadel/ui";

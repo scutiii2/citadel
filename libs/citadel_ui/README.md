@@ -7,4 +7,4 @@ Components, composables and base styles shared by the five admin apps (armory, l
 - **Per-app values are arguments.** `initTheme("<app>_admin.theme")` sets the app's storage key. A `PasswordInput` shows the label row only when you fill its `help` slot.
 - **Tests.** `pnpm test` here runs the shared components' tests. `pnpm run build` type-checks.
 - **Docker.** `docker/admin.Dockerfile` builds any admin app from the Citadel root (`--build-arg APP=<folder>`); `tools/publish_live.py` ships this folder.
-- **Not shared yet** (differs between apps): `SettingRow`, `CopyButton`, headers and navs.
+- **Not shared yet** (differs between apps): headers and navs.
