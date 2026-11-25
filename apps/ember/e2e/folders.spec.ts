@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { ACCOUNT, installFakeApi, newState } from "./fakeApi.ts";
 
-test("the Temp folders page creates a folder with a real click", async ({ page }) => {
+for (const width of [1280, 910, 768, 375]) test(`the Temp folders page creates a folder with a real click at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 800 });
   const state = newState();
   await installFakeApi(page, state);
   const folders: unknown[] = [];
@@ -25,7 +26,7 @@ test("the Temp folders page creates a folder with a real click", async ({ page }
 
   await page.goto("/folders");
   const create = page.getByRole("button", { name: "Create folder" });
-  await expect(create).toBeDisabled();
+  await expect(create).toBeEnabled();
   await page.getByLabel("Folder name").fill("Trip");
   await page.getByRole("button", { name: "15 min" }).click();
   await expect(create).toBeEnabled();
