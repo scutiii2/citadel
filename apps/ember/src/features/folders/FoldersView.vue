@@ -92,21 +92,21 @@ watch(() => auth.account?.id, () => { folders.value = []; loading.value = true; 
   <PageLayout class="folders info-content" title="Temp folders">
     <template #actions>
       <PanelHelp title="Temporary folders">
-        Open a folder and send its link to anyone: they need no account to download or add files. Each file can be {{ formatBytes(MAX_FILE_BYTES) }} at most.
+        Create a folder and send its link to anyone: they need no account to download or add files. Each file can be {{ formatBytes(MAX_FILE_BYTES) }} at most.
         A folder is deleted when its time is up (an hour at most), and adding or removing files never changes that. Only you can remove files or delete the folder.
       </PanelHelp>
     </template>
 
     <form class="new" @submit.prevent="create">
-      <input v-model="name" type="text" aria-label="Folder name" placeholder="Folder name" maxlength="60" autocomplete="off" required :disabled="busy" />
+      <input v-model="name" type="text" aria-label="Folder name" placeholder="Name a new folder" maxlength="60" autocomplete="off" required :disabled="busy" />
       <SegmentedControl v-model="length" :options="LENGTHS" aria-label="Delete after" />
-      <button type="submit" class="pill-btn primary" :disabled="busy || name.trim() === ''">Open folder</button>
+      <button type="submit" class="pill-btn primary" :disabled="busy || name.trim() === ''">Create folder</button>
     </form>
     <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
 
     <StateMessage v-if="loading" kind="loading">Loading …</StateMessage>
     <StateMessage v-else-if="error" kind="error" @retry="load">Could not load your folders: {{ error }}</StateMessage>
-    <StateMessage v-else-if="!open.length" kind="empty">You have no open folders.</StateMessage>
+    <StateMessage v-else-if="!open.length" kind="empty">No folders yet. Name one above and choose how long it lasts, then press Create folder.</StateMessage>
     <template v-else>
       <section v-for="folder in open" :key="folder.id" class="card folder" :aria-label="folder.name">
         <header>
