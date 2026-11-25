@@ -304,7 +304,7 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </div>
-      <footer class="generate-footer"><p>Generated values aren't saved.</p><button type="submit" class="primary" :disabled="!canRun" :aria-busy="busy"><svg class="line-icon" v-if="!busy" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 7M4 12l2 7a8 8 0 0 0 13-2" /></svg>{{ generateLabel }}</button></footer>
+      <footer class="generate-footer"><p>Generated values aren't saved.</p><p v-if="!busy && tab === 'password' && !characterTypes" class="disabled-reason" role="status">Choose at least one kind of character.</p><p v-else-if="!busy && tab === 'totp' && !options.totp.secret.trim()" class="disabled-reason" role="status">Enter the secret first.</p><button type="submit" class="primary" :disabled="!canRun" :aria-busy="busy"><svg class="line-icon" v-if="!busy" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 7M4 12l2 7a8 8 0 0 0 13-2" /></svg>{{ generateLabel }}</button></footer>
     </WorkspaceLayout>
     <ConfirmModal :open="leaving !== null" title="Discard the generated value?" :message="`Generated values are not stored. Leaving this ${leaving?.page ? 'page' : 'tab'} removes the one you made, so copy it first if you still need it.`" confirm-label="Discard and leave" @confirm="answerLeave(true)" @close="answerLeave(false)" />
   </PageLayout>

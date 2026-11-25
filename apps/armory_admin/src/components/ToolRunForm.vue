@@ -301,6 +301,7 @@ function inputType(field: ToolField): string {
       <small :id="`${fieldId(f.name)}-description`" v-if="f.description" class="hint">{{ f.description }}</small>
     </div>
 
+    <p v-if="!live && !auth.hasPermission('tools.execute')" class="hint" role="status">You need the tools.execute permission to run tools. Ask an administrator.</p>
     <button v-if="!live" type="submit" class="run" :disabled="running || uploading || !auth.hasPermission('tools.execute')">
       {{ running ? "Running ..." : uploading ? "Uploading ..." : submitLabel }}
     </button>

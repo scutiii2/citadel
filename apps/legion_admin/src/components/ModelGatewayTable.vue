@@ -361,7 +361,7 @@ onMounted(load);
     </div>
   </section>
   <Teleport to="body">
-    <RecordDrawer ref="drawer" :open="open" :title="drawerTitle" editable :editing="editing" :busy="saving" :fallback-focus="() => searchField?.focus()"
+    <RecordDrawer ref="drawer" :open="open" :title="drawerTitle" editable :editing="editing" :busy="saving" :note="editing && !type ? 'Choose a gateway type first.' : ''" :fallback-focus="() => searchField?.focus()"
       @edit="edit" @close="close" @discard="discard" @save="save">
       <form v-if="editing" :id="`${kind}-editor`" class="admin-editor" novalidate @submit.prevent="submit">
         <FormTabs v-if="needsModel" v-model="tab" :items="tabItems" :prefix="kind" :label="`${title} settings`" />

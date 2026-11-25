@@ -151,6 +151,7 @@ function send(): void {
         <button type="button" class="small move" :disabled="busy || groupId === null" @click="emit('move', groupId)">Move</button>
         <button type="button" class="small split" :disabled="busy" @click="emit('move', null)">Split out</button>
       </div>
+      <p v-if="groupId === null" class="disabled-reason">Enter a group number to move this ticket there.</p>
       <button
         v-if="ticket.possible_group_id !== null"
         type="button"

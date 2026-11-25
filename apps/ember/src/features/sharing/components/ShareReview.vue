@@ -130,6 +130,7 @@ const blockSender = () => answer(async () => {
         <p v-if="problem" class="error" role="alert">{{ problem }}</p>
       </template>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="detail && !decided && !title.trim()" class="disabled-reason" role="status">Give it a title first.</p>
       <div class="buttons">
         <button type="button" class="pill-btn ghost" :disabled="busy" @click="close">Close</button>
         <template v-if="!decided">

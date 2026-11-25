@@ -115,6 +115,7 @@ async function send(): Promise<void> {
         <p v-if="mode === 'global'" class="note" role="note">Global shares are reviewed first. If approved, every account and every agent can read the text. Do not share private data.</p>
         <p v-else class="note" role="note">They see the text and choose whether to keep it. The server removes tags and private Markdown links. Check the text for private paths before sending. You can withdraw it from Shares until they answer.</p>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <p v-if="!valid" class="disabled-reason" role="status">Enter the username to send to.</p>
         <div class="buttons">
           <button type="button" class="pill-btn ghost" :disabled="sending" @click="close">Cancel</button>
           <button type="submit" class="pill-btn primary" :disabled="!valid || sending" :aria-busy="sending">Send</button>

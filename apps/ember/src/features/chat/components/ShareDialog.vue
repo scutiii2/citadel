@@ -126,6 +126,7 @@ const hasLinks = computed(() => links.value.length > 0);
           <option v-for="e in EXPIRIES" :key="String(e.value)" :value="e.value">{{ e.label }}</option>
         </select>
       </label>
+      <p v-if="!chatId" class="disabled-reason" role="status">Open a saved chat to share it.</p>
       <button type="submit" class="pill-btn primary" :aria-busy="creating" :disabled="creating || !chatId">
         Create link
       </button>

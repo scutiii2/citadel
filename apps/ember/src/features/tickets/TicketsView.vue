@@ -366,6 +366,7 @@ async function reopenTicket(): Promise<void> {
         <p v-if="formError" class="form-error error" role="alert">{{ formError }}</p>
       </form>
       <template #footer>
+        <p v-if="!draft.title.trim() || !draft.description.trim()" class="disabled-reason" role="status">Add a title and a description.</p>
         <button type="button" class="chip" @click="newDrawer?.requestCancel()">Cancel</button>
         <button type="submit" form="new-ticket-form" class="primary submit-ticket" :disabled="!canSubmit" :aria-busy="saving">Submit</button>
       </template>

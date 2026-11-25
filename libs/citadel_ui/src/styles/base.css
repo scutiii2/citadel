@@ -205,3 +205,6 @@ table.admin-records thead th { overflow-wrap: normal; white-space: nowrap; }
   :is(.armory-header, .legion-header, .portcullis-header, .stronghold-header, .treasury-header) .chip, .admin-panel-card .chip, .record-drawer .chip, .record-drawer .danger,
   .admin-panel-card .primary, .record-drawer .primary { min-height: 44px; }
 }
+
+/* Why a button is disabled, in text beside it (ruling: ember-design-system, Button behaviour). */
+.disabled-reason { margin: 0; color: var(--muted); font-size: 0.85em; overflow-wrap: anywhere; }

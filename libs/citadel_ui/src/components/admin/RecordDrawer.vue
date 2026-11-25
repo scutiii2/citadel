@@ -9,6 +9,8 @@ const props = defineProps<{
   editable?: boolean;
   editing?: boolean;
   busy?: boolean;
+  /** Why the main button is disabled, shown beside the buttons. Leave empty when it is enabled. */
+  note?: string;
   saveLabel?: string;
   fallbackFocus?: () => void;
 }>();
@@ -78,7 +80,7 @@ defineExpose({ requestSave, requestCancel: () => requestClose(false) });
       </button>
     </div>
     <div ref="body" class="drawer-body"><slot /></div>
-    <footer v-if="$slots.footer" class="drawer-footer"><slot name="footer" /></footer>
+    <footer v-if="$slots.footer" class="drawer-footer"><p v-if="note" class="drawer-note" role="status">{{ note }}</p><slot name="footer" /></footer>
   </BaseModal>
   <ConfirmModal
     :open="!!confirmation"
@@ -101,6 +103,7 @@ dialog.record-drawer.expanded:modal { width: 90vw; }
 .drawer-tools { position: absolute; inset: 12px 60px auto auto; display: flex; }
 .drawer-tools .admin-icon { width: 44px; height: 44px; }
 .drawer-body { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding: 0 24px 24px; }
+.drawer-note { flex: 1 1 12rem; min-width: 0; margin: 0; color: var(--muted); font-size: 0.85em; overflow-wrap: anywhere; }
 .drawer-footer { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border); padding: 12px 24px calc(12px + env(safe-area-inset-bottom, 0px)); }
 @media (max-width: 767px) {
   dialog.record-drawer.expanded:modal { width: 100vw; max-width: 100vw; }

@@ -287,7 +287,7 @@ watch([editing, creating], () => { tab.value = "general"; });
       </div>
     </section>
 
-    <RecordDrawer ref="drawer" :open="drawerOpen" :title="creating ? 'Add connection' : selected ? `Connection ${selected.name}` : 'Connection'" :editable="!creating" :editing="editing" :busy="busy"
+    <RecordDrawer ref="drawer" :open="drawerOpen" :title="creating ? 'Add connection' : selected ? `Connection ${selected.name}` : 'Connection'" :editable="!creating" :editing="editing" :busy="busy" :note="editing && !name.trim() ? 'Name the connection first.' : ''"
       :save-label="creating ? 'Add connection' : 'Save connection'" :fallback-focus="() => searchField?.focus()" @edit="editing = true" @discard="discard" @save="save" @close="close">
       <form v-if="editing" ref="formEl" class="admin-editor" data-test="form" @submit.prevent="requestSave">
         <FormTabs v-model="tab" :items="tabItems" prefix="conn" label="Connection settings" />

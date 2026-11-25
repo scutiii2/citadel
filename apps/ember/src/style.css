@@ -323,3 +323,6 @@ table.admin-records thead th { overflow-wrap: normal; white-space: nowrap; }
   .admin-panel-card .chip, .record-drawer .chip, .record-drawer .danger,
   .admin-panel-card .primary, .record-drawer .primary { min-height: 44px; }
 }
+
+/* Why a button is disabled, in text beside it (ruling: ember-design-system, Button behaviour). */
+.disabled-reason { margin: 0 auto 0 0; color: var(--muted); font-size: 0.85em; overflow-wrap: anywhere; }
