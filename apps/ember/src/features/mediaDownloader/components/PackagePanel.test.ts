@@ -83,5 +83,5 @@ it('builds a group, confirms starting and hides every membership editor after ac
   expect(wrapper.text()).toContain('🔒 Locked')
   expect(wrapper.find('textarea').exists()).toBe(false)
   expect(wrapper.findAll('button').some(b => b.text() === 'Remove')).toBe(false)
-  expect(wrapper.find('progress').exists()).toBe(true)
+  expect(wrapper.find('[role=progressbar]').exists()).toBe(true)
 })

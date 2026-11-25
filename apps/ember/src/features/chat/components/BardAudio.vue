@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { isDesktop, mediaUrl } from "../../../utils/server";
 import { useAuthStore } from "../../../stores/auth";
+import RangeSlider from "../../../components/ui/forms/RangeSlider.vue";
 
 /** In-chat player for a Bard answer. The audio streams through ember_api: the
  * page's content security policy only allows same-origin media, so it never
@@ -64,16 +65,7 @@ function onDuration(): void {
           <path v-else d="M5 3l8 5-8 5z" />
         </svg>
       </button>
-      <input
-        class="seek"
-        type="range"
-        min="0"
-        :max="total || 1"
-        step="0.01"
-        :value="current"
-        aria-label="Seek"
-        @input="seek"
-      />
+      <RangeSlider class="seek" :model-value="current" :min="0" :max="total || 1" step="0.01" aria-label="Seek" @input="seek" />
       <span class="clock">{{ clock(current) }} / {{ clock(total) }}</span>
     </div>
     <a v-if="auth.hasPermission('files.download')" class="save-audio" :href="url" download="bard.mp3">
@@ -153,10 +145,6 @@ function onDuration(): void {
 .seek {
   flex: 1;
   min-width: 0;
-  height: 20px;
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
 }
 .clock {
   flex: none;
@@ -193,7 +181,6 @@ function onDuration(): void {
   border-color: var(--accent);
 }
 .play:focus-visible,
-.seek:focus-visible,
 .save-audio:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -201,9 +188,6 @@ function onDuration(): void {
 @media (max-width: 767px) {
   .play {
     width: 44px;
-    height: 44px;
-  }
-  .seek {
     height: 44px;
   }
   .save-audio {

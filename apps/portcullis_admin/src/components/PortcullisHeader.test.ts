@@ -30,7 +30,7 @@ it("shows the title, toggles the sidebar and keeps theme and logout inside Profi
   const { wrapper, auth } = await show([]);
   const logout = vi.spyOn(auth, "logout").mockResolvedValue(undefined as never);
   expect(wrapper.get("h1").text()).toBe("Accounts");
-  await wrapper.get('[aria-label="Collapse sidebar"]').trigger("click");
+  await wrapper.get('[aria-label="Sidebar"]').trigger("click");
   expect(wrapper.emitted("toggle")).toHaveLength(1);
   expect(wrapper.find("select").exists()).toBe(false);
   expect(wrapper.find(".logout").exists()).toBe(false);

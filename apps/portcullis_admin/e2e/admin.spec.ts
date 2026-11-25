@@ -18,12 +18,12 @@ test("the sidebar collapses behind the header toggle on mobile and the profile m
     } else {
       // Mobile: hidden until the header toggle discloses it above the content.
       await expect(sidebar).toBeHidden();
-      await page.getByRole("button", { name: "Expand sidebar" }).click();
+      await page.getByRole("button", { name: "Sidebar" }).click();
       await expect(sidebar).toBeVisible();
       const box = (await sidebar.boundingBox())!;
       expect(box.width).toBe(375);
       expect(box.y).toBeLessThan(200);
-      await page.getByRole("button", { name: "Collapse sidebar" }).click();
+      await page.getByRole("button", { name: "Sidebar" }).click();
       await expect(sidebar).toBeHidden();
     }
     expect(await page.evaluate<boolean>("document.documentElement.scrollWidth <= window.innerWidth")).toBe(true);

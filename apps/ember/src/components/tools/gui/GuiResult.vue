@@ -56,7 +56,7 @@ const scalars = computed(() =>
       <div v-else class="secret-card">
         <div class="secret-row">
           <code data-test="secret" class="secret"><template v-if="revealed"><span v-for="(s, i) in segments" :key="i" :class="s.kind">{{ s.text }}</span></template><template v-else>{{ hiddenText }}</template></code>
-          <button type="button" class="icon" data-test="toggle" :aria-label="revealed ? 'Hide' : 'Show'" :title="revealed ? 'Hide' : 'Show'" @click="revealed = !revealed">
+          <button type="button" class="icon" data-test="toggle" aria-label="Show" :aria-pressed="revealed" :title="revealed ? 'Hide' : 'Show'" @click="revealed = !revealed">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
               <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8" />

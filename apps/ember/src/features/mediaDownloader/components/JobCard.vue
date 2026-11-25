@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WavyProgress from "../../../components/ui/status/WavyProgress.vue";
 import { computed } from 'vue'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
 import DownloadCards from '../../../components/content/DownloadCards.vue'
@@ -46,7 +47,7 @@ const stateText = computed(() => {
     </div>
     <DownloadCards v-if="job.state === 'done' && job.file" :downloads="[{ filename: job.file.name, bytes: job.file.size, href: job.file.download_url, label: 'DOWNLOAD' }]" />
     <p v-if="job.state === 'done' && !job.file" class="muted small">The download finished, but the file is no longer available.</p>
-    <progress aria-label="Download progress" v-if="running" max="100" :value="job.state === 'processing' ? 100 : (job.percent ?? 0)"></progress>
+    <WavyProgress v-if="running" class="job-progress" label="Download progress" :value="job.state === 'processing' ? 100 : (job.percent ?? 0)" />
   </li>
 </template>
 
@@ -58,6 +59,5 @@ const stateText = computed(() => {
 .name { font-size: .9em; font-weight: 500; }
 .name .small { display: block; margin-top: 3px; color: var(--muted); }
 .grow > .small { margin-top: 6px; font-size: .75em; }
-progress { height: 4px; border-radius: var(--radius-full); }
 .panel :deep(button.action) { border-radius: var(--radius-full); }
 </style>

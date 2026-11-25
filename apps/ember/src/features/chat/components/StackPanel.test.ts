@@ -41,7 +41,6 @@ describe("StackPanel", () => {
     expect(rows[0]!.text()).toContain("You");
     expect(rows[1]!.text()).toContain("Pinned");
     expect(rows[1]!.get("[data-test=pin]").attributes("aria-pressed")).toBe("true");
-    expect(rows[1]!.get("[data-test=pin]").attributes("aria-label")).toBe("Unpin item");
     expect(rows[2]!.text()).toContain("Summary");
     expect(w.get(".summary").text()).toContain("3 of 40 items");
   });

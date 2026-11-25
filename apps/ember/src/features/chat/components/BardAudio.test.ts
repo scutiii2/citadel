@@ -54,7 +54,7 @@ describe("BardAudio", () => {
     await wrapper.get("audio").trigger("timeupdate");
     expect(wrapper.text()).toContain("0:01 / 0:02");
 
-    await wrapper.get("input.seek").setValue("0.5");
+    await wrapper.get(".seek input").setValue("0.5");
     expect(position).toBe(0.5);
   });
 

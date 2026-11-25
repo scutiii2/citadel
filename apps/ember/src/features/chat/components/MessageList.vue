@@ -34,6 +34,7 @@ import ToolSteps from "./ToolSteps.vue";
 import UsageChip from "./UsageChip.vue";
 import WelcomeCard from "./WelcomeCard.vue";
 import { useMessageScroll } from "../composables/useMessageScroll";
+import ThinkingBar from "../../../components/ui/status/ThinkingBar.vue";
 
 const props = defineProps<{
   conversationId?: string | null;
@@ -412,6 +413,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
         <span v-if="activity" class="activity" role="status"><span class="dot" />{{ activity }}</span>
         <MarkdownContent v-if="streaming" :text="hideDownloadMarkers(streaming)" />
         <span v-else-if="!activity" class="activity" role="status"><span class="dot" />thinking ...</span>
+        <ThinkingBar v-if="!streaming" />
         <ElapsedTime v-if="since" :since="since" class="elapsed" />
         <span v-if="liveTokens && liveTokens.total > 0" class="elapsed live-tokens" data-test="live-tokens">
           {{ liveTokens.estimated ? "~" : "" }}{{ compactNumber(liveTokens.total) }} tokens

@@ -58,7 +58,7 @@ watch(() => route.fullPath, () => { panel.value = undefined; });
 <template>
   <header ref="header" class="legion-header" @keydown.esc.stop="dismiss" @focusout="(event) => { if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node)) panel = undefined; }">
     <button type="button" class="admin-icon" aria-controls="legion-sidebar" :aria-expanded="expanded"
-      :title="expanded ? 'Collapse sidebar' : 'Expand sidebar'" :aria-label="expanded ? 'Collapse sidebar' : 'Expand sidebar'" @click="$emit('toggle')">
+      :title="expanded ? 'Collapse sidebar' : 'Expand sidebar'" aria-label="Sidebar" @click="$emit('toggle')">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M9 5v14" /></svg>
     </button>
     <span class="brand">Legion Admin</span>
