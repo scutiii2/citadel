@@ -4,7 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
 import AdminNav from "./components/AdminNav.vue";
 import PortcullisHeader from "./components/PortcullisHeader.vue";
-import ThemeSelect from "./components/ThemeSelect.vue";
+import { ThemeSelect } from "@citadel/ui";
 import PwaStatus from "./components/layout/PwaStatus.vue";
 import { pageTitle } from "./router/pages";
 import { useAuthStore } from "./stores/auth";

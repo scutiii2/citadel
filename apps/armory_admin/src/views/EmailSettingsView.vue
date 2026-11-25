@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import FieldLabel from "../components/admin/FieldLabel.vue";
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { FieldLabel } from "@citadel/ui";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { emailSettingsClient, type EmailChanges, type EmailSettings } from "../api/EmailSettingsClient";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
-import PasswordInput from "../components/PasswordInput.vue";
-import ToggleSwitch from "../components/ToggleSwitch.vue";
+import { PasswordInput } from "@citadel/ui";
+import { ToggleSwitch } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
 
 /** The SMTP account Armory sends mail through. Saved in Armory's database; a send uses the saved values at once.

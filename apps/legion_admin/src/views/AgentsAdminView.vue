@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { ActionMessage } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import StatusFilters from "../components/admin/StatusFilters.vue";
-import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { StatusFilters } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
 import {
   agentsAdminClient,
   type AgentConfig,
@@ -20,7 +20,7 @@ import type { CapabilityInfo } from "../api/CommandsClient";
 import AgentAdminCard from "../components/admin/AgentAdminCard.vue";
 import AgentForm from "../components/admin/AgentForm.vue";
 import SharedPromptsDrawer from "../components/admin/SharedPromptsDrawer.vue";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
 
 // ai_agent's supervisor rescans its agents folder about every 2 seconds.

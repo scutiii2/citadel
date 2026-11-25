@@ -6,7 +6,7 @@ import { useAuthStore } from "../stores/auth";
 import { useConfigIssuesStore } from "../stores/configIssues";
 import { useNavPrefsStore } from "../stores/navPrefs";
 import { railPages } from "../utils/navArrangement";
-import { ADMIN_APPS, adminAppUrl } from "../utils/siblings";
+import { ADMIN_APPS, adminAppUrl } from "@citadel/ui";
 
 /** The sidebar: Overview, the permitted pages in the saved arrangement, Config issues while there are
  * any, and shortcuts to the other admin apps. Collapsed it shows named icons. */

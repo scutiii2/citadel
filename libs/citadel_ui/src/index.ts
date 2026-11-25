@@ -1,0 +1,20 @@
+// The one entry point of @citadel/ui. Apps import from here, never from a deep path.
+export { default as AuthCard } from "./components/AuthCard.vue";
+export { default as BaseModal } from "./components/BaseModal.vue";
+export { default as DeleteButton } from "./components/DeleteButton.vue";
+export { default as PageLayout } from "./components/PageLayout.vue";
+export { default as PasswordInput } from "./components/PasswordInput.vue";
+export { default as ThemeSelect } from "./components/ThemeSelect.vue";
+export { default as ToggleSwitch } from "./components/ToggleSwitch.vue";
+export { default as ActionMessage } from "./components/admin/ActionMessage.vue";
+export { default as AdminSearch } from "./components/admin/AdminSearch.vue";
+export { default as ConfirmModal } from "./components/admin/ConfirmModal.vue";
+export { default as DraftActions } from "./components/admin/DraftActions.vue";
+export { default as FieldLabel } from "./components/admin/FieldLabel.vue";
+export { default as PanelHelp } from "./components/admin/PanelHelp.vue";
+export { default as RecordDrawer } from "./components/admin/RecordDrawer.vue";
+export { default as StatTile } from "./components/admin/StatTile.vue";
+export { default as StatusFilters } from "./components/admin/StatusFilters.vue";
+export { useDraftPanel } from "./composables/useDraftPanel";
+export { DEFAULT_THEME, initTheme, useTheme, type Theme } from "./composables/useTheme";
+export { ADMIN_APPS, adminAppUrl, type AdminApp } from "./utils/siblings";

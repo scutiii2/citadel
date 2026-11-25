@@ -2,7 +2,7 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { treasuryAdminClient } from "../api/TreasuryAdminClient";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import OutsideView from "./OutsideView.vue";
 
 const view = { groups: [

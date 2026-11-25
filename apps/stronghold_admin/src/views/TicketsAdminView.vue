@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import PageLayout from "../components/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import TicketsPanel from "../components/admin/TicketsPanel.vue";
 import type { TicketFilterState } from "../utils/ticketFormat";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 import "../components/infoPage.css";
 
 const STATUSES = ["open", "in_progress", "resolved", "closed"] as const;

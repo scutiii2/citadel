@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PanelHelp from "./admin/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 
 /** A form label with a help icon beside it; the popover shows the paragraphs in `help`. */
 defineProps<{ for: string; title: string; help?: string[] }>();

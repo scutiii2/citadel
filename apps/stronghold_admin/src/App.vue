@@ -2,7 +2,7 @@
 import { storeToRefs } from "pinia";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
-import ThemeSelect from "./components/ThemeSelect.vue";
+import { ThemeSelect } from "@citadel/ui";
 import StrongholdHeader from "./components/StrongholdHeader.vue";
 import StrongholdNav from "./components/StrongholdNav.vue";
 import { pageTitle } from "./router/pages";

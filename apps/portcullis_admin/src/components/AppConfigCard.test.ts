@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { appConfigClient, type AppConfig } from "../api/AppConfigClient";
-import ConfirmModal from "./admin/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import AppConfigCard from "./AppConfigCard.vue";
 
 const VIEW: AppConfig = {

@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { adminClient, type Invite } from "../../api/AdminClient";
 import { errorMessage, formatUtc } from "../../utils/errors";
-import AdminSearch from "./AdminSearch.vue";
-import PanelHelp from "./PanelHelp.vue";
-import ConfirmModal from "./ConfirmModal.vue";
-import RecordDrawer from "./RecordDrawer.vue";
-import "./admin.css";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 
 /** Open invites: a searchable roster whose rows open an invite's details (with Revoke), and a create
  * drawer for the email invite. The overview counts (OverviewView) change whenever an invite does. */

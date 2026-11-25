@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import FieldLabel from "../components/admin/FieldLabel.vue";
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { FieldLabel } from "@citadel/ui";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { limitsClient, type CapabilityLimits, type LimitsCapability, type LimitsChanges, type LimitsView } from "../api/LimitsClient";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";

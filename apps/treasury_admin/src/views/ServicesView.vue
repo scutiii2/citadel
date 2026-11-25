@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, onMounted, ref } from "vue";
 import { treasuryAdminClient, type ServiceRow, type ServicesView } from "../api/TreasuryAdminClient";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import RecordDrawer from "../components/admin/RecordDrawer.vue";
-import StatusFilters from "../components/admin/StatusFilters.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
+import { StatusFilters } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { errorMessage } from "../utils/errors";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 /** Where Citadel services reach each other. A pinned address takes precedence over registration. Editing happens
  * in the row's drawer; the displayed address changes only once Treasury has answered. */

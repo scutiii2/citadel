@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import ActionMessage from "../components/admin/ActionMessage.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { ActionMessage } from "@citadel/ui";
+import { PageLayout } from "@citadel/ui";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { usageClient, type AccountUsage, type MyUsage, type UsageGroupBy, type UsageRecordRow } from "../api/UsageClient";
 import { ApiError } from "../api/http";
-import AdminSearch from "../components/admin/AdminSearch.vue";
-import PanelHelp from "../components/admin/PanelHelp.vue";
-import StatTile from "../components/admin/StatTile.vue";
-import RecordDrawer from "../components/admin/RecordDrawer.vue";
+import { AdminSearch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import { StatTile } from "@citadel/ui";
+import { RecordDrawer } from "@citadel/ui";
 import SegmentedControl from "../components/SegmentedControl.vue";
 import UsageDetails from "../components/usage/UsageDetails.vue";
 import { useAuthStore } from "../stores/auth";
@@ -15,7 +15,7 @@ import { downloadText, exportFileName } from "../utils/downloadText";
 import { errorMessage, formatUtc } from "../utils/errors";
 import { usageToMarkdown } from "../utils/usageExport";
 import { monthStart, utcDay } from "../utils/usageStats";
-import "../components/admin/admin.css";
+import "@citadel/ui/admin.css";
 
 const auth = useAuthStore();
 const RANGES = [

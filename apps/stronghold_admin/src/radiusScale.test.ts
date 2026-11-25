@@ -122,7 +122,7 @@ describe("the radius scale", () => {
 
   it("scans the app's styles, CSS files included", () => {
     expect(Object.keys(sources).length).toBeGreaterThan(10);
-    expect(sources["style.css"]).toContain("--radius-md");
+    expect(sources["style.css"]).toContain("@citadel/ui/base.css"); // the tokens live in the shared base
     expect(sources["components/analytics/chart.css"]).toContain("border-radius");
   });
 

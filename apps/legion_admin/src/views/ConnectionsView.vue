@@ -2,7 +2,7 @@
 import { nextTick, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import ModelGatewayTable from "../components/ModelGatewayTable.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import ServersView from "./ServersView.vue";
 
 const route = useRoute();

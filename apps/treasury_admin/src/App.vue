@@ -2,7 +2,7 @@
 import { storeToRefs } from "pinia";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
-import ThemeSelect from "./components/ThemeSelect.vue";
+import { ThemeSelect } from "@citadel/ui";
 import TreasuryHeader from "./components/TreasuryHeader.vue";
 import TreasuryNav from "./components/TreasuryNav.vue";
 import { pageTitle } from "./router/pages";

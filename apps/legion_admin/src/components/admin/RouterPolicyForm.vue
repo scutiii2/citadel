@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { RouterPolicy } from "../../api/AgentsAdminClient";
-import ToggleSwitch from "../ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 
 const props = defineProps<{ modelValue: RouterPolicy; busy: boolean }>();
 const emit = defineEmits<{ "update:modelValue": [value: RouterPolicy] }>();

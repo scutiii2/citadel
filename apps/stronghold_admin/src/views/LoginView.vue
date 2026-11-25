@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import PasswordInput from "../components/PasswordInput.vue";
+import { PasswordInput } from "@citadel/ui";
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import AuthCard from "../components/AuthCard.vue";
+import { AuthCard } from "@citadel/ui";
 import { safeRedirect } from "../router/redirect";
 import { useAuthStore } from "../stores/auth";
 

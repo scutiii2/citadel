@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref } from "vue";
-import BaseModal from "../components/BaseModal.vue";
+import { BaseModal } from "@citadel/ui";
 import EmberLogo from "../components/EmberLogo.vue";
-import PageLayout from "../components/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import SettingRow from "../components/SettingRow.vue";
-import ToggleSwitch from "../components/ToggleSwitch.vue";
-import ConfirmModal from "../components/admin/ConfirmModal.vue";
-import { ADMIN_APPS, adminAppUrl } from "../utils/siblings";
+import { ToggleSwitch } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { ADMIN_APPS, adminAppUrl } from "@citadel/ui";
 import { pages, panels, samples, sectionsByPath, type PreviewRecord } from "./previewData";
 
 const icons = {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import ThemeSelect from "./ThemeSelect.vue";
+import { ThemeSelect } from "@citadel/ui";
 
 /** The Profile popover's content: identity, the personal pages, theme and Log out.
  * The header owns opening, Escape and focus return. */

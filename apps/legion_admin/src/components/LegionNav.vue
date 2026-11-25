@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { canOpen, LEGION_PAGES } from "../router/pages";
-import { ADMIN_APPS, adminAppUrl } from "../utils/siblings";
+import { ADMIN_APPS, adminAppUrl } from "@citadel/ui";
 import { useAuthStore } from "../stores/auth";
 
 defineProps<{ expanded: boolean }>();

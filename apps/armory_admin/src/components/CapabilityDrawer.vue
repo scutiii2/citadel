@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ActionMessage from "./admin/ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, ref, watch } from "vue";
 import { commandsClient } from "../api/CommandsClient";
 import { McpServerClient } from "../api/McpServerClient";
@@ -8,9 +8,9 @@ import { useAuthStore } from "../stores/auth";
 import { errorMessage } from "../utils/errors";
 import { commandsByTool } from "../utils/toolCommands";
 import CopyButton from "./CopyButton.vue";
-import RecordDrawer from "./admin/RecordDrawer.vue";
+import { RecordDrawer } from "@citadel/ui";
 import ToolRunForm from "./ToolRunForm.vue";
-import "./admin/admin.css";
+import "@citadel/ui/admin.css";
 
 const props = defineProps<{ open: boolean; title: string; identity: string; names: string[]; available: boolean; kind?: "capability" | "extension"; status?: string }>();
 const emit = defineEmits<{ close: [] }>();

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import ActionMessage from "./ActionMessage.vue";
+import { ActionMessage } from "@citadel/ui";
 import { computed, reactive, ref, watch } from "vue";
 import type { AdminAccount, PermissionInfo, Role, RoleChanges } from "../../api/AdminClient";
 import { useAuthStore } from "../../stores/auth";
-import ToggleSwitch from "../ToggleSwitch.vue";
-import PanelHelp from "./PanelHelp.vue";
-import "./admin.css";
+import { ToggleSwitch } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
+import "@citadel/ui/admin.css";
 
 /** One role in the record drawer: name and description, the grouped permission switches, the
  * accounts that hold it, and delete. The draft (`RoleChanges`) lives here, so searching permissions

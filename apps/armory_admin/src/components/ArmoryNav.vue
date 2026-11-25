@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { ARMORY_PAGES } from "../router/pages";
 import { useAuthStore } from "../stores/auth";
-import { ADMIN_APPS, adminAppUrl } from "../utils/siblings";
+import { ADMIN_APPS, adminAppUrl } from "@citadel/ui";
 
 /** The sidebar: the permitted pages, then shortcuts to the other admin apps. Collapsed it shows named icons. */
 defineProps<{ expanded: boolean }>();

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PageLayout from "../components/PageLayout.vue";
+import { PageLayout } from "@citadel/ui";
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { AccountStatus } from "../api/AdminClient";

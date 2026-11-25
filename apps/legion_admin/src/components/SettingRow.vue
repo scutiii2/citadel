@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PanelHelp from "./admin/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 /** One setting on the Settings page: its name and description on the left, its
  * control (the default slot) on the right. A setting that differs from its
  * default (`modified`) gets an accent dot and a reset button; the parent owns
