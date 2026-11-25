@@ -303,7 +303,7 @@ table.admin-records thead th { overflow-wrap: normal; white-space: nowrap; }
   min-height: 36px; padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-full);
   color: var(--text); background: transparent; cursor: pointer; font: inherit; font-size: 0.84rem;
 }
-.admin-panel-card .primary, .record-drawer .primary { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); font-weight: 650; border-radius: var(--radius-md); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.admin-panel-card .primary, .record-drawer .primary { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); font-weight: 650; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .record-drawer .danger { color: var(--danger); border-color: var(--danger); }
 .admin-panel-card button:disabled, .record-drawer button:disabled { opacity: 0.55; cursor: default; }
 .admin-panel-card .muted, .record-drawer .muted { color: var(--muted); }

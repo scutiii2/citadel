@@ -242,7 +242,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .stack { display: grid; gap: 10px; margin: 0 14px 14px; padding: 14px; border-radius: var(--radius-md); background: var(--code-bg); }
 .stack label { display: grid; gap: 5px; font-size: 0.85em; }
 .stack input { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; }
-.primary { display: inline-flex; align-items: center; gap: 8px; justify-self: start; min-height: 36px; padding: 5px 16px; border: none; border-radius: var(--radius-md); background: var(--accent); color: var(--accent-contrast); cursor: pointer; font: inherit; font-size: 0.85em; font-weight: 650; }
+.primary { display: inline-flex; align-items: center; gap: 8px; justify-self: start; min-height: 36px; padding: 5px 16px; border: none; border-radius: var(--radius-full); background: var(--accent); color: var(--accent-contrast); cursor: pointer; font: inherit; font-size: 0.85em; font-weight: 650; }
 .primary:disabled { opacity: 0.5; cursor: default; }
 .error { margin: 0; color: var(--danger); }
 .notice { margin: 0; color: var(--success); }

@@ -118,7 +118,6 @@ describe("the radius scale", () => {
   it("scans the app's styles, CSS files included", () => {
     expect(Object.keys(sources).length).toBeGreaterThan(10);
     expect(sources["style.css"]).toContain("@citadel/ui/base.css"); // the tokens live in the shared base
-    expect(sources["components/infoPage.css"]).toContain("border-radius");
   });
 
   it("uses a token in every component: no literal border radius outside the allowed marks", () => {

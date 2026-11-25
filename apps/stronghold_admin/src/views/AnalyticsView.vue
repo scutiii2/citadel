@@ -9,7 +9,7 @@ import BarList from "../components/analytics/BarList.vue";
 import HourHeatmap from "../components/analytics/HourHeatmap.vue";
 import KindStatTile from "../components/analytics/KindStatTile.vue";
 import TrafficPanel from "../components/analytics/TrafficPanel.vue";
-import "../components/infoPage.css";
+import "@citadel/ui/infoPage.css";
 import "@citadel/ui/admin.css";
 import LogEntries from "../components/LogEntries.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";

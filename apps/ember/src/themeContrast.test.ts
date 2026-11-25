@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const source = dirname(fileURLToPath(import.meta.url));
-const themes = [resolve(source, "style.css"), resolve(source, "../../portcullis_admin/src/style.css")];
+const themes = [resolve(source, "style.css"), resolve(source, "../../../libs/citadel_ui/src/styles/base.css")];
 
 function luminance(hex: string): number {
   const rgb = hex.match(/[a-f\d]{2}/gi)!.map((channel) => {
@@ -38,7 +38,7 @@ describe("ordinary accent text contrast", () => {
   for (const url of themes) {
     const css = readFileSync(url, "utf8");
     for (const [index, theme] of ["light", "dark"].entries()) {
-      it(`${url.includes("portcullis_admin") ? "Admin" : "Web"} ${theme}: primary labels and links meet 4.5:1`, () => {
+      it(`${url.includes("citadel_ui") ? "Admin" : "Web"} ${theme}: primary labels and links meet 4.5:1`, () => {
         const accent = pair(css, "accent")[index]!;
         expect(contrast(pair(css, "accent-contrast")[index]!, accent)).toBeGreaterThanOrEqual(4.5);
         for (const surface of ["bg", "surface"]) {

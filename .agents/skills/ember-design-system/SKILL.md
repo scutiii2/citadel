@@ -57,7 +57,19 @@ A nested corner is `calc(outer - padding)`. An element flush to an edge is squar
 
 ## Interaction rules
 
-- **Controls:** primary action = accent-filled pill (`--radius-full`, weight 600, `--accent-contrast` text). Secondary = outlined pill. Inputs = `--radius-md`, `--border`, `--bg` fill, accent border on focus. On/off = `ToggleSwitch` pill (real checkbox, `role="switch"`), never a bare checkbox. A handful of exclusive choices = segmented pill (accent track, white sliding thumb). Both in [components.md](components.md).
+- **Controls:** primary action = accent-filled pill (`--radius-full`, weight 600, `--accent-contrast` text). Secondary = outlined pill. Shape and weight rules follow below. Inputs = `--radius-md`, `--border`, `--bg` fill, accent border on focus. On/off = `ToggleSwitch` pill (real checkbox, `role="switch"`), never a bare checkbox. A handful of exclusive choices = segmented pill (accent track, white sliding thumb). Both in [components.md](components.md).
+- **Button shape** (ruling): shape follows what is inside, not the page.
+  - **Pill** (`--radius-full`): every text button that is one line: primary, secondary, danger, chips, dialog Cancel/Save. One button family, so a primary never sits square beside pill chips.
+  - **Circle** (`--radius-full`, width = height): an icon-only button that is the single focal action of its area: Send, Record, Add (floating), a media Play, a dialog or toast close. Never a row of them.
+  - **Rounded square** (`--radius-md`, width = height): icon-only buttons that repeat or sit in dense UI: toolbars, table rows, drawer and panel headers, the Show/Hide inside a field, the help icon beside a label.
+  - **Rounded rectangle** (`--radius-md`): anything that can wrap to two lines, fills the row, or holds an icon plus text in a card or list tile. A pill with two lines looks broken.
+  - Never mix a pill and a rounded-rectangle text button in one view. Radius is a token, never a literal.
+- **Button weight** (ruling): the outline shows how important the action is. One accent-filled button per area.
+  - **Filled** (accent): the one main action of a view, drawer or dialog.
+  - **Outlined** (`--border`, transparent fill): other actions that stand alone or sit beside the filled one: Cancel, Test, Export, Add.
+  - **Danger** (red outline, red text): a destructive trigger. The confirm button in its dialog is red filled. Never bare when it is the only way to delete.
+  - **Bare** (no outline, no fill; only a label or an icon; hover/focus shows a `--surface` tint): use it only for a quiet, repeated or dense action: row and table actions, toolbar and header icons, nav and tabs, "Back", "Show more", links inside text. A bare text button takes the accent colour or an underline so it still reads as clickable, and a bare icon has a tooltip and `aria-label`.
+  - Never bare: the main action, the only button in an empty state, anything that spends money, deletes or sends. Hit area stays 44px on touch even when nothing is drawn.
 - **Confirmations:** never the browser's `confirm()`. Use an in-app modal; friction scales with severity. Severe actions (delete account, delete something in use, delete all) require typing the name or phrase (`requireText`) before the confirm button enables. Destructive buttons are red-outlined pills and sit in a red-tinted **Danger zone** block, last in the form.
 - **Settings:** browser-only preferences apply instantly. Server settings stay in a draft until Save. In admin panels, follow the shared dirty-only Save slot or drawer footer pattern. A setting that differs from its default shows an accent dot and its own reset button.
 - **Busy state:** disable the control, set `aria-busy`, show progress on the control itself (spinner ring, drawn globally for `button[aria-busy="true"]` in ember, so no per-component copy); ignore clicks while busy.
