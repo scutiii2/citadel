@@ -409,9 +409,9 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
           @skip="(id) => emit('skip-question', id)"
         />
         <AgentActivity />
-        <span v-if="activity" class="activity"><span class="dot" />{{ activity }}</span>
+        <span v-if="activity" class="activity" role="status"><span class="dot" />{{ activity }}</span>
         <MarkdownContent v-if="streaming" :text="hideDownloadMarkers(streaming)" />
-        <span v-else-if="!activity" class="activity"><span class="dot" />thinking ...</span>
+        <span v-else-if="!activity" class="activity" role="status"><span class="dot" />thinking ...</span>
         <ElapsedTime v-if="since" :since="since" class="elapsed" />
         <span v-if="liveTokens && liveTokens.total > 0" class="elapsed live-tokens" data-test="live-tokens">
           {{ liveTokens.estimated ? "~" : "" }}{{ compactNumber(liveTokens.total) }} tokens

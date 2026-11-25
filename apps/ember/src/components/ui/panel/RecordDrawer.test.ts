@@ -16,7 +16,7 @@ it("keeps the same body and draft across resize and confirms dismissal once", as
   await input.setValue("Draft");
   await wrapper.get('[aria-label="Expand drawer"]').trigger("click");
   expect(wrapper.get(".record-drawer").classes()).toContain("expanded");
-  await wrapper.get('[aria-label="Restore drawer size"]').trigger("click");
+  await wrapper.get('[aria-label="Expand drawer"]').trigger("click");
   expect(wrapper.get(".drawer-body").element).toBe(body);
   expect(wrapper.get("input").element).toBe(input.element);
   expect(input.element.value).toBe("Draft");

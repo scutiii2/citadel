@@ -36,7 +36,7 @@ const percent = computed(() =>
         Merging… {{ plan.progress.done }} of {{ plan.progress.total }} pages
         <ElapsedTime :since="plan.startedAt" />
         <ActionButton icon="close" @click="cancelOpen = true">Cancel merge</ActionButton>
-        <progress :value="percent" max="100" />
+        <progress aria-label="Merge progress" :value="percent" max="100" />
       </template>
       <template v-else-if="plan.status === 'done' && plan.result">
         Done · {{ plan.result.name }} ({{ formatBytes(plan.result.size) }})
