@@ -170,7 +170,10 @@ services:
     networks: [core]
 
   ember:
-    build: ./apps/ember
+    build:
+      context: .
+      dockerfile: docker/admin.Dockerfile
+      args: { APP: ember }
     restart: unless-stopped
     environment:
       FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
