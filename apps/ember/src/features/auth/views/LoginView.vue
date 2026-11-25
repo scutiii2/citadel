@@ -44,7 +44,7 @@ async function submit(): Promise<void> {
       </label>
       <PasswordInput label="Password" v-model="password" autocomplete="current-password" required />
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <button class="primary" :disabled="busy" :aria-busy="busy">{{ busy ? "Logging in ..." : "Log in" }}</button>
+      <button class="primary" :disabled="busy" :aria-busy="busy">Log in</button>
     </form>
     <template #footer>
       Have an invite code? <RouterLink to="/register">Create an account</RouterLink>

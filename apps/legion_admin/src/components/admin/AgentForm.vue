@@ -511,7 +511,7 @@ function previewPrompt(): void {
         <p class="hint">The system prompt the model receives, built from this form and the shared prompts.</p>
         <div class="row preview-bar">
           <ToggleSwitch :checked="previewCaveman" data-test="preview-caveman" @change="previewCaveman = ($event.target as HTMLInputElement).checked">Preview with the chat's caveman toggle on</ToggleSwitch>
-          <button type="button" class="cancel" data-test="preview" :disabled="previewing" @click="previewPrompt">{{ previewing ? "Building…" : "Show prompt" }}</button>
+          <button type="button" class="cancel" data-test="preview" :disabled="previewing" :aria-busy="previewing" @click="previewPrompt">Show prompt</button>
         </div>
         <ActionMessage v-if="previewError" kind="error" :text="previewError" data-test="preview-error" />
         <pre v-if="previewText" class="prompt-text" data-test="preview-text">{{ previewText }}</pre>

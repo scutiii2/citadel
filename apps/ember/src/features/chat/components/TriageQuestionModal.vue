@@ -201,7 +201,7 @@ function close(): void {
         <div class="option-actions">
           <button type="button" class="pill-btn ghost" :disabled="rows.length >= TRIAGE_MAX_OPTIONS" @click="addRow">Add option</button>
           <button type="button" class="pill-btn ghost" :disabled="busy || !descriptionsFilled" :aria-busy="titling" @click="generateTitles">
-            {{ titling ? "Writing titles …" : "Generate titles" }}
+            Generate titles
           </button>
         </div>
         <small v-if="titleHint" class="hint">{{ titleHint }}</small>
@@ -241,7 +241,7 @@ function close(): void {
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
         <button type="button" class="pill-btn ghost" :disabled="asking" @click="close">Cancel</button>
-        <button type="submit" class="pill-btn primary" :disabled="!canAsk" :aria-busy="asking">{{ asking ? "Asking …" : "Ask" }}</button>
+        <button type="submit" class="pill-btn primary" :disabled="!canAsk" :aria-busy="asking">Ask</button>
       </div>
     </form>
   </BaseModal>

@@ -18,6 +18,4 @@ button.danger :deep(.icon) { stroke: currentColor; }
 .presets { margin: 12px 0; padding-left: 18px; font-size: .9em; }
 .probe :deep(.segmented-control) { margin-top: 12px; display: flex; }
 progress { width: 100%; height: 8px; accent-color: var(--accent); margin-top: 12px; }
-button[aria-busy="true"]::after { content: ''; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); animation: video-spin .7s linear infinite; }
-@keyframes video-spin { to { transform: rotate(360deg); } }
 @media (max-width: 600px) { .probe { grid-template-columns: minmax(0, 1fr); } .preview { max-width: 180px; } .row :deep(.downloads) { width: 100%; overflow-wrap: anywhere; } }

@@ -230,7 +230,8 @@ describe("creating a link", () => {
 
     await wrapper.find("form.create").trigger("submit");
     await wrapper.find("form.create").trigger("submit");
-    expect(wrapper.find("button.primary").text()).toBe("Creating …");
+    expect(wrapper.find("button.primary").text()).toBe("Create link");
+    expect(wrapper.find("button.primary").attributes("aria-busy")).toBe("true");
     expect(wrapper.find("button.primary").attributes("disabled")).toBeDefined();
 
     finish(created(1));

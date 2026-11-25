@@ -139,7 +139,7 @@ async function confirmDelete(): Promise<void> {
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
         <button type="button" class="ghost" @click="requestClose">Cancel</button>
-        <button type="submit" class="primary" :aria-busy="busy" :disabled="!canSave">{{ busy ? "Saving …" : "Save" }}</button>
+        <button type="submit" class="primary" :aria-busy="busy" :disabled="!canSave">Save</button>
       </div>
     </form>
     <div v-else-if="mode" class="form">

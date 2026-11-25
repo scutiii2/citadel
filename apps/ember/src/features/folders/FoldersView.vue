@@ -71,10 +71,18 @@ async function act(action: () => Promise<unknown>): Promise<void> {
   }
 }
 
-const create = () => act(async () => {
-  await foldersClient.create(name.value.trim() || "Folder", Number(length.value));
-  name.value = "";
-});
+const creating = ref(false);
+const create = async () => {
+  creating.value = true;
+  try {
+    await act(async () => {
+      await foldersClient.create(name.value.trim() || "Folder", Number(length.value));
+      name.value = "";
+    });
+  } finally {
+    creating.value = false;
+  }
+};
 const end = () => act(async () => { if (ending.value) await foldersClient.remove(ending.value.id); }).finally(() => { ending.value = null; });
 const removeFile = () => act(async () => {
   if (removing.value) await foldersClient.removeFile(removing.value.folder.id, removing.value.file.id);
@@ -100,7 +108,7 @@ watch(() => auth.account?.id, () => { folders.value = []; loading.value = true; 
     <form class="new" @submit.prevent="create">
       <input v-model="name" type="text" aria-label="Folder name" placeholder="Name (optional)" maxlength="60" autocomplete="off" :disabled="busy" />
       <SegmentedControl v-model="length" :options="LENGTHS" aria-label="Delete after" />
-      <button type="submit" class="pill-btn primary" :disabled="busy">Create folder</button>
+      <button type="submit" class="pill-btn primary" :disabled="busy" :aria-busy="creating">Create folder</button>
     </form>
     <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
 

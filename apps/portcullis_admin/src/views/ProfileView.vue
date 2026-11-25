@@ -149,7 +149,7 @@ async function changePassword(): Promise<void> {
             <label>New email<input v-model="emailForm.email" type="email" autocomplete="email" required /></label>
             <PasswordInput v-model="emailForm.password" label="Current password" autocomplete="current-password" required />
             <ActionMessage v-if="emailForm.error" kind="error" :text="emailForm.error" />
-            <button class="primary" :disabled="emailForm.busy" :aria-busy="emailForm.busy"><span v-if="emailForm.busy" class="spinner" aria-hidden="true" />{{ emailForm.busy ? 'Changing email…' : 'Change email' }}</button>
+            <button class="primary" :disabled="emailForm.busy" :aria-busy="emailForm.busy">Change email</button>
           </form>
           <div class="row">
             <div class="row-copy"><div class="row-title">Password</div><div class="muted small">Use a strong, unique password.</div></div>
@@ -162,7 +162,7 @@ async function changePassword(): Promise<void> {
             <ActionMessage v-if="passwordMismatch" kind="error" text="The new passwords don't match." />
             <ActionMessage v-else-if="passwordForm.error" kind="error" :text="passwordForm.error" />
             <ActionMessage v-else-if="passwordForm.done" kind="ok" text="Password changed." />
-            <button class="primary" :disabled="passwordForm.busy || passwordMismatch" :aria-busy="passwordForm.busy"><span v-if="passwordForm.busy" class="spinner" aria-hidden="true" />{{ passwordForm.busy ? 'Changing password…' : 'Change password' }}</button>
+            <button class="primary" :disabled="passwordForm.busy || passwordMismatch" :aria-busy="passwordForm.busy">Change password</button>
           </form>
         </div>
       </section>
@@ -246,8 +246,6 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .primary:disabled { opacity: 0.5; cursor: default; }
 .error { margin: 0; color: var(--danger); }
 .notice { margin: 0; color: var(--success); }
-.spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); animation: account-spin 0.8s linear infinite; }
-@keyframes account-spin { to { transform: rotate(360deg); } }
 .access-body { display: grid; gap: 12px; padding: 14px; }
 .roles { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .permissions summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; font-size: 0.85em; list-style: none; }

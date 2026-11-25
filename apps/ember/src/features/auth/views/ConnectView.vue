@@ -74,7 +74,7 @@ async function submit(): Promise<void> {
       </label>
       <p id="connect-help" class="help">The address of Portcullis, usually http://&lt;server-ip&gt;:29601.</p>
       <p v-if="error" id="connect-error" class="error" role="alert">{{ error }}</p>
-      <button class="primary" :disabled="busy" :aria-busy="busy">{{ busy ? "Connecting ..." : "Connect" }}</button>
+      <button class="primary" :disabled="busy" :aria-busy="busy">Connect</button>
     </form>
   </AuthCard>
 </template>

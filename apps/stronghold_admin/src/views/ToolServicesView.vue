@@ -396,9 +396,9 @@ watch(selectedName, () => { tab.value = "general"; });
         </section>
       </form>
       <template v-if="selected" #footer>
-        <button class="chip" type="button" data-test="test" :disabled="!!selected.pending" :aria-busy="selected.pending === 'test'" @click="test(selected)">{{ selected.pending === "test" ? "Testing…" : "Test" }}</button>
+        <button class="chip" type="button" data-test="test" :disabled="!!selected.pending" :aria-busy="selected.pending === 'test'" @click="test(selected)">Test</button>
         <button class="chip" type="button" data-test="cancel" :disabled="!!selected.pending || !isDirty(selected)" @click="drawer?.requestCancel()">Cancel</button>
-        <button class="primary" type="button" data-test="save" :disabled="!!selected.pending || !isDirty(selected) || !canSave(selected)" :aria-busy="selected.pending === 'save'" @click="drawer?.requestSave()">{{ selected.pending === "save" ? "Saving…" : "Save" }}</button>
+        <button class="primary" type="button" data-test="save" :disabled="!!selected.pending || !isDirty(selected) || !canSave(selected)" :aria-busy="selected.pending === 'save'" @click="drawer?.requestSave()">Save</button>
       </template>
     </RecordDrawer>
 

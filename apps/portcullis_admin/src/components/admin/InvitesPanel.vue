@@ -188,7 +188,7 @@ onMounted(loadInvites);
       <ActionMessage v-if="sentTo" kind="ok" :text="`Invitation sent to ${sentTo}.`" class="created" />
       <template #footer>
         <button type="button" class="chip" :disabled="creating" @click="createOpen = false">Close</button>
-        <button type="submit" form="invite-create" class="primary" :disabled="!canSend" :aria-busy="creating">{{ creating ? "Sending ..." : "Send invite" }}</button>
+        <button type="submit" form="invite-create" class="primary" :disabled="!canSend" :aria-busy="creating">Send invite</button>
       </template>
     </RecordDrawer>
 

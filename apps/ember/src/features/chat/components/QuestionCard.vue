@@ -100,8 +100,8 @@ function submit(): void {
       />
     </section>
     <div class="buttons">
-      <button type="submit" class="submit" :aria-busy="answering" :disabled="!complete || answering">{{ answering ? "Submitting ..." : "Submit" }}</button>
-      <button type="button" class="skip" :aria-busy="answering" :disabled="answering" @click="emit('skip', pending.id)">{{ answering ? "Waiting ..." : "Skip" }}</button>
+      <button type="submit" class="submit" :aria-busy="answering" :disabled="!complete || answering">Submit</button>
+      <button type="button" class="skip" :aria-busy="answering" :disabled="answering" @click="emit('skip', pending.id)">Skip</button>
     </div>
     <p class="note">The agent waits for you. Skip lets it go on with its best guess.</p>
   </form>

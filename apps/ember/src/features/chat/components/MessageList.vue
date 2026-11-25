@@ -381,7 +381,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
           </details>
           <div class="buttons">
             <button type="button" class="allow" :aria-busy="isDeciding(a.id)" :disabled="isDeciding(a.id)" @click="emit('decide', a.id, 'allow')">
-              {{ isDeciding(a.id) ? "Deciding ..." : "Allow once" }}
+              Allow once
             </button>
             <button
               v-if="!approvalRequired"
@@ -389,10 +389,10 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
               :aria-busy="isDeciding(a.id)" :disabled="isDeciding(a.id)"
               @click="emit('decide', a.id, 'always')"
             >
-              {{ isDeciding(a.id) ? "Deciding ..." : "Allow for this chat" }}
+              Allow for this chat
             </button>
             <button type="button" class="deny" :aria-busy="isDeciding(a.id)" :disabled="isDeciding(a.id)" @click="emit('decide', a.id, 'deny')">
-              {{ isDeciding(a.id) ? "Deciding ..." : "Deny" }}
+              Deny
             </button>
           </div>
           <p class="note">No answer within 4 minutes counts as Deny.</p>

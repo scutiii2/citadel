@@ -45,7 +45,7 @@ defineEmits<{ back: []; submit: [] }>();
         <span v-if="dirty" class="unsaved" role="status"><i aria-hidden="true" />Unsaved changes</span>
         <span v-else-if="showSavedState" class="saved-state">No unsaved changes</span>
         <slot name="actions" />
-        <button type="submit" class="primary" :disabled="!canSave" :aria-busy="saving">{{ saving ? "Saving…" : "Save" }}</button>
+        <button type="submit" class="primary" :disabled="!canSave" :aria-busy="saving">Save</button>
       </footer>
     </form>
     <div v-else class="placeholder"><slot name="placeholder" /></div>

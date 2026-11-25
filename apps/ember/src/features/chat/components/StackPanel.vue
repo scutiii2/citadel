@@ -76,7 +76,7 @@ defineExpose({ clearDraft: (): void => { draft.value = ""; } });
         <button
           type="button" class="pill-btn ghost" data-test="compact" :aria-busy="compacting ? 'true' : undefined"
           :disabled="!canCompact" :title="hasUnpinned ? undefined : 'Nothing to compact'" @click="emit('compact')"
-        >{{ compacting ? "Compacting" : "Compact now" }}</button>
+        >Compact now</button>
         <span v-if="compacting" class="hint">This can take a moment.</span>
         <span v-else-if="locked" class="hint">Available when the answer is done.</span>
       </div>

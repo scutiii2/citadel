@@ -53,7 +53,7 @@ onMounted(() => { if (!stored.value) void run(async owner => adopt(await tuningC
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <div class="actions">
       <button type="button" data-test="clear" :disabled="!anySet || saving" @click="clear">Use defaults</button>
-      <button type="button" class="primary" data-test="save" :disabled="!dirty || saving" :aria-busy="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
+      <button type="button" class="primary" data-test="save" :disabled="!dirty || saving" :aria-busy="saving" @click="save">Save</button>
     </div>
   </fieldset>
   <p v-else-if="error" class="error" role="alert">{{ error }}</p>

@@ -314,12 +314,7 @@ async function changePassword(): Promise<void> {
                 class="primary"
                 :disabled="emailForm.busy"
                 :aria-busy="emailForm.busy"
-              >
-                <span
-                  v-if="emailForm.busy"
-                  class="spinner"
-                  aria-hidden="true"
-                />{{ emailForm.busy ? "Changing email…" : "Change email" }}
+              >Change email
               </button>
             </form>
             <div class="row">
@@ -382,14 +377,7 @@ async function changePassword(): Promise<void> {
                 class="primary"
                 :disabled="passwordForm.busy || passwordMismatch"
                 :aria-busy="passwordForm.busy"
-              >
-                <span
-                  v-if="passwordForm.busy"
-                  class="spinner"
-                  aria-hidden="true"
-                />{{
-                  passwordForm.busy ? "Changing password…" : "Change password"
-                }}
+              >Change password
               </button>
             </form>
           </div>
@@ -1059,20 +1047,6 @@ button.forget {
   outline-offset: 2px;
 }
 
-.spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: var(--radius-full);
-  animation: account-spin 0.8s linear infinite;
-}
-
-@keyframes account-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 @media (max-width: 767px) {
   .more-pages {

@@ -63,7 +63,7 @@ const logout = useLogout();
         <input v-model="code" :aria-invalid="codeError" :aria-describedby="codeError ? 'verification-error' : undefined" autocomplete="one-time-code" spellcheck="false" required autofocus />
       </label>
       <p v-if="error" class="error" role="alert" id="verification-error">{{ error }}</p>
-      <button type="submit" class="primary" :disabled="busy" :aria-busy="action === 'verify'">{{ action === 'verify' ? "Verifying…" : "Verify" }}</button>
+      <button type="submit" class="primary" :disabled="busy" :aria-busy="action === 'verify'">Verify</button>
     </form>
     <template #footer>
       <RouterLink to="/account">Change email</RouterLink>

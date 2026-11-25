@@ -10,7 +10,7 @@ const emit = defineEmits<{ 'update:uri': [value: string]; read: [uri: string] }>
         URI
         <input :value="uri" @input="emit('update:uri', ($event.target as HTMLInputElement).value)" :disabled="pending" type="text" spellcheck="false" />
       </label>
-      <button class="primary" :disabled="pending" :aria-busy="pending">{{ pending ? "Reading…" : "Read" }}</button>
+      <button class="primary" :disabled="pending" :aria-busy="pending">Read</button>
     </form>
     <p v-if="readError" class="error">{{ readError }}</p>
     <template v-if="readResult">

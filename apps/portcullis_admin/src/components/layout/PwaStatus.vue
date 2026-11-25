@@ -79,11 +79,11 @@ onUnmounted(() => {
     <p v-if="online && reconnectNeeded" role="status">Back online. Reload to reconnect. <button type="button" @click="retry">Retry</button></p>
     <p v-if="needRefresh && online" role="status">
       A new version of {{ appName }} is ready. Save your work before reloading.
-      <button type="button" :disabled="updating" :aria-busy="updating" @click="update">{{ updating ? 'Updating…' : 'Reload to update' }}</button>
+      <button type="button" :disabled="updating" :aria-busy="updating" @click="update">Reload to update</button>
       <button type="button" @click="needRefresh = false">Later</button>
     </p>
     <p v-if="installPrompt && online">Install {{ appName }} for quick access.
-      <button type="button" :disabled="installing" :aria-busy="installing" @click="install">{{ installing ? 'Installing…' : 'Install app' }}</button>
+      <button type="button" :disabled="installing" :aria-busy="installing" @click="install">Install app</button>
       <button type="button" @click="installPrompt = null">Dismiss</button>
     </p>
     <p v-if="error" role="alert">{{ error }}</p>
