@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import traceback
 from datetime import timedelta
@@ -55,6 +56,7 @@ from src.routes import (
     stronghold_brain_settings,
     stronghold_usage_settings,
     settings as settings_routes,
+    shared_folders,
     shares,
     skills,
     stack,
@@ -80,6 +82,7 @@ from src.services.legion_ask import LegionAsk
 from src.services.outside_guard import ClientRateLimiter, OutsideGuard
 from src.services.secret_box import SecretBox, ensure_secrets_key
 from src.services.public_rate_limiter import PublicReadLimiter
+from src.services.shared_folder_service import MAX_FILE_BYTES, sweep_forever
 from src.services.server_tools import McpServerTools, ServerTools
 from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
@@ -96,6 +99,8 @@ DEFAULT_REQUEST_BYTES = 1024 * 1024
 # The routes that take big bodies: chats (history imports, questions with
 # attached text), attachment files and command-form uploads.
 LARGE_BODY_PREFIXES = ("/api/chats", "/api/attachments", "/api/uploads", "/api/pdf-merger/files")
+# A shared-folder upload is the raw file, up to MAX_FILE_BYTES; the service refuses a bigger one with a clear message.
+FOLDER_UPLOAD_BYTES = MAX_FILE_BYTES + 1024 * 1024
 
 # No read timeout: an MCP event stream stays open for as long as a chat turn
 # (or the session) lasts. Connect/write/pool still fail fast.
@@ -181,6 +186,9 @@ def create_app(
         app.state.traffic = recorder
         recorder.start()
         app.state.share_limiter = PublicReadLimiter()
+        # Deletes expired shared folders now and every 30 s; an expired folder already reads as missing.
+        folder_sweeper = asyncio.create_task(
+            sweep_forever(database, settings.database_path.parent / "shared_folders"), name="shared-folder-sweeper")
         app.state.outside_guard = OutsideGuard(ClientRateLimiter())
         app.state.legion_ask = LegionAsk()
         from src.services.pricing import Pricing
@@ -199,6 +207,7 @@ def create_app(
         try:
             yield
         finally:
+            folder_sweeper.cancel()
             await catalog.stop()
             if registration is not None:
                 registration.cancel()
@@ -225,7 +234,7 @@ def create_app(
     app.add_middleware(
         BodyLimitMiddleware,
         max_bytes=DEFAULT_REQUEST_BYTES,
-        path_limits={prefix: MAX_REQUEST_BYTES for prefix in LARGE_BODY_PREFIXES},
+        path_limits={**{prefix: MAX_REQUEST_BYTES for prefix in LARGE_BODY_PREFIXES}, "/api/folder-links": FOLDER_UPLOAD_BYTES},
     )
     # Added last, so it runs first: blocked IPs never reach JSON checks or
     # routes, and even those rejections carry the security headers.
@@ -255,6 +264,8 @@ def create_app(
     app.include_router(triage.router)
     app.include_router(account_agents.router)
     app.include_router(user_extensions.router)
+    app.include_router(shared_folders.router)
+    app.include_router(shared_folders.public_router)
     app.include_router(shares.router)
     app.include_router(shares.public_router)
     app.include_router(shares.page_router)

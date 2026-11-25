@@ -128,7 +128,7 @@ describe("the rest of the app stays behind the login", () => {
   it("only the shared route is marked public", () => {
     const publicRoutes = router.getRoutes().filter((r) => r.meta.public).map((r) => r.name);
 
-    expect(publicRoutes).toEqual(["shared"]);
+    expect(publicRoutes).toEqual(["shared", "shared-folder"]);
   });
 });
 

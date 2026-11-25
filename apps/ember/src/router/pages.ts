@@ -63,6 +63,13 @@ export const NAV_PAGES: NavPage[] = [
     permission: "chat.use",
   },
   {
+    to: "/folders",
+    label: "Temp folders",
+    icon: ["M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"],
+    description: "Open a temporary folder and share its link: anyone can add and download files; it is deleted within the hour.",
+    permission: "folders.use",
+  },
+  {
     to: "/generator",
     label: "Generator",
     icon: ["M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"],

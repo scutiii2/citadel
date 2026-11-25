@@ -32,10 +32,12 @@ TUNING_MANAGE = "tuning.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
 BRAIN_GLOBAL_WRITE = "brain.global.write"
+FOLDERS_USE = "folders.use"
 
 ALL_PERMISSIONS = MappingProxyType({
     BRAIN_GLOBAL_WRITE: "Write the global brain and review what people share with it",
     CHAT_USE: "Chat with ai_agent instances",
+    FOLDERS_USE: "Open temporary folders and share them by link",
     TOOLS_VIEW: "Browse tools, capabilities, help and resources",
     TOOLS_EXECUTE: "Run tools directly and through chat agents",
     CHAT_SHARE: "Create public read-only links to your chats",
@@ -79,7 +81,7 @@ ADMIN_ROLE = "Administrator"
 # has to be created. Only applied on creation: later edits by an admin stick.
 DEFAULT_ROLE_PERMISSIONS = (
     CHAT_USE, TOOLS_VIEW, TOOLS_EXECUTE, CHAT_SHARE,
-    EXTENSIONS_PERSONAL_MANAGE, FILES_UPLOAD, FILES_DOWNLOAD, TICKETS_CREATE,
+    EXTENSIONS_PERSONAL_MANAGE, FILES_UPLOAD, FILES_DOWNLOAD, TICKETS_CREATE, FOLDERS_USE,
 )
 
 ADMIN_PERMISSIONS = (
