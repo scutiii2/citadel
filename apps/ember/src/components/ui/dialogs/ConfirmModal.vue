@@ -97,9 +97,8 @@ function confirm(): void {
   color: var(--text);
   background: var(--bg);
 }
-.require input:focus {
-  outline: none;
-  border-color: var(--accent);
+.require input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .count {
   align-self: flex-end;

@@ -184,7 +184,7 @@ header {
 }
 .other:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 .buttons .submit {
   border-color: var(--accent);

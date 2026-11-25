@@ -184,8 +184,8 @@ input[type="text"] {
   background: var(--bg);
   font: inherit;
 }
-input[type="text"]:focus {
-  border-color: var(--accent);
+input[type="text"]:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .confirm {
   margin: 0;

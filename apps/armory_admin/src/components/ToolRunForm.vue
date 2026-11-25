@@ -353,11 +353,10 @@ textarea {
   font-size: 0.9em;
   resize: vertical;
 }
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .invalid input,
 .invalid select,
