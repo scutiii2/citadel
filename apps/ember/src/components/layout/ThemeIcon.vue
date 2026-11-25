@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Theme } from "../../composables/useTheme";
+import type { Theme } from "@citadel/ui";
 
 defineProps<{ theme: Theme }>();
 </script>

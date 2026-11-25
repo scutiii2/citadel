@@ -1,13 +1,21 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 /** A modal dialog the parent opens and closes with `open`. It closes itself on
  * Escape, on the × and on a click outside the panel, by asking the parent
  * (`close`) rather than hiding on its own. The default slot is the body. */
-const props = defineProps<{ open: boolean; title: string; side?: boolean }>();
+const props = defineProps<{ open: boolean; title: string; wide?: boolean; side?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 const dialog = ref<HTMLDialogElement | null>(null);
+let unmounting = false;
+
+onBeforeUnmount(() => {
+  unmounting = true;
+  // A conditional parent can remove the dialog before the open watcher runs.
+  // Close it while connected so the browser can return focus to the opener.
+  if (dialog.value?.open) dialog.value.close?.();
+});
 
 watch(
   () => props.open,
@@ -19,8 +27,11 @@ watch(
   { immediate: true },
 );
 
+/** The browser fires `close` for a close made from code too. When the parent
+ * already set `open` to false it asked for that, so it must not hear it back:
+ * it may be switching to another dialog, and the echo would shut that one. */
 function onNativeClose(): void {
-  if (props.open) emit("close");
+  if (props.open && !unmounting) emit("close");
 }
 
 /** A click on the backdrop lands on the <dialog> itself, not on its content. */
@@ -30,7 +41,7 @@ function onClick(event: MouseEvent): void {
 </script>
 
 <template>
-  <dialog ref="dialog" :class="['modal', { 'side-modal': side }]" :aria-label="title" @close="onNativeClose" @cancel.prevent="emit('close')" @click="onClick">
+  <dialog ref="dialog" class="modal" :class="{ wide, 'side-modal': side }" :aria-label="title" @close="onNativeClose" @cancel.prevent="emit('close')" @click="onClick">
     <header>
       <h3>{{ title }}</h3>
       <button type="button" class="close" aria-label="Close" @click="emit('close')">×</button>
@@ -49,6 +60,9 @@ function onClick(event: MouseEvent): void {
   border-radius: var(--radius-xl);
   color: var(--text);
   background: var(--surface);
+}
+.modal.wide {
+  width: min(1000px, calc(100vw - 32px));
 }
 .modal::backdrop {
   background: rgb(0 0 0 / 45%);

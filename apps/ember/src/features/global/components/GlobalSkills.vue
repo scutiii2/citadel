@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import RecordDrawer from "../../../components/ui/panel/RecordDrawer.vue";
-import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
+import { RecordDrawer } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
 import SearchField from "../../../components/ui/lists/SearchField.vue";
 import CharacterCount from "../../../components/ui/status/CharacterCount.vue";
 import StateMessage from "../../../components/ui/status/StateMessage.vue";

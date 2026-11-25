@@ -2,7 +2,7 @@
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { usageClient, type MyUsage, type UsageGroupBy, type UsageRecordRow } from "./api/UsageClient";
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import ActionButton from "../../components/ui/buttons/ActionButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";

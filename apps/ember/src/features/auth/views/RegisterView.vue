@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PasswordInput from "../../../components/ui/forms/PasswordInput.vue";
+import { PasswordInput } from "@citadel/ui";
 import { reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AuthCard from "../../../components/auth/AuthCard.vue";

@@ -7,7 +7,7 @@ import { RouterLink } from "vue-router";
 import { useOutsideClose } from "../../../composables/useOutsideClose";
 import { checked } from "../../../utils/browser/dom";
 import { withTokenCost } from "../../usage/utils/tokenCosts";
-import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 
 defineProps<{
   caveman: boolean;

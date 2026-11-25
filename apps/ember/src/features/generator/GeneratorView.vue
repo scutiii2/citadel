@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import "../../components/layout/infoPage.css";
+import "@citadel/ui/infoPage.css";
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { McpServerClient } from "../../api/tools/McpServerClient";
 import { onBeforeRouteLeave } from "vue-router";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
-import CopyButton from "../../components/ui/buttons/CopyButton.vue";
+import { ConfirmModal } from "@citadel/ui";
+import { CopyButton } from "@citadel/ui";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
-import ToggleSwitch from "../../components/ui/forms/ToggleSwitch.vue";
-import RangeSlider from "../../components/ui/forms/RangeSlider.vue";
+import { ToggleSwitch } from "@citadel/ui";
+import { RangeSlider } from "@citadel/ui";
 import { checked } from "../../utils/browser/dom";
 import { errorMessage } from "../../utils/errors";
 

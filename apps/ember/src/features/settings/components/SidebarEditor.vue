@@ -5,8 +5,8 @@
 // rail (a hidden page stays reachable from the Overview page). Every change
 // is emitted as a draft when v-model is supplied; other consumers save immediately.
 import { computed, ref } from "vue";
-import SettingRow from "../../../components/ui/forms/SettingRow.vue";
-import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
+import { SettingRow } from "@citadel/ui";
+import { ToggleSwitch } from "@citadel/ui";
 import { NAV_PAGES, visiblePages } from "../../../router/pages";
 import { usePageVisibilityStore } from "../../../stores/navigation/pageVisibility";
 import { useAuthStore } from "../../../stores/auth";

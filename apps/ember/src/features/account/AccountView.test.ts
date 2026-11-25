@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { authClient, type KnownDevice } from "../../api/auth/AuthClient";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import { useAuthStore } from "../../stores/auth";
 import AccountView from "./AccountView.vue";
 

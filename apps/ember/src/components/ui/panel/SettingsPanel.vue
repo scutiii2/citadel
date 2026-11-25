@@ -2,10 +2,10 @@
 import { ref, toRef, useId } from "vue";
 import { useDraftPanel } from "../../../composables/useDraftPanel";
 import PageLayout from "../../layout/PageLayout.vue";
-import AdminSearch from "./AdminSearch.vue";
-import ConfirmModal from "../dialogs/ConfirmModal.vue";
-import DraftActions from "./DraftActions.vue";
-import PanelHelp from "./PanelHelp.vue";
+import { AdminSearch } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { DraftActions } from "@citadel/ui";
+import { PanelHelp } from "@citadel/ui";
 import "./admin.css";
 
 /** A settings page as one admin panel: the header holds the help popover, the Cancel and Save icons (only while

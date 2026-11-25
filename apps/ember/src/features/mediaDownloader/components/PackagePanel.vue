@@ -4,7 +4,7 @@ import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, react
 import { onBeforeRouteLeave } from 'vue-router'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
 import WavyProgress from '../../../components/ui/status/WavyProgress.vue'
-import ConfirmModal from '../../../components/ui/dialogs/ConfirmModal.vue'
+import { ConfirmModal } from "@citadel/ui"
 import DownloadCards from '../../../components/content/DownloadCards.vue'
 import type { ProbeResult } from '../api/MediaDownloaderTypes'
 import { useMediaPackagesStore } from '../stores/mediaPackages'

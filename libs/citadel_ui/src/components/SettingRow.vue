@@ -3,8 +3,9 @@ import PanelHelp from "./admin/PanelHelp.vue";
 /** One setting on the Settings page: its name and description on the left, its
  * control (the default slot) on the right. A setting that differs from its
  * default (`modified`) gets an accent dot and a reset button; the parent owns
- * the value and puts it back on `reset`. `settingId` is what the search jumps to. */
-defineProps<{ settingId: string; label: string; description?: string; modified?: boolean }>();
+ * the value and puts it back on `reset`. `settingId` is what the search jumps to.
+ * `cost` is a short note on what the setting costs in model tokens. */
+defineProps<{ settingId: string; label: string; description?: string; cost?: string; modified?: boolean }>();
 const emit = defineEmits<{ reset: [] }>();
 </script>
 
@@ -18,6 +19,7 @@ const emit = defineEmits<{ reset: [] }>();
         <PanelHelp v-if="$slots.help" :title="label"><slot name="help" /></PanelHelp>
       </div>
       <p v-if="description" class="description">{{ description }}</p>
+      <p v-if="cost" class="cost" data-test="cost">{{ cost }}</p>
     </div>
     <div class="control">
       <button
@@ -66,6 +68,12 @@ const emit = defineEmits<{ reset: [] }>();
   height: 8px;
   border-radius: var(--radius-full);
   background: var(--accent);
+}
+.cost {
+  margin: 2px 0 0;
+  font-size: 0.8em;
+  color: var(--muted);
+  font-style: italic;
 }
 .description {
   margin: 2px 0 0;

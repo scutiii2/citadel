@@ -3,7 +3,7 @@ import { computed, nextTick, ref, useId, watch } from "vue";
 import DangerZone from "../../../components/ui/status/DangerZone.vue";
 import CharacterCount from "../../../components/ui/status/CharacterCount.vue";
 import TagInput from "../../../components/ui/forms/TagInput.vue";
-import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
+import { ToggleSwitch } from "@citadel/ui";
 import { growOnResize, growToContent } from "../../../utils/browser/autoGrow";
 import { FILE_TAG_MAX, FILE_TAGS_MAX, FILE_TITLE_MAX, normalizeFolder, normalizeTag, type BrainFile } from "../api/BrainClient";
 

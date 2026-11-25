@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, inject, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from "vue";
+import { PAGE_ACTIONS_KEY, useHeaderHelp } from "../../composables/useHeaderHelp";
 
 /** The helper icon in a panel header: one click shows a popover (in the top layer, so it also shows over a drawer) saying what the panel is for.
  * The popover is teleported to <body> because panel cards clip their paint. It closes on Escape
@@ -7,13 +8,29 @@ import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 const props = defineProps<{ title: string }>();
 
 const open = ref(false);
+// A page-level help moves to the header Help button on wide screens (see useHeaderHelp).
+const header = useHeaderHelp();
+const active = ref(true); // false while a kept-alive page is hidden
+const inActions = inject(PAGE_ACTIONS_KEY, false);
+const hosted = computed(() => inActions && header.ready.value && active.value);
+onActivated(() => { active.value = true; });
+onDeactivated(() => { active.value = false; });
+watch(hosted, (now, _before, onCleanup) => {
+  if (!now) return;
+  header.count.value++;
+  onCleanup(() => { header.count.value--; });
+}, { immediate: true });
+watch(() => header.open.value, (now) => { if (hosted.value) open.value = now; });
+watch(open, (now) => { if (hosted.value && header.open.value !== now) header.open.value = now; });
+watch(hosted, (now) => { if (!now) { open.value = false; header.open.value = false; } });
+const anchor = (): HTMLElement | null => (hosted.value ? header.trigger.value : button.value);
 const button = ref<HTMLButtonElement | null>(null);
 const pop = ref<HTMLElement | null>(null);
 const place = ref({ top: "0px", left: "0px" });
 const id = `panel-help-${Math.random().toString(36).slice(2, 8)}`;
 
 function position() {
-  const rect = button.value?.getBoundingClientRect();
+  const rect = anchor()?.getBoundingClientRect();
   if (!rect) return;
   const width = Math.min(300, window.innerWidth - 16);
   const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8);
@@ -22,12 +39,12 @@ function position() {
 
 function close(returnFocus = false) {
   open.value = false;
-  if (returnFocus) button.value?.focus();
+  if (returnFocus) anchor()?.focus();
 }
 
 function outside(event: Event) {
   const target = event.target as Node;
-  if (!pop.value?.contains(target) && !button.value?.contains(target)) close();
+  if (!pop.value?.contains(target) && !anchor()?.contains(target)) close();
 }
 
 function onScroll() { close(); }
@@ -54,7 +71,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <button ref="button" type="button" class="admin-icon" :aria-label="`About ${props.title}`" :title="`About ${props.title}`" aria-haspopup="true" :aria-expanded="open" :aria-controls="open ? id : undefined" data-test="panel-help" @click="open = !open">
+  <button v-if="!hosted" ref="button" type="button" class="admin-icon" :aria-label="`About ${props.title}`" :title="`About ${props.title}`" aria-haspopup="true" :aria-expanded="open" :aria-controls="open ? id : undefined" data-test="panel-help" @click="open = !open">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M9.5 9.2a2.6 2.6 0 1 1 3.7 2.4c-.8.4-1.2 1-1.2 1.9M12 17h.01" /></svg>
   </button>
   <Teleport to="body">

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
-import "../../components/layout/infoPage.css";
+import "@citadel/ui/infoPage.css";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import { useAuthStore } from "../../stores/auth";
 import { errorMessage } from "../../utils/errors";

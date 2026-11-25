@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import { computed, nextTick, ref, watch } from "vue";
 import { matchesWords } from "../../utils/search";
 import PageLayout from "../../components/layout/PageLayout.vue";
@@ -9,13 +9,13 @@ import SearchField from "../../components/ui/lists/SearchField.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import DangerZone from "../../components/ui/status/DangerZone.vue";
 import CharacterCount from "../../components/ui/status/CharacterCount.vue";
-import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 import ShareDialog, { type ShareTarget } from "../sharing/components/ShareDialog.vue";
 import { useDeleteConfirm } from "../../composables/useDeleteConfirm";
 import { useListLoad } from "../../composables/useListLoad";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { growOnResize, growToContent } from "../../utils/browser/autoGrow";
-import "../../components/layout/infoPage.css";
+import "@citadel/ui/infoPage.css";
 import { errorMessage } from "../../utils/errors";
 import { SKILL_LIMITS, skillsClient, type Skill, type SkillStatus, type SkillText } from "./api/SkillsClient";
 

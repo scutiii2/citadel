@@ -6,7 +6,7 @@
 import { nextTick, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useOutsideClose } from "../../composables/useOutsideClose";
-import { THEME_LABELS, useTheme } from "../../composables/useTheme";
+import { THEME_LABELS, useTheme } from "@citadel/ui";
 import ThemeIcon from "./ThemeIcon.vue";
 import { PROFILE_ICON, type NavPage } from "../../router/pages";
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ToggleSwitch from '../../../components/ui/forms/ToggleSwitch.vue'
+import { ToggleSwitch } from "@citadel/ui"
 import SegmentedControl from '../../../components/ui/forms/SegmentedControl.vue'
 // Output file name, metadata and image defaults.
 import { usePlanStore } from '../stores/plan'

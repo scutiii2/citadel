@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PanelHelp from "../../components/ui/panel/PanelHelp.vue";
+import { PanelHelp } from "@citadel/ui";
 import { useNarrow } from "../../composables/useNarrow";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
@@ -8,8 +8,8 @@ import PageLayout from '../../components/layout/PageLayout.vue'
 import ActionButton from '../../components/ui/buttons/ActionButton.vue'
 import DangerZone from "../../components/ui/status/DangerZone.vue";
 import RetentionNote from "../../components/ui/status/RetentionNote.vue";
-import ConfirmModal from '../../components/ui/dialogs/ConfirmModal.vue'
-import RecordDrawer from '../../components/ui/panel/RecordDrawer.vue'
+import { ConfirmModal } from "@citadel/ui"
+import { RecordDrawer } from "@citadel/ui"
 import SegmentedControl from '../../components/ui/forms/SegmentedControl.vue'
 import UrlBar from './components/UrlBar.vue'
 import ProbeCard from './components/ProbeCard.vue'

@@ -4,9 +4,9 @@ import { sharesClient, type ShareCreated, type ShareExpiry, type ShareInfo } fro
 import { errorMessage } from "../../../utils/errors";
 import { formatUtc } from "../../../utils/time";
 import { publicOrigin } from "../../../utils/server";
-import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
-import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
-import CopyButton from "../../../components/ui/buttons/CopyButton.vue";
+import { BaseModal } from "@citadel/ui";
+import { ConfirmModal } from "@citadel/ui";
+import { CopyButton } from "@citadel/ui";
 
 /** Makes, lists and revokes read-only share links for one chat. A link's
  * secret exists only in the response that creates it, so it lives here in

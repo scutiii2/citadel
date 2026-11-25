@@ -3,7 +3,7 @@
 import { ref } from 'vue'
 import { useReorder } from '../../../composables/useReorder'
 import { useFilesStore } from '../stores/files'
-import ConfirmModal from '../../../components/ui/dialogs/ConfirmModal.vue'
+import { ConfirmModal } from "@citadel/ui"
 import type { SourceState } from '../stores/files'
 import SourceRow from './SourceRow.vue'
 

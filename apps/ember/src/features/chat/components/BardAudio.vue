@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { isDesktop, mediaUrl } from "../../../utils/server";
 import { useAuthStore } from "../../../stores/auth";
-import RangeSlider from "../../../components/ui/forms/RangeSlider.vue";
+import { RangeSlider } from "@citadel/ui";
 
 /** In-chat player for a Bard answer. The audio streams through ember_api: the
  * page's content security policy only allows same-origin media, so it never

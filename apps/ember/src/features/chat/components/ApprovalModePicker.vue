@@ -2,7 +2,7 @@
 import { nextTick, ref, useId, useTemplateRef } from "vue";
 import { useOutsideClose } from "../../../composables/useOutsideClose";
 import { ALLOW_ALL_CONFIRM, APPROVAL_MODES, approvalLabel, type ApprovalMode } from "../utils/approvalMode";
-import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
+import { ConfirmModal } from "@citadel/ui";
 
 /** The chat bar's tool-approval chip: shows how the agent asks before a tool runs and opens a small
  * menu to change it (Ask every time, Auto, Allow all). While an administrator requires approval for
