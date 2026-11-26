@@ -11,6 +11,6 @@ Ember Windows app: Vue 3 + TypeScript UI inside a Tauri 2 shell (`src-tauri/`). 
 - Anything opened from a page or panel opens in a `RecordDrawer`. `BaseModal` is only for chat, the attachment preview and the dialog and drawer bases (`architecture.test.ts` enforces it); `ConfirmModal` stays modal.
 - Every page header carries a `PanelHelp` first among its actions; the page description lives in it. Header actions are icon buttons (`admin-icon`, `accent` for the primary one) with an accessible name.
 - An on/off or a choice from a list is a `ToggleSwitch`. A checkbox is only for selecting list rows or a form acknowledgement.
-- Checks: `pnpm exec vue-tsc -b`, `pnpm test`, `pnpm run test:e2e` (built app, fake `/api`; port 26507, `EMBER_E2E_PORT` overrides it). The Tauri shell needs Rust and was not built when written.
+- Checks: `pnpm exec vue-tsc -b`, `pnpm test`, `pnpm run test:e2e` (built app, fake `/api`; port 26507, `EMBER_E2E_PORT` overrides it). The Tauri shell needs Rust.
 
-- Shared UI lives in `libs/citadel_ui` (`@citadel/ui`) and is the real source for every frontend, Ember included. Use an existing component, composable or style from there; if none applies, create it there and export it from `src/index.ts`, not in the app. Ember is not in the pnpm workspace yet, so its local copies of library components move to the library as you touch them.
+- Shared UI lives in `libs/citadel_ui` (`@citadel/ui`) and is the real source for every frontend, Ember included. Use an existing component, composable or style from there; if none applies, create it there and export it from `src/index.ts`, not in the app. Ember is in the pnpm workspace; move any remaining local copy of a library file to the library when you touch it.

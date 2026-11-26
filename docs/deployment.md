@@ -4,18 +4,19 @@ Citadel runs as containers from one `docker-compose.yml`:
 
 | Service | Role | Port |
 |---|---|---|
+| `ember` | chat web app for users | 26502 |
 | `portcullis_admin` | admin web app: accounts, roles, invites, settings | 26501 |
 | `legion_admin` | admin web app: agents, connections | 26500 |
 | `armory_admin` | admin web app: capabilities, connections | 26503 |
 | `stronghold_admin` | admin web app: usage, analytics, tickets, usage settings, tool services | 26504 |
 | `treasury_admin` | admin web app: Treasury instances, connections and service addresses | 26505 |
-| `portcullis` | backend for both web apps | internal |
+| `portcullis` | backend for the web apps and the Windows app | internal (29601 with the ZimaOS overlay) |
 | `armory` | MCP server (capabilities, including Server Manager) | internal 29600 |
 | `legion` | AI agent, with the chat and decision model gateways built in | internal |
 | `treasury` | database gateway | internal 29602 |
 | `stronghold` | product logic, called only by portcullis | internal 29650 |
 
-Only the five admin web apps publish ports (on `127.0.0.1`; the ZimaOS overlay opens them to the LAN). The rest talk over the internal `core` network; Legion also joins `llm_net` to reach model providers. Laya is not in this stack: it runs
+`ember` publishes 26502 on all interfaces (`EMBER_BIND` changes that). The five admin web apps publish on `127.0.0.1`; the ZimaOS overlay opens them to the LAN and publishes `portcullis` on 29601 for the Windows app. The rest talk over the internal `core` network; Legion also joins `llm_net` to reach model providers. Laya is not in this stack: it runs
 from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:29220`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)

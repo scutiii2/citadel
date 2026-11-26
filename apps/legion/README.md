@@ -442,8 +442,8 @@ collide with the orchestrator's, so consumers key on `(agent_id, id)`.
 ## Architects
 
 `agents/code-architect.json` defines the code pipeline, using OmniRoute's
-`combo/heavy` for planning and assembly. It is disabled by default and has no
-model-offered tools. Enabling it does not switch Ember to plan mode.
+`combo/heavy` for planning and assembly. It ships enabled, has no model-offered
+tools, and Ember plans through it (see Orchestrator).
 
 The pipeline optionally calls the first configured prefetch specialist when the
 brief names a code file or conservative path, caps its output at 8,000 characters,
@@ -467,7 +467,7 @@ Each planner, repair and assembler completion has its own durable usage row;
 worker usage is retained through the normal delegation path. Cancellation is
 cooperative, and an already-running one-shot completion may finish upstream.
 
-Operations, approvals, runtime skill marking and the Ember rollout remain deferred.
+Operations, approvals and runtime skill marking remain deferred.
 
 ## Trusted gateways and confidential data
 
