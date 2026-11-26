@@ -16,14 +16,14 @@ from typing import Any
 
 from src.agents import agent_spec
 
-from src.runtime import approvals, internal_auth, tool_filter
+from src.runtime import approvals, elicitations, internal_auth, tool_filter
 from src.providers.decision import gateway_client
 from src.providers.decision.contract import DecisionError
 
 from src.tools.mcp_client import tool_progress
 from src.runtime.config_files import SETTINGS_DB
 from src.tools.mcp_client.sync_wrapper import SyncMcpClient
-from src.citadel_auth import ServiceAuth, settings_store
+from src.citadel_auth import settings_store
 from src.citadel_auth.failure import parse
 from src.runtime.service_catalog import catalog
 
@@ -104,8 +104,8 @@ def connect(url_override: str | None = None) -> None:
     client.connect_all(
         _CONFIG_PATH, url_overrides,
         auth_by_server={
-            _SERVER_ID: ServiceAuth(internal_auth.keyring, "armory"),
-            _STRONGHOLD_ID: ServiceAuth(internal_auth.keyring, _STRONGHOLD_ID),
+            _SERVER_ID: internal_auth.McpServiceAuth(internal_auth.keyring, "armory"),
+            _STRONGHOLD_ID: internal_auth.McpServiceAuth(internal_auth.keyring, _STRONGHOLD_ID),
         },
         builtins={_STRONGHOLD_ID: stronghold},
     )
@@ -153,7 +153,8 @@ def _remember_read_only(tools: list[Any]) -> None:
         for tool in tools
         if tool.name.startswith(_PREFIX)
         and "__" not in unprefixed(tool.name)  # an extension's tool arrives as main__<ext>__<tool>
-        and getattr(getattr(tool, "annotations", None), "readOnlyHint", None) is True
+        and (annotations := getattr(tool, "annotations", None)) is not None
+        and annotations.read_only_hint is True
     )
 
 
@@ -213,13 +214,23 @@ def _flag_output(text: str) -> str:
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> str:
+    """Run one tool and return the text the model gets."""
+    notes: list[str] = []
+    text = _dispatch_tool(name, arguments, elicitations.asker(notes))
+    if notes:
+        # Citadel's own words, so they are added after screening. A numbered failure stays one.
+        text = type(text)("\n\n".join((text, *dict.fromkeys(notes))))
+    return text
+
+
+def _dispatch_tool(name: str, arguments: dict[str, Any], elicit: Any) -> str:
     name = _qualified(name)
     private = name.startswith(private_turn.TOOL_PREFIX)
     short = name if private else unprefixed(name)
     if tool_filter.is_blocked(short):
         raise PermissionError(f"tool {name!r} is switched off for this user")
     if private:
-        return _call_private(name, arguments)
+        return _call_private(name, arguments, elicit)
     scope = agent_spec.current().tools
     if not (scope.allows_explicitly(short) if _other_server(name) else scope.allows(short)):
         # The model only sees in-scope tools, but may still name another one.
@@ -235,16 +246,18 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
         extra["on_progress"] = on_progress
     if meta:
         extra["meta"] = meta
+    if elicit:
+        extra["elicit"] = elicit
     result = client.call_tool(name, arguments, **extra)
     parts = [getattr(block, "text", str(block)) for block in result.content]
     text = "\n".join(parts) if parts else "(no output)"
     citadel_tool = name.startswith(_STRONGHOLD_PREFIX) or (
         name.startswith(_PREFIX) and "__" not in name.removeprefix(_PREFIX)
     )
-    if citadel_tool and getattr(result, "isError", False) and parse(text) is not None:
+    if citadel_tool and result.is_error and parse(text) is not None:
         return NumberedFailureText(text)
     if name == f"{_PREFIX}tool_web_search":
-        structured = getattr(result, "structuredContent", None) or {}
+        structured = result.structured_content
         hits = structured.get("results", [])
         snippets = "\n\n".join(
             hit["snippet"] for hit in hits if isinstance(hit, dict) and isinstance(hit.get("snippet"), str)
@@ -257,7 +270,7 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
     return text
 
 
-def _call_private(name: str, arguments: dict[str, Any]) -> str:
+def _call_private(name: str, arguments: dict[str, Any], elicit: Any = None) -> str:
     turn = private_turn.current()
     route = turn.route(name) if turn else None
     if turn is None or route is None or not agent_spec.current().tools.allows(name):
@@ -266,7 +279,8 @@ def _call_private(name: str, arguments: dict[str, Any]) -> str:
     spec, upstream = route
     try:
         # No identity is sent: the user's own server is not mcp_server.
-        result = client.run_coroutine(private_pool.call(turn.account, spec, upstream, arguments))
+        result = client.run_coroutine(private_pool.call(
+            turn.account, spec, upstream, arguments, **({"elicit": elicit} if elicit else {})))
     except Exception as error:  # noqa: BLE001 - say what happened without a header value or a traceback
         raise RuntimeError(describe_error(error, spec.secrets)) from None
     finally:

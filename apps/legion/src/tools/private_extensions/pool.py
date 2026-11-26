@@ -16,17 +16,21 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from datetime import timedelta
+from functools import partial
 from typing import Any
 
-import httpx
+import httpx2
 from mcp import types
 from mcp.client.session import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
-from mcp.shared.exceptions import McpError
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.exceptions import MCPError
+from mcp_types import CONNECTION_CLOSED
+from mcp_types.version import LATEST_HANDSHAKE_VERSION
 
+from src.tools.mcp_client import input_loop
+from src.tools.mcp_client.transports import open_negotiated
 from src.tools.private_extensions.guard import guarded_client_factory
 from src.tools.private_extensions.spec import PrivateSpec
 
@@ -45,15 +49,16 @@ async def _preflight_handshake(spec: PrivateSpec, factory: Any, timeout_seconds:
         "id": 0,
         "method": "initialize",
         "params": {
-            "protocolVersion": types.LATEST_PROTOCOL_VERSION,
+            "protocolVersion": LATEST_HANDSHAKE_VERSION,
             "capabilities": {},
             "clientInfo": {"name": "ai_agent-preflight", "version": "0"},
         },
     }
     headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json", **spec.header_map}
-    async with factory(None, httpx.Timeout(timeout_seconds)) as client:
+    async with factory(None, httpx2.Timeout(timeout_seconds)) as client:
         async with client.stream("POST", spec.url, json=payload, headers=headers) as response:
-            if response.status_code >= 400:
+            # 400 is how a 2026-only server refuses the old handshake; negotiation handles it.
+            if response.status_code >= 400 and response.status_code != 400:
                 hint = " (check the extension's headers)" if response.status_code in (401, 403) else ""
                 raise ConnectionError(f"The server rejected the MCP handshake: HTTP {response.status_code}{hint}")
 
@@ -61,16 +66,17 @@ async def _preflight_handshake(spec: PrivateSpec, factory: Any, timeout_seconds:
 async def open_private_session(
     stack: AsyncExitStack, spec: PrivateSpec, factory: Any, timeout_seconds: float
 ) -> ClientSession:
-    """Open and initialize a session for `spec`, registering what it opens on `stack`."""
+    """Open a ready session for `spec`, registering what it opens on `stack`."""
+    # First, so a blocked address or a bad header is reported in words; the SDK transport hides both.
     await _preflight_handshake(spec, factory, timeout_seconds)
-    read_stream, write_stream, _session_id = await stack.enter_async_context(
-        streamablehttp_client(spec.url, headers=spec.header_map or None, httpx_client_factory=factory)
-    )
-    session = await stack.enter_async_context(
-        ClientSession(read_stream, write_stream, read_timeout_seconds=timedelta(seconds=timeout_seconds))
-    )
-    await session.initialize()
-    return session
+
+    @asynccontextmanager
+    async def open_streams():
+        async with factory(spec.header_map or None) as http:
+            async with streamable_http_client(spec.url, http_client=http) as streams:
+                yield streams
+
+    return await open_negotiated(stack, open_streams, timeout_seconds, probe=True)
 
 
 @dataclass
@@ -79,6 +85,7 @@ class _Entry:
     stack: AsyncExitStack
     session: ClientSession
     last_used: float
+    busy: int = 0
 
 
 async def _close_quietly(stack: AsyncExitStack) -> None:
@@ -116,7 +123,7 @@ class PrivateSessionPool:
         key = (account, spec.key())
         async with self._locks.setdefault(key, asyncio.Lock()):
             entry = self._entries.get(key)
-            if entry is not None and self._clock() - entry.last_used <= self._idle:
+            if entry is not None and (entry.busy or self._clock() - entry.last_used <= self._idle):
                 entry.last_used = self._clock()
                 return entry.session
             if entry is not None:
@@ -132,15 +139,20 @@ class PrivateSessionPool:
             return session
 
     async def _make_room(self, account: str) -> None:
+        """Close idle and oldest sessions. A session in the middle of a call is never closed here."""
         now = self._clock()
         for key, entry in list(self._entries.items()):
-            if now - entry.last_used > self._idle:
+            if not entry.busy and now - entry.last_used > self._idle:
                 await self._close(key)
-        mine = sorted((k for k, e in self._entries.items() if e.account == account), key=lambda k: self._entries[k].last_used)
-        while len(mine) >= self._per_account:
-            await self._close(mine.pop(0))
+        mine = [k for k, e in self._entries.items() if e.account == account]
+        spare = sorted((k for k in mine if not self._entries[k].busy), key=lambda k: self._entries[k].last_used)
+        for key in spare[: max(0, len(mine) - self._per_account + 1)]:
+            await self._close(key)
         while len(self._entries) >= self._total:
-            await self._close(min(self._entries, key=lambda k: self._entries[k].last_used))
+            spare = [k for k, e in self._entries.items() if not e.busy]
+            if not spare:
+                break
+            await self._close(min(spare, key=lambda k: self._entries[k].last_used))
 
     async def _close(self, key: tuple[str, str]) -> None:
         entry = self._entries.pop(key, None)
@@ -153,8 +165,11 @@ class PrivateSessionPool:
     async def _use(self, account: str, spec: PrivateSpec, action: Callable[[ClientSession], Awaitable[Any]]) -> Any:
         try:
             return await action(await self.session(account, spec))
-        except (RuntimeError, McpError) as error:
-            # The SDK raises McpError after a server restart (RuntimeError in older versions).
+        except MCPError as error:
+            if error.code == CONNECTION_CLOSED:
+                # Dead connection: forget it, but never replay a call that may have run.
+                await self.drop(account, spec)
+                raise
             if "Session terminated" not in str(error):
                 raise
         # The server dropped the session: one fresh one, one retry.
@@ -165,9 +180,28 @@ class PrivateSessionPool:
         listed = await self._use(account, spec, lambda session: session.list_tools())
         return list(listed.tools)
 
-    async def call(self, account: str, spec: PrivateSpec, tool: str, arguments: dict[str, Any]) -> types.CallToolResult:
-        timeout = timedelta(seconds=self._call_timeout)
-        return await self._use(account, spec, lambda session: session.call_tool(tool, arguments, read_timeout_seconds=timeout))
+    async def call(
+        self, account: str, spec: PrivateSpec, tool: str, arguments: dict[str, Any],
+        elicit: input_loop.Elicit | None = None,
+    ) -> types.CallToolResult:
+        async def run(session: ClientSession) -> Any:
+            entry = self._entries.get((account, spec.key()))
+            if entry is not None:
+                entry.busy += 1  # a user may take minutes to answer; the session must stay open
+            try:
+                async def send(**round_arguments: Any):
+                    return await session.call_tool(
+                        tool, arguments, read_timeout_seconds=self._call_timeout, **round_arguments)
+
+                if not input_loop.speaks_input(session):
+                    return await send()
+                return await input_loop.call_with_input(send, partial(elicit, spec.label, tool) if elicit else None)
+            finally:
+                if entry is not None:
+                    entry.busy -= 1
+                    entry.last_used = self._clock()
+
+        return await self._use(account, spec, run)
 
     async def probe(self, spec: PrivateSpec) -> list[types.Tool]:
         """Connect once, list the tools, close. Nothing is kept."""

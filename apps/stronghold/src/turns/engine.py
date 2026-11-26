@@ -31,7 +31,7 @@ from src.agents.gateway import AgentCallError, AgentGateway, Caller
 from src.brain.compaction import CompactionError, StackCompactor
 from src.chats.store import ChatNotFound, ChatStore, message_time
 from src.triage.questions import TriageQuestions, TriageRejected, TriageUnavailable
-from src.turns import question_answers, summarization
+from src.turns import elicitation_events, question_answers, summarization
 from src.turns.logs import TurnLogs
 from src.turns.step_digest import is_private_memory_tool
 from src.usage.rows import stored_rows, usage_rows
@@ -107,6 +107,8 @@ class TurnOptions:
     limits: dict[str, int] = field(default_factory=dict)
     # The browser can show the agent's clickable questions and send answers back.
     can_ask: bool = False
+    # The browser can show an outside server's own questions and send answers back.
+    can_elicit: bool = False
     # The account's enabled private extensions as ai_agent wants them ({id, label, url, headers});
     # headers are secrets, so this never shows in repr(). Loaded server-side, never from the browser.
     private_extensions: tuple[dict[str, Any], ...] = field(default=(), repr=False)
@@ -192,6 +194,8 @@ class Turn:
     pending_approvals: dict[str, dict[str, Any]] = field(default_factory=dict)
     # Questions waiting for the user's answer, by step id: {id, questions}.
     pending_questions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Outside servers' questions waiting for the user, by elicitation id.
+    pending_elicitations: dict[str, dict[str, Any]] = field(default_factory=dict)
     plans: dict[str, dict[str, Any]] = field(default_factory=dict)
     # What the chat-turn log says about each agent that ran, and the prompts it got (same order).
     trace_agents: list[dict[str, Any]] = field(default_factory=list)
@@ -215,6 +219,7 @@ class Turn:
             "steps": [dict(s) for s in self.steps],
             "approvals": [dict(a) for a in self.pending_approvals.values()],
             "questions": [dict(q) for q in self.pending_questions.values()],
+            "elicitations": [dict(e) for e in self.pending_elicitations.values()],
             "plans": [dict(p) for p in self.plans.values()],
             "active_agents": [dict(a) for a in self.active_agents],
             "sequence": self.sequence,
@@ -240,6 +245,11 @@ class Turn:
         if not step_id:
             return
         self.pending_questions[step_id] = {"id": step_id, "questions": event.get("questions") or []}
+
+    def record_elicitation(self, event: dict[str, Any]) -> None:
+        """Remembers a server's question that waits for the user, for a browser that joins late."""
+        if event.get("id"):
+            self.pending_elicitations[event["id"]] = {k: v for k, v in event.items() if k != "type"}
 
     def record_plan(self, event: dict[str, Any]) -> None:
         """Keep each agent's latest checklist for a reconnect, only this turn."""
@@ -410,6 +420,24 @@ class TurnRegistry:
             return False
         return await self._gateway.answer_question(turn.agent.url, turn.caller, turn.request_id, step_id, answers, skipped)
 
+    def pending_elicitation(self, owner: str, chat_id: str, elicitation_id: str) -> dict[str, Any] | None:
+        """The server question with this id that is waiting for an answer, if any."""
+        turn = self.get(owner, chat_id)
+        if turn is None or turn.status != "running":
+            return None
+        return turn.pending_elicitations.get(elicitation_id)
+
+    async def answer_elicitation(
+        self, owner: str, chat_id: str, elicitation_id: str, action: str, content: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        """Sends the user's answer to the agent. None when it is not waiting. The agent then reports an
+        `elicitation_resolved` event, which clears it for every watcher. Nothing of it is kept here."""
+        turn = self.get(owner, chat_id)
+        if turn is None or turn.status != "running" or elicitation_id not in turn.pending_elicitations:
+            return None
+        return await self._gateway.answer_elicitation(
+            turn.agent.url, turn.caller, turn.request_id, elicitation_id, action, content)
+
     async def discard(self, owner: str, chat_id: str) -> None:
         """The chat is being deleted: stop its turn and forget the replay.
         The task finds no chat to save into and ends quietly."""
@@ -502,6 +530,12 @@ class TurnRegistry:
             elif kind == "question_resolved":
                 turn.activity = ""
                 turn.pending_questions.pop(str(event.get("id") or ""), None)
+            elif kind == "elicitation_request":
+                turn.activity = "waiting for your answer"
+                turn.record_elicitation(event)
+            elif kind == "elicitation_resolved":
+                turn.activity = ""
+                turn.pending_elicitations.pop(str(event.get("id") or ""), None)
             elif kind == "summarized":
                 turn.activity = ""
             elif kind == "summarizing":
@@ -512,6 +546,7 @@ class TurnRegistry:
                 turn.finished_at = monotonic()
                 turn.pending_approvals.clear()
                 turn.pending_questions.clear()
+                turn.pending_elicitations.clear()
                 turn.active_agents.clear()
             turn.condition.notify_all()
 
@@ -583,6 +618,7 @@ class TurnRegistry:
             if event.get("type") in (
                 "token", "token_reset", "step_start", "step_progress", "step_end", "usage",
                 "approval_request", "approval_resolved", "question_request", "question_resolved",
+                "elicitation_request", "elicitation_resolved",
                 "agent_start", "agent_end", "agent_token", "plan_update",
             ):
                 await self._publish(turn, _clamped(event))
@@ -609,6 +645,7 @@ class TurnRegistry:
                 allow_read_only=turn.options.allow_read_only,
                 disabled_tools=list(turn.options.disabled_tools),
                 ask_user=turn.options.can_ask,
+                elicit=turn.options.can_elicit,
                 plan=turn.options.plan,
                 plan_lean=turn.options.plan_lean,
                 exact_context=turn.options.exact_context,
@@ -900,6 +937,8 @@ def _clamped(event: dict[str, Any]) -> dict[str, Any]:
         return {**event, "question": event["question"][:AGENT_QUESTION_MAX]}
     if kind == "agent_token" and isinstance(event.get("text"), str):
         return {**event, "text": event["text"][:AGENT_TEXT_MAX]}
+    if kind == "elicitation_request":
+        return elicitation_events.clamp_request(event)
     if kind == "question_request":
         return {**event, "questions": question_answers.clamp_questions(event.get("questions"))}
     if kind == "plan_update":

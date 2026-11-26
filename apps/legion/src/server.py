@@ -1,4 +1,4 @@
-"""ai_agent entry point - a FastMCP server exposing ask/status/cancel
+"""ai_agent entry point - an MCP server exposing ask/status/cancel
 tools to chat_app, backed by one pinned LLM provider (agent_config.py)
 that itself talks to mcp_server as an MCP client (mcp_upstream.py).
 
@@ -56,7 +56,7 @@ except agent_spec.AgentSpecError as _exc:
     sys.exit(1)
 
 import uvicorn
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -66,7 +66,8 @@ from starlette.responses import JSONResponse
 _CONFIG_ERROR_NAMES = {"AgentConfigError", "AgentRoleError", "ConfigError", "AgentSpecError"}
 try:
     from src.agents import agent_config, agent_events, agent_registry, agent_store
-    from src.runtime import approvals, internal_auth, questions, usage_log
+    from src.agents.roles.orchestrator import delegation
+    from src.runtime import approvals, elicitations, internal_auth, questions, usage_log
     from src.tools.mcp_client import mcp_upstream
     from src.providers.base_provider import ChatCancelled, ChatResult
     from src.providers import model_tiers
@@ -117,15 +118,16 @@ except ValueError as _exc:
     sys.stderr.write(f"\nai_agent cannot start - configuration error:\n  {_exc}\n\n")
     sys.exit(1)
 
-mcp = FastMCP(
+# `ask` carries the whole chat history; the SDK's 4 MiB default would refuse long chats.
+MAX_REQUEST_BYTES = 32 * 1024 * 1024
+
+mcp = MCPServer(
     name=f"ai-agent-{_AGENT_ID}",
     instructions=(
         f"Chat agent backed by {agent_config.PROVIDER_ID} "
         f"({agent_config.MODEL or 'provider default'}), with tool access to "
         "mcp_server. Call ask() with a question."
     ),
-    host=HOST,
-    port=PORT,
 )
 
 
@@ -182,6 +184,7 @@ async def ask(
     limits: dict[str, int] | None = None,
     chat_id: str | None = None,
     confidential: bool = False,
+    elicit: bool = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ask this agent a question. Runs its own tool-calling loop against
@@ -223,10 +226,12 @@ async def ask(
 
     exact_context: count what fills the context window with the provider's own
     token counter; the result's `context_breakdown_exact` says whether that worked.
-    ctx, if the MCP client requested it, is FastMCP's injected Context -
+    elicit: the caller can show a server's own questions (`elicitation_request` events) and send
+    answers back through answer_elicitation(); a delegating agent passes it to its specialists.
+    ctx, if the MCP client requested it, is the MCP server's injected Context -
     used below only to relay run_chat's live step/token events as MCP
     progress notifications; chat_app's own tool call never needs to pass
-    it explicitly, FastMCP supplies it automatically per request."""
+    it explicitly, the MCP server supplies it automatically per request."""
 
     if SPEC.internal_role == "router":
         raise ValueError("Router is internal; ask is unavailable")
@@ -267,6 +272,7 @@ async def ask(
             disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
             allow_read_only=allow_read_only, exact_context=exact_context,
             **tier_args, **private_args, **limit_args, **({"confidential": True} if confidential else {}),
+            **({"elicit": True} if elicit else {}),
         )
     except ChatCancelled as error:
         reply = _cancelled_result()
@@ -622,7 +628,8 @@ def status() -> dict[str, Any]:
     `private_extensions` says ask() understands private_extensions;
     `read_only_approval` says ask() understands allow_read_only;
     `exact_context` says ask() understands exact_context.
-    `user_limits` says ask() understands limits."""
+    `user_limits` says ask() understands limits.
+    `user_elicitations` says ask() understands elicit."""
     role_info = {}
     if SPEC.role == "architect":
         role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
@@ -637,6 +644,7 @@ def status() -> dict[str, Any]:
         "tool_filter": True,
         "tool_filter_all": True,
         "user_questions": True,
+        "user_elicitations": True,
         "plan_toggle": True,
         "read_only_approval": True,
         "exact_context": True,
@@ -679,6 +687,27 @@ async def answer_question(
     waiting for that request and step - unknown, already answered, or the
     turn ended."""
     return {"answered": questions.BROKER.answer(request_id, step_id, answers or [], skipped)}
+
+
+@mcp.tool()
+async def answer_elicitation(
+    request_id: str,
+    id: str,
+    action: str,
+    content: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Answers a server's question an ask() call raised with an `elicitation_request` event:
+    action is "accept", "decline" or "cancel"; content holds a form's values. Only the account
+    that asked can answer. {"answered": false, "problem": "..."} means the content was refused
+    and the question stays open; without a problem, nothing is waiting under that id."""
+    uid = internal_auth.current_requester().uid
+    answered = elicitations.BROKER.answer(request_id, id, uid, action, content)
+    if answered is not None:
+        return answered
+    relay = elicitations.relay_for(request_id, id, uid)
+    if relay is None:
+        return {"answered": False, "problem": None}
+    return await delegation.answer_elicitation(relay.url, relay.request_id, id, action, content)
 
 
 @mcp.tool()
@@ -767,7 +796,7 @@ def main() -> None:
         # via portcullis's proxy), never a browser - which is also why /mcp
         # can require the shared internal token (once one is configured).
         internal_auth.install_mcp(mcp)
-        app = mcp.streamable_http_app()
+        app = mcp.streamable_http_app(host=HOST, max_request_body_size=MAX_REQUEST_BYTES)
         internal_auth.install_auth(app)
         previous_lifespan = app.router.lifespan_context
 

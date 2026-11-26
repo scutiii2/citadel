@@ -24,7 +24,8 @@ import anyio.to_thread
 from src.agents import agent_events
 
 from src.tools.mcp_client import tool_progress
-from src.providers import cancellation, cooldown
+from src.providers import cancellation, cooldown, deadlines
+from src.runtime import elicitations
 
 
 OnEvent = Callable[[dict[str, Any]], Awaitable[None]]
@@ -57,6 +58,12 @@ async def dispatch_with_progress(
     pending: list[Any] = []
     pending_lock = threading.Lock()
     closed = False
+    # Time limits pause while a question from this step, or from a specialist under it, is open.
+    waits = deadlines.UserWaits()
+
+    async def deliver(event: dict[str, Any]) -> None:
+        waits.note(event)
+        await on_event(event)
 
     def sink(message: str) -> None:
         event_sink(step_event("step_progress", id=step_id, message=message))
@@ -64,21 +71,25 @@ async def dispatch_with_progress(
     def event_sink(event: dict[str, Any]) -> None:
         with pending_lock:
             if not closed:
-                pending.append(asyncio.run_coroutine_threadsafe(on_event(event), loop))
+                pending.append(asyncio.run_coroutine_threadsafe(deliver(event), loop))
 
     token = tool_progress.bind(sink)
     events_token = agent_events.bind(event_sink, step_id)
+    channel_token = elicitations.bind_channel(deliver, loop)
     try:
+        # shortcut: a waiting question holds one worker thread (anyio allows 40); raise the limiter if many users wait at once
         return await anyio.to_thread.run_sync(dispatch, *args)
     finally:
         # A deadline may leave a worker finishing cooperatively; its late events
         # must not reopen a finished turn or target a closed event loop.
         with pending_lock:
             closed = True
+        elicitations.reset_channel(channel_token)
         agent_events.reset(events_token)
         tool_progress.reset(token)
         # Deliver every queued progress event before the caller's step_end.
         await asyncio.gather(*(asyncio.wrap_future(f) for f in pending), return_exceptions=True)
+        waits.close()
 
 
 class LiveUsage:

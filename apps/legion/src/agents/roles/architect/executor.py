@@ -11,7 +11,7 @@ from src.agents import agent_events
 from src.agents.agent_spec import ArchitectLimits
 from src.agents.roles.architect.types import Node, NodeResult, Step
 from src.agents.roles.orchestrator import delegation
-from src.providers import cancellation
+from src.providers import cancellation, deadlines
 from src.providers.base_provider import ChatCancelled, OnEvent, dispatch_with_progress
 
 
@@ -76,7 +76,7 @@ class DagExecutor:
                             agent_events.emit({"type": "agent_start", **event, "at": agent_events.now_iso()})
                         result = NodeResult("cancelled")
                         try:
-                            async with asyncio.timeout(self.limits.unit_timeout_seconds):
+                            async with deadlines.deadline(self.limits.unit_timeout_seconds):
                                 output = await runner(node, _TIERS[tier],
                                                       {key: results[key] for key in node.depends_on})
                             result = output if isinstance(output, NodeResult) else NodeResult("done", output=output)

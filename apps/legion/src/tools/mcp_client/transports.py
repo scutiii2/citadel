@@ -5,7 +5,7 @@ whatever the wire actually needs (an HTTP header today), and opening the
 transport itself (stdio subprocess or streamable HTTP) the same way
 mcp_server/src/infra/extensions.py does, including the TCP-reachability
 pre-check that module's docstring explains at length: a real HTTP connect
-failure reaching streamablehttp_client directly corrupts anyio's
+failure reaching streamable_http_client directly corrupts anyio's
 cancel-scope tree for the caller's task, so an unreachable host must
 never be allowed to reach it in the first place.
 """
@@ -14,19 +14,24 @@ from __future__ import annotations
 
 import asyncio
 import os
-from contextlib import AsyncExitStack
-from datetime import timedelta
+from contextlib import AsyncExitStack, asynccontextmanager
 from functools import partial
 from urllib.parse import urlsplit
 
-import httpx
+import httpx2
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
+from mcp.shared.exceptions import MCPError
+from mcp_types import ElicitResult
+from pydantic import ValidationError
 
 from src.tools.mcp_client.config import ServerConfig
 from src.citadel_auth import resolved
+
+# Citadel's own servers stay on the handshake-era protocol; every other connection is probed.
+_INTERNAL_IDS = frozenset({"main", "stronghold"})
 
 
 class AuthResolutionError(RuntimeError):
@@ -53,7 +58,7 @@ def resolve_headers(config: ServerConfig) -> dict[str, str]:
 
 async def _check_tcp_reachable(url: str, timeout_seconds: float) -> None:
     """Raise a plain exception if `url`'s host:port won't accept a TCP
-    connection - without ever calling streamablehttp_client. Plain
+    connection - without ever calling streamable_http_client. Plain
     asyncio, not anyio: this opens no anyio task group, so it can't
     corrupt one - it only answers "is anyone listening"; the real
     connection is opened separately right after this returns."""
@@ -69,12 +74,12 @@ async def _check_tcp_reachable(url: str, timeout_seconds: float) -> None:
         pass
 
 
-def _origin_client(url: str, **options) -> httpx.AsyncClient:
+def _origin_client(url: str, **options) -> httpx2.AsyncClient:
     """Reject any request that would carry credentials beyond the catalog origin."""
-    origin = httpx.URL(url)
+    origin = httpx2.URL(url)
     expected = (origin.scheme, origin.host, origin.port)
 
-    async def check_origin(request: httpx.Request) -> None:
+    async def check_origin(request: httpx2.Request) -> None:
         target = request.url
         if (target.scheme, target.host, target.port) != expected:
             raise AuthResolutionError("MCP request left its configured origin")
@@ -84,6 +89,44 @@ def _origin_client(url: str, **options) -> httpx.AsyncClient:
     return client
 
 
+async def _decline_input(_context, _params) -> ElicitResult:
+    """Declares elicitation on a 2026 session. The real answers go through input_loop.py."""
+    return ElicitResult(action="decline")
+
+
+async def _open(stack: AsyncExitStack, open_streams, timeout_seconds: float, **options) -> ClientSession:
+    read_stream, write_stream = await stack.enter_async_context(open_streams())
+    return await stack.enter_async_context(
+        ClientSession(read_stream, write_stream, read_timeout_seconds=timeout_seconds, **options)
+    )
+
+
+async def open_negotiated(
+    stack: AsyncExitStack, open_streams, timeout_seconds: float, *, probe: bool
+) -> ClientSession:
+    """A ready session registered on `stack`. With `probe`, protocol 2026-07-28 when the
+    server speaks it; otherwise, and for an older server, a fresh handshake-era session."""
+    if probe:
+        attempt = AsyncExitStack()
+        try:
+            session = await _open(attempt, open_streams, timeout_seconds, elicitation_callback=_decline_input)
+            try:
+                await session.discover()
+            except (MCPError, ValidationError, RuntimeError):
+                # Not a 2026 server. A real connection problem shows again in initialize().
+                session = None
+        except BaseException:
+            await attempt.aclose()
+            raise
+        if session is not None:
+            stack.push_async_exit(attempt.pop_all())
+            return session
+        await attempt.aclose()
+    session = await _open(stack, open_streams, timeout_seconds)
+    await session.initialize()
+    return session
+
+
 async def open_session(
     stack: AsyncExitStack,
     config: ServerConfig,
@@ -91,7 +134,7 @@ async def open_session(
     extra_headers: dict[str, str] | None = None,
     auth=None,
 ) -> ClientSession:
-    """Open and initialize a session for `config`, registering every
+    """Open a ready session for `config`, registering every
     resource it opens on `stack` so the caller controls their lifetime.
     Does not call list_tools() - that's the caller's job (registry.py).
     `extra_headers` (HTTP only) are added to the auth block's."""
@@ -105,18 +148,16 @@ async def open_session(
                 raise
             raise ConnectionError("Could not reach the MCP origin") from error
         headers = {**resolve_headers(config), **(extra_headers or {})}
-        options = {"auth": auth} if auth else {}
-        if config.origins or (config.id == "stronghold" and auth is not None):
-            options["httpx_client_factory"] = partial(_origin_client, url)
-        read_stream, write_stream, _get_session_id = await stack.enter_async_context(
-            streamablehttp_client(url, headers=headers or None, **options)
-        )
+        guarded = bool(config.origins) or (config.id == "stronghold" and auth is not None)
+
+        @asynccontextmanager
+        async def open_streams():
+            build = partial(_origin_client, url) if guarded else create_mcp_http_client
+            async with build(headers=headers or None, auth=auth) as http:
+                async with streamable_http_client(url, http_client=http) as streams:
+                    yield streams
     else:
         params = StdioServerParameters(command=config.command, args=config.args or [])
-        read_stream, write_stream = await stack.enter_async_context(stdio_client(params))
+        open_streams = partial(stdio_client, params)
 
-    session = await stack.enter_async_context(
-        ClientSession(read_stream, write_stream, read_timeout_seconds=timedelta(seconds=timeout_seconds))
-    )
-    await session.initialize()
-    return session
+    return await open_negotiated(stack, open_streams, timeout_seconds, probe=config.id not in _INTERNAL_IDS)

@@ -82,6 +82,9 @@ const {
   deciding,
   pendingQuestions,
   answeringQuestions,
+  pendingElicitations,
+  answeringElicitations,
+  elicitationProblems,
   searchQuery,
   searchActive,
   searchHits,
@@ -462,6 +465,10 @@ useChatShortcuts({
         @decide="chat.decideApproval"
         @answer-question="chat.answerQuestion"
         @skip-question="chat.skipQuestion"
+        :elicitations="pendingElicitations"
+        :answering-elicitations="answeringElicitations"
+        :elicitation-problems="elicitationProblems"
+        @answer-elicitation="chat.answerElicitation"
         :regenerate-index="chat.regenerateIndex"
         :jump-index="chat.jumpIndex"
         @jumped="chat.clearJump"

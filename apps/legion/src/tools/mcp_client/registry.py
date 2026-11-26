@@ -16,16 +16,18 @@ import asyncio
 import time
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field, replace
-from datetime import timedelta
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
-import httpx
+import httpx2
 from mcp import types
 from mcp.client.session import ClientSession
-from mcp.shared.exceptions import McpError
+from mcp.shared.exceptions import MCPError
+from mcp_types import CONNECTION_CLOSED, REQUEST_TIMEOUT
 
 from src.citadel_auth import resolved
+from src.tools.mcp_client import input_loop
 from src.tools.mcp_client.config import OriginRef, ServerConfig, load_servers_config
 from src.tools.mcp_client.schema import inline_refs
 from src.tools.mcp_client.transports import open_session
@@ -59,9 +61,9 @@ def is_connection_failure(error: BaseException) -> bool:
     """A dead or silent origin justifies the next one. Any answer (a refusal, a bad request) never does."""
     if isinstance(error, BaseExceptionGroup):
         return all(is_connection_failure(child) for child in error.exceptions)
-    if isinstance(error, McpError):
-        return error.error.code == 408
-    return isinstance(error, (ConnectionError, TimeoutError, httpx.TransportError))
+    if isinstance(error, MCPError):
+        return error.code in (REQUEST_TIMEOUT, CONNECTION_CLOSED)
+    return isinstance(error, (ConnectionError, TimeoutError, httpx2.TransportError))
 
 
 @dataclass
@@ -84,8 +86,8 @@ def _namespace(server_id: str, tools: list[types.Tool]) -> list[types.Tool]:
         types.Tool(
             name=f"{server_id}{NAMESPACE_SEPARATOR}{tool.name}",
             description=tool.description,
-            inputSchema=inline_refs(tool.inputSchema),
-            outputSchema=tool.outputSchema,
+            input_schema=inline_refs(tool.input_schema),
+            output_schema=tool.output_schema,
             _meta=tool.meta,
             annotations=tool.annotations,
             icons=tool.icons,
@@ -320,29 +322,20 @@ class McpClientRegistry:
         if config.url is trusted:
             return True
         try:
-            return httpx.URL(resolved(config.url)) == httpx.URL(resolved(trusted))
-        except (KeyError, ValueError, httpx.InvalidURL):
+            return httpx2.URL(resolved(config.url)) == httpx2.URL(resolved(trusted))
+        except (KeyError, ValueError, httpx2.InvalidURL):
             return False
 
     async def _connect_one(self, server_id: str, config: ServerConfig) -> ServerStatus:
         if config.origins:
             return await self._connect_origins(config, self._eligible_origins(config) or list(config.origins))
-        local_stack = AsyncExitStack()
         try:
             auth = self._auth_by_server.get(server_id)
             if server_id in self._builtin_tasks:
                 auth = auth if self._uses_builtin_url(config) else None
-                opened, session, namespaced_tools = await self._open_origin(config, extra_headers=self._extra_headers, auth=auth)
-            else:
-                session = await open_session(local_stack, config, CONNECT_TIMEOUT_SECONDS, self._extra_headers,
-                                             **({"auth": auth} if auth is not None else {}))
-                namespaced_tools = _namespace(server_id, (await session.list_tools()).tools)
-                opened = local_stack.pop_all()
+            # Each connection gets its own owner task: a reconnect arrives on a different task.
+            opened, session, namespaced_tools = await self._open_origin(config, extra_headers=self._extra_headers, auth=auth)
         except Exception as error:  # noqa: BLE001 - one bad server must not block the others
-            try:
-                await local_stack.aclose()
-            except Exception:  # noqa: BLE001 - a messy close must not escape a failed connect
-                pass
             status = ServerStatus(
                 id=server_id,
                 label=config.label,
@@ -408,6 +401,7 @@ class McpClientRegistry:
         arguments: dict[str, Any],
         on_progress: Callable[[str], None] | None = None,
         meta: dict[str, Any] | None = None,
+        elicit: input_loop.Elicit | None = None,
     ) -> types.CallToolResult:
         """Route `name` (as returned by list_tools(), e.g. "main__ping")
         to whichever server owns it. Raises KeyError for a name that
@@ -417,7 +411,8 @@ class McpClientRegistry:
         `on_progress` receives each message the tool reports while it runs
         (an MCP progress notification with a message); it is called on this
         registry's own event-loop thread. `meta` becomes the request's
-        `_meta` (the asking user - see internal_auth.py)."""
+        `_meta` (the asking user - see internal_auth.py). `elicit` puts a
+        server's question to the user; without it a question is declined."""
         server_id, separator, upstream_name = name.partition(NAMESPACE_SEPARATOR)
         config = self._configs.get(server_id) if separator else None
         origin_connection = config is not None and bool(config.origins)
@@ -444,9 +439,16 @@ class McpClientRegistry:
             extra["meta"] = meta
 
         async def call(on: Any) -> types.CallToolResult:
-            return await on.call_tool(
-                upstream_name, arguments, read_timeout_seconds=timedelta(seconds=CALL_TIMEOUT_SECONDS), **extra
-            )
+            async def send(**round_arguments: Any):
+                return await on.call_tool(
+                    upstream_name, arguments, read_timeout_seconds=CALL_TIMEOUT_SECONDS, **extra, **round_arguments
+                )
+
+            if not input_loop.speaks_input(on):
+                return await send()
+            # The name comes from this installation's settings, never from the server.
+            label = config.label if config else server_id
+            return await input_loop.call_with_input(send, partial(elicit, label, upstream_name) if elicit else None)
 
         if origin_connection:
             self._origin_calls[session] = self._origin_calls.get(session, 0) + 1
@@ -467,15 +469,18 @@ class McpClientRegistry:
 
         try:
             return await call(session)
-        except RuntimeError as error:
-            if str(error) != "Session terminated":
+        except MCPError as error:
+            terminated = error.message == "Session terminated"
+            if not terminated and error.code != CONNECTION_CLOSED:
                 raise
             if server_id in self._builtin_tasks:
+                # The SDK no longer raises transport errors to the owner task: mark it for _retry_builtin.
                 self._origin_errors[session] = error
                 raise
             await self._reconnect(server_id)
             recovered_session = self._sessions.get(server_id)
-            if recovered_session is None:
+            # A closed connection may have run the tool already, so only a terminated session is replayed.
+            if not terminated or recovered_session is None:
                 raise
             return await call(recovered_session)
 

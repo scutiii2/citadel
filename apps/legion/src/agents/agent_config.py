@@ -22,7 +22,7 @@ from src.agents.roles.orchestrator import auto_route, delegation, memory_recall,
 from src.agents.roles.router import router_routing
 from src.agents.roles.orchestrator import plan as plan_policy
 
-from src.runtime import approvals, confidentiality, internal_auth, questions, tool_filter, tuning_overrides, turn_effects
+from src.runtime import approvals, confidentiality, elicitations, internal_auth, questions, tool_filter, tuning_overrides, turn_effects
 from src.tools.private_extensions import turn as private_turn
 from src.agents import auto_tier, protocol_chain
 from src.providers import context_breakdown, llm_config, llm_options, model_tiers, token_limits
@@ -130,6 +130,7 @@ async def run_chat(
     limits: dict[str, int] | None = None,
     delegated_by: str | None = None,
     confidential: bool = False,
+    elicit: bool = False,
 ) -> ChatResult:
     """Run a chat completion request through the configured provider.
 
@@ -163,6 +164,9 @@ async def run_chat(
     sent them (see private_extensions/turn.py). Their tools are offered after
     the user approves each one; a server that cannot be reached is reported
     in `result.private_extension_errors` and the turn goes on without it.
+
+    elicit: the caller can show a server's own questions and send answers back through
+    answer_elicitation(); needs a verified account and a request_id.
 
     approval_mode / allowed_tools: see approvals.py - with "ask" a tool runs
     only after the user allows it (tools in allowed_tools were allowed
@@ -198,6 +202,8 @@ async def run_chat(
     caveman_token = delegation.bind_caveman(caveman)
     approval_token = approvals.bind(policy)
     question_token = questions.bind(questions.QuestionPolicy(ask_user and depth == 0))
+    elicit_token = elicitations.bind(elicitations.Policy(
+        bool(elicit and requester.uid and request_id), requester.uid, request_id or ""))
     filter_token = tool_filter.bind(disabled_tools or ())
     plan_token = plan_policy.bind(plan_policy.PlanPolicy(plan, agent_spec.current().plan_tool, plan_lean))
     private_token = private_turn.bind(private)
@@ -311,6 +317,7 @@ async def run_chat(
         plan_policy.reset(plan_token)
         tool_filter.reset(filter_token)
         questions.reset(question_token)
+        elicitations.reset(elicit_token)
         approvals.reset(approval_token)
         delegation.reset_caveman(caveman_token)
         delegation.reset_attachments(attachment_token)

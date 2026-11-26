@@ -231,6 +231,9 @@ class TurnRequest(BaseModel):
     # The browser can show the agent's clickable questions (answers go to
     # POST /api/chats/{id}/questions). Off for clients that cannot, e.g. chat_cli.
     can_ask: bool = False
+    # The browser can show an outside server's own questions (answers go to
+    # POST /api/chats/{id}/elicitations).
+    can_elicit: bool = False
 
     @field_validator("allowed_tools")
     @classmethod
@@ -268,6 +271,14 @@ class QuestionRequest(BaseModel):
     skipped: bool = False
     # One entry per question, in order (ignored when skipped).
     answers: list[QuestionAnswerIn] = Field(default_factory=list, max_length=question_answers.MAX_QUESTIONS)
+
+
+class ElicitationRequest(BaseModel):
+    # The question being answered: the `id` of an elicitation_request event.
+    id: str = Field(min_length=1, max_length=64)
+    action: Literal["accept", "decline", "cancel"]
+    # A form's values by field name; Stronghold and Legion check them.
+    content: dict[str, Any] | None = Field(default=None, max_length=10)
 
 
 class BranchRequest(BaseModel):
@@ -621,6 +632,17 @@ async def answer_questions(
     """Answers (or skips) the questions the running answer is waiting on (the `id` of a `question_request`
     event). The answer text is not logged: it is the user's own words, kept only in the chat's saved steps."""
     return as_response(await stronghold.forward("POST", f"/turns/{chat_id}/questions", account, json=body.model_dump()))
+
+
+@router.post("/{chat_id}/elicitations")
+async def answer_elicitation(
+    body: ElicitationRequest,
+    chat_id: str = ChatId,
+    account: Account = Depends(require_chat),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
+) -> Response:
+    """Answers a question an outside server asked during the running answer. The content is not logged."""
+    return as_response(await stronghold.forward("POST", f"/turns/{chat_id}/elicitations", account, json=body.model_dump()))
 
 
 @router.post("/{chat_id}/cancel")

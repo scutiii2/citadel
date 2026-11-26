@@ -6,12 +6,12 @@ from datetime import datetime, timedelta
 
 import anyio
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared._httpx_utils import create_mcp_http_client
 
 from src.agents import agent_registry, agent_spec
 from src.agents.roles.router.router_contract import RouteRequest, RouteResponse, VoterUsage
 from src.runtime import internal_auth
-from src.citadel_auth import ServiceAuth
 from src.providers import cancellation
 
 
@@ -27,29 +27,32 @@ def usage_row(row: VoterUsage, request_id: str, delegated_by: str | None = None)
 
 
 async def _call(agent: dict, request: RouteRequest) -> dict:
-    async with streamablehttp_client(agent["url"], headers=internal_auth.outbound_headers(),
-                                     auth=ServiceAuth(internal_auth.keyring, "legion")) as (reader, writer, _):
-        async with ClientSession(reader, writer) as session:
-            await session.initialize()
-            result = None
-            async with anyio.create_task_group() as tasks:
-                async def watch():
-                    while True:
-                        if cancellation.is_cancelled(request.request_id):
-                            await session.call_tool("cancel", {"request_id": request.request_id})
-                            tasks.cancel_scope.cancel()
-                            return
-                        await anyio.sleep(.05)
-                tasks.start_soon(watch)
-                try:
-                    result = await session.call_tool("route", {"request": request.model_dump()})
-                finally:
-                    tasks.cancel_scope.cancel()
-            if result is None or result.isError:
-                raise ValueError("Router returned no decision")
-            if result.structuredContent is not None:
-                return result.structuredContent
-            return json.loads(next(c.text for c in result.content if c.type == "text"))
+    async with create_mcp_http_client(
+        headers=internal_auth.outbound_headers() or None,
+        auth=internal_auth.McpServiceAuth(internal_auth.keyring, "legion"),
+    ) as http:
+        async with streamable_http_client(agent["url"], http_client=http) as (reader, writer):
+            async with ClientSession(reader, writer) as session:
+                await session.initialize()
+                result = None
+                async with anyio.create_task_group() as tasks:
+                    async def watch():
+                        while True:
+                            if cancellation.is_cancelled(request.request_id):
+                                await session.call_tool("cancel", {"request_id": request.request_id})
+                                tasks.cancel_scope.cancel()
+                                return
+                            await anyio.sleep(.05)
+                    tasks.start_soon(watch)
+                    try:
+                        result = await session.call_tool("route", {"request": request.model_dump()})
+                    finally:
+                        tasks.cancel_scope.cancel()
+                if result is None or result.is_error:
+                    raise ValueError("Router returned no decision")
+                if result.structured_content is not None:
+                    return result.structured_content
+                return json.loads(next(c.text for c in result.content if c.type == "text"))
 
 
 async def decide(request: RouteRequest) -> RouteResponse | None:

@@ -148,7 +148,7 @@ def _tool_schemas(roster: Sequence[RosterEntry] = ()) -> list[dict[str, Any]]:
         {
             "name": tool.name,
             "description": tool_description(tool),
-            "input_schema": tool.inputSchema or {"type": "object", "properties": {}},
+            "input_schema": tool.input_schema or {"type": "object", "properties": {}},
             "display_label": (tool.meta or {}).get("display_label") if hasattr(tool, "meta") else None,
         }
         for tool in ([] if plan_mode else list_tools())

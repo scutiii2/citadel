@@ -9,13 +9,15 @@ from contextlib import asynccontextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 
+import httpx2
 import jwt
+from mcp_types import CallToolResult, TextContent
 
 from pathlib import Path
 
 from src.citadel_auth import data_dir
 from src.citadel_auth import (
-    AuthError, ServiceAuthMiddleware, current_requester as verified_requester,
+    AuthError, ServiceAuth, ServiceAuthMiddleware, current_requester as verified_requester,
     current_requester_token, from_env, requester_context,
 )
 
@@ -110,16 +112,11 @@ def outbound_headers() -> dict[str, str]:
 
 
 @asynccontextmanager
-async def mcp_requester():
-    from mcp.server.lowlevel.server import request_ctx
-    try:
-        context = request_ctx.get()
-    except LookupError:
-        context = None
+async def mcp_requester(context=None):
+    """Bind the verified requester of one MCP request. `context` is the SDK's ServerRequestContext."""
     request = getattr(context, "request", None)
     caller, _, header_token = getattr(request, "scope", {}).get("citadel_auth", (None, None, ""))
-    meta = getattr(context, "meta", None)
-    extras = (meta.model_extra or {}) if meta is not None else {}
+    extras = getattr(context, "meta", None) or {}
     token = extras.get("requester_token", header_token)
     async with requester_context(keyring, caller, token, "legion") as who:
         requester = Requester.from_verified()
@@ -133,15 +130,32 @@ async def mcp_requester():
             reset_requester(handle)
 
 
+async def requester_middleware(context, call_next):
+    """Run every tool call, status included, as its verified requester; refuse one that cannot be verified."""
+    if context.method != "tools/call":
+        return await call_next(context)
+    try:
+        async with mcp_requester(context):
+            return await call_next(context)
+    except AuthError as error:
+        return CallToolResult(content=[TextContent(type="text", text=str(error))], is_error=True)
+
+
 def install_mcp(mcp):
-    """Wrap all tools, including status, so every call can publish a verified renewal."""
-    if getattr(mcp, "_citadel_auth_installed", False):
-        return
-    async def call(name, arguments):
-        async with mcp_requester():
-            return await mcp.call_tool(name, arguments)
-    mcp._mcp_server.call_tool(validate_input=False)(call)
-    mcp._citadel_auth_installed = True
+    """Add the requester middleware once, so every call can publish a verified renewal."""
+    if requester_middleware not in mcp.middleware:
+        mcp.middleware.append(requester_middleware)
+
+
+class McpServiceAuth(httpx2.Auth):
+    """`ServiceAuth` for the SDK's httpx2 clients: the same fresh signed assertion on every request."""
+
+    def __init__(self, keyring, audience: str):
+        self._signer = ServiceAuth(keyring, audience)
+
+    async def async_auth_flow(self, request):
+        async for signed in self._signer.async_auth_flow(request):
+            yield signed
 
 
 def install_auth(app, identity=None):

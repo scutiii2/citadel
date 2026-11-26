@@ -132,6 +132,35 @@ export interface QuestionAnswer {
   other: string | null;
 }
 
+/** One field of a form an outside server asks the user to fill in. */
+export interface ElicitationField {
+  name: string;
+  label: string;
+  kind: "text" | "number" | "integer" | "boolean" | "choice" | "multi_choice";
+  required: boolean;
+  description?: string;
+  options?: { value: string; label: string }[];
+  min?: number;
+  max?: number;
+  max_length?: number;
+}
+
+export type ElicitationValue = string | number | boolean | string[];
+
+export type ElicitationAction = "accept" | "decline" | "cancel";
+
+/** An outside server's question that waits for the user's answer. */
+export interface PendingElicitation {
+  id: string;
+  server: string;
+  tool: string;
+  mode: "form" | "url";
+  message: string;
+  agent_label?: string;
+  fields?: ElicitationField[];
+  url?: string;
+}
+
 /** A private extension a turn could not use, and why. */
 export interface TurnNotice {
   id: string;
@@ -148,7 +177,7 @@ export interface TurnPlan {
 }
 
 export type TurnEvent = { sequence: number } & (
-  | { type: "snapshot"; text: string; activity: string; steps?: ToolStep[]; approvals?: PendingApproval[]; questions?: PendingQuestion[]; active_agents?: ActiveAgent[]; plans?: TurnPlan[] }
+  | { type: "snapshot"; text: string; activity: string; steps?: ToolStep[]; approvals?: PendingApproval[]; questions?: PendingQuestion[]; elicitations?: PendingElicitation[]; active_agents?: ActiveAgent[]; plans?: TurnPlan[] }
   | ({ type: "plan_update" } & TurnPlan)
   | { type: "token"; text: string }
   | { type: "token_reset" }
@@ -159,6 +188,8 @@ export type TurnEvent = { sequence: number } & (
   | { type: "approval_resolved"; id: string; outcome: string }
   | { type: "question_request"; id: string; questions: Question[] }
   | { type: "question_resolved"; id: string; outcome: string }
+  | ({ type: "elicitation_request" } & PendingElicitation)
+  | { type: "elicitation_resolved"; id: string; outcome: string }
   | { type: "notice"; notices: TurnNotice[] }
   | { type: "usage"; total_tokens: number; estimated: boolean }
   | { type: "summarizing" }
