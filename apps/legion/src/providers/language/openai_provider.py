@@ -23,7 +23,7 @@ from src.agents.roles.orchestrator import ask_user, delegation, plan, plan_runne
 from src.providers.gateway_failover import GatewayRoute, classify
 
 from src.runtime import approvals, questions
-from src.runtime import confidentiality, run_tools
+from src.runtime import confidentiality, images, run_tools
 from src.runtime.tool_batch import Call, ToolRound
 
 from src.agents.agent_spec import RosterEntry
@@ -287,7 +287,7 @@ async def run_chat(
     system_prompt = (system_prompt_for(caveman, catalog_text=planning.catalog.text)
                      if planning else system_prompt_for(caveman, roster))
     messages: list[Any] = [{"role": "system", "content": system_prompt}, *history]
-    messages.append({"role": "user", "content": question})
+    messages.append({"role": "user", "content": images.openai_content(question)})
     tools_used: list[str] = []
     tool_calls: list[ToolCallRecord] = []
     schemas = _tool_schemas(roster)

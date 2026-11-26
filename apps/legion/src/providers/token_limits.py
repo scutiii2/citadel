@@ -97,9 +97,24 @@ def max_tool_rounds(provider_id: str, gateway_id: str | None = None) -> int:
     return limits_for(provider_id, gateway_id)["max_tool_rounds"]
 
 
+# About what a model bills for one image at the size Armory sends it.
+IMAGE_TOKENS = 1600
+
+
+def _sized(value: Any) -> Any:
+    """`value` with every image block swapped for filler of the size an image costs; its base64 is far longer."""
+    if isinstance(value, list):
+        return [_sized(item) for item in value]
+    if isinstance(value, dict):
+        if value.get("type") in ("image", "input_image"):
+            return "x" * (IMAGE_TOKENS * 4)
+        return {key: _sized(item) for key, item in value.items()}
+    return value
+
+
 def estimate_context_tokens(messages: list[Any]) -> int:
     """Conservatively estimate provider-neutral prompt tokens from request data."""
-    encoded = json.dumps(messages, ensure_ascii=False, default=str, separators=(",", ":"))
+    encoded = json.dumps(_sized(messages), ensure_ascii=False, default=str, separators=(",", ":"))
     return max(1, math.ceil(len(encoded) / 4))
 
 

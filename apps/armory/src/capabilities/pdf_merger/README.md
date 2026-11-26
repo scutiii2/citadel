@@ -9,6 +9,7 @@ Native PDF and image inspection and merging in Armory, with three tools. Files b
 | `tool_pdf_inspect` | Inspect selected owned uploads, returning page counts, fresh download links and per-ID failures. Read-only. | Local PDF engine and file store |
 | `tool_pdf_listFiles` | List the account's unexpired uploads and merged files with fresh links. Read-only. | Local file store |
 | `tool_pdf_merge` | Merge an ordered structured plan into a new PDF. MCP-only; creates a file. | Local PDF engine and file store |
+| `tool_pdf_image` | Return one owned image as MCP image content, upright, long edge at most 1568 px, PNG or JPEG. Read-only. MCP-only and hidden from tool lists: Legion calls it to show a model an attached image. | Local file store |
 
 ## Slash commands
 

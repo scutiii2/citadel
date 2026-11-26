@@ -471,6 +471,19 @@ cooperative, and an already-running one-shot completion may finish upstream.
 
 Operations, approvals and runtime skill marking remain deferred.
 
+## Attached images
+
+A user message names an uploaded image as `[Image file_id: <id> | ...]`. At the start of a turn the entry agent, an
+orchestrator or a delegable specialist fetches the newest four such images (this question and earlier user messages) from
+Armory's `tool_pdf_image`, as the asking user, and sends them to the model in front of the question
+(`src/runtime/images.py`). Internal helpers get none. Armory hides the tool from tool lists, so no model is offered it,
+and Legion refuses a model that names it. A turn with every tool blocked shows no images.
+
+An image cannot be checked for confidential data, so a turn that shows one goes only to trusted gateways, and is refused
+when the agent has none. An image that expired (Armory keeps uploads for an hour by default) or cannot be read is named to
+the model as unavailable. A gateway without image support refuses the turn. Images are sent again on each follow-up turn,
+and the context estimate counts about 1,600 tokens for each.
+
 ## Trusted gateways and confidential data
 
 Each model gateway has a **Trusted** switch on its setup (Model gateways page, chat and decision lists). A gateway

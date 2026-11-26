@@ -16,7 +16,7 @@ from typing import Any
 
 from src.agents import agent_spec
 
-from src.runtime import approvals, elicitations, internal_auth, tool_filter
+from src.runtime import approvals, elicitations, images, internal_auth, tool_filter
 from src.providers.decision import gateway_client
 from src.providers.decision.contract import DecisionError
 
@@ -39,6 +39,7 @@ _CONFIG_PATH = SETTINGS_DB
 # with the ID of its server.
 _SERVER_ID = "main"
 _PREFIX = f"{_SERVER_ID}__"
+_IMAGE_TOOL = f"{_PREFIX}{images.TOOL_NAME}"
 _STRONGHOLD_ID = "stronghold"
 _STRONGHOLD_PREFIX = f"{_STRONGHOLD_ID}__"
 
@@ -146,6 +147,15 @@ def list_tools() -> list[Any]:
     return result
 
 
+def fetch_image(file_id: str) -> tuple[str, str] | None:
+    """(media type, base64 data) of one of the asking user's images, or None when Armory cannot give it. Blocking.
+    Legion's own call, so no agent tool scope applies; Armory still checks who owns the file."""
+    result = client.call_tool(_IMAGE_TOOL, {"file_id": file_id}, meta=internal_auth.requester_meta())
+    if result.is_error:
+        return None
+    return next(((block.mime_type, block.data) for block in result.content if block.type == "image"), None)
+
+
 def _remember_read_only(tools: list[Any]) -> None:
     global _read_only_builtins
     _read_only_builtins = frozenset(
@@ -225,6 +235,9 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
 
 def _dispatch_tool(name: str, arguments: dict[str, Any], elicit: Any) -> str:
     name = _qualified(name)
+    if name == _IMAGE_TOOL:
+        # Its result is image data for fetch_image; as text it would only flood a model's context.
+        raise PermissionError(f"tool {name!r} is not available to this agent")
     private = name.startswith(private_turn.TOOL_PREFIX)
     short = name if private else unprefixed(name)
     if tool_filter.is_blocked(short):
