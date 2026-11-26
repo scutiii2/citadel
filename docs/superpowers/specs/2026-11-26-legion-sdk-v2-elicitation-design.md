@@ -22,17 +22,17 @@ Out:
 - Sampling and roots requests.
 - Outside clients of Portcullis. They never receive questions.
 
-## Facts to verify while building
+## SDK facts
 
-The SDK facts below come from summaries of the 2.3.0 documentation and source, not from running code. Verify each at the step that depends on it.
+Read from the 2.3.0 source on 2026-11-26, not yet run. The table is in `docs/superpowers/plans/2026-11-26-legion-mcp-sdk-v2.md`. The ones that shape this design:
 
-- First step, before any other change: a small script shows that a 2.x client connects to a running 1.30 server (probe with `discover()`, then connect the old way). Stop and reconsider if it does not.
-- `ClientSession.initialize()` stays on the old protocol. `discover()` selects the new one.
-- `ClientSession.call_tool(..., allow_input_required=True)` returns `InputRequiredResult` to the caller.
-- `MCPServer` has a public `middleware` hook. Its context carries the request and `_meta`.
-- Whether `create_mcp_http_client` still exists.
-- Which error code a request timeout has (1.x code expects 408).
-- Whether `mcp.settings.log_level` still exists.
+- `ClientSession.initialize()` stays on the old protocol; `discover()` selects the new one.
+- `call_tool(..., allow_input_required=True)` returns `InputRequiredResult` to the caller.
+- `MCPServer` has a public `middleware` hook; its context carries the request and `_meta`.
+- A request timeout is error code -32001, not 408. A dead connection or an HTTP error reaches the caller as `MCPError`, not as an HTTP library exception, so failover and reconnect check the error code.
+- `citadel_auth.ServiceAuth` is an `httpx` auth; Legion wraps it for `httpx2` without editing the shared library.
+
+Still to prove by running, as the first implementation step: a 2.x client connects to a 1.30 server (probe with `discover()`, then connect the old way). Stop and reconsider if it does not.
 
 ## Part 1: SDK upgrade (Legion only)
 
