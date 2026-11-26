@@ -182,6 +182,23 @@ def test_a_question_answer_is_passed_on(client: TestClient, upstream) -> None:
     assert too_many.status_code == 422
 
 
+def test_an_elicitation_answer_is_passed_on(client: TestClient, upstream) -> None:
+    chat_id = new_id()
+    body = {"id": "e1", "action": "accept", "content": {"count": 2, "yes": False, "many": ["a"]}}
+    assert client.post(f"/api/chats/{chat_id}/elicitations", json=body).status_code == 401
+    as_admin(client)
+    response = client.post(f"/api/chats/{chat_id}/elicitations", json=body)
+    assert (response.status_code, response.json()) == (200, {"answered": True})
+    assert upstream.turns.bodies("POST", "/elicitations")[-1] == body
+    assert client.post(f"/api/chats/{chat_id}/elicitations", json={"id": "e1", "action": "maybe"}).status_code == 422
+
+
+def test_can_elicit_reaches_stronghold(client: TestClient, upstream) -> None:
+    as_admin(client)
+    start(client, new_id(), can_elicit=True)
+    assert last_start(upstream)["can_elicit"] is True
+
+
 def test_cancel_is_passed_on(client: TestClient, upstream) -> None:
     as_admin(client)
     assert client.post(f"/api/chats/{new_id()}/cancel", json={}).json() == {"cancelled": True}

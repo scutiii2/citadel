@@ -1,6 +1,6 @@
 # Legion on MCP SDK v2, and elicitation
 
-Date: 2026-11-26. Status: design, not built.
+Date: 2026-11-26. Status: built, not shipped.
 
 ## Goal
 
@@ -79,6 +79,7 @@ A new `src/runtime/elicitations.py` reuses `Broker`, like `questions.py`.
 - Keepalive event every 20 seconds.
 - Timeout 600 seconds, then Legion sends `cancel`.
 - Stop ends the wait and the call is not retried.
+- The turn time limit and the architect unit limit pause while a question is open.
 - After `decline`, Legion adds "The user declined the server's question." to the tool result text.
 
 ### Events

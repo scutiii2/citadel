@@ -270,3 +270,26 @@ def test_a_closed_connection_is_dropped_and_the_call_is_not_replayed():
         run(go())
     assert len(h.opened) == 1
     assert h.closed == ["notes"]
+
+
+def test_a_session_in_the_middle_of_a_call_is_not_closed_to_make_room():
+    h = Harness(per_account=1)
+
+    async def go():
+        release = asyncio.Event()
+        first = await h.pool.session("a@x", spec())
+
+        async def slow(tool, arguments, read_timeout_seconds):
+            await release.wait()
+            return "done"
+
+        first.call_tool = slow
+        running = asyncio.create_task(h.pool.call("a@x", spec(), "echo", {}))
+        await asyncio.sleep(0)
+        h.now += 10_000
+        await h.pool.session("a@x", spec("other"))
+        assert h.closed == []
+        release.set()
+        assert await running == "done"
+
+    run(go())

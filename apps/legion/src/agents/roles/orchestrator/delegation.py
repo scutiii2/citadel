@@ -35,7 +35,7 @@ from mcp.shared._httpx_utils import create_mcp_http_client
 from src.agents import agent_events, agent_registry, agent_spec
 from src.agents.roles.orchestrator import plan
 
-from src.runtime import approvals, confidentiality, internal_auth, tool_filter
+from src.runtime import approvals, confidentiality, elicitations, internal_auth, tool_filter
 from src.agents.agent_spec import REASONING_EFFORTS, TIERS, RosterEntry
 from src.providers import cancellation
 
@@ -203,13 +203,27 @@ async def _ask_linked(url: str, arguments: dict[str, Any], on_progress: Any) -> 
         await asyncio.gather(task, return_exceptions=True)
 
 
-def _progress_forwarder(sink: agent_events.Sink | None, step_id: str | None) -> Any:
+async def answer_elicitation(
+    url: str, request_id: str, elicitation_id: str, action: str, content: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Carry the user's answer one hop down, to the specialist that is waiting."""
+    arguments: dict[str, Any] = {"request_id": request_id, "id": elicitation_id, "action": action}
+    if content is not None:
+        arguments["content"] = content
+    return await _call_tool(url, "answer_elicitation", arguments)
+
+
+def _progress_forwarder(
+    sink: agent_events.Sink | None, step_id: str | None, url: str = "", child_id: str | None = None,
+) -> Any:
     """An MCP progress callback that re-emits the specialist's live events
     (JSON in each progress message - see server.ask) into this agent's
     stream. The sink is captured here, not looked up per message: the
     callback runs on the MCP client's own task inside asyncio.run below."""
     if sink is None:
         return None
+
+    policy = elicitations.current()
 
     async def on_progress(progress: float, total: float | None, message: str | None) -> None:
         if not message:
@@ -221,6 +235,9 @@ def _progress_forwarder(sink: agent_events.Sink | None, step_id: str | None) -> 
         if isinstance(event, dict):
             out = agent_events.forwarded(event, step_id)
             if out is not None:
+                if policy.enabled and child_id:
+                    # Recorded before it is shown, so an answer always finds its way back.
+                    elicitations.note_relayed(policy, out, url, child_id)
                 sink(out)
 
     return on_progress
@@ -287,6 +304,8 @@ def call(
             arguments["plan_lean"] = False
         if _caveman.get():
             arguments["caveman"] = True
+        if elicitations.current().enabled:
+            arguments["elicit"] = True
         if confidentiality.current():
             arguments["confidential"] = True  # sent only when set, like caveman
         if model_tier:
@@ -317,7 +336,7 @@ def call(
             _ask_linked(
                 agent["url"],
                 arguments,
-                on_progress=_progress_forwarder(sink, step_id),
+                on_progress=_progress_forwarder(sink, step_id, agent["url"], child_id),
             )
         )
         record_usage(result.get("agent_usage") or [])
@@ -325,6 +344,10 @@ def call(
             raise RuntimeError(result.get("response") or "Architect failed")
         ok = True
     finally:
+        if child_id:
+            # A specialist that ended while a question was open takes its card with it.
+            for elicitation_id in elicitations.drop_relays(elicitations.current().request_id, child_id):
+                agent_events.emit({"type": "elicitation_resolved", "id": elicitation_id, "outcome": "cancelled"})
         cancellation.clear(child_id)
         agent_events.emit({
             "type": "agent_end", "agent_id": agent_id, "agent_label": label,

@@ -65,6 +65,8 @@ class FakeTurns:
             return httpx.Response(self.approval_status, json=self.approval)
         if action == "/questions":
             return httpx.Response(200, json={"answered": True})
+        if action == "/elicitations":
+            return httpx.Response(200, json={"answered": True})
         if action == "/cancel":
             return httpx.Response(200, json={"cancelled": True})
         if action == "/suggestion":

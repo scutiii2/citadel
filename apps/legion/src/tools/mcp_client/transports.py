@@ -24,6 +24,7 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 from mcp.shared.exceptions import MCPError
+from mcp_types import ElicitResult
 from pydantic import ValidationError
 
 from src.tools.mcp_client.config import ServerConfig
@@ -88,10 +89,15 @@ def _origin_client(url: str, **options) -> httpx2.AsyncClient:
     return client
 
 
-async def _open(stack: AsyncExitStack, open_streams, timeout_seconds: float) -> ClientSession:
+async def _decline_input(_context, _params) -> ElicitResult:
+    """Declares elicitation on a 2026 session. The real answers go through input_loop.py."""
+    return ElicitResult(action="decline")
+
+
+async def _open(stack: AsyncExitStack, open_streams, timeout_seconds: float, **options) -> ClientSession:
     read_stream, write_stream = await stack.enter_async_context(open_streams())
     return await stack.enter_async_context(
-        ClientSession(read_stream, write_stream, read_timeout_seconds=timeout_seconds)
+        ClientSession(read_stream, write_stream, read_timeout_seconds=timeout_seconds, **options)
     )
 
 
@@ -103,7 +109,7 @@ async def open_negotiated(
     if probe:
         attempt = AsyncExitStack()
         try:
-            session = await _open(attempt, open_streams, timeout_seconds)
+            session = await _open(attempt, open_streams, timeout_seconds, elicitation_callback=_decline_input)
             try:
                 await session.discover()
             except (MCPError, ValidationError, RuntimeError):

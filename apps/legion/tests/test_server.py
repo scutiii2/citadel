@@ -220,6 +220,7 @@ def test_status_delegates_to_agent_config():
             "tool_filter": True,
             "tool_filter_all": True,
             "user_questions": True,
+                "user_elicitations": True,
             "plan_toggle": True,
             "read_only_approval": True,
             "exact_context": True,

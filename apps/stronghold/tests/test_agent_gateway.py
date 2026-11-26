@@ -62,6 +62,7 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
         allow_read_only: bool = False,
         exact_context: bool = False,
         limits: dict[str, int] | None = None,
+        elicit: bool = False,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         headers = ctx.request_context.request.headers
@@ -84,11 +85,12 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
             "allow_read_only": allow_read_only,
             "exact_context": exact_context,
             "limits": limits,
+            "elicit": elicit,
         }
 
     @mcp.tool()
     def status() -> dict[str, Any]:
-        flags = {"tool_approval": True, "tool_filter": True, "user_questions": True, "plan_toggle": True, "exact_context": True, "user_limits": True} if approvals else {}
+        flags = {"tool_approval": True, "tool_filter": True, "user_questions": True, "plan_toggle": True, "exact_context": True, "user_limits": True, "user_elicitations": True} if approvals else {}
         extras = {**({"private_extensions": True} if private else {}), **({"read_only_approval": True} if read_only else {})}
         return {"available": True, **flags, **extras}
 
@@ -107,6 +109,14 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
         request_id: str, step_id: str, answers: list[dict] | None = None, skipped: bool = False
     ) -> dict[str, Any]:
         return {"answered": (request_id, step_id) == ("r1", "s1"), "echo": {"answers": answers, "skipped": skipped}}
+
+    @mcp.tool()
+    def answer_elicitation(request_id: str, id: str, action: str, content: dict | None = None) -> dict[str, Any]:
+        if (request_id, id) != ("r1", "e1"):
+            return {"answered": False, "problem": None}
+        if action == "accept" and not content:
+            return {"answered": False, "problem": "Name: this field is required."}
+        return {"answered": True, "problem": None}
 
     @mcp.tool()
     def ask_count() -> dict[str, Any]:
@@ -342,6 +352,22 @@ def test_answer_reports_whether_the_question_was_waiting(agent_url: str) -> None
 
     assert asyncio.run(gateway.answer_question(agent_url, CALLER, "r1", "s1", answers, False)) is True
     assert asyncio.run(gateway.answer_question(agent_url, CALLER, "r1", "nope", [], True)) is False
+
+
+def test_ask_sends_elicit_only_when_asked_and_understood(agent_url: str, old_agent_url: str) -> None:
+    gateway = McpAgentGateway(None)
+    assert _ask(gateway, agent_url)["elicit"] is False
+    assert _ask(gateway, agent_url, elicit=True)["elicit"] is True
+    assert _ask(gateway, old_agent_url, elicit=True)["elicit"] is False
+
+
+def test_answering_an_elicitation_passes_the_problem_on(agent_url: str) -> None:
+    def send(*arguments):
+        return asyncio.run(McpAgentGateway(None).answer_elicitation(agent_url, CALLER, *arguments))
+
+    assert send("r1", "e1", "accept", {"name": "Ana"}) == {"answered": True, "problem": None}
+    assert send("r1", "e1", "accept", None) == {"answered": False, "problem": "Name: this field is required."}
+    assert send("r1", "nope", "decline", None) == {"answered": False, "problem": None}
 
 
 # --- private extensions ---------------------------------------------------------------------

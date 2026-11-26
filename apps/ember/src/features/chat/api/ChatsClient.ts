@@ -1,5 +1,5 @@
 import { apiRequest } from "../../../api/http";
-import type { ApprovalDecision, ChatMessage, QuestionAnswer } from "../../../api/types";
+import type { ApprovalDecision, ChatMessage, ElicitationAction, ElicitationValue, QuestionAnswer } from "../../../api/types";
 
 /** A chat as ember_api lists it: no transcript. Times are naive UTC. */
 export interface ChatSummary {
@@ -50,6 +50,8 @@ interface TurnStart {
   allow_read_only?: boolean;
   /** This page can show the agent's clickable questions and send answers back. */
   can_ask?: boolean;
+  /** This page can show an outside server's own questions and send answers back. */
+  can_elicit?: boolean;
 }
 
 interface TurnStarted {
@@ -111,6 +113,9 @@ export const chatsClient = {
   /** Answers (or skips) the questions the running answer waits on (a question_request's id). */
   answerQuestion: (id: string, stepId: string, payload: { answers: QuestionAnswer[]; skipped: boolean }) =>
     apiRequest<{ answered: boolean }>("POST", `${path(id)}/questions`, { step_id: stepId, ...payload }),
+  /** Answers a question an outside server asked during the answer (an elicitation_request's id). */
+  answerElicitation: (id: string, elicitationId: string, action: ElicitationAction, content?: Record<string, ElicitationValue>) =>
+    apiRequest<{ answered: boolean }>("POST", `${path(id)}/elicitations`, { id: elicitationId, action, ...(content ? { content } : {}) }),
   cancel: (id: string) => apiRequest<{ cancelled: boolean }>("POST", `${path(id)}/cancel`),
   /** Replaces the history with a summary plus the raw log (asks an agent). */
   summarize: (id: string) => apiRequest<ChatDetail>("POST", `${path(id)}/summarize`, {}),

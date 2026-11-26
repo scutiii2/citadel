@@ -16,6 +16,7 @@ import asyncio
 import time
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field, replace
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
@@ -26,6 +27,7 @@ from mcp.shared.exceptions import MCPError
 from mcp_types import CONNECTION_CLOSED, REQUEST_TIMEOUT
 
 from src.citadel_auth import resolved
+from src.tools.mcp_client import input_loop
 from src.tools.mcp_client.config import OriginRef, ServerConfig, load_servers_config
 from src.tools.mcp_client.schema import inline_refs
 from src.tools.mcp_client.transports import open_session
@@ -399,6 +401,7 @@ class McpClientRegistry:
         arguments: dict[str, Any],
         on_progress: Callable[[str], None] | None = None,
         meta: dict[str, Any] | None = None,
+        elicit: input_loop.Elicit | None = None,
     ) -> types.CallToolResult:
         """Route `name` (as returned by list_tools(), e.g. "main__ping")
         to whichever server owns it. Raises KeyError for a name that
@@ -408,7 +411,8 @@ class McpClientRegistry:
         `on_progress` receives each message the tool reports while it runs
         (an MCP progress notification with a message); it is called on this
         registry's own event-loop thread. `meta` becomes the request's
-        `_meta` (the asking user - see internal_auth.py)."""
+        `_meta` (the asking user - see internal_auth.py). `elicit` puts a
+        server's question to the user; without it a question is declined."""
         server_id, separator, upstream_name = name.partition(NAMESPACE_SEPARATOR)
         config = self._configs.get(server_id) if separator else None
         origin_connection = config is not None and bool(config.origins)
@@ -435,9 +439,16 @@ class McpClientRegistry:
             extra["meta"] = meta
 
         async def call(on: Any) -> types.CallToolResult:
-            return await on.call_tool(
-                upstream_name, arguments, read_timeout_seconds=CALL_TIMEOUT_SECONDS, **extra
-            )
+            async def send(**round_arguments: Any):
+                return await on.call_tool(
+                    upstream_name, arguments, read_timeout_seconds=CALL_TIMEOUT_SECONDS, **extra, **round_arguments
+                )
+
+            if not input_loop.speaks_input(on):
+                return await send()
+            # The name comes from this installation's settings, never from the server.
+            label = config.label if config else server_id
+            return await input_loop.call_with_input(send, partial(elicit, label, upstream_name) if elicit else None)
 
         if origin_connection:
             self._origin_calls[session] = self._origin_calls.get(session, 0) + 1

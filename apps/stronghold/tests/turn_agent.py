@@ -40,6 +40,11 @@ class TurnAgent:
     answers: list[tuple] = field(default_factory=list)  # (request_id, step_id, answers, skipped)
     answer_result: bool | None = None  # force answer_question()'s result
     answer_error: str | None = None
+    # A server question this fake relays during a turn (the event without type and id).
+    elicitation: dict | None = None
+    elicitation_answers: list[tuple] = field(default_factory=list)  # (id, action, content)
+    elicitation_error: str | None = None
+    _eliciting: dict = field(default_factory=dict)
     _asking: dict = field(default_factory=dict)
     ran: list[str] = field(default_factory=list)  # tools that actually ran
     # Private extensions: what probe_extension() was asked, what it answers per URL
@@ -76,6 +81,7 @@ class TurnAgent:
         allow_read_only=False,
         exact_context=False,
         limits=None,
+        elicit=False,
     ):
         self.asks.append(
             {
@@ -89,6 +95,7 @@ class TurnAgent:
                 "allowed_tools": allowed_tools,
                 "disabled_tools": disabled_tools,
                 "limits": limits,
+                "elicit": elicit,
                 "ask_user": ask_user,
                 "plan": plan,
                 "plan_lean": plan_lean,
@@ -103,6 +110,8 @@ class TurnAgent:
             await self._run_tool(f"step{index}", tool, request_id, approval_mode, allowed_tools or [], on_event)
         if self.questions:
             await self._ask_user("q1", request_id, on_event)
+        if self.elicitation:
+            await self._elicit(request_id, on_event)
         if self.hold:
             self.loop = asyncio.get_running_loop()
             self.gate = asyncio.Event()
@@ -184,6 +193,27 @@ class TurnAgent:
             waiting.set_result("skipped" if skipped else "answered")
         return known
 
+    async def _elicit(self, request_id, on_event):
+        self.loop = asyncio.get_running_loop()
+        waiting = self.loop.create_future()
+        self._eliciting[(request_id, "e1")] = waiting
+        await on_event({"type": "elicitation_request", "id": "e1", **self.elicitation})
+        outcome = await waiting
+        del self._eliciting[(request_id, "e1")]
+        await on_event({"type": "elicitation_resolved", "id": "e1", "outcome": outcome})
+
+    async def answer_elicitation(self, url, caller, request_id, elicitation_id, action, content):
+        if self.elicitation_error:
+            raise AgentCallError(self.elicitation_error)
+        self.elicitation_answers.append((elicitation_id, action, content))
+        waiting = self._eliciting.get((request_id, elicitation_id))
+        if waiting is None or waiting.done():
+            return {"answered": False, "problem": None}
+        if content == {"name": ""}:
+            return {"answered": False, "problem": "Name: this field is required."}
+        waiting.set_result({"accept": "accepted", "decline": "declined", "cancel": "cancelled"}[action])
+        return {"answered": True, "problem": None}
+
     async def probe_extension(self, url, caller, *, extension_url, headers):
         self.probes.append({"url": url, "caller": caller, "extension_url": extension_url, "headers": headers})
         if self.probe_fail:
@@ -206,6 +236,9 @@ class TurnAgent:
             if waiting_request == request_id and not waiting.done():
                 waiting.set_result("cancelled")
         for (waiting_request, _step), waiting in list(self._asking.items()):
+            if waiting_request == request_id and not waiting.done():
+                waiting.set_result("cancelled")
+        for (waiting_request, _id), waiting in list(self._eliciting.items()):
             if waiting_request == request_id and not waiting.done():
                 waiting.set_result("cancelled")
         return True

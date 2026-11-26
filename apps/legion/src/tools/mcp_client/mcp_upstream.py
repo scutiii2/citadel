@@ -16,7 +16,7 @@ from typing import Any
 
 from src.agents import agent_spec
 
-from src.runtime import approvals, internal_auth, tool_filter
+from src.runtime import approvals, elicitations, internal_auth, tool_filter
 from src.providers.decision import gateway_client
 from src.providers.decision.contract import DecisionError
 
@@ -214,13 +214,23 @@ def _flag_output(text: str) -> str:
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> str:
+    """Run one tool and return the text the model gets."""
+    notes: list[str] = []
+    text = _dispatch_tool(name, arguments, elicitations.asker(notes))
+    if notes:
+        # Citadel's own words, so they are added after screening. A numbered failure stays one.
+        text = type(text)("\n\n".join((text, *dict.fromkeys(notes))))
+    return text
+
+
+def _dispatch_tool(name: str, arguments: dict[str, Any], elicit: Any) -> str:
     name = _qualified(name)
     private = name.startswith(private_turn.TOOL_PREFIX)
     short = name if private else unprefixed(name)
     if tool_filter.is_blocked(short):
         raise PermissionError(f"tool {name!r} is switched off for this user")
     if private:
-        return _call_private(name, arguments)
+        return _call_private(name, arguments, elicit)
     scope = agent_spec.current().tools
     if not (scope.allows_explicitly(short) if _other_server(name) else scope.allows(short)):
         # The model only sees in-scope tools, but may still name another one.
@@ -236,6 +246,8 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
         extra["on_progress"] = on_progress
     if meta:
         extra["meta"] = meta
+    if elicit:
+        extra["elicit"] = elicit
     result = client.call_tool(name, arguments, **extra)
     parts = [getattr(block, "text", str(block)) for block in result.content]
     text = "\n".join(parts) if parts else "(no output)"
@@ -258,7 +270,7 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
     return text
 
 
-def _call_private(name: str, arguments: dict[str, Any]) -> str:
+def _call_private(name: str, arguments: dict[str, Any], elicit: Any = None) -> str:
     turn = private_turn.current()
     route = turn.route(name) if turn else None
     if turn is None or route is None or not agent_spec.current().tools.allows(name):
@@ -267,7 +279,8 @@ def _call_private(name: str, arguments: dict[str, Any]) -> str:
     spec, upstream = route
     try:
         # No identity is sent: the user's own server is not mcp_server.
-        result = client.run_coroutine(private_pool.call(turn.account, spec, upstream, arguments))
+        result = client.run_coroutine(private_pool.call(
+            turn.account, spec, upstream, arguments, **({"elicit": elicit} if elicit else {})))
     except Exception as error:  # noqa: BLE001 - say what happened without a header value or a traceback
         raise RuntimeError(describe_error(error, spec.secrets)) from None
     finally:

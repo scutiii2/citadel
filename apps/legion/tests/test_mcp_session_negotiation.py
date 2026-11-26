@@ -8,7 +8,7 @@ from mcp_types import METHOD_NOT_FOUND
 from src.tools.mcp_client import transports
 
 
-def run(monkeypatch, discover_error, probe):
+def run(monkeypatch, discover_error, probe, built=None):
     log = []
 
     @asynccontextmanager
@@ -21,7 +21,8 @@ def run(monkeypatch, discover_error, probe):
 
     class Session:
         def __init__(self, *args, **kwargs):
-            pass
+            if built is not None:
+                built.append("elicitation_callback" in kwargs)
 
         async def __aenter__(self):
             return self
@@ -59,3 +60,9 @@ def test_an_older_server_gets_a_fresh_handshake_session(monkeypatch):
 
 def test_an_internal_server_is_not_probed(monkeypatch):
     assert run(monkeypatch, None, False) == ["open", "initialize", "ready", "close"]
+
+
+def test_only_the_probed_session_declares_elicitation(monkeypatch):
+    built = []
+    run(monkeypatch, MCPError(METHOD_NOT_FOUND, "Method not found"), True, built)
+    assert built == [True, False]

@@ -68,6 +68,7 @@ class AgentGateway(Protocol):
         allow_read_only: bool = False,
         exact_context: bool = False,
         limits: dict[str, int] | None = None,
+        elicit: bool = False,
     ) -> dict[str, Any]: ...
 
     async def interpret(self, url: str, caller: Caller, text: str) -> dict[str, Any]: ...
@@ -75,6 +76,11 @@ class AgentGateway(Protocol):
     async def cancel(self, url: str, caller: Caller, request_id: str) -> bool: ...
 
     async def decide(self, url: str, caller: Caller, request_id: str, step_id: str, decision: str) -> bool: ...
+
+    async def answer_elicitation(
+        self, url: str, caller: Caller, request_id: str, elicitation_id: str, action: str,
+        content: dict[str, Any] | None,
+    ) -> dict[str, Any]: ...
 
     async def answer_question(
         self, url: str, caller: Caller, request_id: str, step_id: str, answers: list[dict[str, Any]], skipped: bool
@@ -147,6 +153,7 @@ class McpAgentGateway:
         allow_read_only=False,
         exact_context=False,
         limits=None,
+        elicit=False,
     ):
         arguments = {
             "question": question,
@@ -186,6 +193,11 @@ class McpAgentGateway:
             status = await self._call(url, caller, "status", {})
             if status.get("user_questions"):
                 arguments["ask_user"] = True
+        if elicit:
+            # Not fail-closed: an older agent never asks, and the turn still runs.
+            status = await self._call(url, caller, "status", {})
+            if status.get("user_elicitations"):
+                arguments["elicit"] = True
         if not plan or not plan_lean:
             # Not fail-closed: an agent from before the toggles keeps its checklist as it was.
             status = await self._call(url, caller, "status", {})
@@ -247,6 +259,17 @@ class McpAgentGateway:
             {"request_id": request_id, "step_id": step_id, "answers": answers, "skipped": skipped},
         )
         return bool(result.get("answered"))
+
+    async def answer_elicitation(self, url, caller, request_id, elicitation_id, action, content):
+        """Sends the user's answer to a server's question. `problem` says why the content was refused
+        (the question stays open); without one, `answered` False means nothing was waiting."""
+        arguments: dict[str, Any] = {"request_id": request_id, "id": elicitation_id, "action": action}
+        if content is not None:
+            arguments["content"] = content
+        result = await self._call(url, caller, "answer_elicitation", arguments)
+        problem = result.get("problem")
+        return {"answered": bool(result.get("answered")),
+                "problem": problem[:300] if isinstance(problem, str) else None}
 
     async def probe_extension(self, url, caller, *, extension_url, headers):
         """Asks the agent to connect once to a user's MCP server and say what it offers.

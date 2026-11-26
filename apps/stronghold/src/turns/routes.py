@@ -26,7 +26,7 @@ from src.document_store import DbGatewayError, DocumentStore
 from src.extensions.service import UserExtensionService
 from src.requester import Requester, current_requester
 from src.tuning.limits import LimitsStore
-from src.turns import question_answers, suggestions, summarization
+from src.turns import elicitation_events, question_answers, suggestions, summarization
 from src.turns.engine import TooManyTurns, TurnConflict, TurnNotFound, TurnOptions, TurnRegistry
 from src.usage.limits import limit_reached
 from src.usage.rows import stored_rows
@@ -87,6 +87,7 @@ class TurnRequest(BaseModel):
     allowed_tools: list[str] = Field(default_factory=list, max_length=MAX_ALLOWED_TOOLS)
     allow_read_only: bool = False
     can_ask: bool = False
+    can_elicit: bool = False
     # Used only when this turn creates the chat.
     title: str | None = Field(default=None, max_length=TITLE_MAX)
     # Regenerate / edit: index of the user question this one replaces; it and everything after it are dropped.
@@ -117,6 +118,21 @@ class QuestionRequest(BaseModel):
     step_id: str = Field(min_length=1, max_length=200)
     skipped: bool = False
     answers: list[QuestionAnswerIn] = Field(default_factory=list, max_length=question_answers.MAX_QUESTIONS)
+
+
+ElicitationValue = (
+    bool | int | float
+    | Annotated[str, Field(max_length=elicitation_events.TEXT_MAX)]
+    | Annotated[list[Annotated[str, Field(max_length=elicitation_events.LABEL_MAX)]],
+                Field(max_length=elicitation_events.MAX_OPTIONS)]
+)
+
+
+class ElicitationRequest(BaseModel):
+    id: str = Field(min_length=1, max_length=elicitation_events.ID_MAX)
+    action: Literal["accept", "decline", "cancel"]
+    content: dict[Annotated[str, Field(max_length=elicitation_events.LABEL_MAX)], ElicitationValue] | None = Field(
+        default=None, max_length=elicitation_events.MAX_FIELDS)
 
 
 def _not_found() -> HTTPException:
@@ -262,6 +278,7 @@ async def start_turn(
             allow_read_only=body.allow_read_only and body.ask_before_tools and not forced,
             disabled_tools=tuple("agent:" + agent_id for agent_id in switched_off) if trusted.tools_execute else ("*",),
             can_ask=body.can_ask,
+            can_elicit=body.can_elicit,
             private_extensions=private_items,
             private_skipped=private_skipped,
         )
@@ -336,6 +353,28 @@ async def answer_questions(body: QuestionRequest, chat_id: str = ChatId, who: Re
     except AgentCallError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
     if not answered:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Nothing is waiting for that answer")
+    return {"answered": True}
+
+
+@router.post("/{chat_id}/elicitations")
+async def answer_elicitation(body: ElicitationRequest, chat_id: str = ChatId,
+                             who: Requester = Depends(current_requester),
+                             turns: TurnRegistry = Depends(get_turns)) -> dict[str, bool]:
+    """Answers a question an outside server asked during the running answer. The content is not logged or saved."""
+    if not turns.is_running(who.uid, chat_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No answer is being written for this chat")
+    if turns.pending_elicitation(who.uid, chat_id, body.id) is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Nothing is waiting for that answer")
+    content = body.content if body.action == "accept" else None
+    try:
+        reply = await turns.answer_elicitation(who.uid, chat_id, body.id, body.action, content)
+    except AgentCallError:
+        # The agent's error text could repeat what the user typed.
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The agent could not take the answer") from None
+    if reply and reply["problem"]:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, reply["problem"])
+    if not reply or not reply["answered"]:
         raise HTTPException(status.HTTP_409_CONFLICT, "Nothing is waiting for that answer")
     return {"answered": True}
 

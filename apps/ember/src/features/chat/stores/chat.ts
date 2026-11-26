@@ -11,8 +11,11 @@ import type {
   ChatMessage,
   ContextPart,
   Conversation,
+  ElicitationAction,
+  ElicitationValue,
   JsonSchema,
   PendingApproval,
+  PendingElicitation,
   PendingQuestion,
   QuestionAnswer,
   ToolStep,
@@ -232,6 +235,11 @@ export const useChatStore = defineStore("chat", () => {
   // whose answer was sent but not yet confirmed by the agent.
   const pendingQuestions = ref<PendingQuestion[]>([]);
   const answeringQuestions = ref<string[]>([]);
+  // Outside servers' questions that wait for the user, the ones whose answer is
+  // on its way, and why an answer was refused (by elicitation id).
+  const pendingElicitations = ref<PendingElicitation[]>([]);
+  const answeringElicitations = ref<string[]>([]);
+  const elicitationProblems = ref<Record<string, string>>({});
   // Slash commands (tools.view): the runner caches the command list and tool
   // schemas, so it's replaced per account.
   let commandRunner = new SlashCommandRunner();
@@ -495,6 +503,7 @@ export const useChatStore = defineStore("chat", () => {
         });
         pendingApprovals.value = event.approvals ?? [];
         pendingQuestions.value = event.questions ?? [];
+        pendingElicitations.value = event.elicitations ?? [];
         livePlans.value = event.plans ?? [];
         activeAgents.value = event.active_agents ?? [];
         agentText.value = {};
@@ -552,6 +561,18 @@ export const useChatStore = defineStore("chat", () => {
       case "question_resolved":
         activity.value = "";
         dropQuestion(event.id);
+        break;
+      case "elicitation_request": {
+        activity.value = "waiting for your answer ...";
+        if (!pendingElicitations.value.some((e) => e.id === event.id)) {
+          const { type: _type, sequence: _sequence, ...pending } = event;
+          pendingElicitations.value.push(pending);
+        }
+        break;
+      }
+      case "elicitation_resolved":
+        activity.value = "";
+        dropElicitation(event.id);
         break;
       case "step_end": {
         activity.value = "";
@@ -621,6 +642,12 @@ export const useChatStore = defineStore("chat", () => {
     answeringQuestions.value = answeringQuestions.value.filter((a) => a !== id);
   }
 
+  function dropElicitation(id: string): void {
+    pendingElicitations.value = pendingElicitations.value.filter((e) => e.id !== id);
+    answeringElicitations.value = answeringElicitations.value.filter((a) => a !== id);
+    delete elicitationProblems.value[id];
+  }
+
   function unfollow(): void {
     watcher?.abort();
     watcher = null;
@@ -637,6 +664,9 @@ export const useChatStore = defineStore("chat", () => {
     deciding.value = [];
     pendingQuestions.value = [];
     answeringQuestions.value = [];
+    pendingElicitations.value = [];
+    answeringElicitations.value = [];
+    elicitationProblems.value = {};
   }
 
   /** Streams chat `id`'s running answer into `streaming` until it ends,
@@ -823,6 +853,7 @@ export const useChatStore = defineStore("chat", () => {
         ...(planLean.value ? {} : { plan_lean: false }),
         ...(contextPanel.value && contextAccuracy.value === "exact" ? { exact_context: true } : {}),
         can_ask: true,
+        can_elicit: true,
         title: conversation.title,
         ...(truncateTo === undefined ? {} : { truncate_to: truncateTo }),
         ...(askBeforeTools.value || forceToolApproval.value
@@ -1174,6 +1205,24 @@ export const useChatStore = defineStore("chat", () => {
     return sendQuestionAnswer(stepId, [], true);
   }
 
+  /** Answers an outside server's question. The card stays (its buttons off) until the agent confirms
+   * with an elicitation_resolved event; a refused answer keeps the card and shows why. */
+  async function answerElicitation(id: string, action: ElicitationAction, content?: Record<string, ElicitationValue>): Promise<void> {
+    const conversation = active.value;
+    if (!conversation || !pendingElicitations.value.some((e) => e.id === id) || answeringElicitations.value.includes(id)) return;
+    const started = generation;
+    answeringElicitations.value = [...answeringElicitations.value, id];
+    delete elicitationProblems.value[id];
+    try {
+      await chatsClient.answerElicitation(conversation.id, id, action, content);
+    } catch (err) {
+      if (started !== generation) return;
+      if (isApiStatus(err, 404, 409)) return dropElicitation(id);
+      answeringElicitations.value = answeringElicitations.value.filter((a) => a !== id);
+      elicitationProblems.value[id] = errorMessage(err);
+    }
+  }
+
   function setPlan(on: boolean): void {
     setFlag(plan, planKey, on);
   }
@@ -1386,6 +1435,10 @@ export const useChatStore = defineStore("chat", () => {
     answeringQuestions,
     answerQuestion,
     skipQuestion,
+    pendingElicitations,
+    answeringElicitations,
+    elicitationProblems,
+    answerElicitation,
     clearChat,
     summarizeChat,
     deleteAllChats,

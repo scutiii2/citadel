@@ -18,6 +18,7 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 import httpx2
@@ -28,6 +29,7 @@ from mcp.shared.exceptions import MCPError
 from mcp_types import CONNECTION_CLOSED
 from mcp_types.version import LATEST_HANDSHAKE_VERSION
 
+from src.tools.mcp_client import input_loop
 from src.tools.mcp_client.transports import open_negotiated
 from src.tools.private_extensions.guard import guarded_client_factory
 from src.tools.private_extensions.spec import PrivateSpec
@@ -83,6 +85,7 @@ class _Entry:
     stack: AsyncExitStack
     session: ClientSession
     last_used: float
+    busy: int = 0
 
 
 async def _close_quietly(stack: AsyncExitStack) -> None:
@@ -120,7 +123,7 @@ class PrivateSessionPool:
         key = (account, spec.key())
         async with self._locks.setdefault(key, asyncio.Lock()):
             entry = self._entries.get(key)
-            if entry is not None and self._clock() - entry.last_used <= self._idle:
+            if entry is not None and (entry.busy or self._clock() - entry.last_used <= self._idle):
                 entry.last_used = self._clock()
                 return entry.session
             if entry is not None:
@@ -136,15 +139,20 @@ class PrivateSessionPool:
             return session
 
     async def _make_room(self, account: str) -> None:
+        """Close idle and oldest sessions. A session in the middle of a call is never closed here."""
         now = self._clock()
         for key, entry in list(self._entries.items()):
-            if now - entry.last_used > self._idle:
+            if not entry.busy and now - entry.last_used > self._idle:
                 await self._close(key)
-        mine = sorted((k for k, e in self._entries.items() if e.account == account), key=lambda k: self._entries[k].last_used)
-        while len(mine) >= self._per_account:
-            await self._close(mine.pop(0))
+        mine = [k for k, e in self._entries.items() if e.account == account]
+        spare = sorted((k for k in mine if not self._entries[k].busy), key=lambda k: self._entries[k].last_used)
+        for key in spare[: max(0, len(mine) - self._per_account + 1)]:
+            await self._close(key)
         while len(self._entries) >= self._total:
-            await self._close(min(self._entries, key=lambda k: self._entries[k].last_used))
+            spare = [k for k, e in self._entries.items() if not e.busy]
+            if not spare:
+                break
+            await self._close(min(spare, key=lambda k: self._entries[k].last_used))
 
     async def _close(self, key: tuple[str, str]) -> None:
         entry = self._entries.pop(key, None)
@@ -172,9 +180,28 @@ class PrivateSessionPool:
         listed = await self._use(account, spec, lambda session: session.list_tools())
         return list(listed.tools)
 
-    async def call(self, account: str, spec: PrivateSpec, tool: str, arguments: dict[str, Any]) -> types.CallToolResult:
-        return await self._use(account, spec, lambda session: session.call_tool(
-            tool, arguments, read_timeout_seconds=self._call_timeout))
+    async def call(
+        self, account: str, spec: PrivateSpec, tool: str, arguments: dict[str, Any],
+        elicit: input_loop.Elicit | None = None,
+    ) -> types.CallToolResult:
+        async def run(session: ClientSession) -> Any:
+            entry = self._entries.get((account, spec.key()))
+            if entry is not None:
+                entry.busy += 1  # a user may take minutes to answer; the session must stay open
+            try:
+                async def send(**round_arguments: Any):
+                    return await session.call_tool(
+                        tool, arguments, read_timeout_seconds=self._call_timeout, **round_arguments)
+
+                if not input_loop.speaks_input(session):
+                    return await send()
+                return await input_loop.call_with_input(send, partial(elicit, spec.label, tool) if elicit else None)
+            finally:
+                if entry is not None:
+                    entry.busy -= 1
+                    entry.last_used = self._clock()
+
+        return await self._use(account, spec, run)
 
     async def probe(self, spec: PrivateSpec) -> list[types.Tool]:
         """Connect once, list the tools, close. Nothing is kept."""

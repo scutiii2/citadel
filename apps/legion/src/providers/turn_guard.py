@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
+from contextlib import AbstractAsyncContextManager
 from typing import Any
 
 from src.citadel_auth.failure import parse
+from src.providers import deadlines
 
 
 class TurnStopped(Exception):
@@ -28,9 +29,9 @@ class TurnGuard:
         self._repetitions = 0
         self._failures: dict[str, str] = {}
 
-    def timeout(self) -> asyncio.Timeout:
-        """Apply the turn deadline to the entire provider loop."""
-        return asyncio.timeout(self.max_seconds)
+    def timeout(self) -> AbstractAsyncContextManager[deadlines.Deadline]:
+        """Apply the turn deadline to the entire provider loop. Waiting on a server's question does not count."""
+        return deadlines.deadline(self.max_seconds)
 
     def check_tokens(self, total: int | None) -> None:
         if total is not None and total >= self.max_tokens:

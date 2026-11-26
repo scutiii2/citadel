@@ -66,8 +66,10 @@ class SyncMcpClient:
         arguments: dict[str, Any],
         on_progress: Callable[[str], None] | None = None,
         meta: dict[str, Any] | None = None,
+        elicit: Any = None,
     ) -> types.CallToolResult:
-        return self._run(self._registry.call_tool(name, arguments, on_progress, meta))
+        extra = {"elicit": elicit} if elicit else {}
+        return self._run(self._registry.call_tool(name, arguments, on_progress, meta, **extra))
 
     def close(self) -> None:
         """Close every connection and stop the background loop/thread.

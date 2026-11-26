@@ -3,7 +3,10 @@ import { computed, nextTick, ref, watch } from "vue";
 import type {
   ApprovalDecision,
   ChatMessage,
+  ElicitationAction,
+  ElicitationValue,
   PendingApproval,
+  PendingElicitation,
   PendingQuestion,
   QuestionAnswer,
   ToolStep,
@@ -28,6 +31,7 @@ import DownloadCards from "../../../components/content/DownloadCards.vue";
 import ElapsedTime from "../../../components/ui/status/ElapsedTime.vue";
 import MarkdownContent from "../../../components/content/MarkdownContent.vue";
 import QuestionCard from "./QuestionCard.vue";
+import ElicitationCard from "./ElicitationCard.vue";
 import PlanPanel from "./PlanPanel.vue";
 import SaveButton from "../../../components/ui/buttons/SaveButton.vue";
 import ToolSteps from "./ToolSteps.vue";
@@ -67,6 +71,10 @@ const props = defineProps<{
    * already answered but not yet confirmed (their buttons are off). */
   questions?: PendingQuestion[];
   answeringQuestions?: string[];
+  /** Outside servers' questions waiting for the user, the ones already answered, and refusals by id. */
+  elicitations?: PendingElicitation[];
+  answeringElicitations?: string[];
+  elicitationProblems?: Record<string, string>;
   /** When the answer being written started (a Date.now() value): shows a running clock. */
   since?: number | null;
   /** The slash commands the account may run, for the welcome card of an empty chat. */
@@ -86,6 +94,7 @@ const emit = defineEmits<{
   decide: [stepId: string, decision: ApprovalDecision];
   "answer-question": [stepId: string, answers: QuestionAnswer[]];
   "skip-question": [stepId: string];
+  "answer-elicitation": [id: string, action: ElicitationAction, content?: Record<string, ElicitationValue>];
 }>();
 
 const ARGS_OPEN_MAX_CHARS = 400;
@@ -408,6 +417,14 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
           :answering="answeringQuestions?.includes(q.id) ?? false"
           @answer="(id, answers) => emit('answer-question', id, answers)"
           @skip="(id) => emit('skip-question', id)"
+        />
+        <ElicitationCard
+          v-for="e in elicitations ?? []"
+          :key="e.id"
+          :pending="e"
+          :answering="answeringElicitations?.includes(e.id) ?? false"
+          :problem="elicitationProblems?.[e.id]"
+          @answer="(id, action, content) => emit('answer-elicitation', id, action, content)"
         />
         <AgentActivity />
         <span v-if="activity" class="activity" role="status"><span class="dot" />{{ activity }}</span>
