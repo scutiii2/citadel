@@ -49,9 +49,9 @@ types, and a tool that reads a stored file's text.
 | `GET /files/{id}/content` | Portcullis, later Stronghold | streams an owned file |
 | `GET /files/{id}/download` | signed link | downloads a file |
 
-Existing `/pdf/ui/...` and signed `/pdf/files/...` links keep working. Ember's image preview moves to
-`/files/{id}/content`, so it no longer depends on the `pdf` capability. `citadel_auth` gets `/files` in the Portcullis to
-Armory rule.
+Existing `/pdf/ui/...` and signed `/pdf/files/...` links keep working. Portcullis serves Ember's image preview from
+`/files/{id}/content`, so the preview no longer depends on the `pdf` capability. Ember's URL does not change.
+`citadel_auth` gets `/files` in the Portcullis to Armory rule.
 
 ### `files` capability
 
@@ -61,8 +61,9 @@ Armory rule.
 | `tool_files_inspect` | details and fresh links for chosen ids |
 | `tool_files_view` | hidden; returns an image for Legion to show a model. Replaces `tool_pdf_image` |
 
-Its upload and view logic live in the shared service or its own `domain.py`. `tool_pdf_inspect` and `tool_pdf_listFiles`
-call the same file service filtered to PDF and image. `tool_pdf_merge` reads from the store and writes its result there.
+File logic lives in the shared service, including the image downscaling that moves out of the PDF converter.
+`files/domain.py` only turns it into tool results. `tool_pdf_inspect` and `tool_pdf_listFiles` call the same service
+filtered to PDF and image. `tool_pdf_merge` reads from the store and writes its result there.
 No capability imports another.
 
 ### Agents and Legion
@@ -140,13 +141,13 @@ refused.
 | 1 | Armory: new `test_user_files.py`, `test_pdf_domain.py`, `test_pdf_routes.py`, `test_upload_pdf_route.py`. Legion: `test_images.py`. Portcullis: `test_capability_files.py` |
 | 2 | Armory: `test_upload_routes.py`. Stronghold: `test_attachments.py`. Portcullis: `test_attachment_pdf.py`, `test_attachments.py`. Legion: `test_images.py`, `test_delegation.py`. Ember: `ChatInput.test.ts`, `MessageList.test.ts`, `attachments.test.ts` |
 | 3 | Stronghold: new `test_mcp_file_tools.py`, `test_tool_services_client.py`. Ember: `ChatInput.test.ts` |
-| 4 | Armory: `tests/tables`, `test_upload_table_route.py`, the math table tests. Ember: `ChatInput.test.ts` |
+| 4 | Armory: `tests/tables`, `test_upload_table_route.py`, `tests/math/test_tool.py`. Ember: `ChatInput.test.ts` |
 
 ## Rollout
 
 | Part | Redeploy |
 |---|---|
-| 1 | Armory, Portcullis, Legion, Ember |
+| 1 | Armory, Portcullis, Legion |
 | 2 | Armory, Stronghold, Portcullis, Legion, Ember |
 | 3 | Armory, Stronghold, Legion, Ember |
 | 4 | Armory, Stronghold, Legion, Ember |
