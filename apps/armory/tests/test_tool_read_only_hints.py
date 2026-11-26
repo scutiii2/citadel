@@ -12,6 +12,7 @@ from src.capabilities.web_research import tool as web_research_tool  # noqa: F40
 from src.capabilities.firecrawl import tool as firecrawl_tool  # noqa: F401
 from src.capabilities.repo_reader import tool as repo_reader_tool  # noqa: F401
 from src.capabilities.tables import tool as tables_tool  # noqa: F401
+from src.capabilities.files import tool as files_tool  # noqa: F401
 from src.capabilities.email import tool as email_tool  # noqa: F401
 from src.capabilities.media_downloader import tool as video_tool  # noqa: F401
 from src.capabilities.pdf_merger import tool as pdf_tool  # noqa: F401

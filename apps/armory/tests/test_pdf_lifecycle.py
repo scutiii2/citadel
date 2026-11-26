@@ -16,6 +16,8 @@ from src.config import settings
 from src.services import capability_meta, capability_registry
 from src.capabilities.pdf_merger.utils import pdf_runtime
 from src.services.capability_loader import CapabilityLoader
+from src.services.user_files import runtime as files_runtime
+from src.services.user_files.service import Settings as FilesSettings
 
 
 def test_pdf_refresh_help_and_runtime_survive_reload(tmp_path, monkeypatch):
@@ -70,6 +72,9 @@ def test_pdf_refresh_help_and_runtime_survive_reload(tmp_path, monkeypatch):
             monkeypatch.setattr(current_domain, "get_runtime", lambda _: runtime)
             monkeypatch.setattr(current_domain, "settings", test_settings)
             monkeypatch.setattr(src.upload_routes, "settings", test_settings)
+            # Uploads go to the shared store; keep this one in tmp_path too.
+            shared = files_runtime.FilesRuntime(FilesSettings(store_dir=tmp_path / "files", signing_key=b"x" * 32))
+            monkeypatch.setattr(files_runtime, "get_runtime", lambda _: shared)
             app = Starlette()
             app.add_middleware(IdentityContextMiddleware)
             install_command_routes(app)
@@ -81,18 +86,22 @@ def test_pdf_refresh_help_and_runtime_survive_reload(tmp_path, monkeypatch):
                 assert response.status_code == 400
         finally:
             runtime.close()
+            shared.close()
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("updates", [
-    {"mcp_wait_seconds": 121}, {"mcp_wait_seconds": float("nan")},
-    {"file_ttl_hours": 0}, {"download_link_minutes": -1},
-    {"limits": {"max_concurrent_merges": 0}},
-    {"limits": {"job_timeout_seconds": float("inf")}},
+@pytest.mark.parametrize("name, updates", [
+    ("pdf_merger", {"mcp_wait_seconds": 121}), ("pdf_merger", {"mcp_wait_seconds": float("nan")}),
+    ("files", {"file_ttl_hours": 0}), ("files", {"download_link_minutes": -1}),
+    ("pdf_merger", {"limits": {"max_concurrent_merges": 0}}),
+    ("pdf_merger", {"limits": {"job_timeout_seconds": float("inf")}}),
 ])
-def test_runtime_rejects_unsafe_tuning(tmp_path, updates):
+def test_runtime_rejects_unsafe_tuning(tmp_path, name, updates):
     config = tmp_path / "settings.db"
-    settings_store.put(config, "tuning", "pdf_merger", updates)
+    settings_store.put(config, "tuning", name, updates)
     test_settings = replace(settings, settings_db_path=config)
     with pytest.raises(ValueError):
-        pdf_runtime._engine_config(test_settings)
+        if name == "files":
+            files_runtime._config(test_settings)
+        else:
+            pdf_runtime._engine_config(test_settings, None)  # refused before the store is looked at

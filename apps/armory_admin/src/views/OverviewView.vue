@@ -68,7 +68,7 @@ onMounted(async () => {
   else { note(caps); if (manage) notices.report(false); }
   if (tags.status === "fulfilled") counts.tickets = Object.keys(tags.value.tags).length; else note(tags);
   if (env.status === "fulfilled") counts.settings = env.value.settings.filter((s) => s.stored).length; else note(env);
-  if (lim.status === "fulfilled") counts.limits = [lim.value.pdf_merger, lim.value.media_downloader].filter((l) => l?.stored).length; else note(lim);
+  if (lim.status === "fulfilled") counts.limits = [lim.value.files, lim.value.pdf_merger, lim.value.media_downloader].filter((l) => l?.stored).length; else note(lim);
   if (mail.status === "fulfilled") counts.email = mail.value.to?.length ?? 0; else note(mail);
   error.value = problems[0] ?? "";
 });

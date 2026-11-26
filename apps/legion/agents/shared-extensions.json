@@ -18,6 +18,8 @@
       "bard__*",
       "scribe__*",
       "media_downloader__*",
+      "tool_files_list",
+      "tool_files_inspect",
       "stronghold__tool_ticket_createTicket"
     ],
     "deny": []

@@ -141,31 +141,32 @@ def test_web_research_keys_are_editable_secrets_used_at_once(client, live):
 
 def test_limits_start_at_the_defaults_and_a_change_keeps_the_rest(client, live):
     first = client.get("/admin/tuning").json()
-    assert first["pdf_merger"]["limits"]["max_file_mb"] == 100 and first["pdf_merger"]["stored"] is False
+    assert first["files"]["limits"]["max_file_mb"] == 100 and first["files"]["stored"] is False
+    assert first["pdf_merger"]["limits"]["max_segments"] == 50
     assert first["media_downloader"]["limits"]["max_caller_downloads"] == 2
 
-    saved = client.put("/admin/tuning/pdf_merger", json={"file_ttl_hours": 12, "limits": {"max_file_mb": 250}})
+    saved = client.put("/admin/tuning/files", json={"file_ttl_hours": 12, "limits": {"max_file_mb": 250}})
 
     assert saved.status_code == 200 and saved.json()["applies"] == "next start"
-    pdf = saved.json()["pdf_merger"]
-    assert (pdf["file_ttl_hours"], pdf["limits"]["max_file_mb"], pdf["limits"]["max_segments"], pdf["stored"]) == (12, 250, 50, True)
+    files = saved.json()["files"]
+    assert (files["file_ttl_hours"], files["limits"]["max_file_mb"], files["limits"]["max_upload_mb"], files["stored"]) == (12, 250, 15, True)
     assert saved.json()["media_downloader"]["stored"] is False
 
-    again = client.put("/admin/tuning/pdf_merger", json={"limits": {"max_segments": 10}}).json()["pdf_merger"]
-    assert (again["file_ttl_hours"], again["limits"]["max_file_mb"], again["limits"]["max_segments"]) == (12, 250, 10)
+    again = client.put("/admin/tuning/files", json={"limits": {"max_session_mb": 900}}).json()["files"]
+    assert (again["file_ttl_hours"], again["limits"]["max_file_mb"], again["limits"]["max_session_mb"]) == (12, 250, 900)
 
 
 def test_unusable_limits_are_refused_and_save_nothing(client, live):
     for name, bad in [
-        ("pdf_merger", {"mcp_wait_seconds": 121}), ("pdf_merger", {"file_ttl_hours": 0}),
+        ("pdf_merger", {"mcp_wait_seconds": 121}), ("files", {"file_ttl_hours": 0}),
         ("pdf_merger", {"limits": {"max_concurrent_merges": 0}}), ("pdf_merger", {"made_up": 1}),
-        ("pdf_merger", {"limits": {"nope": 1}}), ("pdf_merger", {"file_ttl_hours": "6"}), ("pdf_merger", {}),
+        ("pdf_merger", {"limits": {"max_file_mb": 5}}), ("files", {"file_ttl_hours": "6"}), ("files", {}),
         ("media_downloader", {"limits": {"max_caller_downloads": 0}}), ("media_downloader", {"limits": {"max_caller_downloads": 1.5}}),
         ("media_downloader", {"mcp_wait_seconds": 5}), ("nothing", {"file_ttl_hours": 1}),
     ]:
         refused = client.put(f"/admin/tuning/{name}", json=bad)
         assert refused.status_code == 400 and refused.json()["error"], (name, bad)
-    assert client.get("/admin/tuning").json()["pdf_merger"]["stored"] is False
+    assert client.get("/admin/tuning").json()["files"]["stored"] is False
     assert client.put("/admin/tuning/pdf_merger", json=[1]).status_code == 400
 
 

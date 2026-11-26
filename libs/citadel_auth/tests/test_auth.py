@@ -274,3 +274,9 @@ def test_portcullis_may_still_call_armory_for_its_other_routes():
 
 def test_stronghold_may_still_call_armory_for_mcp_and_uploads():
     assert allowed("armory", "stronghold", "/upload/pdf") and allowed("armory", "stronghold", "/mcp")
+
+
+def test_only_portcullis_reads_stored_files_from_armory():
+    assert allowed("armory", "portcullis", "/files/f_1/content")
+    assert not allowed("armory", "stronghold", "/files/f_1/content")
+    assert not allowed("armory", "legion", "/files/f_1/content")

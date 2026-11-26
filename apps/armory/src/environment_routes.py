@@ -15,7 +15,9 @@ from src.services import app_config, capability_tuning, tool_policy
 
 
 def _validator(name: str):
-    if name == "pdf_merger":
+    if name == "files":
+        from src.services.user_files.runtime import validate_tuning
+    elif name == "pdf_merger":
         from src.capabilities.pdf_merger.utils.pdf_runtime import validate_tuning
     else:
         from src.capabilities.media_downloader.utils.media_downloads import validate_tuning

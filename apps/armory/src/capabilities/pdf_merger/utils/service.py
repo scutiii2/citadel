@@ -18,10 +18,10 @@ from src.capabilities.pdf_merger.utils.engine.planner import ExpandedPlan, expan
 from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
 from src.capabilities.pdf_merger.utils.jobs.job_queue import Job, JobQueue, ProgressFn
 from src.capabilities.pdf_merger.utils.models import MergePlan, MergeResult, OutputOptions
-from src.capabilities.pdf_merger.utils.store.file_store import FileStore, StoredFile
-from src.capabilities.pdf_merger.utils.store.names import ensure_pdf_suffix, file_stem, safe_filename
-from src.services.link_signing import LinkSigner
-from src.capabilities.pdf_merger.utils.store.sniff import SNIFF_BYTES, sniff_mime
+from src.services.user_files.store import FileStore, StoredFile
+from src.services.user_files.names import ensure_pdf_suffix, file_stem, safe_filename
+from src.services.user_files.kinds import PAGED
+from src.services.user_files.service import Settings as FilesSettings, UserFiles, build_user_files
 
 
 @dataclass(frozen=True)
@@ -41,34 +41,29 @@ def _raise_if_cancelled(cancel: threading.Event) -> None:
         raise MergerError(ErrorCode.MERGE_TIMEOUT, "The merge took too long and was stopped. Try fewer pages.")
 
 
-def _read_head(path: Path) -> bytes:
-    with path.open("rb") as handle:
-        return handle.read(SNIFF_BYTES)
+_PAGED_UNSUPPORTED = "This file type isn't supported. Upload a PDF or an image (JPG, PNG, WebP, TIFF, GIF or HEIC)."
 
 
 class MergeService:
-    """Facade over files, merging, jobs and signed download links."""
+    """PDF's view of the shared files (PDF and images only), plus merging."""
 
     def __init__(
         self,
         *,
-        store: FileStore,
+        files: UserFiles,
         registry: ConverterRegistry,
         assembler: Assembler,
         jobs: JobQueue,
-        signer: LinkSigner,
         limits: Limits,
-        public_base_url: str,
         file_ttl_seconds: int,
         mcp_wait_seconds: float = 100.0,
     ) -> None:
-        self._store = store
+        self._files = files
+        self._store = files.store
         self._registry = registry
         self._assembler = assembler
         self._jobs = jobs
-        self._signer = signer
         self._limits = limits
-        self._public_base_url = public_base_url.rstrip("/")
         self._file_ttl = file_ttl_seconds
         self._mcp_wait_seconds = mcp_wait_seconds
 
@@ -79,59 +74,37 @@ class MergeService:
     # --- files -------------------------------------------------------------
 
     async def upload(self, caller: Caller, name: str | None, chunks: AsyncIterable[bytes]) -> StoredFile:
-        """Stream to disk, sniff the real type, validate, then commit."""
-        pending = await self._store.write_stream(caller.session, chunks)
-        try:
-            mime = sniff_mime(await asyncio.to_thread(_read_head, pending.path))
-            converter = self._registry.for_mime(mime)
-            pages = await converter.inspect(pending.path)
-        except BaseException:
-            self._store.discard(pending)
-            raise
-        return await self._store.commit(
-            pending, name=safe_filename(name, "upload"), mime=mime or "", kind=converter.kind, pages=pages
-        )
+        return await self._files.upload(caller.session, name, chunks, kinds=PAGED, unsupported=_PAGED_UNSUPPORTED)
 
     def list_files(self, caller: Caller) -> list[StoredFile]:
-        return self._store.list(caller.session)
+        return self._files.list(caller.session, PAGED)
 
     def get_file(self, caller: Caller, file_id: str) -> StoredFile:
-        return self._store.get(file_id, caller.scope)
+        return self._files.get(file_id, caller.scope, PAGED)
 
     def file_path(self, file: StoredFile) -> Path:
-        return self._store.path(file)
+        return self._files.path(file)
 
     async def delete_file(self, caller: Caller, file_id: str) -> None:
         # Deletes use the same owner scope as reads and merges.
-        await self._store.delete(file_id, caller.session)
+        await self._files.delete(file_id, caller.session, PAGED)
 
     def inspect(self, caller: Caller, file_ids: Sequence[str]) -> tuple[list[StoredFile], list[tuple[str, MergerError]]]:
-        """Look up each ID; one bad ID never aborts the rest."""
-        files: list[StoredFile] = []
-        failed: list[tuple[str, MergerError]] = []
-        for file_id in file_ids:
-            try:
-                files.append(self._store.get(file_id, caller.scope))
-            except MergerError as error:
-                failed.append((file_id, error))
-        return files, failed
+        return self._files.lookup(caller.scope, file_ids, PAGED)
 
     # --- links -------------------------------------------------------------
 
     def download_url(self, file: StoredFile) -> str:
-        exp, sig = self._signer.sign(file.file_id)
-        return f"{self._public_base_url}/pdf/files/{file.file_id}/download?exp={exp}&sig={sig}"
+        return self._files.download_url(file, "/pdf/files")
 
     def file_for_download(self, file_id: str, exp: int, sig: str) -> StoredFile:
-        if not self._signer.verify(file_id, exp, sig):
-            raise MergerError(ErrorCode.FILE_NOT_FOUND, "This download link is invalid or has expired.")
-        return self._store.get(file_id, None)
+        return self._files.file_for_download(file_id, exp, sig)
 
     # --- merging -----------------------------------------------------------
 
     def start_merge(self, caller: Caller, plan: MergePlan) -> Job:
         """Validate now (errors raise immediately), then queue the work."""
-        expanded = expand_plan(plan, lambda file_id: self._store.get(file_id, caller.scope), self._limits)
+        expanded = expand_plan(plan, lambda file_id: self.get_file(caller, file_id), self._limits)
         return self._jobs.submit(
             caller.session,
             expanded.total_pages,
@@ -212,22 +185,21 @@ class MergeService:
         return removed
 
 
-def build_service(settings: Settings) -> MergeService:
-    """Wire a MergeService from settings."""
+def build_service(settings: Settings, files: UserFiles | None = None) -> MergeService:
+    """Wire a MergeService. Without `files` it makes a private store from `settings` (tests)."""
     limits = settings.limits
+    files = files or build_user_files(FilesSettings(
+        store_dir=settings.store_dir, public_base_url=settings.public_base_url,
+        file_ttl_seconds=settings.file_ttl_seconds, download_link_seconds=settings.download_link_seconds,
+        signing_key=settings.signing_key, max_file_bytes=limits.max_file_bytes,
+        max_session_bytes=limits.max_session_bytes, max_image_pixels=limits.max_image_pixels,
+    ))
     return MergeService(
-        store=FileStore(
-            settings.store_dir,
-            ttl_seconds=settings.file_ttl_seconds,
-            max_file_bytes=limits.max_file_bytes,
-            max_session_bytes=limits.max_session_bytes,
-        ),
-        registry=default_registry(limits.max_image_pixels),
+        files=files,
+        registry=default_registry(files.settings.max_image_pixels),
         assembler=Assembler(),
         jobs=JobQueue(limits.max_concurrent_merges, limits.job_timeout_seconds),
-        signer=LinkSigner(settings.signing_key, settings.download_link_seconds),
         limits=limits,
-        public_base_url=settings.public_base_url,
-        file_ttl_seconds=settings.file_ttl_seconds,
+        file_ttl_seconds=files.settings.file_ttl_seconds,
         mcp_wait_seconds=settings.mcp_wait_seconds,
     )

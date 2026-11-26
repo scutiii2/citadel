@@ -20,7 +20,7 @@ from src.runtime import tool_filter
 
 _log = logging.getLogger(__name__)
 
-TOOL_NAME = "tool_pdf_image"  # Armory's tool; Legion calls it itself and offers it to no model
+TOOL_NAME = "tool_files_view"  # Armory's tool; Legion calls it itself and offers it to no model
 MAX_IMAGES = 4
 _REFERENCE = re.compile(r"\[(?:Image|PDFMerger) file_id: ([A-Za-z0-9_-]{1,100}) \| \d+ pages \| image(?= \||\])")
 

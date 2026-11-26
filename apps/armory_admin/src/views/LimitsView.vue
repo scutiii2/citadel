@@ -6,7 +6,7 @@ import { limitsClient, type CapabilityLimits, type LimitsCapability, type Limits
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
 import { errorMessage } from "../utils/errors";
 
-/** How much one caller may use and how long files and links last, for the PDF and video capabilities. Saved in
+/** How much one caller may use and how long files and links last, for stored files and the PDF and video capabilities. Saved in
  * Armory's database. Each capability reads these once when its engine starts, so a change is used from Armory's next start. */
 interface Field { key: string; label: string; help: string; unit?: string; limit?: boolean }
 interface Card { name: LimitsCapability; title: string; lede: string; fields: Field[] }
@@ -18,15 +18,22 @@ const LIFETIMES: Field[] = [
 ];
 const CARDS: Card[] = [
   {
-    name: "pdf_merger", title: "PDF merging", lede: "How long files and links last, and how much one account and one merge may use.",
+    name: "files", title: "Stored files", lede: "How long uploads and links last, and how much one account may store.",
     fields: [
       ...LIFETIMES,
-      { key: "mcp_wait_seconds", label: "Longest wait for a tool call", unit: "seconds", help: "How long a tool call waits for a merge to finish before it answers \"still running\". At most 100." },
-      { key: "max_file_mb", label: "Largest file", unit: "MB", limit: true, help: "The size cap for one file." },
+      { key: "max_upload_mb", label: "Largest upload", unit: "MB", limit: true, help: "The size cap for one uploaded file that is not audio." },
+      { key: "max_audio_upload_mb", label: "Largest audio upload", unit: "MB", limit: true, help: "The size cap for one uploaded audio file." },
+      { key: "max_file_mb", label: "Largest stored file", unit: "MB", limit: true, help: "The size cap for any stored file, a merged PDF included." },
       { key: "max_session_mb", label: "Most data per account", unit: "MB", limit: true, help: "The size cap for all the files one account has stored." },
+      { key: "max_image_megapixels", label: "Largest image", unit: "megapixels", limit: true, help: "The size cap for one uploaded image." },
+    ],
+  },
+  {
+    name: "pdf_merger", title: "PDF merging", lede: "How much one merge may use.",
+    fields: [
+      { key: "mcp_wait_seconds", label: "Longest wait for a tool call", unit: "seconds", help: "How long a tool call waits for a merge to finish before it answers \"still running\". At most 100." },
       { key: "max_segments", label: "Most pieces in one merge", limit: true, help: "The most pieces one merge may join." },
       { key: "max_output_pages", label: "Most pages in the result", limit: true, help: "The most pages the merged file may have." },
-      { key: "max_image_megapixels", label: "Largest image", unit: "megapixels", limit: true, help: "The size cap for one image placed in a merge." },
       { key: "max_concurrent_merges", label: "Merges at the same time", limit: true, help: "How many merges run at the same time. More wait for a free place." },
       { key: "job_timeout_seconds", label: "Longest merge", unit: "seconds", limit: true, help: "A merge that runs longer than this is stopped." },
     ],
@@ -46,9 +53,11 @@ const CARDS: Card[] = [
   },
 ];
 
+const noEdits = (): Record<string, Record<string, string>> => ({ files: {}, pdf_merger: {}, media_downloader: {} });
+
 const view = ref<LimitsView | null>(null);
 /** What was typed, by capability and field; a field absent here is unchanged. */
-const edits = ref<Record<string, Record<string, string>>>({ pdf_merger: {}, media_downloader: {} });
+const edits = ref(noEdits());
 const loading = ref(true);
 const busy = ref("");
 const error = ref("");
@@ -75,7 +84,7 @@ const dirty = computed(() => CARDS.some(changed));
 
 function apply(next: LimitsView) {
   view.value = next;
-  edits.value = { pdf_merger: {}, media_downloader: {} };
+  edits.value = noEdits();
 }
 
 onMounted(async () => {
@@ -122,7 +131,7 @@ async function save() {
 }
 
 function discard() {
-  edits.value = { pdf_merger: {}, media_downloader: {} };
+  edits.value = noEdits();
   error.value = notice.value = "";
 }
 
@@ -143,7 +152,7 @@ async function reset(card: Card) {
 <template>
   <SettingsPanel ref="panel" v-model:search="search" title="Limits" heading="Capability limits" label="limits" :dirty="dirty" :saving="busy !== ''" @save="save" @discard="discard">
     <template #help>
-      <p>How much one account may use and how long files and links last, for PDF merging and video downloads.</p>
+      <p>How much one account may use and how long files and links last, for stored files, PDF merging and video downloads.</p>
       <p>They are saved in Armory's database and used from Armory's next start.</p>
     </template>
     <p v-if="loading" class="note muted" role="status">Loading…</p>

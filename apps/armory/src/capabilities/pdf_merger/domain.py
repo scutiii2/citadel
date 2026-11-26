@@ -6,7 +6,6 @@ from src.services import identity_context, untrusted
 from src.capabilities.pdf_merger.utils.pdf_runtime import get_runtime
 
 from .contract import FailedItem, FileInfo, InspectResult, LinkedFileInfo, ListFilesResult, MergePlan, MergeToolResult
-from .utils.converters.image import IMAGE_MIMES, view_image
 from .utils.service import Caller
 
 
@@ -52,19 +51,6 @@ class PdfDesk:
                                  failed=[FailedItem(file_id=i, code=str(e.code), message=e.message) for i, e in failed],
                                  message=f"Found {len(files)} of {len(ids)} file(s).")
         return runtime.call(perform())
-
-    def view(self, file_id: str) -> tuple[bytes, str]:
-        """One owned image as (bytes, media type), small enough to show a model."""
-        caller = self._caller()
-        runtime = get_runtime(settings)
-
-        async def locate():
-            file = runtime.service.get_file(caller, file_id)
-            if file.mime not in IMAGE_MIMES:
-                raise PdfError("That file is not an image.")
-            return runtime.service.file_path(file)
-        # Decoding runs on this worker thread, not on the PDF engine's event loop.
-        return view_image(runtime.call(locate()))
 
     def list_files(self) -> ListFilesResult:
         caller = self._caller()

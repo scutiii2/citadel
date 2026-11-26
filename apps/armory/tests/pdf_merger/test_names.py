@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.capabilities.pdf_merger.utils.store.names import content_disposition, ensure_pdf_suffix, file_stem, safe_filename
+from src.services.user_files.names import content_disposition, ensure_pdf_suffix, file_stem, safe_filename
 
 
 def test_safe_filename_strips_paths_and_odd_characters():

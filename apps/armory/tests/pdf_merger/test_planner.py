@@ -7,7 +7,7 @@ from src.capabilities.pdf_merger.utils.converters.base import ImageOptions
 from src.capabilities.pdf_merger.utils.engine.planner import expand_plan
 from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
 from src.capabilities.pdf_merger.utils.models import MergePlan
-from src.capabilities.pdf_merger.utils.store.file_store import StoredFile
+from src.services.user_files.store import StoredFile
 
 
 def stored(file_id: str, kind: str = "pdf", pages: int = 5, name: str = "doc.pdf") -> StoredFile:

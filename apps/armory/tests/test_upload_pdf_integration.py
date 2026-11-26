@@ -34,7 +34,12 @@ def native_client(monkeypatch, tmp_path):
     monkeypatch.setattr(domain, "settings", test_settings)
     monkeypatch.setattr(upload_routes, "settings", test_settings)
     monkeypatch.setattr(capability_registry, "is_enabled", lambda _: True)
-    runtime = Runtime(Settings(store_dir=tmp_path / "store", signing_key=b"x" * 32, public_base_url="http://testserver"))
+    files = importlib.import_module("src.services.user_files.runtime")
+    FilesSettings = importlib.import_module("src.services.user_files.service").Settings
+    shared = files.FilesRuntime(FilesSettings(store_dir=tmp_path / "store", signing_key=b"x" * 32,
+                                              public_base_url="http://testserver"))
+    monkeypatch.setattr(files, "get_runtime", lambda _: shared)
+    runtime = Runtime(Settings(store_dir=tmp_path / "store", signing_key=b"x" * 32, public_base_url="http://testserver"), shared)
     monkeypatch.setattr(domain, "get_runtime", lambda _: runtime)
 
     # A test-only adapter calls the same domain seam as MCP, inside the
@@ -63,6 +68,7 @@ def native_client(monkeypatch, tmp_path):
             yield client
     finally:
         runtime.close()
+        shared.close()
 
 
 def pdf_bytes(widths):

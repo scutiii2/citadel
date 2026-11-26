@@ -1,4 +1,4 @@
-"""Caps and lifetimes of the PDF and video capabilities, kept in `.data/armory/settings.db` (table `tuning`).
+"""Caps and lifetimes of stored files and of the PDF and video capabilities, kept in `.data/armory/settings.db` (table `tuning`).
 
 An administrator edits them on the Limits page of Armory Admin; nothing is read from a file. A stored document only
 holds what was changed; every other value is the default below. A capability reads its document once, when its
@@ -16,17 +16,23 @@ from src.citadel_auth import settings_store
 TABLE = "tuning"
 
 DEFAULTS: dict[str, dict[str, Any]] = {
-    "pdf_merger": {
+    "files": {
         "file_ttl_hours": 1,
         "sweep_interval_minutes": 10,
         "download_link_minutes": 60,
-        "mcp_wait_seconds": 100,
         "limits": {
+            "max_upload_mb": 15,
+            "max_audio_upload_mb": 20,
             "max_file_mb": 100,
             "max_session_mb": 500,
+            "max_image_megapixels": 80,
+        },
+    },
+    "pdf_merger": {
+        "mcp_wait_seconds": 100,
+        "limits": {
             "max_segments": 50,
             "max_output_pages": 2000,
-            "max_image_megapixels": 80,
             "max_concurrent_merges": 2,
             "job_timeout_seconds": 120,
         },

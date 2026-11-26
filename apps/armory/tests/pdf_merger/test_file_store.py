@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
-from src.capabilities.pdf_merger.utils.store.file_store import FileStore
+from src.services.user_files.store import FileStore
 
 
 class FakeClock:

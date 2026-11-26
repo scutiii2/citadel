@@ -475,8 +475,8 @@ Operations, approvals and runtime skill marking remain deferred.
 
 A user message names an uploaded image as `[Image file_id: <id> | ...]`. At the start of a turn the entry agent, an
 orchestrator or a delegable specialist fetches the newest four such images (this question and earlier user messages) from
-Armory's `tool_pdf_image`, as the asking user, and sends them to the model in front of the question
-(`src/runtime/images.py`). Internal helpers get none. Armory hides the tool from tool lists, so no model is offered it,
+Armory's `tool_files_view`, as the asking user, and sends them to the model in front of the question
+(`src/runtime/images.py`). Internal helpers get none. It needs Armory's `files` capability. Armory hides the tool from tool lists, so no model is offered it,
 and Legion refuses a model that names it. A turn with every tool blocked shows no images.
 
 An image cannot be checked for confidential data, so a turn that shows one goes only to trusted gateways, and is refused

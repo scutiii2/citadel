@@ -15,7 +15,7 @@ def test_chat_image_content_uses_owned_stream_without_capability_subscription(cl
     assert response.content == b"image"
     assert response.headers["content-type"] == "image/png"
     assert response.headers["cache-control"] == "no-store"
-    assert upstream.requests[-1].url.path == "/pdf/ui/files/f_photo/content"
+    assert upstream.requests[-1].url.path == "/files/f_photo/content"
     assert requester(upstream.requests[-1])["username"] == "root"
     assert requester(upstream.requests[-1])["sub"] != "foreign"
     upstream.handler = lambda request: httpx.Response(404, json={"error": {"code": "file_not_found", "message": "Unavailable"}})

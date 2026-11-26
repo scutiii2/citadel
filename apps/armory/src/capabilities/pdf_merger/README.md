@@ -9,7 +9,6 @@ Native PDF and image inspection and merging in Armory, with three tools. Files b
 | `tool_pdf_inspect` | Inspect selected owned uploads, returning page counts, fresh download links and per-ID failures. Read-only. | Local PDF engine and file store |
 | `tool_pdf_listFiles` | List the account's unexpired uploads and merged files with fresh links. Read-only. | Local file store |
 | `tool_pdf_merge` | Merge an ordered structured plan into a new PDF. MCP-only; creates a file. | Local PDF engine and file store |
-| `tool_pdf_image` | Return one owned image as MCP image content, upright, long edge at most 1568 px, PNG or JPEG. Read-only. MCP-only and hidden from tool lists: Legion calls it to show a model an attached image. | Local file store |
 
 ## Slash commands
 
@@ -44,7 +43,7 @@ Armory settings read its normal environment configuration. Caps and lifetimes ar
 
 | Setting | Purpose |
 | --- | --- |
-| `MCP_PDF_MERGER_STORE_DIR` | Generated file store; defaults to `.data/armory/pdf_merger/store`. |
+| `MCP_FILES_STORE_DIR` | The shared file store (all uploads and merged files); defaults to `.data/armory/files/store`. |
 | `MCP_PDF_MERGER_PUBLIC_BASE_URL` | Browser-reachable Armory base URL for download links; defaults to `http://127.0.0.1:{MCP_PORT}`. Configure it for remote browsers or a reverse proxy. |
 | `PDF_MERGER_SIGNING_KEY` | Stable HMAC signing secret. If absent, Armory warns and generates an ephemeral key; links stop working after a process restart. |
 | Service authentication | Requires a signed Ed25519 service assertion and a Portcullis-signed requester token for account operations. |

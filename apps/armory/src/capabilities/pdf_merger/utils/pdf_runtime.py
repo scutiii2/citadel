@@ -6,24 +6,24 @@ import atexit
 import asyncio
 import logging
 import math
-import secrets
 import threading
 from dataclasses import asdict, replace
-from urllib.parse import urlsplit
 
 from src.services import capability_tuning
+from src.services.user_files import runtime as files_runtime
+from src.services.user_files.runtime import FilesRuntime, LoopThread
 
 logger = logging.getLogger(__name__)
 
 
 class Runtime:
-    """Keep mutable PDF state on a dedicated loop, leaving blocking I/O offloaded."""
+    """Mutable PDF state on one loop: the shared files loop in Armory, a private one when built alone (tests)."""
 
-    def __init__(self, config):
+    def __init__(self, config, shared: FilesRuntime | None = None):
         self.config = config
-        self.loop = asyncio.new_event_loop()
-        self.thread = threading.Thread(target=self.loop.run_forever, name="pdf-merger", daemon=True)
-        self.thread.start()
+        self._shared = shared
+        self._own = None if shared else LoopThread("pdf-merger")
+        self._thread = shared or self._own
         self.closed = False
         try:
             self.call(self._initialize())
@@ -35,16 +35,18 @@ class Runtime:
         from src.capabilities.pdf_merger.utils.service import build_service
         from src.services.file_sweeper import run_sweeper
 
-        self.service = build_service(self.config)
-        await self.service.store.load_index()
+        self.service = build_service(self.config, self._shared.files if self._shared else None)
+        if self._shared is None:
+            await self.service.store.load_index()
         self.stop = asyncio.Event()
+        # Also forgets old merge jobs; sweeping files twice on one loop is harmless.
         self.sweeper = asyncio.create_task(run_sweeper(self.service, self.config.sweep_interval_seconds, self.stop))
 
     def call(self, coroutine):
         if self.closed:
             coroutine.close()
             raise RuntimeError("PDF runtime is closed")
-        return asyncio.run_coroutine_threadsafe(coroutine, self.loop).result()
+        return self._thread.call(coroutine)
 
     async def _shutdown(self):
         if hasattr(self, "stop"):
@@ -61,14 +63,12 @@ class Runtime:
         if self.closed:
             return
         try:
-            self.call(self._shutdown())
-            self.call(self.loop.shutdown_asyncgens())
-            self.call(self.loop.shutdown_default_executor())
+            if not self._thread.closed:
+                self.call(self._shutdown())
         finally:
             self.closed = True
-            self.loop.call_soon_threadsafe(self.loop.stop)
-            self.thread.join()
-            self.loop.close()
+            if self._own is not None:
+                self._own.close()
 
 
 _lock = threading.Lock()
@@ -76,7 +76,7 @@ _runtime = None
 
 
 def validate_tuning(raw):
-    """Refuse an unusable caps-and-lifetimes document (ValueError); the Limits page uses it before saving."""
+    """Refuse an unusable merge-limits document (ValueError); the Limits page uses it before saving."""
     from src.capabilities.pdf_merger.utils.config import Limits
 
     limits = Limits.from_config(raw.get("limits", {}))
@@ -86,40 +86,28 @@ def validate_tuning(raw):
     wait = float(raw.get("mcp_wait_seconds", 100))
     if not 0 < wait <= 100:
         raise ValueError("mcp_wait_seconds must be between 0 and 100")
-    ttl = float(raw.get("file_ttl_hours", 1)) * 3600
-    sweep = float(raw.get("sweep_interval_minutes", 10)) * 60
-    link = float(raw.get("download_link_minutes", 60)) * 60
-    if any(not math.isfinite(v) or v < 1 for v in (ttl, sweep, link)):
-        raise ValueError("PDF expiry and sweep intervals must be positive and finite")
-    return limits, wait, ttl, sweep, link
+    return limits, wait
 
 
-def _engine_config(settings):
+def _engine_config(settings, files):
     from src.capabilities.pdf_merger.utils.config import Settings
 
-    raw = capability_tuning.document(settings.settings_db_path, "pdf_merger")
-    limits, wait, ttl, sweep, link = validate_tuning(raw)
-    url = settings.pdf_merger_public_base_url or f"http://127.0.0.1:{settings.port}"
-    parsed = urlsplit(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.query or parsed.fragment or parsed.username:
-        raise ValueError("MCP_PDF_MERGER_PUBLIC_BASE_URL must be an HTTP(S) base URL")
-    key = settings.pdf_merger_signing_key
-    if not key:
-        logger.warning("PDF_MERGER_SIGNING_KEY is unset; PDF links expire on process restart")
-        key = secrets.token_hex(32)
+    limits, wait = validate_tuning(capability_tuning.document(settings.settings_db_path, "pdf_merger"))
     return Settings(
-        store_dir=settings.pdf_merger_store_dir, public_base_url=url.rstrip("/"), signing_key=key.encode(),
-        file_ttl_seconds=int(ttl), sweep_interval_seconds=int(sweep), download_link_seconds=int(link),
-        mcp_wait_seconds=wait, limits=replace(limits, job_timeout_seconds=min(limits.job_timeout_seconds, wait)),
+        store_dir=files.store_dir, public_base_url=files.public_base_url, signing_key=files.signing_key,
+        file_ttl_seconds=files.file_ttl_seconds, sweep_interval_seconds=files.sweep_interval_seconds,
+        download_link_seconds=files.download_link_seconds, mcp_wait_seconds=wait,
+        limits=replace(limits, job_timeout_seconds=min(limits.job_timeout_seconds, wait)),
     )
 
 
 def get_runtime(settings):
-    """Lazy process-wide PDF engine. Configuration changes require an Armory restart."""
+    """Lazy process-wide PDF engine on the shared files loop. Configuration changes require an Armory restart."""
     global _runtime
     with _lock:
         if _runtime is None:
-            _runtime = Runtime(_engine_config(settings))
+            shared = files_runtime.get_runtime(settings)
+            _runtime = Runtime(_engine_config(settings, shared.files.settings), shared)
     return _runtime
 
 

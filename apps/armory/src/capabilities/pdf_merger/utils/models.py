@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from src.capabilities.pdf_merger.utils.converters.base import FitMode, PageSize
-from src.capabilities.pdf_merger.utils.store.file_store import StoredFile
+from src.services.user_files.store import StoredFile
 
 Rotation = Literal[0, 90, 180, 270]
 

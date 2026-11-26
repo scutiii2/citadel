@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.capabilities.pdf_merger.utils.store.sniff import sniff_mime
+from src.services.user_files.sniff import sniff_mime
 
 
 @pytest.mark.parametrize(

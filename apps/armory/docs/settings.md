@@ -10,24 +10,31 @@ shows it.
 | Capabilities | `capabilities` | Which capabilities are on. Every capability starts off. A capability with no entry is never loaded. |
 | Settings | `environment` | Deployment values: the Tavily and Firecrawl keys, the public addresses and signing keys of the PDF and video links, `DB_GATEWAY_INSTANCE`/`DB_GATEWAY_CONNECTION`, `MCP_WORKSPACE_DIR`. "Use the default" removes a saved value. A change is used at once, except what is read only at start (the signing keys, Treasury restart". See `src/environment_settings.py`. |
 | Email | `email` (key `smtp`) | The SMTP server, port, connection (`ssl`, `starttls` or `none`), sender, password, standing recipients and allowed domains. Gmail `smtp.gmail.com` 465 ssl; Outlook / Microsoft 365 `smtp.office365.com` 587 starttls; Proton Mail needs Proton Mail Bridge running, then `127.0.0.1` 1025 starttls with the Bridge's own password. Gmail, Outlook, Yahoo and iCloud need an app password. A relay without a login needs none. A send uses the saved values at once. See `src/services/app_config.py`. |
-| Limits | `tuning` | Caps and lifetimes of PDF merging and video downloads (below). Used from Armory's next start. See `src/services/capability_tuning.py`. |
+| Limits | `tuning` | Caps and lifetimes of stored files, PDF merging and video downloads (below). Used from Armory's next start. See `src/services/capability_tuning.py`. |
 | Tool approval | `policy` (key `force_tool_approval`) | One switch: every answer asks a person before each tool runs, whatever the person chose. Off until switched. Armory owns the rule because it holds the tools; Portcullis reads it for each answer (`GET /admin/tool-approval`, `PUT /admin/tool-approval` with `{"value": true|false}`) and requires approval if Armory does not answer. `GET` also says `stored`: false until the switch was saved once. See `src/services/tool_policy.py`. |
 
 ## Limits
+
+Stored files (`files`):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `file_ttl_hours` | 1 | How long an uploaded or generated file is kept. |
+| `sweep_interval_minutes` | 10 | How often expired files are removed. |
+| `download_link_minutes` | 60 | How long a signed download link works. |
+| `limits.max_upload_mb`, `limits.max_audio_upload_mb` | 15, 20 | Size caps for one upload: any file, and audio. |
+| `limits.max_file_mb`, `limits.max_session_mb` | 100, 500 | Size caps for one stored file (a merge result included) and for one account's stored files. |
+| `limits.max_image_megapixels` | 80 | The size cap for one uploaded image. |
+
+Files are in `.data/armory/files/store/` (`MCP_FILES_STORE_DIR`).
 
 PDF merging (`pdf_merger`):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `file_ttl_hours` | 1 | How long an uploaded or merged file is kept. |
-| `sweep_interval_minutes` | 10 | How often expired files are removed. |
-| `download_link_minutes` | 60 | How long a signed download link works. |
 | `mcp_wait_seconds` | 100 | How long a tool call waits for a merge before it answers "still running" (at most 100). |
-| `limits.max_file_mb`, `limits.max_session_mb` | 100, 500 | Size caps for one file and for one account's stored files. |
-| `limits.max_segments`, `limits.max_output_pages`, `limits.max_image_megapixels` | 50, 2000, 80 | Caps on one merge. |
+| `limits.max_segments`, `limits.max_output_pages` | 50, 2000 | Caps on one merge. |
 | `limits.max_concurrent_merges`, `limits.job_timeout_seconds` | 2, 120 | Parallel merges and the time one may take. |
-
-Files are in `.data/armory/pdf_merger/store/`.
 
 Video downloads (`media_downloader`):
 

@@ -18,31 +18,6 @@ def test_identity_required(monkeypatch):
         domain.desk.list_files()
 
 
-def test_view_returns_a_downscaled_owned_image_only(caller, monkeypatch, tmp_path):
-    import io
-
-    from PIL import Image
-    from src.capabilities.pdf_merger.utils.pdf_runtime import Runtime
-    from src.capabilities.pdf_merger.utils.config import Settings
-    from src.capabilities.pdf_merger.utils.errors import MergerError
-
-    runtime = Runtime(Settings(store_dir=tmp_path / "store", signing_key=b"x" * 32))
-    monkeypatch.setattr(domain, "get_runtime", lambda _: runtime)
-    try:
-        source = io.BytesIO()
-        Image.new("RGBA", (3000, 100), (0, 0, 0, 0)).save(source, format="PNG")
-        uploaded = domain.desk.upload("wide.png", source.getvalue())
-        data, media_type = domain.desk.view(uploaded.file_id)
-        with Image.open(io.BytesIO(data)) as shown:
-            assert media_type == "image/png" and shown.width == 1568 and shown.mode == "RGB"
-            assert shown.getpixel((0, 0)) == (255, 255, 255)
-        monkeypatch.setattr(identity_context, "current_uid", lambda: "account-b")
-        with pytest.raises(MergerError):
-            domain.desk.view(uploaded.file_id)
-    finally:
-        runtime.close()
-
-
 def test_native_upload_merge_and_isolation(caller, monkeypatch, tmp_path):
     import pikepdf
     from src.capabilities.pdf_merger.contract import MergePlan
