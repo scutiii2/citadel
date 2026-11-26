@@ -17,7 +17,7 @@ from src.tools.mcp_client import mcp_upstream
 
 
 def tool(name: str) -> types.Tool:
-    return types.Tool(name=name, description="d", inputSchema={"type": "object"})
+    return types.Tool(name=name, description="d", input_schema={"type": "object"})
 
 
 # main is Armory; bard and lens are Legion connections; main__bard__* is Armory's proxied extension of the same name.
@@ -143,7 +143,7 @@ def test_requester_metadata_reaches_armory_and_stronghold_with_chat_id_only_for_
 
 
 def test_an_outside_read_only_hint_does_not_skip_approval(upstream, monkeypatch):
-    annotated = CATALOG[-1].model_copy(update={"annotations": types.ToolAnnotations(readOnlyHint=True)})
+    annotated = CATALOG[-1].model_copy(update={"annotations": types.ToolAnnotations(read_only_hint=True)})
     monkeypatch.setattr(mcp_upstream.client, "list_tools", lambda: [annotated])
     assert listed(allow=("lens__*",)) == ["lens__tool_ocr"]
     policy = approvals.ApprovalPolicy("ask", read_only_check=mcp_upstream.is_read_only_builtin)

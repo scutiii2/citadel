@@ -23,7 +23,7 @@ from src.providers.decision.contract import DecisionError
 from src.tools.mcp_client import tool_progress
 from src.runtime.config_files import SETTINGS_DB
 from src.tools.mcp_client.sync_wrapper import SyncMcpClient
-from src.citadel_auth import ServiceAuth, settings_store
+from src.citadel_auth import settings_store
 from src.citadel_auth.failure import parse
 from src.runtime.service_catalog import catalog
 
@@ -104,8 +104,8 @@ def connect(url_override: str | None = None) -> None:
     client.connect_all(
         _CONFIG_PATH, url_overrides,
         auth_by_server={
-            _SERVER_ID: ServiceAuth(internal_auth.keyring, "armory"),
-            _STRONGHOLD_ID: ServiceAuth(internal_auth.keyring, _STRONGHOLD_ID),
+            _SERVER_ID: internal_auth.McpServiceAuth(internal_auth.keyring, "armory"),
+            _STRONGHOLD_ID: internal_auth.McpServiceAuth(internal_auth.keyring, _STRONGHOLD_ID),
         },
         builtins={_STRONGHOLD_ID: stronghold},
     )
@@ -153,7 +153,8 @@ def _remember_read_only(tools: list[Any]) -> None:
         for tool in tools
         if tool.name.startswith(_PREFIX)
         and "__" not in unprefixed(tool.name)  # an extension's tool arrives as main__<ext>__<tool>
-        and getattr(getattr(tool, "annotations", None), "readOnlyHint", None) is True
+        and (annotations := getattr(tool, "annotations", None)) is not None
+        and annotations.read_only_hint is True
     )
 
 
@@ -241,10 +242,10 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
     citadel_tool = name.startswith(_STRONGHOLD_PREFIX) or (
         name.startswith(_PREFIX) and "__" not in name.removeprefix(_PREFIX)
     )
-    if citadel_tool and getattr(result, "isError", False) and parse(text) is not None:
+    if citadel_tool and result.is_error and parse(text) is not None:
         return NumberedFailureText(text)
     if name == f"{_PREFIX}tool_web_search":
-        structured = getattr(result, "structuredContent", None) or {}
+        structured = result.structured_content
         hits = structured.get("results", [])
         snippets = "\n\n".join(
             hit["snippet"] for hit in hits if isinstance(hit, dict) and isinstance(hit.get("snippet"), str)

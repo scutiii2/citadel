@@ -1,5 +1,5 @@
 """server.py tests: the ask/status/cancel tool contracts, with
-agent_config mocked - FastMCP's @mcp.tool() decorator returns the
+agent_config mocked - MCPServer's @mcp.tool() decorator returns the
 wrapped function unchanged, so these are called directly as plain
 Python functions, no MCP transport involved. ask is now async,
 so tests wrap the call in asyncio.run().
@@ -280,7 +280,6 @@ def test_laya_main_serves_health_while_warming_without_an_upstream_connection(mo
 
     import httpx
 
-    monkeypatch.setattr(server.mcp, "_session_manager", None)
     warmed, serving = threading.Event(), threading.Event()
 
     def prepare():
@@ -324,8 +323,6 @@ def test_laya_load_failure_does_not_register_an_unavailable_agent(monkeypatch):
     from src.providers.decision import provider
 
     monkeypatch.setattr(server.agent_config, "PROVIDER_ID", "decision")
-
-    monkeypatch.setattr(server.mcp, "_session_manager", None)
 
     def fail():
         raise RuntimeError("weights could not load")
@@ -441,5 +438,5 @@ def test_ask_reports_the_tier_models_context_window_only_when_tiered():
 def test_the_ask_tool_has_no_enabled_extensions_argument():
     tools = asyncio.run(server.mcp.list_tools())
     ask = next(tool for tool in tools if tool.name == "ask")
-    assert "enabled_extensions" not in ask.inputSchema["properties"]
-    assert "private_extensions" in ask.inputSchema["properties"]
+    assert "enabled_extensions" not in ask.input_schema["properties"]
+    assert "private_extensions" in ask.input_schema["properties"]

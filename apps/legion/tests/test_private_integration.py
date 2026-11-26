@@ -12,10 +12,10 @@ import socket
 import threading
 import time
 
-import httpx
+import httpx2
 import pytest
 import uvicorn
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from src.tools.private_extensions import guard
 from src.tools.private_extensions.pool import PrivateSessionPool
@@ -52,7 +52,7 @@ class Auth:
 class Server:
     def __init__(self, port: int):
         self.port = port
-        mcp = FastMCP("smoke", port=port)
+        mcp = MCPServer("smoke")
 
         @mcp.tool()
         def echo(text: str) -> str:
@@ -60,7 +60,7 @@ class Server:
             return text
 
         config = uvicorn.Config(
-            Auth(mcp.streamable_http_app()), host="127.0.0.1", port=port, log_level="warning",
+            Auth(mcp.streamable_http_app(host="127.0.0.1")), host="127.0.0.1", port=port, log_level="warning",
             # Do not wait on a client's open stream when the test ends.
             timeout_graceful_shutdown=1,
         )
@@ -149,7 +149,7 @@ def test_nothing_listening_is_a_connect_error_and_the_pool_still_works(server):
     async def go():
         pool = PrivateSessionPool()
         try:
-            with pytest.raises(httpx.ConnectError):
+            with pytest.raises(httpx2.ConnectError):
                 await pool.tools("a@x", dead)
             return [t.name for t in await pool.tools("a@x", spec_for(server.port))]
         finally:

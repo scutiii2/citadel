@@ -7,10 +7,10 @@ import socket
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import replace
 
-import httpx
+import httpx2
 import pytest
-from mcp import types
-from mcp.shared.exceptions import McpError
+from mcp.shared.exceptions import MCPError
+from mcp_types import CONNECTION_CLOSED, REQUEST_TIMEOUT
 
 from src.tools.mcp_client import registry as registry_module
 from src.tools.mcp_client.config import validate_server
@@ -122,10 +122,10 @@ def test_it_returns_to_the_primary_when_the_cooldown_has_passed(world):
 
 
 @pytest.mark.parametrize("error, expected", [
-    (ConnectionError("x"), True), (TimeoutError(), True), (httpx.ConnectError("x"), True),
-    (httpx.ReadTimeout("x"), True),
-    (McpError(types.ErrorData(code=408, message="timed out")), True),
-    (McpError(types.ErrorData(code=-32602, message="bad params")), False),
+    (ConnectionError("x"), True), (TimeoutError(), True), (httpx2.ConnectError("x"), True),
+    (httpx2.ReadTimeout("x"), True),
+    (MCPError(REQUEST_TIMEOUT, "timed out"), True), (MCPError(CONNECTION_CLOSED, "closed"), True),
+    (MCPError(-32602, "bad params"), False),
     (ValueError("x"), False), (RuntimeError("Session terminated"), False),
 ])
 def test_only_a_dead_or_silent_origin_counts_as_a_connection_failure(error, expected):
@@ -138,7 +138,7 @@ def test_a_rejected_handshake_does_not_try_another_origin(world, monkeypatch):
 
     async def denied(_stack, config, _timeout, _headers):
         attempted.append(config.url)
-        raise McpError(types.ErrorData(code=403, message="denied"))
+        raise MCPError(403, "denied")
 
     monkeypatch.setattr(registry_module, "open_session", denied)
     status = asyncio.run(registry._connect_one("bard", registry._configs["bard"]))
@@ -179,17 +179,15 @@ def test_an_origin_transport_rejects_a_different_scheme_before_sending_credentia
         return None
 
     @asynccontextmanager
-    async def attempt(url, *, headers, httpx_client_factory=None):
-        assert httpx_client_factory is not None
-        async with httpx_client_factory(headers=headers) as client:
-            for check in client.event_hooks["request"]:
-                await check(httpx.Request("POST", url))
-                await check(httpx.Request("POST", "https://one/mcp"))
+    async def attempt(url, *, http_client):
+        for check in http_client.event_hooks["request"]:
+            await check(httpx2.Request("POST", url))
+            await check(httpx2.Request("POST", "https://one/mcp"))
         pytest.fail("Unlisted origin was accepted")
         yield
 
     monkeypatch.setattr(transports, "_check_tcp_reachable", reachable)
-    monkeypatch.setattr(transports, "streamablehttp_client", attempt)
+    monkeypatch.setattr(transports, "streamable_http_client", attempt)
     target = replace(validate_server("bard", ENTRY), url="http://one/mcp")
 
     async def connect():
@@ -206,15 +204,15 @@ def test_a_call_timeout_does_not_mask_the_transport_owner_http_refusal(world, mo
     async def run():
         refused, closed = asyncio.Event(), asyncio.Event()
         target_url = "http://one:1/mcp"
-        request = httpx.Request("POST", target_url)
-        refusal = httpx.HTTPStatusError("Unauthorized", request=request,
-                                       response=httpx.Response(401, request=request))
+        request = httpx2.Request("POST", target_url)
+        refusal = httpx2.HTTPStatusError("Unauthorized", request=request,
+                                       response=httpx2.Response(401, request=request))
 
         class RefusedSession(_Session):
             async def call_tool(self, name, arguments, read_timeout_seconds, **extra):
                 refused.set()
                 await closed.wait()
-                raise McpError(types.ErrorData(code=408, message="timed out"))
+                raise MCPError(REQUEST_TIMEOUT, "timed out")
 
         @asynccontextmanager
         async def transport():
@@ -238,7 +236,7 @@ def test_a_call_timeout_does_not_mask_the_transport_owner_http_refusal(world, mo
         monkeypatch.setattr(registry_module, "open_session", fake_open)
         try:
             assert (await registry._connect_one("bard", registry._configs["bard"])).origin_id == "o1"
-            with pytest.raises(McpError):
+            with pytest.raises(MCPError):
                 await registry.call_tool("bard__x", {})
             assert registry.statuses()[0].origin_id == "o1"
         finally:

@@ -5,7 +5,7 @@ import time
 from types import SimpleNamespace
 
 import uvicorn
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 
 from src.agents import agent_spec
 from src.agents.roles.router import router_client, router_service
@@ -21,7 +21,7 @@ def test_real_mcp_route_roundtrip_has_token_and_structured_response(monkeypatch,
             return RouteResponse(policy_revision=policy.revision())
     monkeypatch.setattr(router_service, "_engine", Engine())
     port = free_port()
-    mcp = FastMCP("router-transport-test", port=port)
+    mcp = MCPServer("router-transport-test")
     seen = []
 
     @mcp.tool()
@@ -31,7 +31,7 @@ def test_real_mcp_route_roundtrip_has_token_and_structured_response(monkeypatch,
         return await router_service.route(request, headers)
 
     internal_auth.install_mcp(mcp)
-    app = mcp.streamable_http_app()
+    app = mcp.streamable_http_app(host="127.0.0.1")
     internal_auth.install_auth(app)
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port,
         log_level="warning", timeout_graceful_shutdown=1))

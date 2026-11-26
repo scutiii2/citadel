@@ -10,7 +10,6 @@ import json
 import os
 import sys
 import tempfile
-from datetime import timedelta
 from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
@@ -37,14 +36,14 @@ async def check() -> None:
             cwd=str(PROJECT), env=env,
         )
         async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write, read_timeout_seconds=timedelta(seconds=120)) as session:
+            async with ClientSession(read, write, read_timeout_seconds=120.0) as session:
                 await session.initialize()
                 status = await session.call_tool("status", {})
                 status_data = json.loads(status.content[0].text)
                 assert status_data["provider_id"] == "decision"
                 assert status_data["context_window"] is None
                 result = await session.call_tool("ask", {"question": json.dumps({"text": "SQLite database is locked; the SQL write failed.", "questions": TRIAGE_QUESTIONS})})
-                assert not result.isError, result.content
+                assert not result.is_error, result.content
                 data = json.loads(result.content[0].text)
                 assert data["provider_id"] == "decision"
                 assert data["output_tokens"] == 0

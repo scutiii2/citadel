@@ -19,7 +19,7 @@ RAW = [
 def tool(name: str, description: str = "does a thing") -> types.Tool:
     return types.Tool(
         name=name, description=description,
-        inputSchema={"type": "object", "properties": {"q": {"type": "string"}}},
+        input_schema={"type": "object", "properties": {"q": {"type": "string"}}},
     )
 
 
@@ -90,7 +90,7 @@ def test_a_namespaced_tool_keeps_its_schema_and_says_where_it_is_from():
     turn = loaded(pool=FakePool({"notes": [tool("search", "Find notes.")]}))
     only = next(t for t in turn.tools() if t.name == "u_notes__search")
 
-    assert only.inputSchema["properties"]["q"] == {"type": "string"}
+    assert only.input_schema["properties"]["q"] == {"type": "string"}
     assert only.description.startswith("Find notes.")
     assert "Notes" in only.description
 

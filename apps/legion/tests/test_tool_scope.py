@@ -17,7 +17,7 @@ from src.agents.agent_spec import AgentSpec, LlmSpec, ToolScope
 
 
 def _tool(name):
-    return SimpleNamespace(name=name, description="", inputSchema={})
+    return SimpleNamespace(name=name, description="", input_schema={})
 
 
 @pytest.fixture

@@ -29,8 +29,8 @@ from contextvars import ContextVar, Token
 from typing import Any
 
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
-from src.citadel_auth import ServiceAuth
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared._httpx_utils import create_mcp_http_client
 
 from src.agents import agent_events, agent_registry, agent_spec
 from src.agents.roles.orchestrator import plan
@@ -169,16 +169,19 @@ async def _call_tool(url: str, name: str, arguments: dict[str, Any], on_progress
     # usefully.
     # The shared token (peers require it) and the asking user, so the
     # delegate's own mcp_server calls carry them on too.
-    async with streamablehttp_client(url, headers=internal_auth.outbound_headers() or None,
-                                     auth=ServiceAuth(internal_auth.keyring, "legion")) as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(name, arguments, progress_callback=on_progress)
+    async with create_mcp_http_client(
+        headers=internal_auth.outbound_headers() or None,
+        auth=internal_auth.McpServiceAuth(internal_auth.keyring, "legion"),
+    ) as http:
+        async with streamable_http_client(url, http_client=http) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(name, arguments, progress_callback=on_progress)
 
-    if result.isError:
+    if result.is_error:
         parts = [getattr(block, "text", str(block)) for block in result.content]
         raise RuntimeError("\n".join(parts) if parts else f"{name} failed")
-    return result.structuredContent or {}
+    return result.structured_content or {}
 
 
 async def _ask_linked(url: str, arguments: dict[str, Any], on_progress: Any) -> dict[str, Any]:

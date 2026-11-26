@@ -34,7 +34,7 @@ def _clean(monkeypatch):
 
 
 def tool(name: str, read_only):
-    annotations = None if read_only is None else SimpleNamespace(readOnlyHint=read_only)
+    annotations = None if read_only is None else SimpleNamespace(read_only_hint=read_only)
     return SimpleNamespace(name=name, annotations=annotations)
 
 

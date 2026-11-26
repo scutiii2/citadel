@@ -46,8 +46,8 @@ def _namespace(spec: PrivateSpec, tools: list[types.Tool]) -> tuple[list[tuple[t
                 types.Tool(
                     name=name,
                     description=f"{description}\n\n{note}" if description else note,
-                    inputSchema=inline_refs(tool.inputSchema),
-                    outputSchema=tool.outputSchema,
+                    input_schema=inline_refs(tool.input_schema),
+                    output_schema=tool.output_schema,
                     _meta=tool.meta,
                     annotations=tool.annotations,
                     icons=tool.icons,

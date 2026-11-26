@@ -19,7 +19,7 @@ import socket
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-import httpx
+import httpx2
 
 MAX_REDIRECTS = 3
 Resolver = Callable[[str, int], Awaitable[list[str]]]
@@ -76,22 +76,22 @@ async def checked_addresses(host: str, port: int, resolver: Resolver = system_re
         try:
             addresses = await resolver(bare, port)
         except OSError as error:
-            raise httpx.ConnectError("Couldn't resolve the host") from error
+            raise httpx2.ConnectError("Couldn't resolve the host") from error
     if not addresses:
-        raise httpx.ConnectError("Couldn't resolve the host")
+        raise httpx2.ConnectError("Couldn't resolve the host")
     if any(is_blocked(address) for address in addresses):
         raise BlockedAddress()
     return addresses
 
 
-class GuardedTransport(httpx.AsyncBaseTransport):
+class GuardedTransport(httpx2.AsyncBaseTransport):
     """Checks the host of every request, then sends it to the checked IP."""
 
-    def __init__(self, resolver: Resolver = system_resolver, inner: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(self, resolver: Resolver = system_resolver, inner: httpx2.AsyncBaseTransport | None = None) -> None:
         self._resolver = resolver
-        self._inner = inner if inner is not None else httpx.AsyncHTTPTransport()
+        self._inner = inner if inner is not None else httpx2.AsyncHTTPTransport()
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         host = request.url.host
         port = request.url.port or (443 if request.url.scheme == "https" else 80)
         addresses = await checked_addresses(host, port, self._resolver)
@@ -99,7 +99,7 @@ class GuardedTransport(httpx.AsyncBaseTransport):
         if request.url.scheme == "https":
             # The certificate is checked against the name, not the pinned IP.
             extensions["sni_hostname"] = host
-        pinned = httpx.Request(
+        pinned = httpx2.Request(
             request.method,
             request.url.copy_with(host=addresses[0]),
             headers=request.headers,
@@ -112,11 +112,11 @@ class GuardedTransport(httpx.AsyncBaseTransport):
         await self._inner.aclose()
 
 
-def _origin(url: httpx.URL) -> tuple[str, str, int]:
+def _origin(url: httpx2.URL) -> tuple[str, str, int]:
     return (url.scheme, url.host, url.port or (443 if url.scheme == "https" else 80))
 
 
-async def _refuse_foreign_redirect(response: httpx.Response) -> None:
+async def _refuse_foreign_redirect(response: httpx2.Response) -> None:
     if not response.is_redirect:
         return
     location = response.headers.get("location")
@@ -127,19 +127,19 @@ async def _refuse_foreign_redirect(response: httpx.Response) -> None:
 
 
 def guarded_client_factory(
-    resolver: Resolver = system_resolver, inner: httpx.AsyncBaseTransport | None = None
-) -> Callable[..., httpx.AsyncClient]:
-    """A factory with the shape the MCP SDK's `httpx_client_factory` expects."""
+    resolver: Resolver = system_resolver, inner: httpx2.AsyncBaseTransport | None = None
+) -> Callable[..., httpx2.AsyncClient]:
+    """A factory for the HTTP client of one private extension connection."""
 
     def factory(
         headers: dict[str, str] | None = None,
-        timeout: httpx.Timeout | None = None,
-        auth: httpx.Auth | None = None,
-    ) -> httpx.AsyncClient:
-        return httpx.AsyncClient(
+        timeout: httpx2.Timeout | None = None,
+        auth: httpx2.Auth | None = None,
+    ) -> httpx2.AsyncClient:
+        return httpx2.AsyncClient(
             transport=GuardedTransport(resolver, inner),
             headers=headers,
-            timeout=timeout if timeout is not None else httpx.Timeout(30.0),
+            timeout=timeout if timeout is not None else httpx2.Timeout(30.0, read=300.0),
             auth=auth,
             follow_redirects=True,
             max_redirects=MAX_REDIRECTS,

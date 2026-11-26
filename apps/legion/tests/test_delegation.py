@@ -1,6 +1,6 @@
 """delegation.py tests: availability/description built from the
 configured agent registry, the depth cap, unknown-agent handling, and
-the isError -> plain-exception translation - mirroring
+the is_error -> plain-exception translation - mirroring
 chat_app/tests/test_ai_agent_client.py's convention (asyncio.run() in a
 plain test function, no pytest-asyncio plugin needed).
 """
@@ -151,7 +151,7 @@ def _fake_session(*, is_error: bool, content: list, structured: dict | None):
     session = AsyncMock()
     session.initialize = AsyncMock(return_value=None)
     session.call_tool = AsyncMock(
-        return_value=SimpleNamespace(isError=is_error, content=content, structuredContent=structured)
+        return_value=SimpleNamespace(is_error=is_error, content=content, structured_content=structured)
     )
     return session
 
@@ -170,7 +170,7 @@ def _cm(value):
 def test_call_tool_raises_plain_exception_on_iserror_result():
     session = _fake_session(is_error=True, content=[SimpleNamespace(text="openai is rate-limited")], structured=None)
 
-    with patch("src.agents.roles.orchestrator.delegation.streamablehttp_client", return_value=_cm((None, None, None))), \
+    with patch("src.agents.roles.orchestrator.delegation.streamable_http_client", return_value=_cm((None, None))), \
          patch("src.agents.roles.orchestrator.delegation.ClientSession", return_value=_cm(session)):
         try:
             asyncio.run(delegation._call_tool("http://127.0.0.1:9101/mcp", "ask", {}))

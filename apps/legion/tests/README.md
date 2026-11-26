@@ -9,5 +9,5 @@ API call.
 - **`test_anthropic_provider.py`, `test_openai_provider.py`** - the 6-round
   tool-calling loop, cancellation checkpoint, and rate-limit cooldown,
   with the SDK client and `src.tools.mcp_client.mcp_upstream` both mocked.
-- **`test_server.py`** - the `ask`/`status`/`cancel` FastMCP tool
+- **`test_server.py`** - the `ask`/`status`/`cancel` MCP tool
   contracts, with `agent_config` mocked.

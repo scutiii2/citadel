@@ -1,4 +1,4 @@
-"""ai_agent entry point - a FastMCP server exposing ask/status/cancel
+"""ai_agent entry point - an MCP server exposing ask/status/cancel
 tools to chat_app, backed by one pinned LLM provider (agent_config.py)
 that itself talks to mcp_server as an MCP client (mcp_upstream.py).
 
@@ -56,7 +56,7 @@ except agent_spec.AgentSpecError as _exc:
     sys.exit(1)
 
 import uvicorn
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -117,15 +117,16 @@ except ValueError as _exc:
     sys.stderr.write(f"\nai_agent cannot start - configuration error:\n  {_exc}\n\n")
     sys.exit(1)
 
-mcp = FastMCP(
+# `ask` carries the whole chat history; the SDK's 4 MiB default would refuse long chats.
+MAX_REQUEST_BYTES = 32 * 1024 * 1024
+
+mcp = MCPServer(
     name=f"ai-agent-{_AGENT_ID}",
     instructions=(
         f"Chat agent backed by {agent_config.PROVIDER_ID} "
         f"({agent_config.MODEL or 'provider default'}), with tool access to "
         "mcp_server. Call ask() with a question."
     ),
-    host=HOST,
-    port=PORT,
 )
 
 
@@ -223,10 +224,10 @@ async def ask(
 
     exact_context: count what fills the context window with the provider's own
     token counter; the result's `context_breakdown_exact` says whether that worked.
-    ctx, if the MCP client requested it, is FastMCP's injected Context -
+    ctx, if the MCP client requested it, is the MCP server's injected Context -
     used below only to relay run_chat's live step/token events as MCP
     progress notifications; chat_app's own tool call never needs to pass
-    it explicitly, FastMCP supplies it automatically per request."""
+    it explicitly, the MCP server supplies it automatically per request."""
 
     if SPEC.internal_role == "router":
         raise ValueError("Router is internal; ask is unavailable")
@@ -767,7 +768,7 @@ def main() -> None:
         # via portcullis's proxy), never a browser - which is also why /mcp
         # can require the shared internal token (once one is configured).
         internal_auth.install_mcp(mcp)
-        app = mcp.streamable_http_app()
+        app = mcp.streamable_http_app(host=HOST, max_request_body_size=MAX_REQUEST_BYTES)
         internal_auth.install_auth(app)
         previous_lifespan = app.router.lifespan_context
 

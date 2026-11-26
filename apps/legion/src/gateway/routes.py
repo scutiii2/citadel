@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -95,7 +95,7 @@ def _forget() -> None:
     decision_client.reset_cache()
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
     @mcp.custom_route("/agents/model-gateways/{kind}", methods=["GET"])
     async def listing(request: Request) -> JSONResponse:
         kind = request.path_params["kind"]

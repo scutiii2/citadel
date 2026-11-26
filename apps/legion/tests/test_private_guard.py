@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import asyncio
 
-import httpx
+import httpx2
 import pytest
 
 from src.tools.private_extensions import guard
@@ -65,7 +65,7 @@ def test_a_name_that_does_not_resolve_is_a_connect_error():
     async def failing(host, port):
         raise OSError("nope")
 
-    with pytest.raises(httpx.ConnectError):
+    with pytest.raises(httpx2.ConnectError):
         run(guard.checked_addresses("nowhere.test", 80, failing))
 
 
@@ -76,21 +76,21 @@ def test_localhost_is_blocked_with_the_real_resolver():
 
 class Recorder:
     def __init__(self):
-        self.seen: list[httpx.Request] = []
+        self.seen: list[httpx2.Request] = []
 
-    def __call__(self, request: httpx.Request) -> httpx.Response:
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
         self.seen.append(request)
         if request.url.path == "/hop":
-            return httpx.Response(307, headers={"location": "/mcp/"})
+            return httpx2.Response(307, headers={"location": "/mcp/"})
         if request.url.path == "/away":
-            return httpx.Response(307, headers={"location": "http://other.test/x"})
+            return httpx2.Response(307, headers={"location": "http://other.test/x"})
         if request.url.path == "/loop":
-            return httpx.Response(307, headers={"location": "/loop"})
-        return httpx.Response(200, json={"ok": True})
+            return httpx2.Response(307, headers={"location": "/loop"})
+        return httpx2.Response(200, json={"ok": True})
 
 
-def client(recorder: Recorder, **headers) -> httpx.AsyncClient:
-    return guard.guarded_client_factory(resolver, httpx.MockTransport(recorder))(headers or None)
+def client(recorder: Recorder, **headers) -> httpx2.AsyncClient:
+    return guard.guarded_client_factory(resolver, httpx2.MockTransport(recorder))(headers or None)
 
 
 def test_the_request_goes_to_the_checked_address_with_the_host_kept():
@@ -176,6 +176,6 @@ def test_a_redirect_loop_stops():
         async with client(recorder) as c:
             await c.post("http://example.com/loop", json={})
 
-    with pytest.raises(httpx.TooManyRedirects):
+    with pytest.raises(httpx2.TooManyRedirects):
         run(go())
     assert len(recorder.seen) <= guard.MAX_REDIRECTS + 1

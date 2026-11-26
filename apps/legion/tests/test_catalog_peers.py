@@ -45,14 +45,14 @@ def test_open_session_resolves_callable_again_after_reconnect(monkeypatch):
         targets.append(url)
     @asynccontextmanager
     async def stream(url, **kwargs):
-        yield (None, None, None)
+        yield (None, None)
     class Session:
         def __init__(self, *args, **kwargs): pass
         async def __aenter__(self): return self
         async def __aexit__(self, *args): pass
         async def initialize(self): pass
     monkeypatch.setattr(transports, "_check_tcp_reachable", reachable)
-    monkeypatch.setattr(transports, "streamablehttp_client", stream)
+    monkeypatch.setattr(transports, "streamable_http_client", stream)
     monkeypatch.setattr(transports, "ClientSession", Session)
     server = config.ServerConfig("main", "Armory", "", "http", url=lambda: current["url"])
     async def go():

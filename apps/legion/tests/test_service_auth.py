@@ -4,9 +4,6 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from mcp.server.lowlevel.server import request_ctx
-from mcp.shared.context import RequestContext
-from mcp.types import RequestParams
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 
@@ -34,35 +31,32 @@ async def _running_requester_uses_verified_renewal_without_changing_identity(tmp
     monkeypatch.setattr(internal_auth, "keyring", stack["legion"])
     original = mint_requester(stack["portcullis"], "alice", "alice", "", ["legion", "armory"])
     renewed = mint_requester(stack["portcullis"], "alice", "alice", "", ["legion", "armory"])
-    context = RequestContext(request_id=1, meta=RequestParams.Meta(requester_token=original), session=None,
-        lifespan_context=None, request=SimpleNamespace(scope={"citadel_auth": (Caller("stronghold"), None, "")}))
-    handle = request_ctx.set(context)
-    try:
-        async with internal_auth.mcp_requester():
-            assert internal_auth.requester_meta()["requester_token"] == original
-            # A separate status request updates the credential while the original ask context lives.
-            async def status_update():
-                update = RequestContext(request_id=2, meta=RequestParams.Meta(requester_token=renewed),
-                    session=None, lifespan_context=None, request=context.request)
-                token = request_ctx.set(update)
-                try:
-                    async with internal_auth.mcp_requester():
-                        pass
-                finally:
-                    request_ctx.reset(token)
-            await asyncio.create_task(status_update())
-            assert internal_auth.current_requester().uid == "alice"
-            assert internal_auth.requester_meta()["requester_token"] == renewed
-        context.meta = RequestParams.Meta(requester={"uid": "forged"})
-        async with internal_auth.mcp_requester():
-            assert not internal_auth.current_requester()
-            assert internal_auth.requester_meta() is None
-        context.meta = RequestParams.Meta(requester_token="forged")
-        with pytest.raises(AuthError):
-            async with internal_auth.mcp_requester():
-                pytest.fail("forged requester reached tool")
-    finally:
-        request_ctx.reset(handle)
+    request = SimpleNamespace(scope={"citadel_auth": (Caller("stronghold"), None, "")})
+
+    def context(meta):
+        return SimpleNamespace(method="tools/call", request=request, meta=meta)
+
+    async with internal_auth.mcp_requester(context({"requester_token": original})):
+        assert internal_auth.requester_meta()["requester_token"] == original
+        # A separate status request updates the credential while the original ask context lives.
+        async def status_update():
+            async with internal_auth.mcp_requester(context({"requester_token": renewed})):
+                pass
+        await asyncio.create_task(status_update())
+        assert internal_auth.current_requester().uid == "alice"
+        assert internal_auth.requester_meta()["requester_token"] == renewed
+    async with internal_auth.mcp_requester(context({"requester": {"uid": "forged"}})):
+        assert not internal_auth.current_requester()
+        assert internal_auth.requester_meta() is None
+    with pytest.raises(AuthError):
+        async with internal_auth.mcp_requester(context({"requester_token": "forged"})):
+            pytest.fail("forged requester reached tool")
+
+    async def tool(_context):
+        pytest.fail("forged requester reached tool")
+
+    refused = await internal_auth.requester_middleware(context({"requester_token": "forged"}), tool)
+    assert refused.is_error
 
 
 def test_inbound_policy_and_unsigned_headers(tmp_path):

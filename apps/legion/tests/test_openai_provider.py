@@ -47,7 +47,7 @@ def _fake_tool():
     return SimpleNamespace(
         name="get_status_tool",
         description="Get the status of a resource.",
-        inputSchema={"type": "object", "properties": {"resource_id": {"type": "string"}}},
+        input_schema={"type": "object", "properties": {"resource_id": {"type": "string"}}},
     )
 
 

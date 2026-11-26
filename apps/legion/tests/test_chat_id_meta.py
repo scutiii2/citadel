@@ -39,7 +39,7 @@ def test_ask_binds_the_optional_chat_id_only_during_the_turn(monkeypatch, chat_a
 
     monkeypatch.setattr(server.agent_config, "run_chat", run_chat)
     async def run():
-        schema = next(tool.inputSchema for tool in await server.mcp.list_tools() if tool.name == "ask")
+        schema = next(tool.input_schema for tool in await server.mcp.list_tools() if tool.name == "ask")
         assert "chat_id" in schema["properties"] and "chat_id" not in schema["required"]
         assert (await server.ask("question", **chat_args))["response"] == "answer"
         assert not internal_auth.current_requester().chat_id

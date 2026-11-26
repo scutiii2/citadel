@@ -78,9 +78,9 @@ def test_a_ref_that_is_not_local_is_left_as_it_is() -> None:
 
 
 def test_namespacing_inlines_the_schema() -> None:
-    tool = types.Tool(name="tool_pdf_merge", description="d", inputSchema=PDF_MERGE)
+    tool = types.Tool(name="tool_pdf_merge", description="d", input_schema=PDF_MERGE)
 
     (namespaced,) = _namespace("pdf", [tool])
 
     assert namespaced.name == "pdf__tool_pdf_merge"
-    assert "$ref" not in str(namespaced.inputSchema)
+    assert "$ref" not in str(namespaced.input_schema)

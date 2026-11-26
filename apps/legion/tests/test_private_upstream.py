@@ -27,7 +27,7 @@ class FakePool:
         self.probed = []
 
     async def tools(self, account, spec):
-        return [types.Tool(name="search", description="Find.", inputSchema={"type": "object"})]
+        return [types.Tool(name="search", description="Find.", input_schema={"type": "object"})]
 
     async def call(self, account, spec, tool, arguments):
         if self.error:
@@ -39,7 +39,7 @@ class FakePool:
         self.probed.append(spec)
         if spec.url.endswith("/down"):
             raise ConnectionError(f"refused for {spec.header_map.get('X-Key', '')}")
-        return [types.Tool(name="search", inputSchema={"type": "object"}), types.Tool(name="add", inputSchema={"type": "object"})]
+        return [types.Tool(name="search", input_schema={"type": "object"}), types.Tool(name="add", input_schema={"type": "object"})]
 
     async def aclose(self):
         pass

@@ -128,20 +128,18 @@ def test_only_the_trusted_http_destination_gets_internal_credentials(tmp_path, m
 
 def test_stronghold_stream_rejects_cross_origin_redirects(monkeypatch):
     from contextlib import AsyncExitStack, asynccontextmanager
-    from functools import partial
+
+    import httpx2
 
     from src.tools.mcp_client import transports
     from src.tools.mcp_client.config import validate_server
-
-    transport_options = {}
 
     async def reachable(url, timeout):
         pass
 
     @asynccontextmanager
     async def stream(url, **options):
-        transport_options.update(options)
-        yield None, None, None
+        yield None, None
 
     class Session:
         def __init__(self, *args, **kwargs):
@@ -157,15 +155,21 @@ def test_stronghold_stream_rejects_cross_origin_redirects(monkeypatch):
             pass
 
     monkeypatch.setattr(transports, "_check_tcp_reachable", reachable)
-    monkeypatch.setattr(transports, "streamablehttp_client", stream)
+    monkeypatch.setattr(transports, "streamable_http_client", stream)
     monkeypatch.setattr(transports, "ClientSession", Session)
+    guarded = []
+    real = transports._origin_client
+
+    def origin_client(url, **options):
+        guarded.append(url)
+        return real(url, **options)
+
+    monkeypatch.setattr(transports, "_origin_client", origin_client)
     config = validate_server("stronghold", STRONGHOLD["stronghold"])
 
     async def run():
         async with AsyncExitStack() as stack:
-            await transports.open_session(stack, config, 1, auth=object())
+            await transports.open_session(stack, config, 1, auth=httpx2.BasicAuth("user", "password"))
 
     asyncio.run(run())
-    factory = transport_options["httpx_client_factory"]
-    assert isinstance(factory, partial) and factory.func is transports._origin_client
-    assert factory.args == ("http://stronghold.test/mcp",)
+    assert guarded == ["http://stronghold.test/mcp"]

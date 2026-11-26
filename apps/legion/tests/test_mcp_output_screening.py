@@ -19,7 +19,7 @@ def test_public_search_sends_only_snippets_to_jev_and_flags_injection(monkeypatc
 
     result = CallToolResult(
         content=[TextContent(type="text", text=f"{query}: {snippets}")],
-        structuredContent={"query": query, "results": [{"snippet": snippets}]},
+        structured_content={"query": query, "results": [{"snippet": snippets}]},
     )
     monkeypatch.setattr(mcp_upstream.client, "call_tool", lambda *args, **kwargs: result)
     monkeypatch.setattr(mcp_upstream.agent_spec, "current", lambda: SimpleNamespace(tools=ToolScope()))

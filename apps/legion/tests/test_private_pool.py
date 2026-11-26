@@ -7,7 +7,8 @@ import asyncio
 
 import pytest
 from mcp import types
-from mcp.shared.exceptions import McpError
+from mcp.shared.exceptions import MCPError
+from mcp_types import CONNECTION_CLOSED, INVALID_REQUEST
 
 from src.tools.private_extensions.pool import PrivateSessionPool
 from src.tools.private_extensions.spec import PrivateSpec
@@ -24,7 +25,7 @@ class FakeSession:
         self.fail_once: Exception | None = None
 
     async def list_tools(self):
-        return types.ListToolsResult(tools=[types.Tool(name="echo", inputSchema={"type": "object", "properties": {}})])
+        return types.ListToolsResult(tools=[types.Tool(name="echo", input_schema={"type": "object", "properties": {}})])
 
     async def call_tool(self, name, arguments, read_timeout_seconds=None):
         if self.fail_once is not None:
@@ -160,7 +161,7 @@ def test_a_terminated_session_is_replaced_and_the_call_retried_once():
 
     async def go():
         await h.pool.call("a@x", spec(), "echo", {})
-        h.sessions[0].fail_once = RuntimeError("Session terminated")
+        h.sessions[0].fail_once = MCPError(INVALID_REQUEST, "Session terminated")
         return await h.pool.call("a@x", spec(), "echo", {"n": 1})
 
     result = run(go())
@@ -189,7 +190,7 @@ def test_an_mcp_error_saying_the_session_terminated_is_retried_once():
 
     async def go():
         await h.pool.call("a@x", spec(), "echo", {})
-        h.sessions[0].fail_once = McpError(types.ErrorData(code=32600, message="Session terminated"))
+        h.sessions[0].fail_once = MCPError(32600, "Session terminated")
         return await h.pool.call("a@x", spec(), "echo", {"n": 1})
 
     result = run(go())
@@ -204,10 +205,10 @@ def test_an_mcp_error_with_another_message_is_not_retried():
 
     async def go():
         await h.pool.call("a@x", spec(), "echo", {})
-        h.sessions[0].fail_once = McpError(types.ErrorData(code=-32602, message="Invalid params"))
+        h.sessions[0].fail_once = MCPError(-32602, "Invalid params")
         await h.pool.call("a@x", spec(), "echo", {})
 
-    with pytest.raises(McpError, match="Invalid params"):
+    with pytest.raises(MCPError, match="Invalid params"):
         run(go())
     assert len(h.opened) == 1
 
@@ -255,3 +256,17 @@ def test_drop_closes_one_session():
 
     run(go())
     assert h.closed == ["one"]
+
+
+def test_a_closed_connection_is_dropped_and_the_call_is_not_replayed():
+    h = Harness()
+
+    async def go():
+        await h.pool.call("a@x", spec(), "echo", {})
+        h.sessions[0].fail_once = MCPError(CONNECTION_CLOSED, "Connection closed")
+        await h.pool.call("a@x", spec(), "echo", {"n": 1})
+
+    with pytest.raises(MCPError, match="Connection closed"):
+        run(go())
+    assert len(h.opened) == 1
+    assert h.closed == ["notes"]
