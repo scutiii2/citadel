@@ -44,6 +44,13 @@ def test_ask_and_interpret_usage_record_actual_gateway(monkeypatch):
         assert own["gateway_switches"] == result.gateway_switches
 
 
+def test_ask_says_why_the_model_gateway_refused_a_turn(monkeypatch):
+    refusal = server.gateway_client.GatewayCallError(422, "gateway_refused", "The provider refused the request.")
+    monkeypatch.setattr(server.agent_config, "run_chat", AsyncMock(side_effect=refusal))
+    with pytest.raises(server.ToolError, match="The provider refused the request"):
+        asyncio.run(server.ask("hello"))
+
+
 def test_ask_returns_the_result_shape_chat_app_expects():
     """ask is now async and forwards the ChatResult from run_chat."""
     async def _run():

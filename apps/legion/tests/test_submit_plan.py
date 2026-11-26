@@ -41,6 +41,13 @@ def test_valid_forward_dependencies_and_schema():
     assert schema["additionalProperties"] is False
 
 
+def test_a_step_may_leave_out_depends_on():
+    bare = step()
+    del bare["depends_on"]
+    result, problem = submit_plan.validate({"steps": [bare]}, {"code-architect"})
+    assert problem is None and result.steps[0].depends_on == ()
+
+
 def test_catalog_drops_workers_before_architects_and_enforces_hard_cap():
     agents = [{"id": "code-architect", "role": "architect", "kind": "code", "focus": "Build code",
                "workers": ["worker"]},

@@ -73,6 +73,8 @@ def validate(arguments: Any, architect_ids: Collection[str], max_steps: int = MA
         if architect not in architect_ids:
             return None, f"{prefix}.architect {architect!r} is not in this turn's catalog."
         dependencies = item.get("depends_on")
+        if dependencies is None:  # models often leave it out of a step that depends on nothing
+            dependencies = []
         if (not isinstance(dependencies, list)
                 or not all(isinstance(key, str) and 1 <= len(key.strip()) <= 64 for key in dependencies)):
             return None, f"{prefix}.depends_on must be a list of step ids."

@@ -68,6 +68,15 @@ def setup_provider(monkeypatch, provider, batches):
     return stream
 
 
+def assert_final_tools(provider, stream):
+    """The Anthropic API refuses a history with tool calls and no tool definitions; OpenAI does not."""
+    tools = stream.call_args_list[-1].kwargs.get("tools")
+    if provider is anthropic_provider:
+        assert [tool["name"] for tool in tools] == ["submit_plan"]
+    else:
+        assert not tools
+
+
 @pytest.mark.parametrize("provider", [anthropic_provider, openai_provider])
 def test_one_repair_then_execute_and_synthesize(monkeypatch, plan_spec, provider):
     bad = {"steps": [step(depends_on=["missing"])]}
@@ -93,7 +102,7 @@ def test_one_repair_then_execute_and_synthesize(monkeypatch, plan_spec, provider
             assert calls == [("code-architect", step()["brief"], 0)]
             assert "code-architect" in str(stream.call_args_list[0])
             assert "Finished code" in str(stream.call_args_list[-1])
-            assert not stream.call_args_list[-1].kwargs.get("tools")
+            assert_final_tools(provider, stream)
             snapshots = [e["items"] for e in events if e["type"] == "plan_update"]
             assert snapshots[0][0]["status"] == "pending" and snapshots[-1][0]["status"] == "done"
         finally:
@@ -109,7 +118,7 @@ def test_second_invalid_plan_falls_back_directly_and_never_runs(monkeypatch, pla
     result = asyncio.run(provider.run_chat("build", []))
     assert result.response == "Direct reply" and len(result.tool_calls) == 2
     assert "Answer directly" in result.tool_calls[-1].result
-    assert not stream.call_args_list[-1].kwargs.get("tools")
+    assert_final_tools(provider, stream)
 
 
 @pytest.mark.parametrize("provider", [anthropic_provider, openai_provider])

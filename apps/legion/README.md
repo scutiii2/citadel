@@ -423,7 +423,9 @@ has 1–8 steps, unique ids, known dependencies, no cycles and self-contained
 briefs of 20–16,000 characters. The first rejection returns the exact validation
 error for one repair; a second rejection asks for a direct answer. Accepted
 plans execute through the shared DAG executor, then the model receives the
-results with no tools offered and writes the final reply. Architect-level code
+results and writes the final reply. A further plan is refused. The Anthropic
+loop keeps the two tools in that last request, because the API refuses a history
+with tool calls and no tool definitions; the OpenAI loop sends none. Architect-level code
 steps are read and may retry; operations and unknown kinds remain write. Unit-level read retries
 escalate light to standard to heavy; writes are never retried automatically.
 

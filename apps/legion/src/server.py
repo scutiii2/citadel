@@ -57,6 +57,7 @@ except agent_spec.AgentSpecError as _exc:
 
 import uvicorn
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -282,6 +283,9 @@ async def ask(
     except ArchitectError as error:
         result = ChatResult(response=str(error), status="failed", model_executed=False,
                             delegated_usage=error.agent_usage, provider_id=SPEC.llm.provider)
+    except gateway_client.GatewayCallError as error:
+        # The SDK hides any other exception's text; this one is scrubbed by the gateway and says why the turn failed.
+        raise ToolError(str(error)) from error
     finally:
         internal_auth.reset_requester(requester_token)
     own_usage = usage_log.own_row(
