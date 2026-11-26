@@ -28,7 +28,7 @@ types, and a tool that reads a stored file's text.
 
 ### Store
 
-- A service in `apps/armory/src/services/` (`user_files.py`), built on `session_file_store.py`. The code comes from
+- A service package in `apps/armory/src/services/user_files/`, built on `session_file_store.py`. The code comes from
   today's `pdf_merger` store, sniffing and download signing.
 - It is a service, not a capability, so uploads work whichever capabilities are switched on.
 - A record holds: id, owner (account id), name, media type, kind (`pdf`, `image`, `text`, `document`, `table`, `audio`),
@@ -37,7 +37,8 @@ types, and a tool that reads a stored file's text.
   `PLAIN_TEXT_SUFFIXES`; docx, xlsx, xlsm; mp3, wav, m4a, ogg, flac, webm. Anything else is refused. PDF and image content is
   checked by sniffing, as today.
 - Limits: 15 MB per upload (20 MB audio), 100 MB per stored file (merge results), 500 MB per account, 1 hour life. They
-  move to a `files` tuning document in `settings.db`. Merge-only limits stay in `pdf_merger`.
+  move to a `files` tuning document in `settings.db`. Merge-only limits stay in `pdf_merger`. Armory Admin's
+  Limits page gets a card for the `files` document.
 - The signing key and public base URL keep their current environment variable names.
 
 ### Routes (Armory)
@@ -147,7 +148,7 @@ refused.
 
 | Part | Redeploy |
 |---|---|
-| 1 | Armory, Portcullis, Legion |
+| 1 | Armory, Armory Admin, Portcullis, Legion |
 | 2 | Armory, Stronghold, Portcullis, Legion, Ember |
 | 3 | Armory, Stronghold, Legion, Ember |
 | 4 | Armory, Stronghold, Legion, Ember |
