@@ -2,8 +2,12 @@ import { computed, ref } from "vue";
 import { useAuthStore } from "../../../stores/auth";
 import { useToolConnectionsStore } from "../../../stores/toolConnections";
 import { attachmentsClient, type ReadPath } from "../../../api/files/AttachmentsClient";
-import { splitAttachments, DOCUMENT_FILE, fileText, markScan, withReadText } from "../../../utils/content/attachments";
+import {
+  splitAttachments, DOCUMENT_FILE, FILE_ONLY_QUESTION, fileText, imageFileId, isExpired, markScan, withReadText,
+} from "../../../utils/content/attachments";
 import { errorMessage } from "../../../utils/errors";
+
+const PICTURE_FILE = /\.(png|jpe?g|webp|gif)$/i;
 
 /** File uploads, previews, and input events for one chat composer. */
 export function useComposerAttachments() {
@@ -32,6 +36,11 @@ export function useComposerAttachments() {
     ocr?: "reading" | "error";
     /** How the file was read beyond its text preview. */
     read?: ReadPath;
+    /** A picture to preview: the file just added, or the stored one of a restored question. */
+    picture?: File;
+    imageId?: string;
+    /** The server no longer has a restored question's file. */
+    expired?: boolean;
   }
 
   let nextAttachmentId = 1;
@@ -51,6 +60,7 @@ export function useComposerAttachments() {
         rows: 0,
         columns: 0,
         error: "",
+        picture: PICTURE_FILE.test(file.name) ? file : undefined,
       };
       attachments.value.push(entry);
       const live = attachments.value[attachments.value.length - 1]!; // the reactive copy
@@ -157,13 +167,22 @@ export function useComposerAttachments() {
   function restoreAttachments(question: string): string {
     const { text, attachments: files } = splitAttachments(question);
     for (const file of files) {
-      attachments.value.push({ id: nextAttachmentId++, filename: file.filename, state: "ready", text: file.text, chars: file.chars, truncated: file.truncated, rows: 0, columns: 0, error: "" });
+      attachments.value.push({
+        id: nextAttachmentId++, filename: file.filename, state: "ready", text: file.text, chars: file.chars,
+        truncated: file.truncated, rows: 0, columns: 0, error: "", imageId: imageFileId(file.text), expired: isExpired(file.text),
+      });
     }
-    return text;
+    // The stand-in text of a files-only question is added again on send.
+    return files.length > 0 && text === FILE_ONLY_QUESTION ? "" : text;
+  }
+
+  /** The picture tile replaces the file's chip; a stored one needs the permission to load it. */
+  function showsPicture(a: PendingAttachment): boolean {
+    return a.state !== "error" && (!!a.picture || (!!a.imageId && auth.hasPermission("files.download")));
   }
 
   return {
     attachments, reading, ready, dragging,
-    removeAttachment, canRead, readWithOcr, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
+    removeAttachment, canRead, readWithOcr, restoreAttachments, showsPicture, onPick, onDragOver, onDragLeave, onDrop, onPaste,
   };
 }

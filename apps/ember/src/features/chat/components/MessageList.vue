@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import type {
   ApprovalDecision,
   ChatMessage,
@@ -14,14 +14,12 @@ import type {
 } from "../../../api/types";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
 import { agentLabelFor } from "../utils/agentLabels";
-import { growToContent } from "../../../utils/browser/autoGrow";
 import { FILE_ONLY_QUESTION, splitAttachments } from "../../../utils/content/attachments";
 import { hideDownloadMarkers, parseDownloads } from "../../../utils/content/downloads";
 import { clockTime, dayDividers, fullTime } from "../utils/messageTime";
 import { toolTitle } from "../../../utils/tools/toolTitles";
 import { bardClips } from "../../../utils/tools/bardAudio";
 import { compactNumber } from "../../../utils/analytics/usageFormat";
-import { ConfirmModal } from "@citadel/ui";
 import BardAudio from "./BardAudio.vue";
 import ReadAloudButton from "./ReadAloudButton.vue";
 import ChatAttachment from "../../../components/content/ChatAttachment.vue";
@@ -42,7 +40,6 @@ import ThinkingBar from "../../../components/ui/status/ThinkingBar.vue";
 
 const props = defineProps<{
   conversationId?: string | null;
-  draftScope?: number | null;
   messages: ChatMessage[];
   streaming: string;
   activity: string;
@@ -55,10 +52,12 @@ const props = defineProps<{
   busy: boolean;
   /** A command, branch or triage question is running (not an agent turn): shows its label as a live line. */
   working?: string;
-  /** Messages may be edited or the last answer redone (nothing is running). */
+  /** The last question may be retried or its answer redone, and answers branched (nothing is running). */
   canChange?: boolean;
   /** Index of the question whose answer Regenerate redoes; -1 for none. */
   regenerateIndex?: number;
+  /** Index of the question Retry puts back in the message box; -1 for none. */
+  retryIndex?: number;
   /** A message to scroll to and flash (a search result); null for none. */
   jumpIndex?: number | null;
   /** Tool runs waiting for the user's answer, and the ones already answered
@@ -88,7 +87,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   "save-prompt": [text: string];
   regenerate: [];
-  edit: [index: number, text: string];
+  retry: [index: number];
   branch: [index: number];
   jumped: [];
   decide: [stepId: string, decision: ApprovalDecision];
@@ -122,98 +121,6 @@ function savableText(index: number): string {
 
 function isDeciding(id: string): boolean {
   return props.deciding?.includes(id) ?? false;
-}
-
-// The question being edited (its index) and its draft text.
-const editingIndex = ref<number | null>(null);
-const editDraft = ref("");
-let editSource: ChatMessage | null = null;
-let editConversation: string | null | undefined;
-const drafts = new Map<string | null | undefined, { index: number; text: string; source: ChatMessage }>();
-const editArea = ref<HTMLTextAreaElement[]>([]);
-
-async function startEdit(index: number): Promise<void> {
-  editingIndex.value = index;
-  editSource = props.messages[index] ?? null;
-  editConversation = props.conversationId;
-  editDraft.value = userParts.value[index]?.text ?? "";
-  await nextTick();
-  const area = editArea.value[0];
-  if (area) {
-    growToContent(area);
-    area.focus();
-    area.setSelectionRange(area.value.length, area.value.length);
-  }
-}
-
-function cancelEdit(): void {
-  drafts.delete(props.conversationId);
-  confirmingEdit.value = false;
-  editingIndex.value = null;
-}
-
-// Editing a question that has later exchanges asks before dropping them; the
-// edit stays open behind the dialog until it is answered.
-const confirmingEdit = ref(false);
-
-function saveEdit(): void {
-  const index = editingIndex.value;
-  if (index === null || props.busy || props.canChange === false || editConversation !== props.conversationId || props.messages[index] !== editSource) return;
-  const hasFiles = (userParts.value[index]?.attachments.length ?? 0) > 0;
-  if (!editDraft.value.trim() && !hasFiles) return;
-  // Everything after this question goes: ask before dropping later exchanges.
-  const later = props.messages.slice(index + 1).some((m) => m.role === "user" && !m.kind);
-  if (later) {
-    confirmingEdit.value = true;
-    return;
-  }
-  sendEdit(index);
-}
-
-function confirmEdit(): void {
-  confirmingEdit.value = false;
-  if (editingIndex.value !== null) sendEdit(editingIndex.value);
-}
-
-function sendEdit(index: number): void {
-  if (props.busy || props.canChange === false || editConversation !== props.conversationId || props.messages[index] !== editSource) return;
-  drafts.delete(props.conversationId);
-  editingIndex.value = null;
-  emit("edit", index, editDraft.value);
-}
-
-// A running answer or a switched chat closes an open edit.
-watch(
-  () => [props.busy, props.canChange === false],
-  () => { editingIndex.value = null; confirmingEdit.value = false; },
-);
-
-watch(() => props.conversationId, (current, previous) => {
-  if (editingIndex.value !== null && editSource) drafts.set(previous, { index: editingIndex.value, text: editDraft.value, source: editSource });
-  editingIndex.value = null;
-  confirmingEdit.value = false;
-  const saved = drafts.get(current);
-  if (saved && props.messages[saved.index] === saved.source) {
-    editingIndex.value = saved.index;
-    editDraft.value = saved.text;
-    editSource = saved.source;
-    editConversation = current;
-  }
-});
-
-watch(() => props.draftScope, () => {
-  drafts.clear();
-  cancelEdit();
-  editDraft.value = "";
-  editSource = null;
-});
-
-function editKeydown(event: KeyboardEvent): void {
-  if (event.isComposing || event.keyCode === 229) return;
-  if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
-    event.preventDefault();
-    saveEdit();
-  }
 }
 
 // The day label above the first message of each day (null: none). `now` is
@@ -263,25 +170,6 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
           </div>
         </div>
         <!-- Only model output is rendered as markdown; the user's own text stays literal. -->
-        <div v-else-if="m.role === 'user' && editingIndex === i" class="user-row editing">
-          <textarea
-            ref="editArea"
-            v-model="editDraft"
-            class="edit-area"
-            rows="2"
-            aria-label="Edit your question"
-            @input="growToContent($event.target as HTMLTextAreaElement)"
-            @keydown.esc.prevent="cancelEdit"
-            @keydown="editKeydown"
-          />
-          <p v-if="userParts[i]?.attachments.length" class="edit-note">
-            Attached files stay with the question ({{ userParts[i]?.attachments.length }}).
-          </p>
-          <div class="actions">
-            <button type="button" class="ghost" @click="cancelEdit">Cancel</button>
-            <button type="button" class="primary" @click="saveEdit">Save &amp; resend</button>
-          </div>
-        </div>
         <div v-else-if="m.role === 'user'" class="user-row">
           <div class="user-bubble">
             <template v-if="userParts[i]?.text">{{ userParts[i]?.text }}</template>
@@ -297,10 +185,17 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
               :title="isSavedPrompt(savableText(i)) ? 'Already one of your saved prompts' : 'Save as a prompt'"
               @click="emit('save-prompt', savableText(i))"
             />
-            <button v-if="canChange" type="button" class="action" title="Edit and resend" aria-label="Edit and resend" @click="startEdit(i)">
+            <button
+              v-if="canChange && i === retryIndex"
+              type="button"
+              class="action"
+              title="Retry: put this question back in the message box"
+              aria-label="Retry"
+              @click="emit('retry', i)"
+            >
               <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
                 <path
-                  d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4"
+                  d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="1.8"
@@ -448,15 +343,6 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
   <Transition name="pill">
     <button v-if="hasNew && !stickToBottom" type="button" class="new-pill" @click="jumpToNew">↓ New messages</button>
   </Transition>
-  <ConfirmModal
-    v-if="confirmingEdit"
-    open
-    title="Edit question"
-    message="Editing this question discards the messages after it. Continue?"
-    confirm-label="Discard and resend"
-    @confirm="confirmEdit"
-    @close="confirmingEdit = false"
-  />
   </div>
 </template>
 
@@ -612,45 +498,6 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
   .assistant .actions .action {
     opacity: 1;
   }
-}
-.editing {
-  width: min(100%, 560px);
-  align-self: flex-end;
-}
-.edit-area {
-  width: 100%;
-  max-height: calc(1.55em * 10);
-  padding: 10px 14px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-lg);
-  outline: none;
-  resize: none;
-  background: var(--surface);
-}
-.edit-note {
-  margin: 0;
-  font-size: 0.75em;
-  color: var(--muted);
-}
-.editing .actions {
-  margin-top: 0;
-}
-.ghost,
-.primary {
-  padding: 4px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  font-size: 0.85em;
-}
-.ghost {
-  color: var(--muted);
-  background: transparent;
-}
-.primary {
-  border-color: var(--accent);
-  color: var(--accent-contrast);
-  background: var(--accent);
 }
 /* An answer sits beside a small round mark; everything in it goes in the second
    column. A command's result (a tool's output, not the agent's words) looks the

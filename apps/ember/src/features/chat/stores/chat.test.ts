@@ -96,7 +96,7 @@ beforeEach(() => {
   client.cancel.mockResolvedValue({ cancelled: true });
 });
 
-describe("send with truncateTo (regenerate / edit)", () => {
+describe("send with truncateTo (regenerate / retry)", () => {
   it("drops the replaced question and what followed, and tells ember_api", async () => {
     const chat = await openChat(FOUR);
 
@@ -228,50 +228,26 @@ describe("regenerate", () => {
   });
 });
 
-describe("editAndResend", () => {
-  const FILE = { filename: "f.txt", chars: 3, truncated: false, text: "abc" };
+describe("retryIndex", () => {
+  it.each<[string, ChatMessage[], number]>([
+    ["a question and its answer", [user("q"), assistant("a")], 0],
+    ["the last of two exchanges", FOUR, 2],
+    ["a question still without an answer", [user("q")], 0],
+    ["a chat that ends in a summary", [assistant("S", { kind: "summary" })], -1],
+    ["nothing typed (only a summary and an answer)", [assistant("S", { kind: "summary" }), assistant("a")], -1],
+    ["an empty chat", [], -1],
+  ])("%s", async (_name, messages, expected) => {
+    const chat = await openChat(messages);
 
-  it("replaces the question and everything after it", async () => {
-    const chat = await openChat(FOUR);
-
-    await chat.editAndResend(0, "  q1 edited  ");
-
-    expect(client.startTurn).toHaveBeenCalledWith("c1", expect.objectContaining({ question: "q1 edited", truncate_to: 0 }));
-    expect(contents(chat.messages)).toEqual(["q1 edited"]);
+    expect(chat.retryIndex).toBe(expected);
   });
 
-  it("keeps the attached files of the question it replaces", async () => {
-    const chat = await openChat([user(withAttachments("old", [FILE])), assistant("a")]);
+  it("is -1 when the chat ends with a slash command's result", async () => {
+    const chat = await openChat([user("q"), assistant("a"), user("/x y"), assistant("result")]);
+    chat.messages[2]!.kind = "command";
+    chat.messages[3]!.kind = "command";
 
-    await chat.editAndResend(0, "new");
-
-    expect(client.startTurn.mock.calls[0]![1].question).toBe(withAttachments("new", [FILE]));
-  });
-
-  it("a blank edit of a question with a file still sends the file", async () => {
-    const chat = await openChat([user(withAttachments("old", [FILE])), assistant("a")]);
-
-    await chat.editAndResend(0, "   ");
-
-    expect(client.startTurn.mock.calls[0]![1].question).toBe(withAttachments("", [FILE]));
-  });
-
-  it("a blank edit of a plain question sends nothing", async () => {
-    const chat = await openChat(FOUR);
-
-    await chat.editAndResend(0, "   ");
-
-    expect(client.startTurn).not.toHaveBeenCalled();
-    expect(contents(chat.messages)).toEqual(["q1", "a1", "q2", "a2"]);
-  });
-
-  it("refuses to edit an answer or an index that is not there", async () => {
-    const chat = await openChat(FOUR);
-
-    await chat.editAndResend(1, "x");
-    await chat.editAndResend(42, "x");
-
-    expect(client.startTurn).not.toHaveBeenCalled();
+    expect(chat.retryIndex).toBe(-1);
   });
 });
 

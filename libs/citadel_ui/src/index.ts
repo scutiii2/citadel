@@ -6,6 +6,7 @@ export { default as PageLayout } from "./components/PageLayout.vue";
 export { default as PasswordInput } from "./components/PasswordInput.vue";
 export { default as ThemeSelect } from "./components/ThemeSelect.vue";
 export { default as CopyButton } from "./components/CopyButton.vue";
+export { default as ImageTile } from "./components/ImageTile.vue";
 export { default as SettingRow } from "./components/SettingRow.vue";
 export { default as ToggleSwitch } from "./components/ToggleSwitch.vue";
 export { default as RangeSlider } from "./components/RangeSlider.vue";

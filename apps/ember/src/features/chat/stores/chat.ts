@@ -34,7 +34,7 @@ import { SlashCommandRunner } from "../services/slashCommands";
 import { watchTurn } from "../services/turnStream";
 import { type ApprovalMode, DEFAULT_APPROVAL_MODE, isApprovalMode } from "../utils/approvalMode";
 import { type ContextAccuracy, DEFAULT_CONTEXT_ACCURACY, isContextAccuracy } from "../utils/contextAccuracy";
-import { splitAttachments, withAttachments } from "../../../utils/content/attachments";
+import { splitAttachments } from "../../../utils/content/attachments";
 import { errorMessage } from "../../../utils/errors";
 import { parseServerTime } from "../../../utils/time";
 import { toolTitle } from "../../../utils/tools/toolTitles";
@@ -797,7 +797,7 @@ export const useChatStore = defineStore("chat", () => {
   /** Asks the main agent. ember_api saves the question and runs the
    * turn; this page shows it arriving. A leading "/" runs a command instead.
    *
-   * `truncateTo` (regenerate / edit): the index of the open chat's question
+   * `truncateTo` (regenerate / retry): the index of the open chat's question
    * this one replaces. That message and everything after it are dropped; if
    * the question isn't accepted they come back.
    *
@@ -900,6 +900,15 @@ export const useChatStore = defineStore("chat", () => {
     }
     return -1;
   });
+  /** Index of the open chat's last typed question when only its answers
+   * follow it - the one Retry puts back in the message box. -1: none. */
+  const retryIndex = computed(() => {
+    const list = messages.value;
+    let i = list.length - 1;
+    while (i >= 0 && list[i]!.role === "assistant" && !list[i]!.kind) i -= 1;
+    const m = list[i];
+    return m && m.role === "user" && !m.kind ? i : -1;
+  });
   /** A typed question of the open chat, as opposed to a summary, a raw log
    * or a slash command - the only messages that can be replaced. */
   function canReplaceFrom(index: number): boolean {
@@ -913,17 +922,6 @@ export const useChatStore = defineStore("chat", () => {
     const question = messages.value[index]?.content;
     if (index < 0 || !question) return Promise.resolve();
     return send(question, { truncateTo: index });
-  }
-
-  /** Replaces question `index` with `text` (its attached files stay) and
-   * drops everything after it; the agent answers the new text. */
-  function editAndResend(index: number, text: string): Promise<boolean | void> {
-    const original = messages.value[index];
-    if (!original || !canReplaceFrom(index)) return Promise.resolve();
-    const { attachments } = splitAttachments(original.content);
-    const typed = text.trim();
-    if (!typed && attachments.length === 0) return Promise.resolve();
-    return send(withAttachments(typed, attachments), { truncateTo: index });
   }
 
   /** Copies the open chat up to and including answer `index` into a new
@@ -1378,8 +1376,8 @@ export const useChatStore = defineStore("chat", () => {
     dismissNotices,
     send,
     regenerateIndex,
+    retryIndex,
     regenerate,
-    editAndResend,
     branchFrom,
     stop,
     newChat,

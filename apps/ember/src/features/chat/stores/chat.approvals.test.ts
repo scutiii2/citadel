@@ -226,7 +226,7 @@ describe("what a question sends", () => {
     expect(client.startTurn.mock.calls[0]![1]).toMatchObject({ ask_before_tools: true, allowed_tools: [] });
   });
 
-  it("regenerate and edit ask too", async () => {
+  it("regenerate asks too", async () => {
     const chat = await storeWith({ c1: FOUR });
     chat.setApprovalMode("ask");
     await chat.selectChat("c1");

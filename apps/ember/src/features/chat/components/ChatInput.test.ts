@@ -300,6 +300,75 @@ describe("giving back a question that was not taken", () => {
   });
 });
 
+describe("picture attachments", () => {
+  const restore = (wrapper: ReturnType<typeof mountInput>, question: string) =>
+    (wrapper.vm as unknown as { restore: (q: string) => void }).restore(question);
+  const picture = (expires: number) => ({
+    filename: "photo.png", chars: 0, truncated: false,
+    text: `[File file_id: f_photo | image | 1 pages | expires_at: ${expires} | preserve this file_id when delegating]`,
+  });
+  const allowDownloads = () => useAuthStore().account!.permissions.push("files.download");
+  const value = (wrapper: ReturnType<typeof mountInput>) => (wrapper.find("textarea").element as HTMLTextAreaElement).value;
+
+  beforeEach(() => {
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+  });
+
+  it("previews an added picture as a tile that can be removed", async () => {
+    upload.mockResolvedValue(uploaded({ filename: "photo.png", kind: "image" }));
+    const wrapper = mountInput();
+
+    await wrapper.find("form").trigger("drop", { dataTransfer: drag(["Files"], [file("photo.png")]) });
+    await flushPromises();
+
+    expect(wrapper.get(".attachments li img").attributes()).toMatchObject({ src: "blob:preview", alt: "photo.png" });
+    await wrapper.get('button[aria-label="Remove photo.png"]').trigger("click");
+    expect(wrapper.find(".attachments").exists()).toBe(false);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
+  });
+
+  it("previews the stored picture of a restored question, and leaves a files-only question's box empty", async () => {
+    allowDownloads();
+    const wrapper = mountInput();
+
+    restore(wrapper, withAttachments("", [picture(2000000000)]));
+    await flushPromises();
+
+    expect(wrapper.get(".attachments li img").attributes("src")).toBe("/api/attachments/files/f_photo/content");
+    expect(wrapper.find(".attachments").text()).not.toContain("expired");
+    expect(value(wrapper)).toBe("");
+  });
+
+  it("says when a restored file has expired on the server", async () => {
+    const wrapper = mountInput();
+
+    restore(wrapper, withAttachments("Look", [picture(1), {
+      filename: "sales.csv", chars: 3, truncated: false,
+      text: "[File file_id: f_sheet | table | expires_at: 1 | preserve this file_id when delegating]\nabc",
+    }]));
+    await flushPromises();
+
+    const rows = wrapper.findAll(".attachments li");
+    expect(rows.map((row) => row.text().includes("expired: attach it again"))).toEqual([true, true]);
+  });
+
+  it("tells its parent whether it is empty, and can be cleared", async () => {
+    const wrapper = mountInput();
+    const input = wrapper.vm as unknown as { isEmpty: () => boolean; clear: () => void };
+    expect(input.isEmpty()).toBe(true);
+
+    restore(wrapper, withAttachments("Look", [picture(2000000000)]));
+    await flushPromises();
+    expect(input.isEmpty()).toBe(false);
+    input.clear();
+    await flushPromises();
+
+    expect(input.isEmpty()).toBe(true);
+    expect(value(wrapper)).toBe("");
+  });
+});
+
 describe("pasting files", () => {
   it("turns a pasted file into an attachment and keeps it out of the text", async () => {
     const wrapper = mountInput();
@@ -310,7 +379,7 @@ describe("pasting files", () => {
     await flushPromises();
 
     expect(upload).toHaveBeenCalledExactlyOnceWith(pasted);
-    expect(wrapper.find(".attachments li").text()).toContain("screenshot.png");
+    expect(wrapper.find(".attachments li img").attributes("alt")).toBe("screenshot.png");
     expect((textarea.element as HTMLTextAreaElement).value).toBe("");
   });
 

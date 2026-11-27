@@ -48,6 +48,20 @@ export function tableHeader(table: AttachmentTable | null): string {
   return `[table_id: ${table.table_id} | ${table.rows} rows | columns: ${names.join(", ")}${more} | the text below is only a preview of the start of the file; use the data tools with this table_id for the whole file]\n`;
 }
 
+/** The stored image an attachment's first line names, current and older saved forms. */
+export function imageFileId(text: string): string | undefined {
+  const found = text.match(
+    /^\[(?:File file_id: ([A-Za-z0-9_-]{1,100}) \| image(?: \||\])|(?:Image|PDFMerger) file_id: ([A-Za-z0-9_-]{1,100}) \| \d+ pages \| image(?: \||\]))/,
+  );
+  return found?.[1] ?? found?.[2];
+}
+
+/** Whether the server has dropped the file an attachment's first line names. */
+export function isExpired(text: string, now: number = Date.now()): boolean {
+  const found = text.match(/^\[(?:File|Image|PDFMerger) file_id: [^\]\n]*\| expires_at: (\d+(?:\.\d+)?)/);
+  return found !== null && Number(found[1]) * 1000 <= now;
+}
+
 /** What asks Legion to read a file itself: show a PDF's pages, or transcribe audio. */
 const LEGION_MARKS: Partial<Record<ReadPath, string>> = { pages: " | scan", listen: " | listen" };
 

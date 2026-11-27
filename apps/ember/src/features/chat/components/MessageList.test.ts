@@ -6,7 +6,6 @@ import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "../stores/chat";
 import { useEntryAgentStore } from "../stores/entryAgent";
 import { withAttachments } from "../../../utils/content/attachments";
-import { ConfirmModal } from "@citadel/ui";
 import MessageList from "./MessageList.vue";
 
 // <AgentActivity> reads the chat store, which loads chats when it starts.
@@ -177,101 +176,28 @@ describe("regenerate button", () => {
   });
 });
 
-describe("editing a question", () => {
-  const editButtons = (wrapper: ReturnType<typeof mountList>) => wrapper.findAll('button[aria-label="Edit and resend"]');
+describe("retry", () => {
+  const retryButtons = (wrapper: ReturnType<typeof mountList>) => wrapper.findAll('button[aria-label="Retry"]');
 
-  it("offers an edit on every typed question, not on answers", () => {
-    expect(editButtons(mountList())).toHaveLength(2);
+  it("is offered on the last question only, and says which one", async () => {
+    const wrapper = mountList({ retryIndex: 2 });
+
+    expect(retryButtons(wrapper)).toHaveLength(1);
+    await wrapper.findAll(".msg")[2]!.get('button[aria-label="Retry"]').trigger("click");
+
+    expect(wrapper.emitted("retry")).toEqual([[2]]);
   });
 
-  it("is not offered while an answer is running", () => {
-    expect(editButtons(mountList({ canChange: false }))).toHaveLength(0);
+  it.each([
+    ["an answer is running", { retryIndex: 2, canChange: false }],
+    ["there is nothing to retry", { retryIndex: -1 }],
+    ["the parent gave no index", {}],
+  ])("is hidden when %s", (_name, props) => {
+    expect(retryButtons(mountList(props))).toHaveLength(0);
   });
 
-  it("opens with the typed text, and Save & resend emits the new text", async () => {
-    const wrapper = mountList();
-    await editButtons(wrapper)[0]!.trigger("click");
-    const area = wrapper.find("textarea");
-
-    expect((area.element as HTMLTextAreaElement).value).toBe("q1");
-    await area.setValue("q1 edited");
-    await wrapper.find("button.primary").trigger("click");
-    await wrapper.getComponent(ConfirmModal).get(".confirm").trigger("click");
-
-    expect(wrapper.emitted("edit")).toEqual([[0, "q1 edited"]]);
-    expect(wrapper.find("textarea").exists()).toBe(false);
-  });
-
-  it("asks before discarding later exchanges, and stays open on 'no'", async () => {
-    const wrapper = mountList();
-    await editButtons(wrapper)[0]!.trigger("click"); // q1 has q2 after it
-    await wrapper.find("textarea").setValue("changed");
-
-    await wrapper.find("button.primary").trigger("click");
-    expect(wrapper.getComponent(ConfirmModal).props("message")).toContain("discards the messages after it");
-    await wrapper.getComponent(ConfirmModal).get(".cancel").trigger("click");
-
-    expect(wrapper.findComponent(ConfirmModal).exists()).toBe(false);
-    expect(wrapper.emitted("edit")).toBeUndefined();
-    expect(wrapper.find("textarea").exists()).toBe(true);
-  });
-
-  it("does not ask when editing the last question", async () => {
-    const wrapper = mountList();
-    await editButtons(wrapper)[1]!.trigger("click"); // q2 is the last
-    await wrapper.find("textarea").setValue("q2 edited");
-
-    await wrapper.find("button.primary").trigger("click");
-
-    expect(wrapper.findComponent(ConfirmModal).exists()).toBe(false);
-    expect(wrapper.emitted("edit")).toEqual([[2, "q2 edited"]]);
-  });
-
-  it("Enter saves, Shift+Enter does not, Esc cancels", async () => {
-    const wrapper = mountList();
-    await editButtons(wrapper)[1]!.trigger("click");
-    const area = wrapper.find("textarea");
-    await area.setValue("again");
-
-    await area.trigger("keydown", { key: "Enter", shiftKey: true });
-    expect(wrapper.emitted("edit")).toBeUndefined();
-
-    await area.trigger("keydown", { key: "Escape" });
-    expect(wrapper.find("textarea").exists()).toBe(false);
-    expect(wrapper.emitted("edit")).toBeUndefined();
-
-    await editButtons(wrapper)[1]!.trigger("click");
-    await wrapper.find("textarea").setValue("again");
-    await wrapper.find("textarea").trigger("keydown", { key: "Enter" });
-    expect(wrapper.emitted("edit")).toEqual([[2, "again"]]);
-  });
-
-  it("will not save a blank question, but will for one that has a file", async () => {
-    const wrapper = mountList({
-      messages: [user("plain"), assistant("a"), user(withAttachments("with file", [FILE])), assistant("b")],
-    });
-
-    await editButtons(wrapper)[0]!.trigger("click");
-    await wrapper.find("textarea").setValue("   ");
-    await wrapper.find("button.primary").trigger("click");
-    expect(wrapper.emitted("edit")).toBeUndefined();
-    await wrapper.find("button.ghost").trigger("click");
-
-    await editButtons(wrapper)[1]!.trigger("click");
-    expect(wrapper.find(".edit-note").text()).toContain("Attached files stay");
-    await wrapper.find("textarea").setValue("");
-    await wrapper.find("button.primary").trigger("click");
-    expect(wrapper.emitted("edit")).toEqual([[2, ""]]);
-  });
-
-  it("closes the editor when an answer starts running", async () => {
-    const wrapper = mountList();
-    await editButtons(wrapper)[0]!.trigger("click");
-    expect(wrapper.find("textarea").exists()).toBe(true);
-
-    await wrapper.setProps({ busy: true, canChange: false });
-
-    expect(wrapper.find("textarea").exists()).toBe(false);
+  it("replaces editing: no question can be edited in place", () => {
+    expect(mountList({ retryIndex: 2 }).find('button[aria-label="Edit and resend"]').exists()).toBe(false);
   });
 });
 
@@ -779,51 +705,6 @@ describe("question cards", () => {
   });
 });
 
-
-describe("edit ownership and composition", () => {
-  it("retains an edit only in its cached conversation and clears its truncation confirmation", async () => {
-    const a = [user("a1"), assistant("answer"), user("a2")];
-    const b = [user("b1"), assistant("answer b"), user("b2")];
-    const wrapper = mountList({ conversationId: "a", messages: a });
-    await wrapper.findAll('button[aria-label="Edit and resend"]')[0]!.trigger("click");
-    await wrapper.find("textarea").setValue("Draft for A");
-    await wrapper.find("textarea").trigger("keydown", { key: "Enter" });
-    expect(wrapper.findComponent(ConfirmModal).exists()).toBe(true);
-    await wrapper.setProps({ conversationId: "b", messages: b });
-    expect(wrapper.find("textarea").exists()).toBe(false);
-    expect(wrapper.findComponent(ConfirmModal).exists()).toBe(false);
-    expect(wrapper.emitted("edit")).toBeUndefined();
-    await wrapper.setProps({ conversationId: "a", messages: a });
-    expect((wrapper.find("textarea").element as HTMLTextAreaElement).value).toBe("Draft for A");
-    await wrapper.find("textarea").trigger("keydown", { key: "Enter" });
-    await wrapper.getComponent(ConfirmModal).get(".confirm").trigger("click");
-    expect(wrapper.emitted("edit")).toEqual([[0, "Draft for A"]]);
-  });
-  it("does not resend an edited question while composing or for a replaced message", async () => {
-    const wrapper = mountList({ conversationId: "a", messages: [user("original")] });
-    await wrapper.find('button[aria-label="Edit and resend"]').trigger("click");
-    await wrapper.find("textarea").setValue("composing");
-    await wrapper.find("textarea").trigger("keydown", { key: "Enter", isComposing: true });
-    await wrapper.find("textarea").trigger("keydown", { key: "Enter", keyCode: 229 });
-    expect(wrapper.emitted("edit")).toBeUndefined();
-    await wrapper.setProps({ messages: [user("replacement")] });
-    await wrapper.find("textarea").trigger("keydown", { key: "Enter" });
-    expect(wrapper.emitted("edit")).toBeUndefined();
-  });
-});
-
-
-it("clears cached editing drafts when the account scope changes", async () => {
-  const a = [user("A")];
-  const wrapper = mountList({ conversationId: "a", draftScope: 1, messages: a });
-  await wrapper.find('button[aria-label="Edit and resend"]').trigger("click");
-  await wrapper.find("textarea").setValue("private draft");
-  await wrapper.setProps({ conversationId: "b", messages: [user("B")] });
-  await wrapper.setProps({ draftScope: 2 });
-  await wrapper.setProps({ conversationId: "a", messages: a });
-  expect(wrapper.find("textarea").exists()).toBe(false);
-  expect(wrapper.emitted("edit")).toBeUndefined();
-});
 
 describe("working line", () => {
   it("shows a live line with the label and a clock while a command or triage question runs", () => {

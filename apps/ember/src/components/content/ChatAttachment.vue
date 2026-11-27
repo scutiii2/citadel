@@ -1,31 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { isDesktop, mediaUrl } from "../../utils/server";
-import type { AttachmentBlock } from "../../utils/content/attachments";
+import { computed, ref, watch } from "vue";
+import { imageFileId, type AttachmentBlock } from "../../utils/content/attachments";
+import { useImagePreview } from "../../composables/useImagePreview";
 import { useAuthStore } from "../../stores/auth";
 import { BaseModal } from "@citadel/ui";
 
 const props = defineProps<{ attachment: AttachmentBlock }>();
 const auth = useAuthStore();
-// Accept both current and older saved image references. Never use a URL from
-// attachment text: only a bounded file ID can form the authenticated local URL.
-const imageId = computed(() => {
-  const found = props.attachment.text.match(
-    /^\[(?:File file_id: ([A-Za-z0-9_-]{1,100}) \| image(?: \||\])|(?:Image|PDFMerger) file_id: ([A-Za-z0-9_-]{1,100}) \| \d+ pages \| image(?: \||\]))/,
-  );
-  return found?.[1] ?? found?.[2];
-});
-const imagePath = computed(() => imageId.value ? `/api/attachments/files/${imageId.value}/content` : "");
-// Browser: the path itself (cookie). Windows app: a blob: URL fetched with the bearer.
-const imageUrl = ref(isDesktop() ? "" : imagePath.value);
-watch(imagePath, async (path) => {
-  revoke();
-  if (!path) { imageUrl.value = ""; return; }
-  try { imageUrl.value = await mediaUrl(path); } catch { failed.value = true; }
-}, { immediate: true });
-function revoke(): void { if (imageUrl.value.startsWith("blob:")) URL.revokeObjectURL(imageUrl.value); }
-onBeforeUnmount(revoke);
-const failed = ref(false);
+const imageId = computed(() => imageFileId(props.attachment.text));
+const { url: imageUrl, failed } = useImagePreview(() => imageId.value);
 const enlarged = ref(false);
 watch(() => props.attachment, () => { failed.value = false; enlarged.value = false; });
 </script>

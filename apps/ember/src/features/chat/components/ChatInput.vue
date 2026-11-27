@@ -11,6 +11,7 @@ import { MAX_SCAN_PAGES, withAttachments } from "../../../utils/content/attachme
 import { paramSuggestions } from "../utils/commandParams";
 import { appendToDraft, filterTemplates, preview, templateQuery } from "../utils/templates";
 import { fieldsFromSchema, type ToolField } from "../../../utils/tools/toolSchema";
+import ComposerImage from "./ComposerImage.vue";
 import TemplatePicker from "./TemplatePicker.vue";
 import { growToContent } from "../../../utils/browser/autoGrow";
 import { useOutsideClose } from "../../../composables/useOutsideClose";
@@ -157,7 +158,7 @@ watch(() => auth.hasPermission("files.upload"), (allowed) => { if (!allowed) can
 const fileInput = ref<HTMLInputElement | null>(null);
 const {
   attachments, reading, ready, dragging,
-  removeAttachment, canRead, readWithOcr, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
+  removeAttachment, canRead, readWithOcr, restoreAttachments, showsPicture, onPick, onDragOver, onDragLeave, onDrop, onPaste,
 } = useComposerAttachments();
 
 // shortcut: counts one file; Legion shares the limit across a turn's scans and tells the model what it left out.
@@ -343,9 +344,22 @@ function restore(question: string): void {
   setDraft(restoreAttachments(question));
 }
 
+/** Nothing typed or attached, so a question can be put back without overwriting anything. */
+function isEmpty(): boolean {
+  return !draftLocked.value && draft.value.trim() === "" && attachments.value.length === 0;
+}
+
+function clear(): void {
+  if (draftLocked.value) return;
+  draft.value = "";
+  attachments.value = [];
+  recallIndex.value = null;
+  void nextTick(autoGrow);
+}
+
 // The chat view hands over files dragged anywhere on the chat, and shows `fileDragging`.
 defineExpose({
-  setDraft, focus, insertText, restore,
+  setDraft, focus, insertText, restore, isEmpty, clear,
   onFileDragOver: onDragOver, onFileDragLeave: onDragLeave, onFileDrop: onDrop, fileDragging: dragging,
 });
 
@@ -494,26 +508,6 @@ function onKeydown(event: KeyboardEvent): void {
     <p v-if="independent" class="independent-note" role="note">
       Independent prompts is on: each request and response is standalone and does not include the earlier messages of this chat.
     </p>
-    <ul v-if="attachments.length" class="attachments">
-      <li v-for="a in attachments" :key="a.id" :class="a.state" :title="a.error || a.filename">
-        <span class="name">
-          {{ a.state === "reading" ? `Reading ${a.filename} …` : a.state === "error" ? `${a.filename}: ${a.error}` : a.filename }}
-          <small v-if="a.state === 'ready' && a.truncated">(cut to {{ a.chars.toLocaleString() }} characters)</small>
-          <small v-if="a.state === 'ready' && a.pages">({{ a.pages }} pages · available for PDF tools)</small>
-          <small v-if="a.state === 'ready' && a.rows">({{ a.rows.toLocaleString() }} rows, {{ a.columns }} columns)</small>
-          <small v-if="a.state === 'ready' && a.read === 'reader'">(read by Reader)</small>
-          <small v-if="a.state === 'ready' && a.read === 'pages'">({{ pagesNote(a.pages) }})</small>
-          <small v-if="a.state === 'ready' && a.read === 'scribe'">(read by Scribe)</small>
-          <small v-if="a.state === 'ready' && a.read === 'listen'">(will be transcribed)</small>
-          <small v-if="a.ocr === 'error'">(OCR failed: {{ a.error }})</small>
-        </span>
-        <button v-if="canRead(a)" type="button" class="ocr" :disabled="a.ocr === 'reading'"
-          :title="readerUnavailable || undefined" @click="readWithOcr(a.id)">
-          {{ a.ocr === "reading" ? "Sending to OCR …" : readerUnavailable ? "Attach pages" : a.ocr === "error" ? "Retry OCR" : "Read with OCR" }}
-        </button>
-        <button type="button" :aria-label="`Remove ${a.filename}`" @click="removeAttachment(a.id)">×</button>
-      </li>
-    </ul>
     <p v-if="draft === '' && suggestion && recallIndex === null" class="recall">Tab to use the suggestion</p>
     <p v-if="recallIndex !== null" class="recall" aria-live="polite">
       Earlier question {{ recallIndex + 1 }} of {{ history.length }} · ↑ older · ↓ newer
@@ -521,6 +515,30 @@ function onKeydown(event: KeyboardEvent): void {
     <span :id="messageLabelId" class="message-label">Message</span>
     <div :class="['box', { dragging, 'draft-locked': draftLocked }]">
       <input ref="fileInput" type="file" multiple hidden @change="onPick" />
+      <!-- Inside the box, above the text: what will be sent with it. -->
+      <ul v-if="attachments.length" class="attachments">
+        <li v-for="a in attachments" :key="a.id" :class="[a.state, { picture: showsPicture(a) }]" :title="a.error || a.filename">
+          <ComposerImage v-if="showsPicture(a)" :name="a.filename" :file="a.picture" :file-id="a.imageId"
+            :busy="a.state === 'reading'" @remove="removeAttachment(a.id)" />
+          <span class="name">
+            <template v-if="!showsPicture(a)">{{ a.state === "reading" ? `Reading ${a.filename} …` : a.state === "error" ? `${a.filename}: ${a.error}` : a.filename }}</template>
+            <small v-if="a.state === 'ready' && a.truncated">(cut to {{ a.chars.toLocaleString() }} characters)</small>
+            <small v-if="a.state === 'ready' && a.pages">({{ a.pages }} pages · available for PDF tools)</small>
+            <small v-if="a.state === 'ready' && a.rows">({{ a.rows.toLocaleString() }} rows, {{ a.columns }} columns)</small>
+            <small v-if="a.state === 'ready' && a.read === 'reader'">(read by Reader)</small>
+            <small v-if="a.state === 'ready' && a.read === 'pages'">({{ pagesNote(a.pages) }})</small>
+            <small v-if="a.state === 'ready' && a.read === 'scribe'">(read by Scribe)</small>
+            <small v-if="a.state === 'ready' && a.read === 'listen'">(will be transcribed)</small>
+            <small v-if="a.ocr === 'error'">(OCR failed: {{ a.error }})</small>
+            <small v-if="a.expired">(file expired: attach it again so tools can read it)</small>
+          </span>
+          <button v-if="canRead(a)" type="button" class="ocr" :disabled="a.ocr === 'reading'"
+            :title="readerUnavailable || undefined" @click="readWithOcr(a.id)">
+            {{ a.ocr === "reading" ? "Sending to OCR …" : readerUnavailable ? "Attach pages" : a.ocr === "error" ? "Retry OCR" : "Read with OCR" }}
+          </button>
+          <button v-if="!showsPicture(a)" type="button" :aria-label="`Remove ${a.filename}`" @click="removeAttachment(a.id)">×</button>
+        </li>
+      </ul>
       <ListComposer
         v-if="listMode && !draftLocked"
         ref="listEditor"
@@ -833,7 +851,7 @@ button.dictation.ending { color: var(--danger); }
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 0 0 6px;
+  margin: 0 0 4px -6px;
   padding: 0;
   list-style: none;
 }
@@ -855,6 +873,22 @@ button.dictation.ending { color: var(--danger); }
   border-color: var(--danger);
   color: var(--danger);
 }
+/* A picture is its own tile: no chip around it, its notes underneath. Room above for the × that overlaps it. */
+.attachments li.picture {
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 8px 8px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.attachments li.picture .name {
+  max-width: 220px;
+  white-space: normal;
+}
+.attachments li.picture .name:empty {
+  display: none;
+}
 .attachments .name {
   overflow: hidden;
   white-space: nowrap;
@@ -863,7 +897,7 @@ button.dictation.ending { color: var(--danger); }
 .attachments small {
   color: var(--muted);
 }
-.attachments button {
+.attachments li > button {
   padding: 0 6px;
   border: none;
   cursor: pointer;
@@ -871,11 +905,11 @@ button.dictation.ending { color: var(--danger); }
   color: inherit;
   background: transparent;
 }
-.attachments button.ocr {
+.attachments li > button.ocr {
   font-size: 1em;
   color: var(--accent);
 }
-.attachments button.ocr:disabled {
+.attachments li > button.ocr:disabled {
   cursor: default;
   color: var(--muted);
 }

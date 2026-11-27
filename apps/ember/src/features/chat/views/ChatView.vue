@@ -28,6 +28,7 @@ import type { JsonSchema } from "../../../api/types";
 import { useChatRoute } from "../composables/useChatRoute";
 import { useChatShortcuts } from "../composables/useChatShortcuts";
 import { useFolderCollapse } from "../composables/useFolderCollapse";
+import { useQuestionRetry } from "../composables/useQuestionRetry";
 import { useSidebarCollapse } from "../composables/useSidebarCollapse";
 import { agentLabelFor } from "../utils/agentLabels";
 import { builtinCommand, type BuiltinCommand } from "../utils/builtinCommands";
@@ -134,6 +135,11 @@ const formCommand = ref<CommandInfo | null>(null);
 const formSchema = ref<JsonSchema | null>(null);
 const input = ref<InstanceType<typeof ChatInput> | null>(null);
 const triageOpen = ref(false);
+const retry = useQuestionRetry({ activeId, messages }, () => input.value);
+
+function startRetry(index: number): void {
+  sendError.value = retry.start(index) ? "" : "Send or clear what is in the message box first, then retry.";
+}
 
 async function openCommandForm(command: CommandInfo): Promise<void> {
   const schema = await chat.commandSchema(command);
@@ -160,6 +166,11 @@ function onChatDrop(event: DragEvent): void {
 /** A question ember_api did not take (no entry agent, limit reached ...) goes
  * back into the box, as typed, along with its files. */
 async function onSend(question: string): Promise<void> {
+  if (retry.active.value && !question.startsWith("/")) {
+    if (!(await retry.resend(question, chat.send))) input.value?.restore(question);
+    return;
+  }
+  retry.forget(); // a command: the retried question stays as it was
   const builtin = builtinCommand(question);
   if (builtin) {
     if (!runBuiltin(builtin)) input.value?.restore(question);
@@ -457,8 +468,7 @@ useChatShortcuts({
         v-show="!chatLoading"
         class="messages"
         :conversation-id="active?.id ?? null"
-        :draft-scope="auth.account?.id ?? null"
-        :messages="messages"
+        :messages="retry.shown.value"
         :streaming="streaming"
         :activity="activity"
         :live-tokens="liveTokens ? liveUsage : null"
@@ -466,7 +476,7 @@ useChatShortcuts({
         :plans="livePlans"
         :busy="busy"
         :working="working"
-        :can-change="!busy && !working"
+        :can-change="!busy && !working && !retry.active.value"
         :approvals="pendingApprovals"
         :since="clockStart"
         :commands="commands"
@@ -485,13 +495,18 @@ useChatShortcuts({
         :elicitation-problems="elicitationProblems"
         @answer-elicitation="chat.answerElicitation"
         :regenerate-index="chat.regenerateIndex"
+        :retry-index="chat.retryIndex"
         :jump-index="chat.jumpIndex"
         @jumped="chat.clearJump"
         @regenerate="chat.regenerate"
         @branch="chat.branchFrom"
-        @edit="chat.editAndResend"
+        @retry="startRetry"
       />
       <div class="composer-area">
+        <p v-if="retry.active.value" class="retrying" role="status">
+          Retrying your last question. Sending replaces it and its answer.
+          <button type="button" @click="retry.cancel()">Cancel</button>
+        </p>
         <ChatInput
           ref="input"
           :conversation-id="activeId"
@@ -616,6 +631,25 @@ useChatShortcuts({
 }
 .composer-area {
   flex-shrink: 0;
+}
+.retrying {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 16px;
+  font-size: 0.85em;
+  color: var(--muted);
+}
+.retrying button {
+  padding: 2px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  color: var(--text);
+  background: transparent;
 }
 .working {
   font-size: 0.8em;
