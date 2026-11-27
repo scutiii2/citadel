@@ -135,6 +135,8 @@ def _agent_usage(row: dict[str, Any]) -> dict[str, Any]:
         "input_tokens": row["input_tokens"],
         "output_tokens": row["output_tokens"],
         "total_tokens": row["total_tokens"],
+        "context_tokens": row.get("context_tokens"),
+        "context_window": row.get("context_window"),
         "started_at": _iso(row.get("started_at")),
         "finished_at": _iso(row.get("finished_at")),
         **_context_breakdown(row),
@@ -142,6 +144,21 @@ def _agent_usage(row: dict[str, Any]) -> dict[str, Any]:
     if entry.get("context_breakdown") and row.get("context_breakdown_exact") is False:
         entry["context_breakdown_exact"] = False
     return {key: value for key, value in entry.items() if value is not None}
+
+
+def _usage_fields(result: dict[str, Any]) -> dict[str, Any]:
+    """Who used the tokens and the whole answer's total, when the answer's own figures do
+    not say it: several agents ran, or the answering agent's own model never did
+    (the router sent the question straight to a specialist)."""
+    rows = usage_rows(result)
+    if not rows or (len(rows) == 1 and result.get("total_tokens")):
+        return {}
+    # Router voter rows can be many: past the limit they are the ones to drop.
+    shown = rows if len(rows) <= MAX_AGENT_USAGE_ROWS else sorted(rows, key=lambda row: row["agent"] == "router")
+    return {
+        "turn_tokens": sum(row["total_tokens"] for row in rows),
+        "agent_usage": [_agent_usage(row) for row in shown[:MAX_AGENT_USAGE_ROWS]],
+    }
 
 
 def _context_breakdown(result: dict[str, Any]) -> dict[str, Any]:
@@ -704,11 +721,7 @@ class TurnRegistry:
             "duration_s": round(monotonic() - turn.started_at, 1),
         }
         turn.trace_agents, turn.trace_prompts = _trace_parts(result, turn)
-        rows = usage_rows(result)
-        # Several agents ran (the answer's agent plus delegated ones): keep who used
-        # what. One agent only repeats the answer's own totals.
-        if len(rows) > 1:
-            message["agent_usage"] = [_agent_usage(row) for row in rows[:MAX_AGENT_USAGE_ROWS]]
+        message.update(_usage_fields(result))
         await self._record_usage(turn, "chat", result)
         await self._finish(turn, message, status="cancelled" if cancelled else "completed", error=None, cancelled=cancelled)
 

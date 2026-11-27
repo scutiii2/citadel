@@ -18,6 +18,8 @@ const props = defineProps<{
   exact?: boolean;
   /** Each call's prompt cost; these do not fill the answering agent's window. */
   agentUsage?: AgentUsage[];
+  /** The specialist the bar belongs to, when it is not the answering agent. */
+  agentLabel?: string;
   /** How the next questions are counted; leave out to hide the switch. */
   accuracy?: ContextAccuracy;
 }>();
@@ -63,7 +65,7 @@ function formatPercent(percent: number): string {
   <div class="context-panel" role="dialog" aria-label="Context breakdown" data-test="context-panel">
     <template v-if="window > 0 && parts.length">
     <p class="summary">
-      <strong>{{ usedPercent }}% used</strong>
+      <strong>{{ agentLabel ? `${agentLabel}: ` : "" }}{{ usedPercent }}% used</strong>
       <span>{{ compactNumber(tokens) }} / {{ compactNumber(window) }}</span>
     </p>
     <div class="bar" aria-hidden="true">

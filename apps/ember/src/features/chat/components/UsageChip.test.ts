@@ -28,7 +28,7 @@ describe("UsageChip", () => {
   it("shows cost in the summary, after total tokens, and in agent rows", async () => {
     const wrapper = mount(UsageChip, { props: { message: { ...FULL, cost: 0.042,
       agent_usage: [{ agent: "a", total_tokens: 100, cost: 0.01 }] } } });
-    expect(wrapper.find("button").text()).toContain("12.4k tokens · $0.042");
+    expect(wrapper.find("button").text()).toContain("100 tokens · $0.042");
     await wrapper.find("button").trigger("click");
     expect(rows(wrapper).Cost).toBe("$0.042");
     expect(rows(wrapper).a).toContain("100 total · $0.010");
@@ -189,10 +189,10 @@ describe("UsageChip on an answer that ran several agents", () => {
     expect(shown["openai"]).toBe("50 total");
   });
 
-  it("keeps the one-line summary as it was", () => {
+  it("shows what all its agents used on the one line", () => {
     const wrapper = mount(UsageChip, { props: { message: { ...FULL, agent_usage: AGENTS } } });
 
-    expect(wrapper.find("button").text()).toBe("claude-test · 12.4k tokens · 4.2 s · 3 tools");
+    expect(wrapper.find("button").text()).toBe("claude-test · 150 tokens · 4.2 s · 3 tools");
   });
 
   it("lists the agents after the answer's own figures", async () => {

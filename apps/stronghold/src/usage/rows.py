@@ -53,6 +53,7 @@ def usage_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
                     "finished_at": _time(entry.get("finished_at")),
                     "delegated_by": _text(entry.get("delegated_by"), 120),
                     **{key: entry[key] for key in ("context_breakdown", "context_breakdown_exact") if key in entry},
+                    **{key: _int(entry[key]) for key in ("context_tokens", "context_window") if _int(entry.get(key))},
                 }
             )
     if not rows and _int(result.get("total_tokens")):
@@ -77,7 +78,7 @@ def usage_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 # Shown on a message but not stored as usage.
-_DISPLAY_ONLY = {"agent_label", "context_breakdown", "context_breakdown_exact"}
+_DISPLAY_ONLY = {"agent_label", "context_breakdown", "context_breakdown_exact", "context_tokens", "context_window"}
 
 
 def stored_rows(result: dict[str, Any]) -> list[dict[str, Any]]:

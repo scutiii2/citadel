@@ -473,32 +473,6 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
   color: var(--text);
   background: var(--surface);
 }
-/* Shown on hover or keyboard focus; always on touch screens. */
-.user-actions,
-.assistant .actions .stamp,
-.assistant .actions :deep(.copy),
-.assistant .actions .action {
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-.user-row:hover .user-actions,
-.assistant:hover .actions .stamp,
-.assistant:hover .actions :deep(.copy),
-.assistant:hover .actions .action,
-.actions:focus-within .stamp,
-.actions:focus-within :deep(.copy),
-.actions:focus-within .action,
-.user-actions:focus-within {
-  opacity: 1;
-}
-@media (hover: none) {
-  .user-actions,
-  .assistant .actions .stamp,
-  .assistant .actions :deep(.copy),
-  .assistant .actions .action {
-    opacity: 1;
-  }
-}
 /* An answer sits beside a small round mark; everything in it goes in the second
    column. A command's result (a tool's output, not the agent's words) looks the
    same, with a plain "/" mark instead of the accent-colored spark. */

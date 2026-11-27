@@ -72,6 +72,21 @@ export function formatClock(ms: number): string {
   return `${minutes} min ${String(Math.floor(seconds - minutes * 60)).padStart(2, "0")} s`;
 }
 
+/** The tokens one answer used, every agent that ran for it included. An answer the router
+ * sent straight to a specialist has none of its own, only its agents' rows. */
+export function answerUsage(m: ChatMessage): { input?: number; output?: number; total?: number } {
+  const agents = m.agent_usage;
+  if (!agents?.length) return { input: m.input_tokens, output: m.output_tokens, total: m.total_tokens };
+  // A split no agent reported stays absent, not 0.
+  const sum = (values: (number | undefined)[]): number | undefined =>
+    values.every((n) => n === undefined) ? undefined : values.reduce<number>((all, n) => all + (n ?? 0), 0);
+  return {
+    input: sum(agents.map((a) => a.input_tokens)),
+    output: sum(agents.map((a) => a.output_tokens)),
+    total: m.turn_tokens ?? sum(agents.map((a) => a.total_tokens)),
+  };
+}
+
 /** The chip's one line for an answer: the agent that wrote it, model, tokens,
  * time and tools. Empty when the message carries none of them (old chats,
  * errors). `agentLabel` is the agent's name for display; without it the saved
@@ -89,10 +104,11 @@ export function usageSummary(m: ChatMessage, agentLabel?: string): string {
       .filter(Boolean)
       .join(" · ");
   }
+  const { total } = answerUsage(m);
   return [
     agentLabel ?? m.agent,
     m.model,
-    m.total_tokens ? `${compactNumber(m.total_tokens)} tokens` : "",
+    total ? `${compactNumber(total)} tokens` : "",
     m.cost !== undefined ? formatCost(m.cost) : "",
     m.duration_s !== undefined ? formatDuration(m.duration_s) : "",
     m.steps?.length ? plural(m.steps.length, "tool") : "",

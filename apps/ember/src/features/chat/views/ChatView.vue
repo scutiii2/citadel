@@ -67,6 +67,7 @@ const {
   notices,
   working,
   contextUsage,
+  contextAgent,
   contextParts,
   contextExact,
   contextAgentUsage,
@@ -335,7 +336,7 @@ const contextBreakdown = computed(() => {
   const usage = contextUsage.value;
   if (!contextPanel.value) return null;
   if ((!usage || contextParts.value.length === 0) && contextAgentUsage.value.length === 0) return null;
-  return { tokens: usage?.tokens ?? 0, window: usage?.window ?? 0, parts: contextParts.value, exact: contextExact.value, agentUsage: contextAgentUsage.value };
+  return { tokens: usage?.tokens ?? 0, window: usage?.window ?? 0, parts: contextParts.value, exact: contextExact.value, agentUsage: contextAgentUsage.value, agentLabel: contextAgent.value };
 });
 
 function onSelect(id: string, messageIndex?: number): void {

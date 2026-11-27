@@ -218,8 +218,11 @@ stored in the chat transcript.
 
 Delegated answers retain bounded `context_breakdown` parts and
 `context_breakdown_exact` on each `agent_usage` row, including chat resaves
-and imports. These describe each call's prompt cost; the answering agent's
-top-level context fields still describe its own window.
+and imports. Each row also keeps its own `context_tokens` and `context_window`.
+The answer's top-level context fields describe the answering agent's window; they
+are absent when the router sent the question straight to a specialist, and Ember
+then shows the fullest agent row's window. Such answers, and any with several
+agents, carry `turn_tokens`: what every agent of the answer used together.
 
 ## Status
 

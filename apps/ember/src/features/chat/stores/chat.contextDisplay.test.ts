@@ -164,6 +164,16 @@ describe("what fills the context", () => {
     expect(fresh.contextAgentUsage).toEqual(usage);
   });
 
+  it("takes a routed answer's bar from the specialist that ran it", async () => {
+    const analyst = { agent: "data-analyst", agent_label: "Analyst", total_tokens: 500, context_tokens: 400, context_window: 200_000, context_breakdown: PARTS };
+    const chat = await openChat([{ role: "assistant", content: "a", agent_usage: [{ agent: "router", total_tokens: 10 }, analyst] }]);
+
+    expect(chat.contextUsage).toEqual({ tokens: 400, window: 200_000 });
+    expect(chat.contextParts).toEqual(PARTS);
+    expect(chat.contextAgent).toBe("Analyst");
+    expect((await openChat([answer({ agent_usage: [analyst] })])).contextAgent).toBe("");
+  });
+
   it("is empty for an answer saved before breakdowns existed", async () => {
     const chat = await openChat([{ role: "user", content: "q" }, answer()]);
 

@@ -41,6 +41,8 @@ export interface ChatMessage {
   agent?: string;
   model?: string;
   total_tokens?: number;
+  /** What every agent of the answer used together; absent when total_tokens already says it. */
+  turn_tokens?: number;
   /** The split of total_tokens (answers from before these were saved lack them). */
   input_tokens?: number;
   output_tokens?: number;
@@ -86,6 +88,9 @@ export interface AgentUsage {
   input_tokens?: number;
   output_tokens?: number;
   total_tokens: number;
+  /** How full this agent's context was after its call. */
+  context_tokens?: number;
+  context_window?: number;
   /** When the agent's call began and ended (ISO-8601 UTC; no zone means UTC). */
   started_at?: string;
   finished_at?: string;

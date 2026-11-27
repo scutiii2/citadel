@@ -9,6 +9,7 @@ import type {
   ActiveAgent,
   ApprovalDecision,
   ChatMessage,
+  AgentUsage,
   ContextPart,
   Conversation,
   ElicitationAction,
@@ -285,14 +286,29 @@ export const useChatStore = defineStore("chat", () => {
     }
     return null;
   });
-  const contextUsage = computed<{ tokens: number; window: number } | null>(() => {
+  /** The figures the bar shows: the answer's own, or, when the router sent the question
+   * straight to a specialist, those of the fullest agent that ran for it. */
+  const contextSource = computed<ChatMessage | AgentUsage | null>(() => {
     const m = lastContextAnswer.value;
-    return m?.context_tokens && m.context_window ? { tokens: m.context_tokens, window: m.context_window } : null;
+    if (!m || (m.context_tokens && m.context_window)) return m;
+    const fill = (a: AgentUsage): number => a.context_tokens! / a.context_window!;
+    const ran = (m.agent_usage ?? []).filter((a) => a.context_tokens && a.context_window);
+    return ran.sort((a, b) => fill(b) - fill(a))[0] ?? null;
+  });
+  const contextUsage = computed<{ tokens: number; window: number } | null>(() => {
+    const s = contextSource.value;
+    return s?.context_tokens && s.context_window ? { tokens: s.context_tokens, window: s.context_window } : null;
+  });
+  /** The specialist those figures belong to; empty when they are the answering agent's own. */
+  const contextAgent = computed(() => {
+    const s = contextSource.value;
+    if (!s || s === lastContextAnswer.value) return "";
+    return (s as AgentUsage).agent_label || (s as AgentUsage).agent;
   });
   /** What filled that context, when the last answer says; empty otherwise. */
-  const contextParts = computed<ContextPart[]>(() => lastContextAnswer.value?.context_breakdown ?? []);
+  const contextParts = computed<ContextPart[]>(() => contextSource.value?.context_breakdown ?? []);
   /** Whether those parts were counted by the model provider (true) or estimated. */
-  const contextExact = computed(() => lastContextAnswer.value?.context_breakdown_exact === true);
+  const contextExact = computed(() => contextSource.value?.context_breakdown_exact === true);
   const contextAgentUsage = computed(() => lastContextAnswer.value?.agent_usage ?? []);
 
   function find(id: string): Conversation | undefined {
@@ -1367,6 +1383,7 @@ export const useChatStore = defineStore("chat", () => {
     busy,
     working,
     contextUsage,
+    contextAgent,
     contextParts,
     contextExact,
     contextAgentUsage,

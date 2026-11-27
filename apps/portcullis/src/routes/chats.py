@@ -127,6 +127,8 @@ class AgentUsageIn(BaseModel):
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
     total_tokens: int = Field(ge=0)
+    context_tokens: int | None = Field(default=None, ge=0)
+    context_window: int | None = Field(default=None, ge=0)
     context_breakdown: list[ContextPartIn] | None = Field(default=None, max_length=MAX_CONTEXT_PARTS)
     context_breakdown_exact: bool | None = None
 
@@ -149,6 +151,8 @@ class MessageIn(BaseModel):
     # The ember agent id that wrote an answer (saved by the turn).
     agent: str | None = Field(default=None, max_length=120)
     total_tokens: int | None = Field(default=None, ge=0)
+    # What every agent of the answer used together; absent when total_tokens already says it.
+    turn_tokens: int | None = Field(default=None, ge=0)
     # The split of total_tokens, and how long the whole turn took (seconds).
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)

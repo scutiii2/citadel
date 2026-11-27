@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { ChatMessage } from "../../../api/types";
-import { agentDuration, agentStartTime, agentUsageText, formatCost, formatDuration, usageSummary } from "../../../utils/analytics/usageFormat";
+import { agentDuration, agentStartTime, agentUsageText, answerUsage, formatCost, formatDuration, usageSummary } from "../../../utils/analytics/usageFormat";
 
 // agentLabel: the name of the agent that wrote the answer, when the page knows it.
 const props = defineProps<{ message: ChatMessage; agentLabel?: string }>();
@@ -23,9 +23,10 @@ const rows = computed<Row[]>(() => {
   const agent = props.agentLabel ?? m.agent;
   if (agent) list.push({ label: "Agent", value: agent });
   if (m.model) list.push({ label: "Model", value: m.model });
-  if (m.input_tokens !== undefined) list.push({ label: "Input tokens", value: m.input_tokens.toLocaleString() });
-  if (m.output_tokens !== undefined) list.push({ label: "Output tokens", value: m.output_tokens.toLocaleString() });
-  if (m.total_tokens !== undefined) list.push({ label: "Total tokens", value: m.total_tokens.toLocaleString() });
+  const tokens = answerUsage(m);
+  if (tokens.input !== undefined) list.push({ label: "Input tokens", value: tokens.input.toLocaleString() });
+  if (tokens.output !== undefined) list.push({ label: "Output tokens", value: tokens.output.toLocaleString() });
+  if (tokens.total !== undefined) list.push({ label: "Total tokens", value: tokens.total.toLocaleString() });
   if (m.cost !== undefined) list.push({ label: "Cost", value: formatCost(m.cost) });
   if (m.duration_s !== undefined) list.push({ label: "Time", value: formatDuration(m.duration_s) });
   if (m.steps?.length) {

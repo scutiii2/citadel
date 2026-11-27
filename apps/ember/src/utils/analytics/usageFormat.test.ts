@@ -229,3 +229,12 @@ describe("agentStartTime", () => {
     expect(agentStartTime({ agent: "a", total_tokens: 1 })).toBe("");
   });
 });
+
+describe("usageSummary for a routed answer", () => {
+  it("adds up the agents' tokens when the answer has none of its own", () => {
+    const routed = { role: "assistant" as const, content: "a", agent: "ember", total_tokens: 0, agent_usage: [{ agent: "router", total_tokens: 1_200 }, { agent: "data-analyst", total_tokens: 60_000 }] };
+
+    expect(usageSummary(routed, "Ember")).toBe("Ember · 61.2k tokens");
+    expect(usageSummary({ ...routed, turn_tokens: 70_000 }, "Ember")).toBe("Ember · 70k tokens");
+  });
+});

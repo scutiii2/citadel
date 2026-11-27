@@ -288,10 +288,12 @@ async def ask(
         raise ToolError(str(error)) from error
     finally:
         internal_auth.reset_requester(requester_token)
+    # A tier model has its own window, not the pinned model's.
+    window = context_window_for(result.model) if result.model_tier else agent_config.status()["context_window"]
     own_usage = usage_log.own_row(
         result, agent_id=_AGENT_ID, agent_label=_AGENT_LABEL, gateway=result.gateway or SPEC.effective_gateway(),
         started_at=started_at, finished_at=agent_events.now_iso(), delegated_by=delegated_by,
-        model_tier=result.model_tier, reasoning_effort=result.reasoning_effort,
+        model_tier=result.model_tier, reasoning_effort=result.reasoning_effort, context_window=window,
     )
     if result.model_executed:
         budgets.record(user, _AGENT_ID, result.total_tokens)
@@ -314,14 +316,12 @@ async def ask(
         "context_tokens": result.context_tokens,
         "context_breakdown": result.context_breakdown,
         "context_breakdown_exact": result.context_breakdown_exact,
-        "context_window": agent_config.status()["context_window"],
+        "context_window": window,
         "provider_id": result.provider_id,
         "model": result.model,
         "cancelled": False,
     }
     if result.model_tier:
-        # The tier model's own window, not the pinned model's.
-        reply["context_window"] = context_window_for(result.model)
         reply["model_tier"] = result.model_tier
     if result.model_note:
         reply["model_note"] = result.model_note

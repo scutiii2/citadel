@@ -43,6 +43,7 @@ def own_row(
     delegated_by: str | None,
     model_tier: str | None = None,
     reasoning_effort: str | None = None,
+    context_window: int | None = None,
 ) -> dict[str, Any]:
     """This agent's own agent_usage entry for one ask() (delegated agents
     add their own rows - see delegation.py)."""
@@ -61,6 +62,9 @@ def own_row(
         "context_breakdown": result.context_breakdown,
         "context_breakdown_exact": result.context_breakdown_exact,
     }
+    if result.context_tokens and context_window:
+        row["context_tokens"] = result.context_tokens
+        row["context_window"] = context_window
     if result.gateway_switches:
         row["gateway_switches"] = result.gateway_switches
     if result.cached_input_tokens:

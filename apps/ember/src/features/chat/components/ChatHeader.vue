@@ -25,7 +25,7 @@ const props = defineProps<{
   contextPercent: number | null;
   /** What fills the context, for the panel the meter opens; leave out (or null)
    * and the meter is plain text. */
-  breakdown?: { tokens: number; window: number; parts: ContextPart[]; exact?: boolean; agentUsage?: AgentUsage[] } | null;
+  breakdown?: { tokens: number; window: number; parts: ContextPart[]; exact?: boolean; agentUsage?: AgentUsage[]; agentLabel?: string } | null;
   /** How the next questions are counted; with it the panel shows an Estimate / Exact switch. */
   accuracy?: ContextAccuracy;
   locked: boolean;
@@ -38,6 +38,7 @@ const auth = useAuthStore();
 const CONTEXT_HINT = "How full the agent's memory of this chat is. At 60% the chat is summarized automatically.";
 const contextTitle = computed(() =>
   props.contextPercent === null && props.breakdown ? "Prompt cost for each agent that ran this answer."
+    : props.breakdown?.agentLabel ? `How full ${props.breakdown.agentLabel}'s context was for the last answer. Click for what fills it.`
     : props.breakdown ? `How full the agent's memory of this chat is. Click for what fills it. At 60% the chat is summarized automatically.` : CONTEXT_HINT,
 );
 
@@ -135,6 +136,7 @@ function choose(id: string): void {
         :parts="breakdown.parts"
         :exact="breakdown.exact"
         :agent-usage="breakdown.agentUsage"
+        :agent-label="breakdown.agentLabel"
         :accuracy="accuracy"
         @update:accuracy="(value) => emit('update:accuracy', value)"
       />
