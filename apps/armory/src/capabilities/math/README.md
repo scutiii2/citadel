@@ -28,7 +28,8 @@ Use `tool_math_continue` with the complete previous result:
 }
 ```
 
-Replace the placeholder with the actual JSON object. `solution_index` selects one
+Replace the placeholder with the actual JSON object, or its JSON text, which is what a
+`{"$ref": "step_id"}` in Legion's `run_tools` passes. `solution_index` selects one
 solution family. Overrides can specialize its parameters but cannot change its
 selected root or remove original restrictions. For scalar results use
 `slot: "value"` and optional `value_name` (default `value`). Units are restored to
@@ -251,7 +252,7 @@ Existing strings remain valid. To configure a calculation, replace only the root
 | --- | --- | --- |
 | `expression` | Required | Existing string language, or a list of 1–16 equalities forming a simultaneous system. |
 | `solve_for` | Inferred | Root names to solve; undeclared non-target variables remain parameters. |
-| `domain` | `complex` | `real` applies to all variables, private helpers, and expression values. |
+| `domain` | `complex`; `real` for `certified` | `real` applies to all variables, private helpers, and expression values. |
 | `precision` | `15` | Decimal digits for approximations; integer from 15 to 100. |
 | `method` | `symbolic` | `numeric` searches; `auto` searches after unresolved symbolic solving; `certified` isolates supported exact real polynomial roots. |
 | `numerical` | None | Up to eight `initial_guesses` dictionaries and/or one-variable `bounds`. Required for a numerical search. |

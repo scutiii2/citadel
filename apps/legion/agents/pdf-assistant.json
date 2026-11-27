@@ -15,7 +15,7 @@
   "focus": "PDF and image files: list uploads, inspect pages, merge or combine into one PDF, download link.",
   "tools": {
     "allow": [
-      "pdf_merger__*",
+      "tool_pdf_*",
       "tool_files_list",
       "tool_files_inspect",
       "stronghold__tool_ticket_createTicket"

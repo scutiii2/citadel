@@ -11,6 +11,7 @@ connection - not reconnected per call, unlike chat_app's mcp_client.py.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -277,6 +278,8 @@ def _dispatch_tool(name: str, arguments: dict[str, Any], elicit: Any) -> str:
     )
     if citadel_tool and result.is_error and parse(text) is not None:
         return NumberedFailureText(text)
+    if citadel_tool:
+        text = _compact_json(text)
     if name == f"{_PREFIX}tool_web_search":
         structured = result.structured_content
         hits = structured.get("results", [])
@@ -289,6 +292,17 @@ def _dispatch_tool(name: str, arguments: dict[str, Any], elicit: Any) -> str:
     ):
         return _screen_output(text)
     return text
+
+
+def _compact_json(text: str) -> str:
+    """`text` without JSON indentation. Armory and Stronghold indent their results, which can triple what the
+    model reads on every later round and pushes a result over run_tools' size limit. Other text is unchanged."""
+    if not text.startswith("{"):
+        return text
+    try:
+        return json.dumps(json.loads(text), ensure_ascii=False, separators=(",", ":"))
+    except (ValueError, RecursionError):
+        return text
 
 
 def _call_private(name: str, arguments: dict[str, Any], elicit: Any = None) -> str:

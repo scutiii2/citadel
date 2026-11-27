@@ -17,7 +17,7 @@
     "allow": [
       "bard__*",
       "scribe__*",
-      "media_downloader__*",
+      "tool_media_*",
       "tool_files_list",
       "tool_files_inspect",
       "stronghold__tool_ticket_createTicket"

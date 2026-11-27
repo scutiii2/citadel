@@ -107,6 +107,8 @@ class EquationSpec(InputModel):
             raise ValueError("Set method to auto or numeric when supplying numerical hints.")
         if self.method == "certified" and self.numerical is not None and self.numerical.initial_guesses:
             raise ValueError("Certified solving uses exact intervals; supply bounds rather than initial guesses.")
+        if self.method == "certified" and "domain" not in self.model_fields_set:
+            self.domain = "real"  # a certificate covers real roots only, so the complex default could never certify
         return self
 
 
@@ -382,6 +384,12 @@ class ContinuationInput(InputModel):
     value_name: Name = "value"
     bindings: list[Binding] = Field(default_factory=list, max_length=MAX_BINDINGS)
     allow_approximate: bool = False
+
+    @field_validator("previous", mode="before")
+    @classmethod
+    def read_json_text(cls, value):
+        """Legion's run_tools hands an earlier step's result over as JSON text; unreadable text fails validation."""
+        return json.loads(value) if isinstance(value, str) else value
 
 
 class ContinuationRequest(InputModel):
