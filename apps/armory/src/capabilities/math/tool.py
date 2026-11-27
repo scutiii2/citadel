@@ -80,7 +80,9 @@ async def tool_math_batch(
 
 
 @command(name="continue", description="Continue from one prior result with its conditions and units")
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
+@mcp.tool(meta={"keywords": ["math", "continue", "previous", "result", "reuse", "substitute", "equation"],
+                "display_label": "Continuing from a result"},
+          annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
 async def tool_math_continue(equation: SharedEquation, data: ContinuationInput) -> SolveResult:
     """Reuse a selected prior solution or scalar value. Pass previous result in
     data.previous, select solution_index or slot:value and optional value_name.
@@ -92,7 +94,9 @@ async def tool_math_continue(equation: SharedEquation, data: ContinuationInput) 
 
 
 @command(name="table", description="Apply a formula to an owned attached table page")
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
+@mcp.tool(meta={"keywords": ["math", "table", "formula", "columns", "rows", "csv", "calculate"],
+                "display_label": "Calculating table rows"},
+          annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
 async def tool_math_table(equation: SharedEquation, data: TableFormulaInput, ctx: Context) -> BatchResult:
     """Map variables to exact numeric column names from an attached table_id.
     data includes columns, shared bindings, offset, and limit (1–32).
@@ -109,7 +113,9 @@ async def tool_math_table(equation: SharedEquation, data: TableFormulaInput, ctx
 
 
 @command(name="matrix", description="Compute exact bounded matrix operations")
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
+@mcp.tool(meta={"keywords": ["math", "matrix", "determinant", "inverse", "rank", "rref", "linear", "algebra"],
+                "display_label": "Computing the matrix"},
+          annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
 async def tool_math_matrix(
     operation: Literal["add", "subtract", "multiply", "transpose", "determinant", "inverse", "rank", "rref", "solve"],
     data: MatrixOptions,
@@ -124,7 +130,9 @@ async def tool_math_matrix(
 
 
 @command(name="calculus", description="Differentiate, integrate or take a limit with domain evidence")
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
+@mcp.tool(meta={"keywords": ["math", "calculus", "derivative", "differentiate", "integral", "integrate", "limit"],
+                "display_label": "Working the calculus"},
+          annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
 async def tool_math_calculus(expression: str, data: CalculusOptions) -> SolveResult:
     """Differentiate (order 1–8), integrate or take a limit of restricted scalar
     expressions. data includes operation, variable, domain, precision, optional

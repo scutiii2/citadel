@@ -19,7 +19,7 @@ from typing import Any
 from src.providers.base_provider import OnEvent, ToolCallRecord, dispatch_with_progress, step_event
 from src.providers.turn_guard import TurnGuard
 from src.runtime import approvals, counters, questions, run_tools, tool_batch_settings, turn_effects
-from src.tools.mcp_client.mcp_upstream import NumberedFailureText, is_read_only_builtin
+from src.tools.mcp_client.mcp_upstream import FailedToolText, NumberedFailureText, is_read_only_builtin
 
 
 @dataclass(frozen=True)
@@ -103,9 +103,10 @@ class ToolRound:
             return Outcome(f"Tool '{call.name}' failed: {error}", False)
 
     async def _finish(self, call: Call, outcome: Outcome) -> Outcome:
+        if isinstance(outcome.text, FailedToolText):
+            outcome.ok = False
         if isinstance(outcome.text, NumberedFailureText):
             self.guard.note_result(call.name, call.arguments, outcome.text)
-            outcome.ok = False
         await self._emit("step_end", id=call.id, ok=outcome.ok, result=outcome.shown or outcome.text)
         return outcome
 

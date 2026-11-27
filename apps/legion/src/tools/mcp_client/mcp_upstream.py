@@ -195,8 +195,12 @@ def _qualified(name: str) -> str:
     return _PREFIX + name if _PREFIX + name in listed else name
 
 
-class NumberedFailureText(str):
-    """Error content emitted by a Citadel MCP tool."""
+class FailedToolText(str):
+    """The text of a call whose tool reported an error."""
+
+
+class NumberedFailureText(FailedToolText):
+    """Numbered error content emitted by a Citadel MCP tool, which the turn guard acts on."""
 
 
 def _screen_output(text: str, *, public_snippets: str = "") -> str:
@@ -280,8 +284,14 @@ def _dispatch_tool(name: str, arguments: dict[str, Any], elicit: Any) -> str:
         return NumberedFailureText(text)
     if citadel_tool:
         text = _compact_json(text)
+    text = _screen_result(name, text, result, citadel_tool)
+    return FailedToolText(text) if result.is_error else text
+
+
+def _screen_result(name: str, text: str, result: Any, citadel_tool: bool) -> str:
+    """`text`, flagged when it carries outside text that looks like an injected instruction."""
     if name == f"{_PREFIX}tool_web_search":
-        structured = result.structured_content
+        structured = result.structured_content or {}  # none on an error result
         hits = structured.get("results", [])
         snippets = "\n\n".join(
             hit["snippet"] for hit in hits if isinstance(hit, dict) and isinstance(hit.get("snippet"), str)
@@ -329,7 +339,8 @@ def _call_private(name: str, arguments: dict[str, Any], elicit: Any = None) -> s
             f"{text[:MAX_PRIVATE_RESULT_CHARS]}\n\n[Truncated: the extension returned {len(text)} characters; "
             f"only the first {MAX_PRIVATE_RESULT_CHARS} are shown.]"
         )
-    return _screen_output(text)
+    screened = _screen_output(text)
+    return FailedToolText(screened) if result.is_error else screened
 
 
 async def prefetch_private(turn: "private_turn.PrivateTurn") -> None:
