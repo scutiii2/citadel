@@ -11,7 +11,7 @@ from src.capabilities.pdf_merger.utils.converters.base import ImageOptions
 from src.capabilities.pdf_merger.utils.engine.page_ranges import parse_page_ranges
 from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
 from src.capabilities.pdf_merger.utils.models import MergePlan
-from src.capabilities.pdf_merger.utils.store.file_store import StoredFile
+from src.services.user_files.store import StoredFile
 
 
 @dataclass(frozen=True)

@@ -13,7 +13,7 @@ from src.models import Account
 from src.services.mcp_server_info import base_url
 from src.services.mcp_session import identity_headers
 
-Area = Literal["pdf", "media"]
+Area = Literal["pdf", "media", "files"]
 PUBLIC = {"pdf": "pdf-merger", "media": "media-downloader"}
 
 
@@ -85,7 +85,9 @@ class CapabilityFilesGateway:
     async def stream(self, area: Area, file_id: str, account: Account, *, content=False, range_header=None):
         encoded = quote(file_id, safe="")
         if content:
-            url = f"{self.base}/{area}/ui/files/{encoded}/content"
+            # "files" is Armory's shared store; the others are a capability's own screen.
+            url = (f"{self.base}/files/{encoded}/content" if area == "files"
+                   else f"{self.base}/{area}/ui/files/{encoded}/content")
         else:
             # Ownership is checked before minting/fetching a signed bearer link.
             files = await self.request(area, "GET", "/files", account)

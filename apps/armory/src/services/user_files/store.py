@@ -11,16 +11,17 @@ from collections.abc import AsyncIterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from src.capabilities.pdf_merger.utils.config import MB
-from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
+from src.services.file_errors import ErrorCode, FileError
 from src.services.session_file_store import DATA_NAME_RE, WORK_DIR_NAME, SessionFileStore, new_file_id
+
+MB = 1024 * 1024
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class StoredFile:
-    """One committed file. ``kind`` is "pdf" or "image"."""
+    """One committed file. ``session`` is the owner's account id; ``pages`` is 0 for a kind without pages."""
 
     file_id: str
     session: str
@@ -46,10 +47,10 @@ class FileStore(SessionFileStore):
     file_class = StoredFile
 
     def _not_found(self, file_id: str) -> Exception:
-        return MergerError(ErrorCode.FILE_NOT_FOUND, "This file is not available. Upload it again.")
+        return FileError(ErrorCode.FILE_NOT_FOUND, "This file is not available. Upload it again.")
 
     def _delete_failed(self) -> Exception:
-        return MergerError(ErrorCode.INTERNAL, "This file couldn't be deleted right now. Try again in a moment.")
+        return FileError(ErrorCode.INTERNAL, "This file couldn't be deleted right now. Try again in a moment.")
 
     def _valid_id(self, file_id: str) -> bool:
         return bool(DATA_NAME_RE.fullmatch(file_id))
@@ -81,7 +82,7 @@ class FileStore(SessionFileStore):
             async for chunk in chunks:
                 size += len(chunk)
                 if size > self._max_file_bytes:
-                    raise MergerError(
+                    raise FileError(
                         ErrorCode.FILE_TOO_LARGE,
                         f"This file is larger than {self._max_file_bytes // MB} MB. Split or compress it, then upload it again.",
                     )
@@ -101,7 +102,7 @@ class FileStore(SessionFileStore):
         size = (await asyncio.to_thread(pending.path.stat)).st_size
         if self._over_quota(pending.session, size):
             self.discard(pending)
-            raise MergerError(
+            raise FileError(
                 ErrorCode.LIMIT_EXCEEDED,
                 f"Your files would use more than {self._max_session_bytes // MB} MB. Delete some files or wait for them to expire.",
             )

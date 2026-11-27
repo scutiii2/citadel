@@ -2,15 +2,15 @@ import { apiRequest } from "./http";
 
 /** The caps and lifetimes of one capability. `stored` is true once an administrator changed anything from the defaults. */
 export interface CapabilityLimits {
-  file_ttl_hours: number;
-  sweep_interval_minutes: number;
-  download_link_minutes: number;
+  file_ttl_hours?: number;
+  sweep_interval_minutes?: number;
+  download_link_minutes?: number;
   mcp_wait_seconds?: number;
   limits: Record<string, number>;
   stored: boolean;
 }
 
-export type LimitsCapability = "pdf_merger" | "media_downloader";
+export type LimitsCapability = "files" | "pdf_merger" | "media_downloader";
 export type LimitsView = Record<LimitsCapability, CapabilityLimits> & { applies?: string };
 
 /** What one capability's save may carry: top-level numbers and a `limits` object of numbers. */

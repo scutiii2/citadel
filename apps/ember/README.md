@@ -14,8 +14,8 @@ Ember Windows app: the Vue 3, TypeScript and Vite UI in a Tauri 2 shell. The sam
 
 ## Run and build
 
-- `pnpm install`, then `pnpm dev` (browser) or `pnpm tauri dev` (window). Needs Rust (<https://rustup.rs>) for `tauri`.
-- `pnpm release` builds the NSIS installer (per-user) and copies it to `dist/` in the Citadel root. `pnpm tauri build` alone leaves it under `src-tauri/target/release/bundle/nsis`.
+- `pnpm install` (one pnpm workspace with the Citadel root), then `pnpm dev` (browser) or `pnpm tauri dev` (window). Needs Rust (<https://rustup.rs>) for `tauri`.
+- `pnpm run release` builds the NSIS installer (per-user) and copies it to `releases/` in the Citadel root. It copies only the installer; the plain app is `src-tauri/target/release/ember.exe`. `pnpm tauri build` alone leaves the installer under `src-tauri/target/release/bundle/nsis`.
 - Checks: `pnpm exec vue-tsc -b`, `pnpm test`.
 
 ## Windows app specifics
@@ -27,6 +27,5 @@ Ember Windows app: the Vue 3, TypeScript and Vite UI in a Tauri 2 shell. The sam
 
 ## Not done
 
-- The Tauri shell has never been compiled: Rust is not installed on the build machine, so `pnpm tauri dev` and `pnpm tauri build` are untested and there is no `Cargo.lock`.
 - Not run: the app in a window against a live Portcullis, and WebView2's notification and download behaviour.
 - No web push and no offline banner (the PWA code was removed). There is no calendar or games page (the calendar was removed from Citadel in Plan 11).

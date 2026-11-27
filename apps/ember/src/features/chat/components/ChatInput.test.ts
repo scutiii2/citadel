@@ -2,14 +2,14 @@ import { useAuthStore } from "../../../stores/auth";
 import { createPinia, setActivePinia } from "pinia";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { attachmentsClient } from "../../../api/files/AttachmentsClient";
+import { attachmentsClient, type AttachmentFile } from "../../../api/files/AttachmentsClient";
 import type { PromptTemplate } from "../api/TemplatesClient";
 import { withAttachments } from "../../../utils/content/attachments";
 import ChatInput from "./ChatInput.vue";
 import inputSource from "./ChatInput.vue?raw";
 import menuSource from "./ChatSettingsMenu.vue?raw";
 
-vi.mock("../../../api/files/AttachmentsClient", () => ({ attachmentsClient: { text: vi.fn(), table: vi.fn(), pdf: vi.fn(), dictate: vi.fn() } }));
+vi.mock("../../../api/files/AttachmentsClient", () => ({ attachmentsClient: { file: vi.fn(), dictate: vi.fn() } }));
 
 const dictationHooks = vi.hoisted(() => ({ current: undefined as undefined | { onPartial?: (text: string) => void } }));
 vi.mock("../composables/useDictation", async (original) => {
@@ -20,9 +20,13 @@ vi.mock("../composables/useDictation", async (original) => {
   } };
 });
 
-const text = vi.mocked(attachmentsClient.text);
-const pdf = vi.mocked(attachmentsClient.pdf);
-const table = vi.mocked(attachmentsClient.table);
+const upload = vi.mocked(attachmentsClient.file);
+
+const uploaded = (over: Partial<AttachmentFile> = {}): AttachmentFile => ({
+  filename: "scan.pdf", file_id: "file-1", kind: "pdf", size: 1, pages: 2, expires_at: 2000000000,
+  text: "", char_count: 0, truncated: false, table: null, ...over,
+});
+const SHEET = { table_id: "tbl-1", filename: "sales.csv", rows: 1200, columns: ["region", "units"], sheet: null, notes: [] };
 
 function mountInput(props: Record<string, unknown> = {}) {
   return mount(ChatInput, { props: { busy: false, ...props }, attachTo: document.body });
@@ -39,9 +43,8 @@ const drag = (types: string[], files: File[] = []) => ({ types, files });
 beforeEach(() => {
   setActivePinia(createPinia());
   useAuthStore().account = { id: 1, username: "admin", email: "a@example.com", email_verified: true, roles: [], permissions: ["files.upload"] };
-  pdf.mockResolvedValue({ filename: "scan.pdf", file_id: "file-1", pages: 2, kind: "pdf", expires_at: 2000000000, text: "", char_count: 0, truncated: false });
-  text.mockResolvedValue({ text: "extracted", char_count: 9, truncated: false } as never);
-  table.mockResolvedValue({ table_id: "tbl-1", filename: "sales.csv", rows: 1200, columns: ["region", "units"], sheet: null, notes: [] });
+  upload.mockReset();
+  upload.mockImplementation(async (f: File) => uploaded({ filename: f.name }));
 });
 
 afterEach(() => {
@@ -303,7 +306,7 @@ describe("pasting files", () => {
     await textarea.trigger("paste", { clipboardData: clipboard([pasted]) });
     await flushPromises();
 
-    expect(pdf).toHaveBeenCalledExactlyOnceWith(pasted);
+    expect(upload).toHaveBeenCalledExactlyOnceWith(pasted);
     expect(wrapper.find(".attachments li").text()).toContain("screenshot.png");
     expect((textarea.element as HTMLTextAreaElement).value).toBe("");
   });
@@ -327,7 +330,7 @@ describe("pasting files", () => {
     await flushPromises();
 
     expect(event.defaultPrevented).toBe(false);
-    expect(text).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
     expect(wrapper.find(".attachments").exists()).toBe(false);
   });
 
@@ -337,11 +340,11 @@ describe("pasting files", () => {
     await wrapper.find("textarea").trigger("paste", { clipboardData: clipboard([]) });
     await wrapper.find("textarea").trigger("paste");
 
-    expect(text).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
   });
 
   it("shows a file ember_api could not read as an error chip", async () => {
-    pdf.mockRejectedValue(new Error("Unsupported file type"));
+    upload.mockRejectedValue(new Error("Unsupported file type"));
     const wrapper = mountInput();
 
     await wrapper.find("textarea").trigger("paste", { clipboardData: clipboard([file("pic.png")]) });
@@ -354,34 +357,26 @@ describe("pasting files", () => {
 });
 
 describe("attaching a table", () => {
-  it("uploads a .csv beside reading its text and puts the table id in the sent question", async () => {
+  it("uploads a .csv once and puts the file and table ids in the sent question", async () => {
+    upload.mockResolvedValue(uploaded({ filename: "sales.csv", kind: "table", pages: null, text: "extracted", char_count: 9, table: SHEET }));
     const wrapper = mountInput();
     const sheet = file("sales.csv");
 
     await wrapper.find("form").trigger("drop", { dataTransfer: drag(["Files"], [sheet]) });
     await flushPromises();
 
-    expect(text).toHaveBeenCalledExactlyOnceWith(sheet);
-    expect(table).toHaveBeenCalledExactlyOnceWith(sheet);
+    expect(upload).toHaveBeenCalledExactlyOnceWith(sheet);
     expect(wrapper.find(".attachments li").text()).toContain("1,200 rows, 2 columns");
     await wrapper.find("textarea").setValue("total units per region?");
     await wrapper.find("form").trigger("submit");
     const sent = wrapper.emitted("send")![0]![0] as string;
+    expect(sent).toContain("[File file_id: file-1 | table |");
     expect(sent).toContain("table_id: tbl-1");
     expect(sent).toContain("extracted");
   });
 
-  it("does not upload other files as tables", async () => {
-    const wrapper = mountInput();
-
-    await wrapper.find("form").trigger("drop", { dataTransfer: drag(["Files"], [file("notes.txt")]) });
-    await flushPromises();
-
-    expect(table).not.toHaveBeenCalled();
-  });
-
-  it("still attaches the preview, and says so, when the table upload fails", async () => {
-    table.mockRejectedValue(new Error("mcp_server is unreachable"));
+  it("still attaches the preview, and says so, when the table could not be made", async () => {
+    upload.mockResolvedValue(uploaded({ filename: "sales.xlsx", kind: "table", pages: null, text: "extracted", char_count: 9 }));
     const wrapper = mountInput();
 
     await wrapper.find("form").trigger("drop", { dataTransfer: drag(["Files"], [file("sales.xlsx")]) });
@@ -402,7 +397,7 @@ describe("dropping files anywhere on the composer", () => {
     await wrapper.find("form").trigger("drop", { dataTransfer: drag(["Files"], [dropped]) });
     await flushPromises();
 
-    expect(text).toHaveBeenCalledExactlyOnceWith(dropped);
+    expect(upload).toHaveBeenCalledExactlyOnceWith(dropped);
   });
 
   it("highlights the box while files are dragged over, and stops when they leave", async () => {
@@ -439,7 +434,7 @@ describe("dropping files anywhere on the composer", () => {
     expect(over.defaultPrevented).toBe(false);
     expect(drop.defaultPrevented).toBe(false);
     expect(wrapper.find(".box").classes()).not.toContain("dragging");
-    expect(text).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
   });
 });
 
@@ -1092,29 +1087,26 @@ describe("the suggested next prompt", () => {
 });
 
 
-describe("original PDF attachments", () => {
-  it("sends stored IDs in attachment order even without a text preview", async () => {
+describe("stored attachments", () => {
+  it("sends file ids in attachment order even without a text preview", async () => {
     const wrapper = mountInput();
-    pdf.mockResolvedValueOnce({ filename: "scan.pdf", file_id: "first", pages: 2, kind: "pdf", expires_at: 2000000000, text: "", char_count: 0, truncated: false });
-    pdf.mockResolvedValueOnce({ filename: "photo.png", file_id: "second", pages: 1, kind: "image", expires_at: 2000000000, text: "", char_count: 0, truncated: false });
+    upload.mockResolvedValueOnce(uploaded({ file_id: "first" }));
+    upload.mockResolvedValueOnce(uploaded({ filename: "photo.png", file_id: "second", kind: "image", pages: 1 }));
     await wrapper.find("textarea").trigger("paste", { clipboardData: clipboard([file("scan.pdf"), file("photo.png")]) });
     await flushPromises();
     await wrapper.find("form").trigger("submit");
     const sent = wrapper.emitted("send")![0]![0] as string;
     expect(sent.indexOf("file_id: first")).toBeLessThan(sent.indexOf("file_id: second"));
     expect(sent).toContain("No text preview available");
-    const imageBlock = sent.slice(sent.indexOf('[[ATTACHMENT filename="photo.png"'));
-    expect(imageBlock).toContain("[Image file_id: second");
-    expect(imageBlock).not.toContain("PDF Assistant");
-    expect(text).not.toHaveBeenCalled();
+    expect(sent.slice(sent.indexOf('[[ATTACHMENT filename="photo.png"'))).toContain("[File file_id: second | image | 1 pages");
   });
-  it("shows storage errors instead of sending a misleading text-only PDF", async () => {
-    pdf.mockRejectedValue(new Error("PDFMerger is unavailable"));
+  it("shows storage errors instead of sending a misleading text-only file", async () => {
+    upload.mockRejectedValue(new Error("File storage is unavailable"));
     const wrapper = mountInput();
     await wrapper.find("textarea").trigger("paste", { clipboardData: clipboard([file("scan.pdf")]) });
     await flushPromises();
     expect(wrapper.find(".attachments li").classes()).toContain("error");
-    expect(wrapper.find(".attachments li").text()).toContain("PDFMerger is unavailable");
+    expect(wrapper.find(".attachments li").text()).toContain("File storage is unavailable");
     await wrapper.find("form").trigger("submit");
     expect(wrapper.emitted("send")).toBeUndefined();
   });

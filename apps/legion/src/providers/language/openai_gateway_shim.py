@@ -43,6 +43,23 @@ def _text(content: Any) -> str:
     return "".join(parts)
 
 
+def _user_content(content: Any) -> str | list[dict[str, Any]]:
+    """A user message's content: its text, or text and image blocks when it carries images."""
+    if isinstance(content, str) or not any(_get(part, "type") == "input_image" for part in content or []):
+        return _text(content)
+    blocks: list[dict[str, Any]] = []
+    for part in content:
+        if _get(part, "type") != "input_image":
+            blocks.append({"type": "text", "text": _text([part])})
+            continue
+        # Only the data URLs Legion builds itself: "data:<media type>;base64,<data>".
+        head, _, data = str(_get(part, "image_url") or "").partition(";base64,")
+        if not head.startswith("data:") or not data:
+            raise ValueError("Unsupported content part: input_image without base64 data")
+        blocks.append({"type": "image", "media_type": head.removeprefix("data:"), "data": data})
+    return blocks
+
+
 def _arguments(raw: Any) -> dict[str, Any]:
     if isinstance(raw, dict):
         return raw
@@ -97,7 +114,8 @@ def _messages(items: list[Any]) -> tuple[str, list[dict[str, Any]]]:
             system.append(_text(_get(item, "content")))
         elif role in ("user", "assistant"):
             flush()
-            out.append({"role": role, "content": _text(_get(item, "content"))})
+            read = _user_content if role == "user" else _text
+            out.append({"role": role, "content": read(_get(item, "content"))})
         else:
             raise ValueError(f"Unsupported input item: {kind or role}")
     flush()

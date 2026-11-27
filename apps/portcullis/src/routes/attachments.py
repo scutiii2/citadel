@@ -37,7 +37,15 @@ async def attachment_content(
     """Preview an owned chat attachment without a PDF workspace subscription."""
     client = CapabilityFilesGateway(request.app.state.upstream, request.app.state.catalog.mcp_url(),
                                     request.app.state.keyring)
-    return await client.stream("pdf", file_id, account, content=True, range_header=request.headers.get("range"))
+    return await client.stream("files", file_id, account, content=True, range_header=request.headers.get("range"))
+
+
+@router.post("/file")
+async def attachment_file(request: Request, account: Account = Depends(require_chat),
+                          stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
+    """One upload route for every kind of file."""
+    return await pass_on(request, stronghold, account, "/attachments/file")
+
 
 @router.post("/text")
 async def attachment_text(request: Request, account: Account = Depends(require_chat),

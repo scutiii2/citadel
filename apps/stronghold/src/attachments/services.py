@@ -10,10 +10,11 @@ from src.requester import Requester
 from src.service_auth import authenticate
 
 _LONG = 120.0
+_STORE_DOWN = "File storage is unavailable"
 
 
 class ArmoryUploads:
-    """Armory's /upload/pdf and /upload/table: it keeps the file for the data and PDF tools and answers with an id."""
+    """Armory's upload routes: it keeps the file for the file, data and PDF tools and answers with an id."""
 
     def __init__(self, client: httpx.AsyncClient, keyring=None) -> None:
         self._client = authenticate(client, "armory", keyring)
@@ -50,4 +51,12 @@ class ArmoryUploads:
         body = await self._upload("/upload/table", who, filename, content, "armory is unreachable")
         if not isinstance(body.get("table_id"), str):
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "armory is unreachable")
+        return body
+
+    async def file(self, who: Requester, filename: str, content: bytes) -> dict:
+        """Armory's /upload/file: it keeps any accepted file and answers with its id and kind."""
+        body = await self._upload("/upload/file", who, filename, content, _STORE_DOWN)
+        if (not isinstance(body.get("file_id"), str) or not isinstance(body.get("kind"), str)
+                or not isinstance(body.get("pages"), int) or not isinstance(body.get("expires_at"), (int, float))):
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, _STORE_DOWN)
         return body

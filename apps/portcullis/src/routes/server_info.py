@@ -298,14 +298,14 @@ async def set_armory_environment(
 
 @router.get("/armory-tuning")
 async def armory_tuning(account: Account = Depends(require_admin), info: McpServerInfo = Depends(get_server_info)) -> Any:
-    """The caps and lifetimes of Armory's PDF and video capabilities."""
+    """The caps and lifetimes of Armory's stored files and PDF and video capabilities."""
     return await _call(info.tuning(account))
 
 
 @router.put("/armory-tuning/{name}")
 async def set_armory_tuning(
     changes: dict[str, Any],
-    name: Literal["pdf_merger", "media_downloader"],
+    name: Literal["files", "pdf_merger", "media_downloader"],
     account: Account = Depends(require_admin),
     info: McpServerInfo = Depends(get_server_info),
     logs: LogWriter = Depends(get_log_writer),
@@ -318,7 +318,7 @@ async def set_armory_tuning(
 
 @router.delete("/armory-tuning/{name}")
 async def reset_armory_tuning(
-    name: Literal["pdf_merger", "media_downloader"],
+    name: Literal["files", "pdf_merger", "media_downloader"],
     account: Account = Depends(require_admin),
     info: McpServerInfo = Depends(get_server_info),
     logs: LogWriter = Depends(get_log_writer),

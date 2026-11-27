@@ -423,7 +423,9 @@ has 1–8 steps, unique ids, known dependencies, no cycles and self-contained
 briefs of 20–16,000 characters. The first rejection returns the exact validation
 error for one repair; a second rejection asks for a direct answer. Accepted
 plans execute through the shared DAG executor, then the model receives the
-results with no tools offered and writes the final reply. Architect-level code
+results and writes the final reply. A further plan is refused. The Anthropic
+loop keeps the two tools in that last request, because the API refuses a history
+with tool calls and no tool definitions; the OpenAI loop sends none. Architect-level code
 steps are read and may retry; operations and unknown kinds remain write. Unit-level read retries
 escalate light to standard to heavy; writes are never retried automatically.
 
@@ -442,8 +444,8 @@ collide with the orchestrator's, so consumers key on `(agent_id, id)`.
 ## Architects
 
 `agents/code-architect.json` defines the code pipeline, using OmniRoute's
-`combo/heavy` for planning and assembly. It is disabled by default and has no
-model-offered tools. Enabling it does not switch Ember to plan mode.
+`combo/heavy` for planning and assembly. It ships enabled, has no model-offered
+tools, and Ember plans through it (see Orchestrator).
 
 The pipeline optionally calls the first configured prefetch specialist when the
 brief names a code file or conservative path, caps its output at 8,000 characters,
@@ -467,7 +469,20 @@ Each planner, repair and assembler completion has its own durable usage row;
 worker usage is retained through the normal delegation path. Cancellation is
 cooperative, and an already-running one-shot completion may finish upstream.
 
-Operations, approvals, runtime skill marking and the Ember rollout remain deferred.
+Operations, approvals and runtime skill marking remain deferred.
+
+## Attached images
+
+A user message names an uploaded image as `[File file_id: <id> | image | ...]` (older chats say `[Image file_id: <id> | ...]`). At the start of a turn the entry agent, an
+orchestrator or a delegable specialist fetches the newest four such images (this question and earlier user messages) from
+Armory's `tool_files_view`, as the asking user, and sends them to the model in front of the question
+(`src/runtime/images.py`). Internal helpers get none. It needs Armory's `files` capability. Armory hides the tool from tool lists, so no model is offered it,
+and Legion refuses a model that names it. A turn with every tool blocked shows no images.
+
+An image cannot be checked for confidential data, so a turn that shows one goes only to trusted gateways, and is refused
+when the agent has none. An image that expired (Armory keeps uploads for an hour by default) or cannot be read is named to
+the model as unavailable. A gateway without image support refuses the turn. Images are sent again on each follow-up turn,
+and the context estimate counts about 1,600 tokens for each.
 
 ## Trusted gateways and confidential data
 

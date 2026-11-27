@@ -43,7 +43,7 @@ Armory settings read its normal environment configuration. Caps and lifetimes ar
 
 | Setting | Purpose |
 | --- | --- |
-| `MCP_PDF_MERGER_STORE_DIR` | Generated file store; defaults to `.data/armory/pdf_merger/store`. |
+| `MCP_FILES_STORE_DIR` | The shared file store (all uploads and merged files); defaults to `.data/armory/files/store`. |
 | `MCP_PDF_MERGER_PUBLIC_BASE_URL` | Browser-reachable Armory base URL for download links; defaults to `http://127.0.0.1:{MCP_PORT}`. Configure it for remote browsers or a reverse proxy. |
 | `PDF_MERGER_SIGNING_KEY` | Stable HMAC signing secret. If absent, Armory warns and generates an ephemeral key; links stop working after a process restart. |
 | Service authentication | Requires a signed Ed25519 service assertion and a Portcullis-signed requester token for account operations. |

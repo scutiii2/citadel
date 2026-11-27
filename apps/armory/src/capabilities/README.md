@@ -9,6 +9,7 @@ what it does:
 - `media_downloader/` - public video/music/photo probes, queued downloads, status and signed file links (`/media ...`); photo carousels become numbered ZIPs.
 - `firecrawl/` - scrape and crawl through Firecrawl (`/scrape ...`).
 - `repo_reader/` - read-only git history and code (`/repo ...`).
+- `files/` - list and inspect every uploaded file (`/files ...`).
 - `tables/` - questions about an attached CSV or Excel file (`/data ...`).
 - `math/` - direct/recursive equations, assumptions, cases, certificates, units, batch/table formulas, result continuation, matrices, calculus, and strict LaTeX (`/math ...`).
 - `email/` - shared outgoing email and threaded replies (`/email ...`).

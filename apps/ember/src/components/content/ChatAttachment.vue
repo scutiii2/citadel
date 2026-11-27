@@ -9,9 +9,12 @@ const props = defineProps<{ attachment: AttachmentBlock }>();
 const auth = useAuthStore();
 // Accept both current and older saved image references. Never use a URL from
 // attachment text: only a bounded file ID can form the authenticated local URL.
-const imageId = computed(() => props.attachment.text.match(
-  /^\[(?:Image|PDFMerger) file_id: ([A-Za-z0-9_-]{1,100}) \| \d+ pages \| image(?: \||\])/,
-)?.[1]);
+const imageId = computed(() => {
+  const found = props.attachment.text.match(
+    /^\[(?:File file_id: ([A-Za-z0-9_-]{1,100}) \| image(?: \||\])|(?:Image|PDFMerger) file_id: ([A-Za-z0-9_-]{1,100}) \| \d+ pages \| image(?: \||\]))/,
+  );
+  return found?.[1] ?? found?.[2];
+});
 const imagePath = computed(() => imageId.value ? `/api/attachments/files/${imageId.value}/content` : "");
 // Browser: the path itself (cookie). Windows app: a blob: URL fetched with the bearer.
 const imageUrl = ref(isDesktop() ? "" : imagePath.value);

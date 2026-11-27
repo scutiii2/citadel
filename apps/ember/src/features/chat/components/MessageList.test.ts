@@ -24,10 +24,13 @@ const FOUR = [user("q1"), assistant("a1"), user("q2"), assistant("a2")];
 const FILE = { filename: "f.txt", chars: 3, truncated: false, text: "abc" };
 
 describe("image attachments", () => {
-  for (const label of ["PDFMerger", "Image"]) {
+  for (const [label, text] of [
+    ["PDFMerger", "[PDFMerger file_id: f_photo | 1 pages | image | expires_at: 2000000000]"],
+    ["Image", "[Image file_id: f_photo | 1 pages | image | expires_at: 2000000000]"],
+    ["File", "[File file_id: f_photo | image | 1 pages | expires_at: 2000000000 | preserve this file_id when delegating]"],
+  ]) {
     it(`previews saved ${label} image references and opens the viewer`, async () => {
-      const attachment = { filename: "image.png", chars: 0, truncated: false,
-        text: `[${label} file_id: f_photo | 1 pages | image | expires_at: 2000000000]` };
+      const attachment = { filename: "image.png", chars: 0, truncated: false, text: text! };
       const wrapper = mountList({ messages: [user(withAttachments("Look", [attachment]))] });
       const image = wrapper.find<HTMLImageElement>(".attachment-image img");
       expect(image.exists()).toBe(true);

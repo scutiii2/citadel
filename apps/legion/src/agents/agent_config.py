@@ -22,7 +22,7 @@ from src.agents.roles.orchestrator import auto_route, delegation, memory_recall,
 from src.agents.roles.router import router_routing
 from src.agents.roles.orchestrator import plan as plan_policy
 
-from src.runtime import approvals, confidentiality, elicitations, internal_auth, questions, tool_filter, tuning_overrides, turn_effects
+from src.runtime import approvals, confidentiality, elicitations, images, internal_auth, questions, tool_filter, tuning_overrides, turn_effects
 from src.tools.private_extensions import turn as private_turn
 from src.agents import auto_tier, protocol_chain
 from src.providers import context_breakdown, llm_config, llm_options, model_tiers, token_limits
@@ -265,6 +265,15 @@ async def run_chat(
             provider_question = await skill_recall.with_skills(question, provider_question, on_event)
         if provider_question != question and confidentiality.has_untrusted_gateway():
             confidentiality.mark("recall")  # recalled notes and skills are the user's own: trusted gateways only
+        # Attached images are shown to agents that answer people's questions, not to internal helpers.
+        file_ids = images.references(question, history)
+        attached = images.Attached()
+        if file_ids and (spec.orchestrator or spec.delegable):
+            attached = await images.load(file_ids)
+        if attached.pictures and confidentiality.has_untrusted_gateway():
+            confidentiality.mark("image")  # nothing can check a picture for private data: trusted gateways only
+        provider_question = attached.note(provider_question)
+        images_token = images.bind(attached)
         async def call(module: Any, model: str | None) -> ChatResult:
             if inspect.iscoroutinefunction(module.run_chat):
                 return await module.run_chat(provider_question, history, model, request_id, depth, on_event=on_event, caveman=caveman)
@@ -296,6 +305,7 @@ async def run_chat(
                     position += 1
         finally:
             turn_effects.reset(effects_token)
+            images.reset(images_token)
         result.delegated_usage = delegated_usage
         if switches:
             result.gateway_switches = [*switches, *result.gateway_switches]

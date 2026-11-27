@@ -4,9 +4,13 @@ import { limitsClient, type LimitsView } from "../api/LimitsClient";
 import LimitsViewPage from "./LimitsView.vue";
 
 const VIEW: LimitsView = {
+  files: {
+    file_ttl_hours: 6, sweep_interval_minutes: 10, download_link_minutes: 60, stored: false,
+    limits: { max_upload_mb: 15, max_audio_upload_mb: 20, max_file_mb: 100, max_session_mb: 500, max_image_megapixels: 80 },
+  },
   pdf_merger: {
-    file_ttl_hours: 6, sweep_interval_minutes: 10, download_link_minutes: 60, mcp_wait_seconds: 100, stored: true,
-    limits: { max_file_mb: 100, max_session_mb: 500, max_segments: 50, max_output_pages: 2000, max_image_megapixels: 80, max_concurrent_merges: 2, job_timeout_seconds: 120 },
+    mcp_wait_seconds: 100, stored: true,
+    limits: { max_segments: 50, max_output_pages: 2000, max_concurrent_merges: 2, job_timeout_seconds: 120 },
   },
   media_downloader: {
     file_ttl_hours: 6, sweep_interval_minutes: 10, download_link_minutes: 60, stored: false,
@@ -29,7 +33,7 @@ const field = (wrapper: Awaited<ReturnType<typeof mounted>>, card: string, key: 
 describe("LimitsView", () => {
   it("shows both capabilities with their values and keeps Save off until something changes", async () => {
     const wrapper = await mounted();
-    expect((field(wrapper, "pdf_merger", "max_file_mb").element as HTMLInputElement).value).toBe("100");
+    expect((field(wrapper, "files", "max_file_mb").element as HTMLInputElement).value).toBe("100");
     expect((field(wrapper, "media_downloader", "max_file_mb").element as HTMLInputElement).value).toBe("500");
     expect(wrapper.find('[data-test="save"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="card-media_downloader"] [data-test="reset"]').exists()).toBe(false);

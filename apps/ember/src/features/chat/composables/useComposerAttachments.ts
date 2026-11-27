@@ -2,7 +2,7 @@ import { computed, ref } from "vue";
 import { useAuthStore } from "../../../stores/auth";
 import { useToolConnectionsStore } from "../../../stores/toolConnections";
 import { attachmentsClient } from "../../../api/files/AttachmentsClient";
-import { splitAttachments, AUDIO_FILE, DOCUMENT_FILE, PDF_FILE, TABLE_FILE, audioHeader, documentHeader, tableHeader } from "../../../utils/content/attachments";
+import { splitAttachments, AUDIO_FILE, DOCUMENT_FILE, audioHeader, documentHeader, fileText } from "../../../utils/content/attachments";
 import { errorMessage } from "../../../utils/errors";
 
 /** File uploads, previews, and input events for one chat composer. */
@@ -61,41 +61,21 @@ export function useComposerAttachments() {
         }).catch((err: unknown) => Object.assign(live, { state: "error", error: errorMessage(err) }));
         continue;
       }
-      if (PDF_FILE.test(file.name)) {
-        void attachmentsClient.pdf(file).then((result) => {
-          const image = result.kind === "image";
-          Object.assign(live, {
-            state: "ready",
-            text: image
-              ? `[Image file_id: ${result.file_id} | ${result.pages} pages | image | expires_at: ${result.expires_at} | preserve this file_id when delegating; the original image is stored with the pdf_merger tools]\n[No text preview available; inspect the original image when needed.]`
-              : `[PDFMerger file_id: ${result.file_id} | ${result.pages} pages | ${result.kind} | expires_at: ${result.expires_at} | use pdf_merger tools to inspect/merge this original; preserve this file_id when delegating to PDF Assistant]\n` +
-                (result.text || "[No text preview available; the original file is available for inspection and merging.]"),
-            // Reader (OCR) is opt-in: the file is kept so "Read with OCR" can upload it on request.
-            source: DOCUMENT_FILE.test(file.name) ? file : undefined,
-            chars: result.char_count, truncated: result.truncated, pages: result.pages,
-          });
-        }).catch((err: unknown) => Object.assign(live, { state: "error", error: errorMessage(err) }));
-        continue;
-      }
-      // A .csv / .xlsx is also uploaded whole, so the data tools can read every
-      // row; the text preview stays as the fallback if that upload fails.
-      const wantsTable = TABLE_FILE.test(file.name);
-      const tableUpload = wantsTable ? attachmentsClient.table(file).catch(() => null) : Promise.resolve(null);
-      // Each file on its own: one slow or broken file doesn't hold up the rest.
-      void Promise.all([attachmentsClient.text(file), tableUpload])
-        .then(([result, uploaded]) => {
-          Object.assign(live, {
-            state: "ready",
-            text: (wantsTable ? tableHeader(uploaded) : "") + result.text,
-            chars: result.char_count,
-            truncated: result.truncated,
-            rows: uploaded?.rows ?? 0,
-            columns: uploaded?.columns.length ?? 0,
-          });
-        })
-        .catch((err: unknown) => {
-          Object.assign(live, { state: "error", error: errorMessage(err) });
+      // Every other file goes up the same way. Each on its own: one slow or broken file doesn't hold up the rest.
+      void attachmentsClient.file(file).then((result) => {
+        const text = fileText(result);
+        Object.assign(live, {
+          state: "ready",
+          text,
+          chars: result.char_count,
+          truncated: result.truncated,
+          rows: result.table?.rows ?? 0,
+          columns: result.table?.columns.length ?? 0,
+          pages: result.pages ?? undefined,
+          // Reader (OCR) is opt-in: the file is kept so "Read with OCR" can upload it on request.
+          source: DOCUMENT_FILE.test(file.name) ? file : undefined,
         });
+      }).catch((err: unknown) => Object.assign(live, { state: "error", error: errorMessage(err) }));
     }
   }
 

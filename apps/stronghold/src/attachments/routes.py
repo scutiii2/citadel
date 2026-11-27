@@ -1,19 +1,21 @@
 """/attachments: files attached to a chat question, and dictation (files.upload at Portcullis).
 
-The file comes base64-encoded in JSON. Text is read here and sent back; PDFs and tables go to
+The file comes base64-encoded in JSON. Text is read here and sent back; the files themselves go to
 Armory. Stronghold sends audio and documents to the configured Scribe and Reader origins.
 Portcullis checks the login and permissions and relays browser streams.
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
+from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from src.attachments.extraction import MAX_FILE_BYTES, ExtractionError, extract_text_async
+from src.attachments.extraction import MAX_FILE_BYTES, PLAIN_TEXT_SUFFIXES, ExtractionError, extract_text_async
 from src.attachments.services import ArmoryUploads
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
@@ -30,6 +32,8 @@ _DOCUMENT_SUFFIXES = (".pdf", ".png", ".jpg", ".jpeg", ".webp")
 # 20 MB, not Scribe's 25 MB: base64 of 25 MB would not fit the request cap for this path.
 _MAX_AUDIO_BYTES = 20 * 1024 * 1024
 _MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+# Files whose text Stronghold can read as a preview.
+_PREVIEW_SUFFIXES = PLAIN_TEXT_SUFFIXES | {".pdf", ".docx", ".xlsx", ".xlsm"}
 
 
 def _base64(size: int) -> int:
@@ -61,6 +65,11 @@ class AudioIn(BaseModel):
 class DocumentIn(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     data: str = Field(min_length=1, max_length=_base64(_MAX_DOCUMENT_BYTES))
+
+
+class UploadIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    data: str = Field(min_length=1, max_length=_base64(_MAX_AUDIO_BYTES))
 
 
 class TextOut(BaseModel):
@@ -100,6 +109,17 @@ class DocumentOut(BaseModel):
     expires_at: float
 
 
+class FileOut(TextOut):
+    """One uploaded file. `file_id` is None when Armory could not keep it and only its text is attached."""
+
+    file_id: str | None = None
+    kind: str = "text"
+    size: int
+    pages: int | None = None
+    expires_at: float | None = None
+    table: TableOut | None = None
+
+
 class DictationOut(BaseModel):
     text: str
     duration_s: float
@@ -118,6 +138,12 @@ def _decode(data: str, limit: int = MAX_FILE_BYTES, too_big: str = "The file is 
     if len(content) > limit:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, too_big)
     return content
+
+
+def _table_out(table: dict, filename: str) -> TableOut:
+    return TableOut(table_id=table["table_id"], filename=str(table.get("filename", filename)),
+                    rows=int(table.get("rows", 0)), columns=[str(name) for name in table.get("columns", [])],
+                    sheet=table.get("sheet"), notes=[str(note) for note in table.get("notes", [])])
 
 
 def _audio(body: AudioIn) -> tuple[str, bytes]:
@@ -142,6 +168,55 @@ async def attachment_text(body: FileIn, _who: Requester = Depends(current_reques
                    truncated=extracted.truncated)
 
 
+@router.post("/file")
+async def attachment_file(body: UploadIn, who: Requester = Depends(current_requester),
+                          uploads: ArmoryUploads = Depends(get_uploads),
+                          platform: PortcullisClient = Depends(get_platform)) -> FileOut:
+    """One route for every file: Armory keeps the original, and its text is read here as a preview."""
+    filename = _name(body.filename)
+    suffix = PurePosixPath(filename.lower()).suffix
+    if suffix not in _PREVIEW_SUFFIXES and suffix not in _PDF_SUFFIXES and suffix not in _AUDIO_SUFFIXES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Can't read '{suffix or 'extensionless'}' files - try a text, code, image, audio, .pdf, .docx or .xlsx file.")
+    content = _decode(body.data, _MAX_AUDIO_BYTES, "The file is larger than 20 MB")
+    preview = None
+    if suffix in _PREVIEW_SUFFIXES:
+        try:
+            preview = await extract_text_async(filename, content)
+        except ExtractionError as error:
+            if suffix != ".pdf":  # a scan has no text and is still worth keeping
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
+
+    async def table() -> dict | None:
+        """The data tools' copy of a spreadsheet; the file stays attached without it."""
+        if suffix not in _TABLE_SUFFIXES:
+            return None
+        try:
+            return await uploads.table(who, filename, content)
+        except HTTPException:
+            return None
+
+    stored, registered = await asyncio.gather(uploads.file(who, filename, content), table(), return_exceptions=True)
+    if isinstance(registered, BaseException):
+        raise registered
+    if isinstance(stored, BaseException):
+        # With readable text the question can still go out: always during an outage, and for text-like files, which
+        # never needed the store, after a refusal too.
+        outage = isinstance(stored, HTTPException) and stored.status_code == status.HTTP_502_BAD_GATEWAY
+        if not isinstance(stored, HTTPException) or preview is None or not (outage or suffix not in _PDF_SUFFIXES):
+            raise stored
+        stored = None
+    else:
+        await platform.log_action(who.uid, "attachments.file", f"Attached '{filename}' ({len(content):,} bytes)")
+    kept = {} if stored is None else {"file_id": stored["file_id"], "kind": stored["kind"],
+                                      "pages": stored["pages"] or None, "expires_at": stored["expires_at"]}
+    return FileOut(filename=filename, size=len(content), text=preview.text if preview else "",
+                   char_count=preview.char_count if preview else 0,
+                   truncated=preview.truncated if preview else False,
+                   table=_table_out(registered, filename) if registered else None, **kept)
+
+
 @router.post("/table")
 async def attachment_table(body: FileIn, who: Requester = Depends(current_requester),
                            uploads: ArmoryUploads = Depends(get_uploads),
@@ -154,9 +229,7 @@ async def attachment_table(body: FileIn, who: Requester = Depends(current_reques
     content = _decode(body.data)
     table = await uploads.table(who, filename, content)
     await platform.log_action(who.uid, "attachments.table", f"Attached '{filename}' ({len(content):,} bytes) as a table")
-    return TableOut(table_id=table["table_id"], filename=str(table.get("filename", filename)),
-                    rows=int(table.get("rows", 0)), columns=[str(name) for name in table.get("columns", [])],
-                    sheet=table.get("sheet"), notes=[str(note) for note in table.get("notes", [])])
+    return _table_out(table, filename)
 
 
 @router.post("/pdf")

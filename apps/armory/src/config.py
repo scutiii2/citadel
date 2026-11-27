@@ -52,7 +52,8 @@ class Settings:
     # Where POST /upload (upload_routes.py) writes files dropped into a command-form modal.
     # Relative to CWD like the paths above.
     uploads_dir: Path = Path(_env("MCP_UPLOADS_DIR", str(DATA / "uploads")))
-    pdf_merger_store_dir: Path = Path(_env("MCP_PDF_MERGER_STORE_DIR", str(DATA / "pdf_merger" / "store")))
+    # Every uploaded or generated file (services/user_files). Relative to CWD like the paths above.
+    files_store_dir: Path = Path(_env("MCP_FILES_STORE_DIR", str(DATA / "files" / "store")))
     pdf_merger_public_base_url: str = _env("MCP_PDF_MERGER_PUBLIC_BASE_URL", "")
     pdf_merger_signing_key: str = _env("PDF_MERGER_SIGNING_KEY", "")
     # Where capability-owned job watchers keep their state

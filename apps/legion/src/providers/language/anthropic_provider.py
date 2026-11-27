@@ -23,7 +23,7 @@ from src.agents.roles.orchestrator import ask_user, delegation, plan, plan_runne
 from src.providers.gateway_failover import GatewayRoute, classify
 
 from src.runtime import approvals, questions
-from src.runtime import confidentiality, run_tools
+from src.runtime import confidentiality, images, run_tools
 from src.runtime.tool_batch import Call, ToolRound
 from src.runtime.chat_history import validate_history
 
@@ -332,7 +332,7 @@ async def run_chat(
                      if planning else system_prompt_for(caveman, roster))
     model_name = _model_for_route(route, model)
     history = token_limits.trim_history_to_fit(history, PROVIDER_ID, route.current)
-    messages: list[dict[str, Any]] = [*history, {"role": "user", "content": question}]
+    messages: list[dict[str, Any]] = [*history, {"role": "user", "content": images.anthropic_content(question)}]
     tools_used: list[str] = []
     tool_calls: list[ToolCallRecord] = []
     schemas = _tool_schemas(roster)
@@ -496,10 +496,9 @@ async def run_chat(
                 messages.append({"role": "assistant", "content": response.content})
 
                 blocks = [block for block in response.content if block.type == "tool_use"]
+                # A closed plan keeps its tools defined (the API refuses a history with tool blocks and no tools);
+                # PlanSession refuses any further call.
                 outcomes = await runner.run([Call(block.id, block.name, block.input) for block in blocks])
-                if planning and planning.closed:
-                    schemas = []
-                    system, tools = _cached_request(system_prompt, schemas) if use_cache else (system_prompt, schemas)
                 if switch := await confidentiality.protect_round(route, [o.text for o in outcomes], request_id):
                     if on_event:
                         await on_event(step_event("gateway_switch", **switch.as_dict()))
