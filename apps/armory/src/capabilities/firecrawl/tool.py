@@ -19,6 +19,9 @@ from src.errors import numbered_dependency
 from src.offload import offload
 from src.server import mcp
 
+# Not read-only: every call spends Firecrawl credits, so Ember's Auto approval must still ask first.
+_SPENDS_CREDITS = ToolAnnotations(readOnlyHint=False, openWorldHint=True)
+
 
 def _client() -> FirecrawlClient:
     # Built per call so a missing key fails this tool, not server startup.
@@ -28,7 +31,7 @@ def _client() -> FirecrawlClient:
 
 
 @command(name="page", description="Scrape a web page as markdown")
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True), meta={"keywords": ["scrape", "firecrawl", "web", "page", "url", "markdown", "extract", "article"], "display_label": "Scraping web page"})
+@mcp.tool(annotations=_SPENDS_CREDITS, meta={"keywords": ["scrape", "firecrawl", "web", "page", "url", "markdown", "extract", "article"], "display_label": "Scraping web page"})
 @numbered_dependency("firecrawl", FirecrawlError)
 @offload
 def tool_scrape_page(
@@ -42,7 +45,7 @@ def tool_scrape_page(
 
 
 @command(name="map", description="List the pages of a site")
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True), meta={"keywords": ["scrape", "firecrawl", "map", "sitemap", "site", "links", "urls", "pages"], "display_label": "Mapping web site"})
+@mcp.tool(annotations=_SPENDS_CREDITS, meta={"keywords": ["scrape", "firecrawl", "map", "sitemap", "site", "links", "urls", "pages"], "display_label": "Mapping web site"})
 @numbered_dependency("firecrawl", FirecrawlError)
 @offload
 def tool_scrape_map(
@@ -56,7 +59,7 @@ def tool_scrape_map(
 
 
 @command(name="crawl", description="Crawl a site and read its pages")
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True), meta={"keywords": ["scrape", "firecrawl", "crawl", "site", "docs", "documentation", "spider", "pages"], "display_label": "Crawling web site"})
+@mcp.tool(annotations=_SPENDS_CREDITS, meta={"keywords": ["scrape", "firecrawl", "crawl", "site", "docs", "documentation", "spider", "pages"], "display_label": "Crawling web site"})
 @numbered_dependency("firecrawl", FirecrawlError)
 @offload
 def tool_scrape_crawl(

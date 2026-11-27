@@ -156,6 +156,13 @@ def fetch_image(file_id: str) -> tuple[str, str] | None:
     return next(((block.mime_type, block.data) for block in result.content if block.type == "image"), None)
 
 
+def own_only(tools: list[Any]) -> list[Any]:
+    """Of `tools`, those this agent's tools.allow names: what a planning orchestrator may call itself. An empty
+    allow list names none, so a planner is never handed every tool."""
+    scope = agent_spec.current().tools
+    return [tool for tool in tools if scope.allows_explicitly(unprefixed(tool.name))]
+
+
 def _remember_read_only(tools: list[Any]) -> None:
     global _read_only_builtins
     _read_only_builtins = frozenset(

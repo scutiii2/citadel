@@ -36,7 +36,7 @@ from src.providers.context_breakdown import ProviderCounter, breakdown_fields
 from src.providers.base_provider import (
     BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, cancel_on_stop, step_event,
 )
-from src.tools.mcp_client.mcp_upstream import call_tool, list_tools, tool_description
+from src.tools.mcp_client.mcp_upstream import call_tool, list_tools, own_only, tool_description
 
 
 PROVIDER_NAME = "anthropic"
@@ -151,7 +151,7 @@ def _tool_schemas(roster: Sequence[RosterEntry] = ()) -> list[dict[str, Any]]:
             "input_schema": tool.input_schema or {"type": "object", "properties": {}},
             "display_label": (tool.meta or {}).get("display_label") if hasattr(tool, "meta") else None,
         }
-        for tool in ([] if plan_mode else list_tools())
+        for tool in (own_only(list_tools()) if plan_mode else list_tools())
     ]
     # Only an orchestrator has a roster, so only it can delegate.
     if roster and not plan_mode:
@@ -182,7 +182,7 @@ def _tool_schemas(roster: Sequence[RosterEntry] = ()) -> list[dict[str, Any]]:
             "display_label": "Plan",
         })
     # More than one real tool: they can be batched, with dependencies, in one step (runtime/run_tools.py).
-    if run_tools.enabled() and sum(1 for s in schemas if s["name"] not in _LOCAL_TOOLS) > 1:
+    if not plan_mode and run_tools.enabled() and sum(1 for s in schemas if s["name"] not in _LOCAL_TOOLS) > 1:
         schemas.append({
             "name": run_tools.TOOL_NAME,
             "description": run_tools.tool_description(),
@@ -336,6 +336,8 @@ async def run_chat(
     tools_used: list[str] = []
     tool_calls: list[ToolCallRecord] = []
     schemas = _tool_schemas(roster)
+    if planning:
+        planning.direct = frozenset(s["name"] for s in schemas) - _LOCAL_TOOLS
     # display_label isn't a real Anthropic tools= field (see _tool_schemas) -
     # pop it into this name->label lookup here, once, rather than sending it
     # to the API or re-deriving it per tool_use block below.

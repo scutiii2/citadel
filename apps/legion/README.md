@@ -371,7 +371,7 @@ checks. Live diagnostics require a prepared deployment:
 
 ## Orchestrator
 
-The orchestrator always plans: it is offered only `ask_user` and `submit_plan`, never direct tools or `delegate_to_agent`, and its plan runs through the architects in its catalog.
+The orchestrator always plans: it is offered `ask_user`, `submit_plan` and the tools its own `tools.allow` names (Ember: the Brain, skill, stack and ticket tools), never `delegate_to_agent`; an empty allow list names none. It reaches other agents only through its plan, which runs through the architects in its catalog.
 The roster text below describes specialists that other agents may call. Each turn the orchestrator's roster is built from the
 registry: eligible registered specialists (never the agent itself or an internal Router), as lines of `<id> - <label>: <focus>`. Because it is per turn,
 a specialist that starts or stops shows up without a restart. A specialist with
@@ -415,17 +415,17 @@ ordinary call, so the turn guard, approvals (asked step by step), tool filters a
 A step may not call `delegate_to_agent`, `ask_user`, the plan tools or `run_tools`. The orchestrator, architects
 and the router are not offered it.
 
-With `mode: "plan"`, the model sees only `ask_user` (when the caller supports
-questions) and `submit_plan`. The catalog is rebuilt from the live registry,
+With `mode: "plan"`, the model sees `ask_user` (when the caller supports
+questions), `submit_plan` and its own allowed tools, which run with the usual approvals. The catalog is rebuilt from the live registry,
 capped at 8,192 characters; worker lines are dropped before architect lines.
 Only architects included in that snapshot may be named by a plan. A submission
 has 1–8 steps, unique ids, known dependencies, no cycles and self-contained
 briefs of 20–16,000 characters. The first rejection returns the exact validation
 error for one repair; a second rejection asks for a direct answer. Accepted
 plans execute through the shared DAG executor, then the model receives the
-results and writes the final reply. A further plan is refused. The Anthropic
-loop keeps the two tools in that last request, because the API refuses a history
-with tool calls and no tool definitions; the OpenAI loop sends none. Architect-level code
+results and writes the final reply. A further plan is refused; its own tools still
+work. The Anthropic loop keeps every tool defined, because the API refuses a history
+with tool calls and no tool definitions; the OpenAI loop keeps only its own tools. Architect-level code
 steps are read and may retry; operations and unknown kinds remain write. Unit-level read retries
 escalate light to standard to heavy; writes are never retried automatically.
 
