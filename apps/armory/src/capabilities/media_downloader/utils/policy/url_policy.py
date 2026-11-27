@@ -10,38 +10,9 @@ from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit
 
 from src.capabilities.media_downloader.utils.errors import DownloaderError, ErrorCode
+from src.services.public_address import ALLOWED_PORTS, MAX_URL_LENGTH, is_public_ip
 
 Resolver = Callable[[str], Awaitable[list[str]]]
-
-MAX_URL_LENGTH = 2048
-ALLOWED_PORTS = (None, 80, 443)
-
-
-_NAT64 = ipaddress.IPv6Network("64:ff9b::/96")
-_IPV4_COMPATIBLE = ipaddress.IPv6Network("::/96")
-
-
-def _embedded_ipv4(address: ipaddress.IPv6Address) -> ipaddress.IPv4Address | None:
-    """The IPv4 address hidden in an IPv4-mapped, NAT64 or IPv4-compatible IPv6 address."""
-    if address.ipv4_mapped is not None:
-        return address.ipv4_mapped
-    if address in _NAT64 or (address in _IPV4_COMPATIBLE and int(address) > 1):  # not :: or ::1
-        return ipaddress.IPv4Address(int(address) & 0xFFFFFFFF)
-    return None
-
-
-def is_public_ip(ip: str) -> bool:
-    """True only for globally routable unicast addresses; IPv4 embedded in IPv6 is unwrapped first."""
-    try:
-        address = ipaddress.ip_address(ip.split("%", 1)[0])
-    except ValueError:
-        return False
-    if isinstance(address, ipaddress.IPv6Address):
-        embedded = _embedded_ipv4(address)
-        if embedded is not None:
-            address = embedded
-    return address.is_global and not address.is_multicast
-
 
 async def system_resolver(host: str) -> list[str]:
     """Resolve through the event loop's executor, without blocking it."""

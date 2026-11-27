@@ -38,6 +38,7 @@ const model = ref("");
 const api = ref("chat");
 const timeout = ref(0);
 const trusted = ref(false);
+const hearsAudio = ref(false);
 const TIERS = ["light", "standard", "heavy", "extreme"] as const;
 const tiers = ref<Record<string, string>>({});
 const notes = ref<Record<string, string>>({});
@@ -134,6 +135,7 @@ function fill(source: Record<string, unknown>) {
   api.value = String(source.api ?? "chat");
   timeout.value = Number(source.timeout_s ?? 0);
   trusted.value = source.trusted === true;
+  hearsAudio.value = (source.capabilities as Record<string, unknown> | undefined)?.audio === true;
   values.value = {};
   secrets.value = {};
   const models = source.models && typeof source.models === "object" ? source.models as Record<string, unknown> : {};
@@ -142,7 +144,7 @@ function fill(source: Record<string, unknown>) {
   notes.value = Object.fromEntries(TIERS.map((tier) => [tier, String(described[tier] ?? "")]));
   for (const [name, , secret] of fields.value) if (!secret) values.value[name] = String(source[name] ?? "");
   const known = new Set([typeKey.value, "auth", "model", "models", "descriptions", "api", "timeout_s", "trusted", ...fields.value.map(([name]) => name)]);
-  extra.value = Object.fromEntries(Object.entries(source).filter(([name]) => !known.has(name) && !name.startsWith("has_") && name !== "id" && name !== "reachable" && name !== "streams" && name !== "images" && name !== "types"));
+  extra.value = Object.fromEntries(Object.entries(source).filter(([name]) => !known.has(name) && !name.startsWith("has_") && name !== "id" && name !== "reachable" && name !== "streams" && name !== "images" && name !== "audio" && name !== "types"));
 }
 
 function add() {
@@ -204,6 +206,9 @@ const entry = computed(() => {
   if (needsModel.value) body.descriptions = Object.fromEntries(TIERS.map((tier) => [tier, (notes.value[tier] ?? "").trim()]).filter(([, text]) => text));
   if (timeout.value) body.timeout_s = timeout.value;
   body.trusted = trusted.value;
+  if (chat.value && type.value === "openai" && api.value === "chat") {
+    body.capabilities = { ...(extra.value.capabilities as object | undefined), audio: hearsAudio.value };
+  }
   for (const [name, , secret] of fields.value) {
     if (secret) { if (secrets.value[name]) body[name] = secrets.value[name]; } else body[name] = (values.value[name] ?? "").trim();
   }
@@ -417,6 +422,10 @@ onMounted(load);
           <p :id="`${kind}-timeout-help`" class="hint">0 uses the gateway's default.</p>
           <FieldLabel :for="`${kind}-trusted`" title="Trusted" :help="['Marks this gateway as safe for confidential data: passwords, personal identifiers, private messages and documents.', 'When a request holds such data, Legion uses only trusted gateways. Every agent keeps at least one trusted gateway, so the last one cannot be switched off.']">Trusted for confidential data</FieldLabel>
           <ToggleSwitch :id="`${kind}-trusted`" data-test="trusted" :checked="trusted" :disabled="saving" @change="trusted = ($event.target as HTMLInputElement).checked">{{ trusted ? "Trusted" : "Not trusted" }}</ToggleSwitch>
+          <template v-if="chat && type === 'openai' && api === 'chat'">
+            <FieldLabel :for="`${kind}-audio`" title="Hears audio" :help="['Switch on only when the model of this gateway accepts audio input.', 'The transcriber agent needs such a gateway when Scribe cannot transcribe a file.']">Hears audio</FieldLabel>
+            <ToggleSwitch :id="`${kind}-audio`" data-test="audio" :checked="hearsAudio" :disabled="saving" @change="hearsAudio = ($event.target as HTMLInputElement).checked">{{ hearsAudio ? "Hears audio" : "No audio" }}</ToggleSwitch>
+          </template>
         </section>
         <section v-if="needsModel" v-show="tab === 'models'" :id="`${kind}-panel-models`" class="pane" role="tabpanel" :aria-labelledby="`${kind}-tab-models`">
           <p v-if="modelsUrl" class="hint"><a :href="modelsUrl" target="_blank" rel="noopener noreferrer" data-test="models-link">Browse the model list for this provider</a> to find the ids to enter below.</p>

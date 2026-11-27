@@ -79,7 +79,7 @@ def _result(body: dict[str, Any]) -> ChatResult:
 
 class ScutiGateway(BaseGateway):
     provider = "scuti"
-    defaults = {"streams": True, "images": False, "tools": False, "reasoning": False, "schema": False}
+    defaults = {"streams": True, "images": False, "tools": False, "reasoning": False, "schema": False, "audio": False}
     forwards_images = True
 
     def validate(self, request: ChatRequest) -> None:

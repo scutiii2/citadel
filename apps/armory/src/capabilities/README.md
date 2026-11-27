@@ -5,9 +5,8 @@ what it does:
 
 - `server_manager/` - start/stop/restart/list Docker containers and app logs, with owner email notifications from ServerWatcher (`/server ...`).
 - `generator/` - passwords, passphrases, PINs, TOTP (`/gen ...`).
-- `web_research/` - web search and page read through Tavily (`/web ...`).
+- `web_research/` - web search, page read, site map and crawl with fallback between Tavily, Firecrawl, Firecrawl Local and Scrapy (`/web ...`).
 - `media_downloader/` - public video/music/photo probes, queued downloads, status and signed file links (`/media ...`); photo carousels become numbered ZIPs.
-- `firecrawl/` - scrape and crawl through Firecrawl (`/scrape ...`).
 - `repo_reader/` - read-only git history and code (`/repo ...`).
 - `files/` - list and inspect every uploaded file (`/files ...`).
 - `tables/` - questions about an attached CSV or Excel file (`/data ...`).
@@ -229,7 +228,7 @@ A tool that only reads, and changes nothing here or elsewhere, declares it:
 decision with a consequence: ember's **Auto** approval mode (ai_agent's `allow_read_only`) runs a
 built-in tool that declares it **without asking the user**, while every other tool still asks.
 So declare it only when running the tool unasked is harmless. A tool that writes, sends, deletes,
-runs a command, or spends credits or crawls (firecrawl) must not. Only built-in tools count. `tests/test_read_only_declarations.py` pins the exact list, so
+runs a command, crawls, or can spend many credits (`tool_web_map`, `tool_web_crawl`) must not. Only built-in tools count. `tests/test_read_only_declarations.py` pins the exact list, so
 adding or removing a declaration means changing that test too.
 
 ## Add a new capability

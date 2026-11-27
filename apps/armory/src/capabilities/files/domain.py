@@ -54,12 +54,12 @@ class FilesDesk:
                                message=f"Found {len(found)} of {len(ids)} file(s).")
         return self._run(action)
 
-    def view(self, file_id: str) -> tuple[bytes, str]:
-        """One owned image as (bytes, media type)."""
+    def view(self, file_id: str, page: int | None = None) -> tuple[bytes, str]:
+        """One owned image, or one page of an owned PDF, as (bytes, media type)."""
         owner = self._owner()
         files, file = self._run(lambda files: (files, files.get(file_id, owner)))
         # Decoding runs on this worker thread, not on the files loop.
-        return files.view(file)
+        return files.view(file, page)
 
 
 desk = FilesDesk()

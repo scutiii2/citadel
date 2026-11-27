@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../../api/types";
-import { AUDIO_FILE, audioHeader, DOCUMENT_FILE, documentHeader, fileHeader, fileText, questionHistory, splitAttachments, tableHeader, TABLE_FILE, withAttachments } from "./attachments";
+import { AUDIO_FILE, DOCUMENT_FILE, fileHeader, fileText, markScan, questionHistory, splitAttachments, tableHeader, TABLE_FILE, withAttachments, withReadText } from "./attachments";
 
 const user = (content: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ role: "user", content, ...extra });
 const assistant = (content: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ role: "assistant", content, ...extra });
@@ -94,36 +94,68 @@ describe("tableHeader", () => {
 });
 
 describe("audio attachments", () => {
-  it("recognises the supported audio suffixes only", () => {
-    for (const name of ["a.mp3", "A.WAV", "talk.m4a", "x.ogg", "x.flac", "x.webm"]) expect(AUDIO_FILE.test(name)).toBe(true);
-    for (const name of ["a.pdf", "a.csv", "a.mp4", "mp3"]) expect(AUDIO_FILE.test(name)).toBe(false);
+  const audio = {
+    filename: "voice.mp3", file_id: "f_2", kind: "audio", size: 3, pages: null, expires_at: 99,
+    text: "", char_count: 0, truncated: false, table: null, read: "listen" as const,
+  };
+
+  it("matches the formats Scribe reads", () => {
+    expect(AUDIO_FILE.test("note.M4A")).toBe(true);
+    expect(AUDIO_FILE.test("note.mp4")).toBe(false);
   });
 
-  it("writes a header the agent can act on", () => {
-    const header = audioHeader({ file_id: "a".repeat(32), duration_s: 12.34, expires_at: 99 });
-    expect(header).toContain(`[Audio file_id: ${"a".repeat(32)} | 12.3 s | expires_at: 99 |`);
-    expect(header).toContain("tool_scribe_transcribe");
+  it("marks audio that still needs a transcript", () => {
+    expect(fileText(audio).split("\n")).toEqual([
+      "[File file_id: f_2 | audio | listen | expires_at: 99 | preserve this file_id when delegating]",
+      "[No transcript yet; the audio is transcribed when the question is sent.]",
+    ]);
+  });
+
+  it("puts Scribe's transcript under the plain id line", () => {
+    expect(fileText({ ...audio, read: "scribe", text: "words" }).split("\n")).toEqual([
+      "[File file_id: f_2 | audio | expires_at: 99 | preserve this file_id when delegating]", "words",
+    ]);
   });
 });
 
-describe("Reader documents", () => {
+describe("scanned and read documents", () => {
+  const scan = {
+    filename: "scan.pdf", file_id: "f_1", kind: "pdf", size: 3, pages: 12, expires_at: 99,
+    text: "", char_count: 0, truncated: false, table: null, read: "pages" as const,
+  };
+
   it("matches only the formats Reader reads", () => {
     expect(DOCUMENT_FILE.test("scan.PDF")).toBe(true);
     expect(DOCUMENT_FILE.test("photo.jpeg")).toBe(true);
     expect(DOCUMENT_FILE.test("photo.heic")).toBe(false);
   });
 
-  it("writes a header the agent can act on", () => {
-    const header = documentHeader({ file_id: "b".repeat(32), page_count: 3, expires_at: 99 });
-    expect(header).toContain(`[Document file_id: ${"b".repeat(32)} | 3 pages | expires_at: 99 |`);
-    expect(header).toContain("tool_ocr_parse");
+  it("marks a scan on its id line", () => {
+    expect(fileText(scan).split("\n")).toEqual([
+      "[File file_id: f_1 | pdf | 12 pages | scan | expires_at: 99 | preserve this file_id when delegating]",
+      "[No text layer; this PDF's pages are shown to the model as images.]",
+    ]);
+  });
+
+  it("adds the mark once, to the id line only", () => {
+    const text = fileText({ ...scan, read: null, text: "typed" });
+    const marked = markScan(text);
+    expect(marked).toBe(text.replace("| 12 pages |", "| 12 pages | scan |"));
+    expect(markScan(marked)).toBe(marked);
+  });
+
+  it("puts what Reader read under the id line", () => {
+    expect(withReadText(fileText({ ...scan, read: null, text: "old" }), "new").split("\n")).toEqual([
+      fileHeader({ ...scan, read: null }), "new",
+    ]);
+    expect(withReadText("only text", "new")).toBe("new");
   });
 });
 
 describe("stored files", () => {
   const stored = {
     filename: "photo.png", file_id: "f_1", kind: "image", size: 3, pages: 1, expires_at: 99,
-    text: "", char_count: 0, truncated: false, table: null,
+    text: "", char_count: 0, truncated: false, table: null, read: null,
   };
 
   it("writes one id line, with pages only when the file has them", () => {

@@ -99,6 +99,8 @@ def max_tool_rounds(provider_id: str, gateway_id: str | None = None) -> int:
 
 # About what a model bills for one image at the size Armory sends it.
 IMAGE_TOKENS = 1600
+# shortcut: a flat figure, since a file's length is unknown here; raise it if long audio overflows a context.
+AUDIO_TOKENS = 8000
 
 
 def _sized(value: Any) -> Any:
@@ -108,6 +110,8 @@ def _sized(value: Any) -> Any:
     if isinstance(value, dict):
         if value.get("type") in ("image", "input_image"):
             return "x" * (IMAGE_TOKENS * 4)
+        if value.get("type") in ("audio", "input_audio"):
+            return "x" * (AUDIO_TOKENS * 4)
         return {key: _sized(item) for key, item in value.items()}
     return value
 

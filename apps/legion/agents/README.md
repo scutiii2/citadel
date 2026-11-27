@@ -50,6 +50,9 @@ requester’s token usage with `stronghold__tool_usage_summary`. Ember routes us
 roster; Reviewer independently checks math through its existing permitted tools.
 Armory's Mathematics capability must be enabled for math tools to be offered.
 
+`transcriber.json` is a tool-free, non-delegable helper on port 29630 that writes
+down attached audio for the other agents (see "Attached audio" in the Legion README).
+
 `context-summarizer.json` is a tool-free, non-delegable light-tier helper for
 Router context briefs and Ember's manual/automatic conversation compaction.
 It is called directly through `interpret`; it does not choose agents or tiers.

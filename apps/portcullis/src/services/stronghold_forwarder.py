@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 _STACK_COMPACTION_TIMEOUT = httpx.Timeout(70.0, connect=10.0)
 _STREAM_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0)
-# One upload is read, stored and perhaps parsed as a table before Stronghold answers.
+# One upload is read, stored and perhaps parsed as a table or read by Reader before Stronghold answers.
 _UPLOAD_TIMEOUT = httpx.Timeout(150.0, connect=10.0)
-_UPLOAD_PATH = "/attachments/file"
+_UPLOAD_PATHS = frozenset(("/attachments/file", "/attachments/document"))
 _CONNECTION_FEATURES = frozenset(("/bard/speak", "/bard/voices", "/attachments/audio",
                                   "/attachments/document", "/attachments/dictate", "/attachments/dictate/partial"))
 
@@ -94,7 +94,7 @@ class StrongholdForwarder:
         brain = path.startswith("/brain/") or path == "/admin/brain-settings"
         if stack and path.endswith("/compact"):
             timeout = _STACK_COMPACTION_TIMEOUT
-        elif path == _UPLOAD_PATH:
+        elif path in _UPLOAD_PATHS:
             timeout = _UPLOAD_TIMEOUT
         else:
             timeout = _TIMEOUT
@@ -115,7 +115,7 @@ class StrongholdForwarder:
             logger.warning("stronghold %s %s unreachable: %s", method, redact(path), type(error).__name__)
             raise StrongholdUnavailable(type(error).__name__) from error
         # Routes whose 502 carries a detail that is safe and useful to show, such as a Treasury save refusal.
-        tool_service = path in _CONNECTION_FEATURES or path == _UPLOAD_PATH or path.startswith("/admin/tool-services/")
+        tool_service = path in _CONNECTION_FEATURES or path in _UPLOAD_PATHS or path.startswith("/admin/tool-services/")
         safe_error = (tool_service and response.status_code == 502) or ((stack or brain) and response.status_code in {502, 503})
         if response.status_code >= 500 and not safe_error:
             raise StrongholdUnavailable(f"stronghold answered {response.status_code}")

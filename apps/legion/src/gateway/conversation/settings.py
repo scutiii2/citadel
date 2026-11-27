@@ -9,4 +9,5 @@ class Settings:
     max_tools: int = 128
     max_images: int = 20
     max_image_mb: int = 16
+    max_audio_mb: int = 20
     max_inflight: int = 16

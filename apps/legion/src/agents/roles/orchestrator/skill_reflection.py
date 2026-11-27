@@ -39,7 +39,7 @@ LIMITS = {"title": 80, "when_to_use": 300, "steps": 1200, "tools": 200}
 _IGNORED_PREFIXES = ("tool_skill_", "tool_mem_", "stronghold__tool_skill_", "stronghold__tool_brain_", "stronghold__tool_stack_")
 _IGNORED_NAMES = (delegation.TOOL_NAME, plan.TOOL_NAME, "ask_user")
 # Tools that bring in text somebody else wrote: such a turn is not learned from.
-_UNTRUSTED_PREFIXES = ("tool_web_", "tool_firecrawl_", "tool_email_")
+_UNTRUSTED_PREFIXES = ("tool_web_", "tool_email_")
 
 _background: set[asyncio.Task] = set()
 _JSON = re.compile(r"\{.*\}", re.DOTALL)

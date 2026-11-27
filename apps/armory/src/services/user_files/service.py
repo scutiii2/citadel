@@ -15,6 +15,7 @@ from src.services.user_files.sniff import SNIFF_BYTES
 from src.services.user_files.store import MB, FileStore, StoredFile
 
 _NOT_AVAILABLE = "This file is not available. Upload it again."
+HEARD_MIMES = frozenset({"audio/wav", "audio/mpeg"})  # the audio a model gateway accepts
 
 
 @dataclass(frozen=True)
@@ -114,10 +115,25 @@ class UserFiles:
         self.get(file_id, owner, kinds)
         await self.store.delete(file_id, owner)
 
-    def view(self, file: StoredFile) -> tuple[bytes, str]:
-        """An image as (bytes, media type), small enough to show a model. Blocking."""
+    def view(self, file: StoredFile, page: int | None = None) -> tuple[bytes, str]:
+        """An image or one page of a PDF, small enough to show a model, or WAV or MP3 audio as stored: (bytes, media
+        type). Blocking."""
+        if file.kind == "pdf":
+            if page is None or not 1 <= page <= file.pages:
+                raise FileError(ErrorCode.INVALID_RANGE, f"Choose a page from 1 to {file.pages}.")
+            from src.services.user_files.pdfs import view_page
+
+            return view_page(self.path(file), page)
+        if file.kind == "audio":
+            if file.mime not in HEARD_MIMES:
+                raise FileError(ErrorCode.UNSUPPORTED_TYPE, "Only WAV and MP3 audio can be heard.")
+            if page is not None:
+                raise FileError(ErrorCode.INVALID_REQUEST, "Audio has no pages.")
+            return self.path(file).read_bytes(), file.mime
         if file.kind != "image":
-            raise FileError(ErrorCode.UNSUPPORTED_TYPE, "That file is not an image.")
+            raise FileError(ErrorCode.UNSUPPORTED_TYPE, "That file is not an image, a PDF or audio.")
+        if page is not None:
+            raise FileError(ErrorCode.INVALID_REQUEST, "An image has no pages.")
         from src.services.user_files.images import view_image
 
         return view_image(self.path(file))

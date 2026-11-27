@@ -7,7 +7,7 @@ import { EXTENSION_SEPARATOR } from "../../../api/contracts/extensions";
 import type { PromptTemplate } from "../api/TemplatesClient";
 import type { JsonSchema } from "../../../api/types";
 import { BUILTIN_COMMANDS } from "../utils/builtinCommands";
-import { withAttachments } from "../../../utils/content/attachments";
+import { MAX_SCAN_PAGES, withAttachments } from "../../../utils/content/attachments";
 import { paramSuggestions } from "../utils/commandParams";
 import { appendToDraft, filterTemplates, preview, templateQuery } from "../utils/templates";
 import { fieldsFromSchema, type ToolField } from "../../../utils/tools/toolSchema";
@@ -157,8 +157,13 @@ watch(() => auth.hasPermission("files.upload"), (allowed) => { if (!allowed) can
 const fileInput = ref<HTMLInputElement | null>(null);
 const {
   attachments, reading, ready, dragging,
-  removeAttachment, readWithOcr, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
+  removeAttachment, canRead, readWithOcr, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
 } = useComposerAttachments();
+
+// shortcut: counts one file; Legion shares the limit across a turn's scans and tells the model what it left out.
+function pagesNote(pages = 0): string {
+  return pages > MAX_SCAN_PAGES ? `first ${MAX_SCAN_PAGES} of ${pages} pages attached` : "pages attached";
+}
 
 const isCommand = computed(() => draft.value.trimStart().startsWith("/"));
 const canSend = computed(
@@ -492,14 +497,15 @@ function onKeydown(event: KeyboardEvent): void {
           <small v-if="a.state === 'ready' && a.truncated">(cut to {{ a.chars.toLocaleString() }} characters)</small>
           <small v-if="a.state === 'ready' && a.pages">({{ a.pages }} pages · available for PDF tools)</small>
           <small v-if="a.state === 'ready' && a.rows">({{ a.rows.toLocaleString() }} rows, {{ a.columns }} columns)</small>
-          <small v-if="a.ocr === 'done'">(OCR ready)</small>
+          <small v-if="a.state === 'ready' && a.read === 'reader'">(read by Reader)</small>
+          <small v-if="a.state === 'ready' && a.read === 'pages'">({{ pagesNote(a.pages) }})</small>
+          <small v-if="a.state === 'ready' && a.read === 'scribe'">(read by Scribe)</small>
+          <small v-if="a.state === 'ready' && a.read === 'listen'">(will be transcribed)</small>
           <small v-if="a.ocr === 'error'">(OCR failed: {{ a.error }})</small>
         </span>
-        <button v-if="a.state === 'ready' && a.source && a.ocr !== 'done'" type="button" class="ocr"
-          :disabled="a.ocr === 'reading'" :aria-disabled="readerUnavailable ? true : undefined"
-          :title="readerUnavailable || undefined"
-          @click="readerUnavailable ? connectionNotice = readerUnavailable : readWithOcr(a.id)">
-          {{ a.ocr === "reading" ? "Sending to OCR …" : a.ocr === "error" ? "Retry OCR" : "Read with OCR" }}
+        <button v-if="canRead(a)" type="button" class="ocr" :disabled="a.ocr === 'reading'"
+          :title="readerUnavailable || undefined" @click="readWithOcr(a.id)">
+          {{ a.ocr === "reading" ? "Sending to OCR …" : readerUnavailable ? "Attach pages" : a.ocr === "error" ? "Retry OCR" : "Read with OCR" }}
         </button>
         <button type="button" :aria-label="`Remove ${a.filename}`" @click="removeAttachment(a.id)">×</button>
       </li>

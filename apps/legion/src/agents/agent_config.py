@@ -22,7 +22,7 @@ from src.agents.roles.orchestrator import auto_route, delegation, memory_recall,
 from src.agents.roles.router import router_routing
 from src.agents.roles.orchestrator import plan as plan_policy
 
-from src.runtime import approvals, confidentiality, elicitations, images, internal_auth, questions, tool_filter, tuning_overrides, turn_effects
+from src.runtime import approvals, confidentiality, elicitations, images, internal_auth, questions, tool_filter, transcripts, tuning_overrides, turn_effects
 from src.tools.private_extensions import turn as private_turn
 from src.agents import auto_tier, protocol_chain
 from src.providers import context_breakdown, llm_config, llm_options, model_tiers, token_limits
@@ -107,6 +107,17 @@ def _read_only_check():
     from src.tools.mcp_client import mcp_upstream
 
     return mcp_upstream.is_read_only_builtin
+
+
+def _one_model_call(model: str | None, request_id: str | None, depth: int):
+    """One call of this agent's own provider, with no routing, recall or history."""
+    async def ask(text: str) -> ChatResult:
+        if inspect.iscoroutinefunction(_PROVIDER_MODULE.run_chat):
+            return await _PROVIDER_MODULE.run_chat(text, [], model, request_id, depth)
+        return await anyio.to_thread.run_sync(
+            lambda: _PROVIDER_MODULE.run_chat(text, [], model, request_id, depth))
+
+    return ask
 
 
 async def run_chat(
@@ -216,6 +227,11 @@ async def run_chat(
             raise ChatCancelled()
         # What could reach an untrusted gateway is checked first: confidential text goes only to trusted ones.
         await confidentiality.protect_turn(question + _last_assistant_text(history), request_id)
+        if spec.id == transcripts.AGENT_ID:
+            model = model_tiers.clamp_default(MODEL, getattr(_PROVIDER_MODULE, "DEFAULT_MODEL", None), spec.id).model
+            result = await transcripts.write_down(question, _one_model_call(model, request_id, depth))
+            result.delegated_usage = delegated_usage
+            return result
         if getattr(spec, "role", None) == "architect":
             from src.agents.roles.architect import pipeline
 
@@ -266,13 +282,18 @@ async def run_chat(
         if provider_question != question and confidentiality.has_untrusted_gateway():
             confidentiality.mark("recall")  # recalled notes and skills are the user's own: trusted gateways only
         # Attached images are shown to agents that answer people's questions, not to internal helpers.
-        file_ids = images.references(question, history)
+        wanted, omitted = images.references(question, history)
         attached = images.Attached()
-        if file_ids and (spec.orchestrator or spec.delegable):
-            attached = await images.load(file_ids)
+        if wanted and (spec.orchestrator or spec.delegable):
+            attached = await images.load(wanted, omitted)
         if attached.pictures and confidentiality.has_untrusted_gateway():
             confidentiality.mark("image")  # nothing can check a picture for private data: trusted gateways only
         provider_question = attached.note(provider_question)
+        audio_files = transcripts.references(question, history)
+        if audio_files and (spec.orchestrator or spec.delegable) and not tool_filter.is_blocked(images.TOOL_NAME):
+            if confidentiality.has_untrusted_gateway():
+                confidentiality.mark("audio")  # nothing checks speech for private data: trusted gateways only
+            provider_question = await transcripts.add(provider_question, audio_files)
         images_token = images.bind(attached)
         async def call(module: Any, model: str | None) -> ChatResult:
             if inspect.iscoroutinefunction(module.run_chat):

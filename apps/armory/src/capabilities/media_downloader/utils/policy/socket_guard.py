@@ -8,7 +8,7 @@ import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
-from src.capabilities.media_downloader.utils.policy.url_policy import ALLOWED_PORTS, is_public_ip
+from src.services.public_address import ALLOWED_PORTS, is_public_ip
 
 AllowFn = Callable[[str, int | None], bool]
 

@@ -3,7 +3,7 @@ import base64
 from typing import Annotated
 
 from mcp.server.fastmcp.exceptions import ToolError
-from mcp.types import ImageContent, ToolAnnotations
+from mcp.types import AudioContent, ImageContent, ToolAnnotations
 from pydantic import Field
 
 from src.commands import command
@@ -51,10 +51,16 @@ def tool_files_inspect(
 @mcp.tool(meta={"hidden": True, "keywords": ["image", "view", "picture"], "display_label": "Viewing image"},
           annotations=_READ_ONLY, structured_output=False)
 @offload
-def tool_files_view(file_id: Annotated[str, Field(description="ID of one uploaded image.")]) -> ImageContent:
-    """Return one of your uploaded images, upright and downscaled, as image content."""
+def tool_files_view(
+    file_id: Annotated[str, Field(description="ID of one uploaded image, PDF, WAV or MP3.")],
+    page: Annotated[int | None, Field(description="Page of a PDF, counted from 1. Leave out otherwise.")] = None,
+) -> ImageContent | AudioContent:
+    """Return one of your uploaded images or WAV or MP3 files, or one page of a PDF, as content for a model."""
     try:
-        data, media_type = domain.desk.view(file_id)
+        data, media_type = domain.desk.view(file_id, page)
     except (FileError, domain.FilesError) as error:
         raise ToolError(str(getattr(error, "message", error))) from error
-    return ImageContent(type="image", data=base64.b64encode(data).decode("ascii"), mimeType=media_type)
+    encoded = base64.b64encode(data).decode("ascii")
+    if media_type.startswith("audio/"):
+        return AudioContent(type="audio", data=encoded, mimeType=media_type)
+    return ImageContent(type="image", data=encoded, mimeType=media_type)

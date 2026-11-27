@@ -3,7 +3,7 @@
  * agent sees the same thing and saved chats render the same in both apps.
  * The chat view pulls the blocks back out to show them collapsed. */
 
-import type { AttachmentFile, AttachmentTable } from "../../api/files/AttachmentsClient";
+import type { AttachmentFile, AttachmentTable, ReadPath } from "../../api/files/AttachmentsClient";
 import type { ChatMessage } from "../../api/types";
 
 export interface AttachmentBlock {
@@ -26,21 +26,14 @@ export const FILE_ONLY_QUESTION = "Please review the attached file(s).";
 /** Files whose whole content the agent's data tools can read. */
 export const TABLE_FILE = /\.(csv|xlsx)$/i;
 
-/** Audio the agent can transcribe with Scribe. */
+/** Audio files, which may be larger than other attachments. */
 export const AUDIO_FILE = /\.(mp3|wav|m4a|ogg|flac|webm)$/i;
 
-/** The line that stands in for an audio attachment's text: the id Scribe needs and what to do with it. */
-export function audioHeader(a: { file_id: string; duration_s: number; expires_at: number }): string {
-  return `[Audio file_id: ${a.file_id} | ${a.duration_s.toFixed(1)} s | expires_at: ${a.expires_at} | call scribe tool_scribe_transcribe with this file_id to get the transcript; preserve this file_id when delegating]`;
-}
-
-/** Documents Reader can OCR (it reads fewer formats than PDF_FILE). */
+/** Images and PDFs Reader can read (it reads fewer formats than the file store keeps). */
 export const DOCUMENT_FILE = /\.(pdf|png|jpe?g|webp)$/i;
 
-/** The line that stands in for a Reader upload: the id tool_ocr_parse needs and what to do with it. */
-export function documentHeader(d: { file_id: string; page_count: number; expires_at: number }): string {
-  return `[Document file_id: ${d.file_id} | ${d.page_count} pages | expires_at: ${d.expires_at} | call ocr tool_ocr_parse with this file_id to get the text of every page; preserve this file_id when delegating]`;
-}
+/** How many scanned pages Legion shows the model per turn (its `images.MAX_PAGES`). */
+export const MAX_SCAN_PAGES = 10;
 
 const MAX_LISTED_COLUMNS = 30;
 
@@ -55,20 +48,40 @@ export function tableHeader(table: AttachmentTable | null): string {
   return `[table_id: ${table.table_id} | ${table.rows} rows | columns: ${names.join(", ")}${more} | the text below is only a preview of the start of the file; use the data tools with this table_id for the whole file]\n`;
 }
 
+/** What asks Legion to read a file itself: show a PDF's pages, or transcribe audio. */
+const LEGION_MARKS: Partial<Record<ReadPath, string>> = { pages: " | scan", listen: " | listen" };
+
 /** The first line of a stored attachment: the id the file tools need and what the file is. */
-export function fileHeader(f: { file_id: string | null; kind: string; pages: number | null; expires_at: number | null }): string {
+export function fileHeader(f: {
+  file_id: string | null; kind: string; pages: number | null; expires_at: number | null; read?: ReadPath | null;
+}): string {
   const pages = f.pages ? ` | ${f.pages} pages` : "";
-  return `[File file_id: ${f.file_id} | ${f.kind}${pages} | expires_at: ${f.expires_at} | preserve this file_id when delegating]`;
+  const mark = f.read ? (LEGION_MARKS[f.read] ?? "") : "";
+  return `[File file_id: ${f.file_id} | ${f.kind}${pages}${mark} | expires_at: ${f.expires_at} | preserve this file_id when delegating]`;
+}
+
+function noPreview(file: AttachmentFile): string {
+  if (file.read === "pages") return "[No text layer; this PDF's pages are shown to the model as images.]";
+  if (file.read === "listen") return "[No transcript yet; the audio is transcribed when the question is sent.]";
+  if (file.kind === "image") return "[No text preview available; inspect the original image when needed.]";
+  return "[No text preview available; the original file is available for inspection.]";
 }
 
 /** What one uploaded file puts into the question: its id line, the table line, then the preview. */
 export function fileText(file: AttachmentFile): string {
   const id = file.file_id ? `${fileHeader(file)}\n` : "";
   const table = TABLE_FILE.test(file.filename) ? tableHeader(file.table) : "";
-  const preview = file.text || (file.kind === "image"
-    ? "[No text preview available; inspect the original image when needed.]"
-    : "[No text preview available; the original file is available for inspection.]");
-  return id + table + preview;
+  return id + table + (file.text || noPreview(file));
+}
+
+/** A stored PDF's attachment text with `scan` added to its id line. */
+export function markScan(text: string): string {
+  return text.replace(/^(\[File file_id: [^|\]]+ \| pdf \| \d+ pages) \| (?!scan)/, "$1 | scan | ");
+}
+
+/** Attachment text with everything under the id line replaced by what Reader read. */
+export function withReadText(text: string, read: string): string {
+  return text.startsWith("[File file_id: ") ? `${text.slice(0, text.indexOf("\n"))}\n${read}` : read;
 }
 
 /** The question as sent: the typed text, then every attachment. */

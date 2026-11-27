@@ -37,6 +37,16 @@ def _data_url(block: dict[str, Any]) -> str:
     return f"data:{block['media_type']};base64,{block['data']}"
 
 
+def _user_part(block: dict[str, Any]) -> dict[str, Any]:
+    """One block of a user message for Chat Completions."""
+    if block["type"] == "text":
+        return {"type": "text", "text": block["text"]}
+    if block["type"] == "audio":
+        form = "wav" if block["media_type"] == "audio/wav" else "mp3"
+        return {"type": "input_audio", "input_audio": {"data": block["data"], "format": form}}
+    return {"type": "image_url", "image_url": {"url": _data_url(block)}}
+
+
 def chat_params(request: ChatRequest, model: str, entry: dict[str, Any]) -> dict[str, Any]:
     messages: list[dict[str, Any]] = [{"role": "system", "content": request.system}] if request.system else []
     for m in request.messages:
@@ -52,8 +62,7 @@ def chat_params(request: ChatRequest, model: str, entry: dict[str, Any]) -> dict
                 out["tool_calls"] = calls
             messages.append(out)
         else:
-            parts = [{"type": "text", "text": b["text"]} if b["type"] == "text"
-                     else {"type": "image_url", "image_url": {"url": _data_url(b)}} for b in blocks]
+            parts = [_user_part(b) for b in blocks]
             messages.append({"role": "user", "content": parts[0]["text"] if len(parts) == 1 and parts[0]["type"] == "text" else parts})
     params: dict[str, Any] = {"model": request.model or model, "messages": messages}
     if request.tools:
@@ -155,6 +164,9 @@ def responses_result(body: dict[str, Any]) -> ChatResult:
 
 class OpenAIGateway(BaseGateway):
     provider = "openai"
+
+    def sends_audio(self, entry: dict[str, Any]) -> bool:
+        return entry.get("api", "chat") == "chat"
 
     def __init__(self, gateway_id: str, entry: dict[str, Any], transport: httpx.AsyncBaseTransport | None = None) -> None:
         super().__init__(gateway_id, entry, transport)

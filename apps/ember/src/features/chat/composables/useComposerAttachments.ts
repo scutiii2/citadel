@@ -1,8 +1,8 @@
 import { computed, ref } from "vue";
 import { useAuthStore } from "../../../stores/auth";
 import { useToolConnectionsStore } from "../../../stores/toolConnections";
-import { attachmentsClient } from "../../../api/files/AttachmentsClient";
-import { splitAttachments, AUDIO_FILE, DOCUMENT_FILE, audioHeader, documentHeader, fileText } from "../../../utils/content/attachments";
+import { attachmentsClient, type ReadPath } from "../../../api/files/AttachmentsClient";
+import { splitAttachments, DOCUMENT_FILE, fileText, markScan, withReadText } from "../../../utils/content/attachments";
 import { errorMessage } from "../../../utils/errors";
 
 /** File uploads, previews, and input events for one chat composer. */
@@ -24,9 +24,14 @@ export function useComposerAttachments() {
     columns: number;
     error: string;
     pages?: number;
-    /** The original file, kept only while Reader (OCR) can still be asked to read it. */
+    kind?: string;
+    /** Armory kept the original, so its pages can be shown to the model. */
+    stored?: boolean;
+    /** The original file, kept only while Reader can still be asked to read it. */
     source?: File;
-    ocr?: "reading" | "done" | "error";
+    ocr?: "reading" | "error";
+    /** How the file was read beyond its text preview. */
+    read?: ReadPath;
   }
 
   let nextAttachmentId = 1;
@@ -49,19 +54,7 @@ export function useComposerAttachments() {
       };
       attachments.value.push(entry);
       const live = attachments.value[attachments.value.length - 1]!; // the reactive copy
-      if (AUDIO_FILE.test(file.name)) {
-        const reason = connections.reason("scribe");
-        if (reason) {
-          Object.assign(live, { state: "error", error: reason });
-          continue;
-        }
-        void attachmentsClient.audio(file).then((result) => {
-          const text = audioHeader(result);
-          Object.assign(live, { state: "ready", text, chars: text.length });
-        }).catch((err: unknown) => Object.assign(live, { state: "error", error: errorMessage(err) }));
-        continue;
-      }
-      // Every other file goes up the same way. Each on its own: one slow or broken file doesn't hold up the rest.
+      // Every file goes up the same way. Each on its own: one slow or broken file doesn't hold up the rest.
       void attachmentsClient.file(file).then((result) => {
         const text = fileText(result);
         Object.assign(live, {
@@ -72,23 +65,45 @@ export function useComposerAttachments() {
           rows: result.table?.rows ?? 0,
           columns: result.table?.columns.length ?? 0,
           pages: result.pages ?? undefined,
-          // Reader (OCR) is opt-in: the file is kept so "Read with OCR" can upload it on request.
-          source: DOCUMENT_FILE.test(file.name) ? file : undefined,
+          kind: result.kind,
+          stored: result.file_id !== null,
+          read: result.read ?? undefined,
+          // Kept for "Read with OCR". A scan was already handled at upload.
+          source: DOCUMENT_FILE.test(file.name) && !result.read ? file : undefined,
         });
       }).catch((err: unknown) => Object.assign(live, { state: "error", error: errorMessage(err) }));
     }
   }
 
-  /** Only on the user's request: upload the kept original to Reader and tell the agent to OCR it. */
+  const canShowPages = (a: PendingAttachment): boolean => a.kind === "pdf" && a.stored === true;
+
+  /** Whether the button shows. Without Reader, only attaching a stored PDF's pages is left. */
+  function canRead(a: PendingAttachment): boolean {
+    return a.state === "ready" && !!a.source && !a.read && (!connections.reason("reader") || canShowPages(a));
+  }
+
+  function showPages(a: PendingAttachment): void {
+    Object.assign(a, { text: markScan(a.text), read: "pages", ocr: undefined });
+  }
+
+  /** Only on the user's request: Reader's text replaces the preview, else the model is shown the pages. */
   async function readWithOcr(id: number): Promise<void> {
     const live = attachments.value.find((a) => a.id === id);
-    if (!live?.source || live.ocr === "reading" || live.ocr === "done") return;
+    if (!live || !canRead(live) || live.ocr === "reading") return;
+    if (connections.reason("reader")) return showPages(live);
     live.ocr = "reading";
     try {
-      const doc = await attachmentsClient.document(live.source);
-      live.text = documentHeader(doc) + "\n" + live.text;
-      live.chars = live.text.length;
-      live.ocr = "done";
+      const result = await attachmentsClient.document(live.source!);
+      if (result.read === "reader") {
+        Object.assign(live, {
+          text: withReadText(live.text, result.text), chars: result.char_count, truncated: result.truncated,
+          read: "reader", ocr: undefined,
+        });
+      } else if (canShowPages(live)) {
+        showPages(live);
+      } else {
+        throw new Error(live.kind === "image" ? "Reader could not read it. The model still sees the image." : "Reader could not read it.");
+      }
     } catch (err: unknown) {
       live.ocr = "error";
       live.error = errorMessage(err);
@@ -149,6 +164,6 @@ export function useComposerAttachments() {
 
   return {
     attachments, reading, ready, dragging,
-    removeAttachment, readWithOcr, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
+    removeAttachment, canRead, readWithOcr, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
   };
 }

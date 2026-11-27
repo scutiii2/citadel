@@ -1,8 +1,10 @@
 {
-  "summary": "Search the web and read a page's text through Tavily. Needs TAVILY_API_KEY in .env.",
+  "summary": "Search the web, read pages, list a site's pages and crawl it. Tries Tavily, then Firecrawl, then Firecrawl Local, then Scrapy.",
   "tools": [
-    {"name": "tool_web_search", "purpose": "Search the web; returns titles, addresses and snippets.", "connection": "Tavily API", "commands": ["search"]},
-    {"name": "tool_web_readPage", "purpose": "Read the text of one web page.", "connection": "Tavily API", "commands": ["read"]}
+    {"name": "tool_web_search", "purpose": "Search the web; returns titles, addresses and snippets.", "connection": "Tavily or Firecrawl", "commands": ["search"]},
+    {"name": "tool_web_readPage", "purpose": "Read the text of one web page.", "connection": "Tavily, Firecrawl, Firecrawl Local or Scrapy", "commands": ["read"]},
+    {"name": "tool_web_map", "purpose": "List the pages found on a site.", "connection": "Tavily, Firecrawl, Firecrawl Local or Scrapy", "commands": ["map"]},
+    {"name": "tool_web_crawl", "purpose": "Crawl a site and return the text of its pages.", "connection": "Tavily, Firecrawl, Firecrawl Local or Scrapy", "commands": ["crawl"]}
   ],
   "commands": [
     {"name": "search", "tool": "tool_web_search", "params": [
@@ -12,10 +14,20 @@
     ]},
     {"name": "read", "tool": "tool_web_readPage", "params": [
       {"name": "url", "required": true, "default": null, "description": "The full http:// or https:// address."}
+    ]},
+    {"name": "map", "tool": "tool_web_map", "params": [
+      {"name": "url", "required": true, "default": null, "description": "The full http:// or https:// address of the site or section."},
+      {"name": "limit", "required": false, "default": "100", "description": "How many pages to list at most (1 to 500)."}
+    ]},
+    {"name": "crawl", "tool": "tool_web_crawl", "params": [
+      {"name": "url", "required": true, "default": null, "description": "The full http:// or https:// address where the crawl starts."},
+      {"name": "limit", "required": false, "default": "10", "description": "How many pages to read at most (1 to 25)."}
     ]}
   ],
   "workflow": [
     {"sequence": "1", "tool": "tool_web_search", "ai_only_step": false, "explanation": "Find candidate pages."},
-    {"sequence": "2", "tool": "tool_web_readPage", "ai_only_step": false, "explanation": "Read the best one or two pages."}
+    {"sequence": "2", "tool": "tool_web_readPage", "ai_only_step": false, "explanation": "Read the best one or two pages."},
+    {"sequence": "3", "tool": "tool_web_map", "ai_only_step": false, "explanation": "To work through one site, list its pages and pick."},
+    {"sequence": "4", "tool": "tool_web_crawl", "ai_only_step": false, "explanation": "Crawl from a starting address when you need many pages."}
   ]
 }

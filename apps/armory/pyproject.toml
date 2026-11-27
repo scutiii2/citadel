@@ -34,6 +34,10 @@ dependencies = [
     "sqlite-vec>=0.1.6,<0.2",
     "PyYAML>=6.0.2,<7",
     "sympy==1.14.0",
+    "scrapy>=2.13,<3",
+    "markdownify>=1.1,<2",
+    "beautifulsoup4>=4.12,<5",
+    "pypdfium2>=4.30",
 ]
 
 [dependency-groups]

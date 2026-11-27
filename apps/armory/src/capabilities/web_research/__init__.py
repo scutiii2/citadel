@@ -1,4 +1,4 @@
-"""Web research: search the web and read a page through Tavily."""
+"""Web research: search the web, read pages, map and crawl sites, with fallback between engines."""
 
 from src.services.capability_base import Capability
 

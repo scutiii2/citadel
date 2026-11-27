@@ -158,6 +158,12 @@ Stronghold calls Bard for speech, Scribe for dictation and audio attachments, an
 
 REST calls try the next origin on a connection refusal or connect timeout. A transport failure after a connection may have been made fails the call and puts that origin on a 30-second cooldown. An HTTP reply ends the attempt. File requests use the origin recorded when Stronghold received the file ID. The newest 2,000 mappings live in memory and include the account and service. A missing mapping returns 404, including pre-cutover clips, clips generated through MCP, and mappings lost to eviction or restart. Legion selects its MCP origin separately. If the backing stores are separate, an MCP tool can miss an attachment that Stronghold uploaded to a backup. If a Scribe connection cannot open, a new dictation stream can use the backup. The current stream is never replayed.
 
+A PDF with no readable text is sent to Reader at upload (110 seconds for upload and parse). The reply's `read` field is
+`reader` with the text, or `pages` when Reader is not configured or cannot read it; the model is then shown the pages.
+`/attachments/document` does the same when the user asks, and replies `{filename, text, char_count, truncated, read}`.
+Stored audio is sent to Scribe the same way: `read` is `scribe` with the transcript, or `listen` when Legion has to
+transcribe it. `/attachments/audio` remains for older clients.
+
 Uploads are capped at 20 MB, JSON at 1 MB (4 KB for Reader parse), and REST requests at 120 seconds. Bard audio supports Range and streams up to 64 MB within 120 seconds. Scribe allows one live stream per account with 150 seconds of PCM audio, frames up to 64,000 bytes, a 15-second idle limit, and a 120-second final-result limit.
 
 | Route | Purpose |

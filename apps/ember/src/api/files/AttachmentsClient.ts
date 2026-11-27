@@ -1,4 +1,5 @@
 import { apiRequest } from "../http";
+import { AUDIO_FILE } from "../../utils/content/attachments";
 
 /** What mcp_server kept of an attached .csv / .xlsx for the data tools. */
 export interface AttachmentTable {
@@ -9,6 +10,9 @@ export interface AttachmentTable {
   sheet: string | null;
   notes: string[];
 }
+
+/** How a file was read beyond its text preview: by Reader or Scribe, or left to Legion (`pages`, `listen`). */
+export type ReadPath = "reader" | "pages" | "scribe" | "listen";
 
 /** One uploaded file. `file_id` is null when it could not be stored and only its text is attached. */
 export interface AttachmentFile {
@@ -23,20 +27,16 @@ export interface AttachmentFile {
   truncated: boolean;
   /** The data tools' copy of a .csv / .xlsx, when one was made. */
   table: AttachmentTable | null;
-}
-
-interface AttachmentAudio {
-  filename: string;
-  file_id: string;
-  duration_s: number;
-  expires_at: number;
+  /** Set for a PDF with no text of its own, and for audio. */
+  read: ReadPath | null;
 }
 
 interface AttachmentDocument {
   filename: string;
-  file_id: string;
-  page_count: number;
-  expires_at: number;
+  text: string;
+  char_count: number;
+  truncated: boolean;
+  read: "reader" | "pages";
 }
 
 export interface DictationResult {
@@ -81,25 +81,17 @@ export const attachmentsClient = {
       filename: "dictation.webm", data,
     }, undefined, signal);
   },
-  /** Uploads the audio to Scribe through ember_api; the agent transcribes it by file_id. */
-  async audio(file: File): Promise<AttachmentAudio> {
-    if (file.size > MAX_AUDIO_BYTES) throw new Error("Too large - the limit is 20 MB");
-    return apiRequest<AttachmentAudio>("POST", "/api/attachments/audio", {
-      filename: file.name, data: await toBase64(file),
-    });
-  },
-  /** Uploads the document to Reader through ember_api; the agent reads it with tool_ocr_parse by file_id. */
+  /** Asks Reader for the text of an image or PDF; `read: "pages"` means it could not. */
   async document(file: File): Promise<AttachmentDocument> {
     if (file.size > MAX_AUDIO_BYTES) throw new Error("Too large - the limit is 20 MB");
     return apiRequest<AttachmentDocument>("POST", "/api/attachments/document", {
       filename: file.name, data: await toBase64(file),
     });
   },
-  /** Every file but audio goes up one way: the original is kept and a text preview comes back. */
+  /** Every file goes up one way: the original is kept and its text comes back. Audio may be larger. */
   async file(file: File): Promise<AttachmentFile> {
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      throw new Error(`Too large - the limit is ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB`);
-    }
+    const limit = AUDIO_FILE.test(file.name) ? MAX_AUDIO_BYTES : MAX_ATTACHMENT_BYTES;
+    if (file.size > limit) throw new Error(`Too large - the limit is ${limit / (1024 * 1024)} MB`);
     return apiRequest<AttachmentFile>("POST", "/api/attachments/file", {
       filename: file.name,
       data: await toBase64(file),

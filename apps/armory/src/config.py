@@ -67,13 +67,11 @@ class Settings:
     advertise_url: str | None = _APP.get("advertise_url") or None
     db_gateway_instance: str = _env("DB_GATEWAY_INSTANCE", "mcp_server")
     db_gateway_connection: str = _env("DB_GATEWAY_CONNECTION", "data")
-    # Tavily API key for the web_research capability. Blank until set in .env;
-    # the tools then fail with a message naming the variable.
+    # Web engines of the web_research capability, tried in this order; a blank one is skipped (Scrapy needs none).
     tavily_api_key: str = _env("TAVILY_API_KEY", "")
-    # Firecrawl key and optional self-hosted address for the firecrawl capability.
-    # Blank key: the tools fail naming the variable (a self-hosted URL may run keyless).
     firecrawl_api_key: str = _env("FIRECRAWL_API_KEY", "")
-    firecrawl_api_url: str = _env("FIRECRAWL_API_URL", "")
+    firecrawl_local_url: str = _env("FIRECRAWL_LOCAL_URL", "")
+    firecrawl_local_token: str = _env("FIRECRAWL_LOCAL_TOKEN", "")
 
     # Video downloads stay on armory's listener; only the public origin is configurable.
     media_store_dir: Path = Path(_env("MCP_MEDIA_STORE_DIR", str(CACHE / "media_downloader" / "store")))

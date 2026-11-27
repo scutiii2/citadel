@@ -10,12 +10,12 @@ from src.gateway.conversation.contract import ChatRequest, ChatResult
 from src.gateway.conversation.errors import GatewayError
 from src.gateway.conversation.failure import SECRET_KEYS, scrub, upstream_error
 
-CAPABILITIES = ("streams", "images", "tools", "reasoning", "schema")
+CAPABILITIES = ("streams", "images", "tools", "reasoning", "schema", "audio")
 
 
 class BaseGateway:
     provider = ""
-    defaults = {name: True for name in CAPABILITIES}
+    defaults = {name: name != "audio" for name in CAPABILITIES}
     forwards_images = False  # True: the upstream service decides about images, so the gateway does not pre-refuse them
 
     def __init__(self, gateway_id: str, entry: dict[str, Any], transport: httpx.AsyncBaseTransport | None = None) -> None:
@@ -23,6 +23,8 @@ class BaseGateway:
         self.model = str(entry.get("model", ""))
         self.timeout = float(entry.get("timeout_s", 300))
         self.capabilities = {**self.defaults, **{k: bool(v) for k, v in (entry.get("capabilities") or {}).items() if k in self.defaults}}
+        if not self.sends_audio(entry):
+            self.capabilities["audio"] = False  # the switch cannot add what the adapter cannot send
         self.secrets = [str(entry[k]) for k in SECRET_KEYS if entry.get(k)]
         self.http = httpx.AsyncClient(transport=transport, follow_redirects=False, timeout=self.timeout)
 
@@ -32,6 +34,10 @@ class BaseGateway:
         if client is not None:
             await client.close()
         await self.http.aclose()
+
+    def sends_audio(self, entry: dict[str, Any]) -> bool:
+        """Whether this adapter has a way to put audio in a request."""
+        return False
 
     def can(self, capability: str) -> bool:
         return self.capabilities[capability]

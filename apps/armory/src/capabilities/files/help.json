@@ -3,7 +3,7 @@
   "tools": [
     {"name": "tool_files_list", "purpose": "Read-only listing of your unexpired files with fresh download links.", "connection": "Local file store", "commands": ["list"]},
     {"name": "tool_files_inspect", "purpose": "Read-only details of owned file IDs, with fresh links and per-ID failures.", "connection": "Local file store", "commands": ["inspect"]},
-    {"name": "tool_files_view", "purpose": "Return one owned image for a model to see (MCP-only, hidden).", "connection": "Local file store", "commands": []}
+    {"name": "tool_files_view", "purpose": "Return one owned image, PDF page or WAV/MP3 file for a model (MCP-only, hidden).", "connection": "Local file store", "commands": []}
   ],
   "commands": [
     {"name": "list", "tool": "tool_files_list", "params": []},
@@ -15,6 +15,6 @@
     {"sequence": "1", "tool": "(manual - no tool)", "ai_only_step": false, "explanation": "Upload a file through Ember chat."},
     {"sequence": "2", "tool": "tool_files_list", "ai_only_step": false, "explanation": "Find usable file IDs owned by the signed-in account."},
     {"sequence": "3", "tool": "tool_files_inspect", "ai_only_step": false, "explanation": "Check kind, size and expiry before using a file."},
-    {"sequence": "4", "tool": "tool_files_view", "ai_only_step": true, "explanation": "Legion shows an attached image to the model."}
+    {"sequence": "4", "tool": "tool_files_view", "ai_only_step": true, "explanation": "Legion shows or plays an attached file to a model."}
   ]
 }

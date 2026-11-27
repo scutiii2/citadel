@@ -141,7 +141,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `limits` | architect only | see meaning | `max_units: 12`, `max_parallel: 3`, `unit_timeout_seconds: 120`, `max_retries: 1`. Counts are positive integers; retries may be zero; timeout is a finite positive number. Unknown fields are errors. |
 | `memory_recall` | no | `false` | At the start of each top-level turn, search the user's long-term Brain notes with the question (`stronghold__tool_brain_search`, up to 5) and put matching snippets in front of it. Needs the Stronghold connection and `stronghold__tool_brain_*` in the agent's allow list. Orchestrator role only. Only `ember` has it on. |
 | `skill_recall` | no | `false` | At the start of each top-level turn, search the user's **approved** skills with the question (`stronghold__tool_skill_search`, up to 3) and put the matches in front of it, after any recalled notes. A proposal never loads before the user approves it on Ember's Skills page. Needs the Stronghold connection and `stronghold__tool_skill_*` in the agent's allow list. Orchestrator role only. Only `ember` has it on. |
-| `skill_learning` | no | `false` | After a top-level turn that made at least 3 real tool calls and none failed, draft a reusable skill in the background and propose it (`stronghold__tool_skill_propose`) for the user's approval. One extra call to the tool-free `context-summarizer` agent per qualifying turn, so it is billed: switch it on per agent, no tracked agent has it. The drafting model sees only the user's request and the tool names with argument names, never results, values or the answer. A turn that used web, Firecrawl, email or a private extension tool never qualifies. Calls made by delegated specialists are not seen, so it fits agents that call tools themselves. Needs `stronghold__tool_skill_*` allowed and `context-summarizer` running. Orchestrator role only. |
+| `skill_learning` | no | `false` | After a top-level turn that made at least 3 real tool calls and none failed, draft a reusable skill in the background and propose it (`stronghold__tool_skill_propose`) for the user's approval. One extra call to the tool-free `context-summarizer` agent per qualifying turn, so it is billed: switch it on per agent, no tracked agent has it. The drafting model sees only the user's request and the tool names with argument names, never results, values or the answer. A turn that used web, email or a private extension tool never qualifies. Calls made by delegated specialists are not seen, so it fits agents that call tools themselves. Needs `stronghold__tool_skill_*` allowed and `context-summarizer` running. Orchestrator role only. |
 | `delegable` | no | `true` | `false` keeps the agent out of every orchestrator's roster: it is called directly (for example by portcullis), never delegated to. |
 | `plan_tool` | no | `true` (`false` for architects) | Offer the `update_plan` checklist tool (`src/agents/roles/orchestrator/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Plan mode fills the checklist at runtime instead of offering this tool to the model. |
 
@@ -483,6 +483,20 @@ An image cannot be checked for confidential data, so a turn that shows one goes 
 when the agent has none. An image that expired (Armory keeps uploads for an hour by default) or cannot be read is named to
 the model as unavailable. A gateway without image support refuses the turn. Images are sent again on each follow-up turn,
 and the context estimate counts about 1,600 tokens for each.
+
+A PDF without readable text is named as `[File file_id: <id> | pdf | <n> pages | scan | ...]`. Legion then fetches its
+pages through the same tool, at most 10 pages per turn in total (newest file first, from page 1), apart from the four
+image slots. The model is told which pages it cannot see. The rules above for images apply to these pages.
+
+## Attached audio
+
+A user message names audio with no transcript as `[File file_id: <id> | audio | listen | ...]`. At the start of a turn
+the orchestrator or a delegable agent asks the `transcriber` agent for each file (newest four, 110 seconds each) and
+adds the words to the question as data (`src/runtime/transcripts.py`). The transcriber fetches the file from Armory's
+`tool_files_view`, sends it to its own gateway and keeps the transcript in memory per user and file. WAV and MP3 only.
+Its gateway must be an OpenAI-compatible Chat Completions one with the `audio` capability on (**Hears audio** on the
+Model gateways page); it ships pointing at `gemini`. Such a turn is confidential: trusted gateways only. A file that
+cannot be transcribed is named to the model. A turn with every tool blocked hears nothing.
 
 ## Trusted gateways and confidential data
 

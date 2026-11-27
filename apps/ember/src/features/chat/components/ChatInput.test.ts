@@ -8,8 +8,9 @@ import { withAttachments } from "../../../utils/content/attachments";
 import ChatInput from "./ChatInput.vue";
 import inputSource from "./ChatInput.vue?raw";
 import menuSource from "./ChatSettingsMenu.vue?raw";
+import { useToolConnectionsStore } from "../../../stores/toolConnections";
 
-vi.mock("../../../api/files/AttachmentsClient", () => ({ attachmentsClient: { file: vi.fn(), dictate: vi.fn() } }));
+vi.mock("../../../api/files/AttachmentsClient", () => ({ attachmentsClient: { file: vi.fn(), document: vi.fn(), dictate: vi.fn() } }));
 
 const dictationHooks = vi.hoisted(() => ({ current: undefined as undefined | { onPartial?: (text: string) => void } }));
 vi.mock("../composables/useDictation", async (original) => {
@@ -21,10 +22,11 @@ vi.mock("../composables/useDictation", async (original) => {
 });
 
 const upload = vi.mocked(attachmentsClient.file);
+const readDocument = vi.mocked(attachmentsClient.document);
 
 const uploaded = (over: Partial<AttachmentFile> = {}): AttachmentFile => ({
   filename: "scan.pdf", file_id: "file-1", kind: "pdf", size: 1, pages: 2, expires_at: 2000000000,
-  text: "", char_count: 0, truncated: false, table: null, ...over,
+  text: "", char_count: 0, truncated: false, table: null, read: null, ...over,
 });
 const SHEET = { table_id: "tbl-1", filename: "sales.csv", rows: 1200, columns: ["region", "units"], sheet: null, notes: [] };
 
@@ -44,6 +46,7 @@ beforeEach(() => {
   setActivePinia(createPinia());
   useAuthStore().account = { id: 1, username: "admin", email: "a@example.com", email_verified: true, roles: [], permissions: ["files.upload"] };
   upload.mockReset();
+  readDocument.mockReset();
   upload.mockImplementation(async (f: File) => uploaded({ filename: f.name }));
 });
 
@@ -1109,6 +1112,72 @@ describe("stored attachments", () => {
     expect(wrapper.find(".attachments li").text()).toContain("File storage is unavailable");
     await wrapper.find("form").trigger("submit");
     expect(wrapper.emitted("send")).toBeUndefined();
+  });
+});
+
+describe("reading a stored document", () => {
+  async function attach(over: Partial<AttachmentFile>) {
+    upload.mockResolvedValueOnce(uploaded(over));
+    const wrapper = mountInput();
+    await wrapper.find("textarea").trigger("paste", { clipboardData: clipboard([file(over.filename ?? "scan.pdf")]) });
+    await flushPromises();
+    return wrapper;
+  }
+  async function sent(wrapper: ReturnType<typeof mountInput>) {
+    await wrapper.find("form").trigger("submit");
+    return wrapper.emitted("send")![0]![0] as string;
+  }
+  const noReader = () => { useToolConnectionsStore().status = { reader: { ready: false, reason: "Reader is not set up." } }; };
+
+  it("says a scan's pages are attached and offers no button", async () => {
+    const wrapper = await attach({ read: "pages", pages: 12 });
+    expect(wrapper.find(".attachments li").text()).toContain("first 10 of 12 pages attached");
+    expect(wrapper.find("button.ocr").exists()).toBe(false);
+    expect(await sent(wrapper)).toContain("| pdf | 12 pages | scan |");
+  });
+
+  it("replaces a text PDF's preview with what Reader read", async () => {
+    readDocument.mockResolvedValue({ filename: "scan.pdf", text: "OCR words", char_count: 9, truncated: false, read: "reader" });
+    const wrapper = await attach({ text: "old preview", char_count: 11 });
+    expect(wrapper.find("button.ocr").text()).toBe("Read with OCR");
+    await wrapper.find("button.ocr").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".attachments li").text()).toContain("read by Reader");
+    const question = await sent(wrapper);
+    expect(question).toContain("preserve this file_id when delegating]\nOCR words");
+    expect(question).not.toContain("old preview");
+  });
+
+  it("attaches the pages without asking the server when Reader is not ready", async () => {
+    noReader();
+    const wrapper = await attach({ text: "typed", char_count: 5 });
+    expect(wrapper.find("button.ocr").text()).toBe("Attach pages");
+    await wrapper.find("button.ocr").trigger("click");
+    expect(readDocument).not.toHaveBeenCalled();
+    expect(await sent(wrapper)).toContain("| pdf | 2 pages | scan |");
+  });
+
+  it("offers no button on an image without Reader", async () => {
+    noReader();
+    const wrapper = await attach({ filename: "photo.png", kind: "image", pages: 1 });
+    expect(wrapper.find("button.ocr").exists()).toBe(false);
+  });
+
+  it("uploads audio like any file, even when Scribe is not ready", async () => {
+    useToolConnectionsStore().status = { scribe: { ready: false, reason: "Scribe is not set up." } };
+    const wrapper = await attach({ filename: "voice.mp3", kind: "audio", pages: null, read: "listen" });
+    expect(upload).toHaveBeenCalledOnce();
+    expect(wrapper.find(".attachments li").text()).toContain("will be transcribed");
+    expect(await sent(wrapper)).toContain("| audio | listen |");
+  });
+
+  it("says when Reader cannot read an image", async () => {
+    readDocument.mockResolvedValue({ filename: "photo.png", text: "", char_count: 0, truncated: false, read: "pages" });
+    const wrapper = await attach({ filename: "photo.png", kind: "image", pages: 1 });
+    await wrapper.find("button.ocr").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".attachments li").text()).toContain("The model still sees the image");
+    expect(await sent(wrapper)).not.toContain("| scan |");
   });
 });
 

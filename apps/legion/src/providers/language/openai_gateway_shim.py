@@ -43,13 +43,20 @@ def _text(content: Any) -> str:
     return "".join(parts)
 
 
+_MEDIA_PARTS = ("input_image", "input_audio")
+
+
 def _user_content(content: Any) -> str | list[dict[str, Any]]:
-    """A user message's content: its text, or text and image blocks when it carries images."""
-    if isinstance(content, str) or not any(_get(part, "type") == "input_image" for part in content or []):
+    """A user message's content: its text, or text, image and audio blocks when it carries media."""
+    if isinstance(content, str) or not any(_get(part, "type") in _MEDIA_PARTS for part in content or []):
         return _text(content)
     blocks: list[dict[str, Any]] = []
     for part in content:
-        if _get(part, "type") != "input_image":
+        kind = _get(part, "type")
+        if kind == "input_audio":
+            blocks.append({"type": "audio", "media_type": _get(part, "media_type"), "data": _get(part, "data")})
+            continue
+        if kind != "input_image":
             blocks.append({"type": "text", "text": _text([part])})
             continue
         # Only the data URLs Legion builds itself: "data:<media type>;base64,<data>".

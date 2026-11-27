@@ -54,9 +54,9 @@ def _messages(messages: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], boo
                                 "text": str(_get(block, "content") or ""), "is_error": bool(_get(block, "is_error"))})
             elif kind == "thinking":
                 state = _get(block, "state")
-            elif kind == "image":
+            elif kind in ("image", "audio"):
                 source = _get(block, "source") or {}
-                blocks.append({"type": "image", "media_type": source.get("media_type"), "data": source.get("data")})
+                blocks.append({"type": kind, "media_type": source.get("media_type"), "data": source.get("data")})
             else:
                 raise ValueError(f"Unsupported content block: {kind}")
         if results:

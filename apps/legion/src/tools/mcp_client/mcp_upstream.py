@@ -147,13 +147,14 @@ def list_tools() -> list[Any]:
     return result
 
 
-def fetch_image(file_id: str) -> tuple[str, str] | None:
-    """(media type, base64 data) of one of the asking user's images, or None when Armory cannot give it. Blocking.
-    Legion's own call, so no agent tool scope applies; Armory still checks who owns the file."""
-    result = client.call_tool(_IMAGE_TOOL, {"file_id": file_id}, meta=internal_auth.requester_meta())
+def fetch_image(file_id: str, page: int | None = None) -> tuple[str, str] | None:
+    """(media type, base64 data) of one of the asking user's images or audio files, or of one page of their PDF; None
+    when Armory cannot give it. Blocking. Legion's own call, so no agent tool scope applies; Armory still checks who owns the file."""
+    arguments = {"file_id": file_id} if page is None else {"file_id": file_id, "page": page}
+    result = client.call_tool(_IMAGE_TOOL, arguments, meta=internal_auth.requester_meta())
     if result.is_error:
         return None
-    return next(((block.mime_type, block.data) for block in result.content if block.type == "image"), None)
+    return next(((block.mime_type, block.data) for block in result.content if block.type in ("image", "audio")), None)
 
 
 def own_only(tools: list[Any]) -> list[Any]:

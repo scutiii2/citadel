@@ -11,11 +11,12 @@ TIERS = ("light", "standard", "heavy", "extreme")
 TOP = {"gateway", "model", "tier", "system", "messages", "tools", "tool_choice", "schema", "reasoning", "max_tokens",
        "temperature", "cache", "stream"}
 BLOCKS = {  # role -> block type -> allowed keys
-    "user": {"text": {"type", "text"}, "image": {"type", "media_type", "data"}},
+    "user": {"text": {"type", "text"}, "image": {"type", "media_type", "data"}, "audio": {"type", "media_type", "data"}},
     "assistant": {"text": {"type", "text"}, "tool_call": {"type", "id", "name", "arguments"}},
     "tool": {"tool_result": {"type", "id", "text", "is_error"}},
 }
 MEDIA = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+AUDIO = {"audio/wav", "audio/mpeg"}
 EFFORTS = ("low", "medium", "high")
 NAME = re.compile(r"[A-Za-z0-9_.-]{1,64}")
 MAX_STATE = 1_000_000
@@ -28,10 +29,12 @@ class Limits:
     max_tools: int
     max_images: int
     max_image_bytes: int
+    max_audio_bytes: int = 20 * 1024 * 1024
 
     @classmethod
     def from_settings(cls, s: Any) -> "Limits":
-        return cls(s.max_messages, s.max_text, s.max_tools, s.max_images, s.max_image_mb * 1024 * 1024)
+        return cls(s.max_messages, s.max_text, s.max_tools, s.max_images, s.max_image_mb * 1024 * 1024,
+                   s.max_audio_mb * 1024 * 1024)
 
 
 @dataclass(frozen=True)
@@ -56,6 +59,8 @@ class ChatRequest:
         types = {b["type"] for m in self.messages for b in m["content"]}
         if "image" in types:
             used.add("images")
+        if "audio" in types:
+            used.add("audio")
         if self.tools or types & {"tool_call", "tool_result"}:
             used.add("tools")
         if self.reasoning:
@@ -111,6 +116,13 @@ def _blocks(role: str, content: Any, limits: Limits, images: list[int]) -> list[
                 raise bad("an image is larger than the limit.")
             images[0] += 1
             out.append({"type": "image", "media_type": block["media_type"], "data": data})
+        elif kind == "audio":
+            if not isinstance(block.get("media_type"), str) or block["media_type"] not in AUDIO:
+                raise bad("an audio media_type must be audio/wav or audio/mpeg.")
+            data = _text(block.get("data"), "audio data", limits.max_audio_bytes * 4 // 3 + 4)
+            if len(data) * 3 // 4 - min(2, len(data) - len(data.rstrip("="))) > limits.max_audio_bytes:
+                raise bad("an audio file is larger than the limit.")
+            out.append({"type": "audio", "media_type": block["media_type"], "data": data})
         elif kind == "tool_call":
             name = block.get("name")
             if not isinstance(name, str) or not NAME.fullmatch(name) or not isinstance(block.get("arguments"), dict):

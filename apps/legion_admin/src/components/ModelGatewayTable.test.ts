@@ -183,3 +183,22 @@ it("shows a chat gateway's health: cooling down, recent failures, or none", asyn
   expect(wrapper.get('[data-test="health-c"]').text()).toBe("No failures in 24 hours");
   wrapper.unmount();
 });
+
+it("saves the Hears audio switch for an OpenAI-compatible chat gateway", async () => {
+  vi.spyOn(agentsAdminClient, "modelGateways").mockResolvedValue(list as never);
+  const save = vi.spyOn(agentsAdminClient, "saveModelGateway").mockResolvedValue({ id: "ollama", provider: "openai" });
+  const wrapper = mount(ModelGatewayTable, { attachTo: document.body, props: { kind: "conversation", title: "Chat models", help: "Help" }, global: { stubs: { Teleport: true } } });
+  await flushPromises();
+  await wrapper.get('[data-test="add-conversation"]').trigger("click");
+  await wrapper.get('[data-test="preset"]').setValue("ollama");
+  await wrapper.get('[data-test="preset"]').trigger("change");
+  const toggle = wrapper.get('[data-test="audio"]');
+  expect((toggle.element as HTMLInputElement).checked).toBe(false);
+  await toggle.setValue(true);
+  await wrapper.get('[data-test="api_key"]').setValue("secret");
+  await wrapper.get("form").trigger("submit");
+  wrapper.findComponent({ name: "RecordDrawer" }).vm.$emit("save");
+  await flushPromises();
+  expect(save).toHaveBeenCalledWith("conversation", "ollama", expect.objectContaining({ capabilities: { audio: true } }));
+  wrapper.unmount();
+});

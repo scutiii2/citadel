@@ -11,11 +11,13 @@ import asyncio
 import base64
 import binascii
 from pathlib import PurePosixPath
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from src.attachments.extraction import MAX_FILE_BYTES, PLAIN_TEXT_SUFFIXES, ExtractionError, extract_text_async
+from src.attachments.reading import read_with_reader, transcribe_with_scribe
 from src.attachments.services import ArmoryUploads
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
@@ -34,6 +36,8 @@ _MAX_AUDIO_BYTES = 20 * 1024 * 1024
 _MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
 # Files whose text Stronghold can read as a preview.
 _PREVIEW_SUFFIXES = PLAIN_TEXT_SUFFIXES | {".pdf", ".docx", ".xlsx", ".xlsm"}
+_READ_NOTES = {None: "", "reader": "; read by Reader", "pages": "; its pages are shown to the model",
+               "scribe": "; transcribed by Scribe", "listen": "; to be transcribed by Legion"}
 
 
 def _base64(size: int) -> int:
@@ -102,11 +106,10 @@ class AudioOut(BaseModel):
     expires_at: float
 
 
-class DocumentOut(BaseModel):
-    filename: str
-    file_id: str
-    page_count: int
-    expires_at: float
+class DocumentOut(TextOut):
+    """What Reader read; `pages` (with no text) means the caller should show the model the pages instead."""
+
+    read: Literal["reader", "pages"]
 
 
 class FileOut(TextOut):
@@ -118,6 +121,8 @@ class FileOut(TextOut):
     pages: int | None = None
     expires_at: float | None = None
     table: TableOut | None = None
+    # set only for a PDF with no text of its own, and for audio
+    read: Literal["reader", "pages", "scribe", "listen"] | None = None
 
 
 class DictationOut(BaseModel):
@@ -171,6 +176,7 @@ async def attachment_text(body: FileIn, _who: Requester = Depends(current_reques
 @router.post("/file")
 async def attachment_file(body: UploadIn, who: Requester = Depends(current_requester),
                           uploads: ArmoryUploads = Depends(get_uploads),
+                          connections: ToolServices = Depends(get_connections),
                           platform: PortcullisClient = Depends(get_platform)) -> FileOut:
     """One route for every file: Armory keeps the original, and its text is read here as a preview."""
     filename = _name(body.filename)
@@ -207,14 +213,21 @@ async def attachment_file(body: UploadIn, who: Requester = Depends(current_reque
         if not isinstance(stored, HTTPException) or preview is None or not (outage or suffix not in _PDF_SUFFIXES):
             raise stored
         stored = None
-    else:
-        await platform.log_action(who.uid, "attachments.file", f"Attached '{filename}' ({len(content):,} bytes)")
+    read, found = None, None
+    if stored is not None:
+        if suffix == ".pdf" and preview is None:  # a scan: no text of its own
+            found = await read_with_reader(connections, suffix, content)
+            read = "pages" if found is None else "reader"
+        elif suffix in _AUDIO_SUFFIXES:
+            found = await transcribe_with_scribe(connections, suffix, content)
+            read = "listen" if found is None else "scribe"
+        note = _READ_NOTES[read]
+        await platform.log_action(who.uid, "attachments.file", f"Attached '{filename}' ({len(content):,} bytes){note}")
+    text, truncated = found or ((preview.text, preview.truncated) if preview else ("", False))
     kept = {} if stored is None else {"file_id": stored["file_id"], "kind": stored["kind"],
                                       "pages": stored["pages"] or None, "expires_at": stored["expires_at"]}
-    return FileOut(filename=filename, size=len(content), text=preview.text if preview else "",
-                   char_count=preview.char_count if preview else 0,
-                   truncated=preview.truncated if preview else False,
-                   table=_table_out(registered, filename) if registered else None, **kept)
+    return FileOut(filename=filename, size=len(content), text=text, char_count=len(text), truncated=truncated,
+                   table=_table_out(registered, filename) if registered else None, read=read, **kept)
 
 
 @router.post("/table")
@@ -270,15 +283,19 @@ async def attachment_audio(body: AudioIn, who: Requester = Depends(current_reque
 async def attachment_document(body: DocumentIn, who: Requester = Depends(current_requester),
                               connections: ToolServices = Depends(get_connections),
                               platform: PortcullisClient = Depends(get_platform)) -> DocumentOut:
-    """Keep the original for Reader's OCR tool; the agent gets the file_id."""
+    """Read an image or PDF with Reader because the user asked."""
     filename = _name(body.filename)
-    if not filename.lower().endswith(_DOCUMENT_SUFFIXES):
+    suffix = PurePosixPath(filename.lower()).suffix
+    if suffix not in _DOCUMENT_SUFFIXES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Upload a pdf, png, jpg, jpeg or webp file")
     content = _decode(body.data, _MAX_DOCUMENT_BYTES, "The document is larger than 20 MB")
-    uploaded = await connections.post_file("/connections/reader/files", filename, content)
-    await platform.log_action(who.uid, "attachments.document", f"Attached '{filename}' ({len(content):,} bytes) for OCR")
-    return DocumentOut(filename=filename, file_id=uploaded["file_id"], page_count=int(uploaded["page_count"]),
-                       expires_at=float(uploaded["expires_at"]))
+    found = await read_with_reader(connections, suffix, content)
+    text, truncated = found or ("", False)
+    outcome = "Read" if found else "Could not read"
+    await platform.log_action(who.uid, "attachments.document",
+                              f"{outcome} '{filename}' ({len(content):,} bytes) with Reader")
+    return DocumentOut(filename=filename, text=text, char_count=len(text), truncated=truncated,
+                       read="reader" if found else "pages")
 
 
 @router.post("/dictate")
