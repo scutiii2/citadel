@@ -1,9 +1,11 @@
 """Tables from uploaded CSV/XLSX files, held in memory, each bound to its uploading account.
-Other-account, expired and unknown ids are indistinguishable (`get` -> None); a restart drops all. Data is column-major and every change takes the lock."""
+Other-account, expired and unknown ids are indistinguishable (`get` -> None). A restart drops all, but a table asked for
+by its file id is built again from the stored file. Data is column-major and every change takes the lock."""
 
 from __future__ import annotations
 
 import hmac
+import logging
 import secrets
 import threading
 import time
@@ -13,6 +15,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.services.downloads import safe_filename
+
+logger = logging.getLogger(__name__)
 
 TTL_SECONDS = 1800
 MAX_PER_OWNER = 10
@@ -67,7 +71,10 @@ class TableRegistry:
         max_total_bytes: int = MAX_TOTAL_BYTES,
         bytes_per_cell: int = BYTES_PER_CELL,
         clock: Callable[[], float] = time.monotonic,
+        source: Callable[[str], tuple[str, ParsedTable, int] | None] | None = None,
     ) -> None:
+        """`source(table_id)` gives (file name, parsed table, size) for an id that is not held, or None."""
+        self._source = source
         self._ttl = ttl_seconds
         self._max_per_owner = max_per_owner
         self._max_tables = max_tables
@@ -78,7 +85,8 @@ class TableRegistry:
         self._total = 0
         self._lock = threading.Lock()
 
-    def add(self, owner: str, filename: str, parsed: ParsedTable, size_bytes: int) -> Table:
+    def add(self, owner: str, filename: str, parsed: ParsedTable, size_bytes: int,
+            table_id: str | None = None) -> Table:
         """Keeps `parsed` for `owner`, evicting the oldest entries to stay inside the caps.
         The byte cap charges the larger of file size and estimated parsed memory."""
         if not owner:
@@ -87,7 +95,7 @@ class TableRegistry:
         if charge > self._max_total:
             raise TableRefused(f"The file is too large to keep (limit {self._max_total // (1024 * 1024)} MB).")
         table = Table(
-            id=secrets.token_urlsafe(16),
+            id=table_id or secrets.token_urlsafe(16),
             owner=owner,
             filename=safe_filename(filename),
             sheet=parsed.sheet,
@@ -102,6 +110,8 @@ class TableRegistry:
         )
         with self._lock:
             self._drop_expired()
+            if table.id in self._entries:  # two calls rebuilt the same file at once
+                self._drop(table.id)
             while self._count_for(owner) >= self._max_per_owner:
                 self._drop(next(key for key, entry in self._entries.items() if entry.owner == owner))
             while self._entries and (
@@ -113,12 +123,15 @@ class TableRegistry:
         return table
 
     def get(self, table_id: str, owner: str) -> Table | None:
-        """The table, only for the account that uploaded it and before it expires."""
+        """The table, only for the account that uploaded it. One that is not held is asked of `source`.
+        Blocking when it has to be read again."""
         with self._lock:
             self._drop_expired()
             table = self._entries.get(table_id)
-        if table is None or not owner:
+        if not owner:
             return None
+        if table is None:
+            return self._rebuild(table_id, owner)
         if not hmac.compare_digest(table.owner.encode("utf-8"), owner.encode("utf-8")):
             return None
         return table
@@ -137,6 +150,16 @@ class TableRegistry:
             self._drop_expired()
             return len(self._entries)
 
+    def _rebuild(self, table_id: str, owner: str) -> Table | None:
+        if self._source is None:
+            return None
+        try:
+            found = self._source(table_id)
+            return None if found is None else self.add(owner, *found, table_id=table_id)
+        except TableRefused as error:
+            logger.warning("table %s could not be read again: %s", table_id, error)
+            return None
+
     def _count_for(self, owner: str) -> int:
         return sum(1 for entry in self._entries.values() if entry.owner == owner)
 
@@ -149,5 +172,11 @@ class TableRegistry:
         self._total -= self._entries.pop(key).charged_bytes
 
 
+def _from_file_store(file_id: str) -> tuple[str, ParsedTable, int] | None:
+    from src.capabilities.tables.utils.stored import load_stored  # it imports this module, so it is imported late
+
+    return load_stored(file_id)
+
+
 # The one store this server uses; tests swap it.
-registry = TableRegistry()
+registry = TableRegistry(source=_from_file_store)

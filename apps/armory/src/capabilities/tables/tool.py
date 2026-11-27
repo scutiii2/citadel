@@ -25,7 +25,7 @@ from src.server import mcp
 from src.services import identity_context
 from src.capabilities.tables.utils import tables
 
-TableId = Annotated[str, Field(description="The table_id from the attached file's header line or from tool_tables_listTables. Never invent one.")]
+TableId = Annotated[str, Field(description="The table_id from the attachment or from tool_tables_listTables, or the file_id (f_...) of an uploaded CSV or Excel file, which still works after the table_id has expired. Never invent one.")]
 Column = Annotated[str, Field(description="A column name, exactly as the describe tool lists it.")]
 Conditions = Annotated[
     list[Condition] | None,

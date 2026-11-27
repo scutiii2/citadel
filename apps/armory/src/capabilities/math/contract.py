@@ -426,7 +426,7 @@ class BatchProgress(BaseModel):
 
 
 class TableFormulaInput(InputModel):
-    table_id: Annotated[str, Field(min_length=1, max_length=128)]
+    table_id: Annotated[str, Field(min_length=1, max_length=128, description="A table_id, or the file_id of an uploaded CSV or Excel file.")]
     columns: dict[Name, Annotated[str, Field(min_length=1, max_length=256)]] = Field(min_length=1, max_length=16)
     bindings: list[SharedBinding] = Field(default_factory=list, max_length=32)
     offset: StrictInt = Field(default=0, ge=0, le=200000)

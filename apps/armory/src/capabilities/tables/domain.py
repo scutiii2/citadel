@@ -385,7 +385,7 @@ class TableDesk:
         table = self._registry.get(table_id.strip(), self._owner)
         if table is None:
             raise TableNotFound(
-                "Table not found or expired. Ask the user to attach the file again, "
-                "or list the tables with tool_tables_listTables."
+                "Table not found or expired. Call again with the file_id (f_...) of the CSV or Excel file; "
+                "if that is not found either, ask the user to attach the file again."
             )
         return table

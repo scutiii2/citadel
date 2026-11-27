@@ -7,8 +7,12 @@ Chat id `data`, label "Data Tables".
 
 `ember_web` uploads an attached `.csv` / `.xlsx` through `portcullis` to `POST /upload/table` (`upload_routes.py`,
 internal token required). `utils/table_loader.py` parses the whole file once into typed columns;
-`utils/tables.py` keeps it in memory under a random id, bound to the requesting account. Nothing is written to disk.
-A restart, or 30 minutes, drops the table: attach the file again.
+`utils/tables.py` keeps it in memory under a random id, bound to the requesting account. This route writes nothing
+to disk. A restart, or 30 minutes, drops the table.
+
+The chat also keeps the uploaded file in the account's file store (the `files` capability's store). Every tool here, and
+`tool_math_table`, accepts that file's id (`f_...`) as `table_id`: `utils/stored.py` parses the stored file again and
+keeps the table under the file id. This works until the file itself expires; then attach it again.
 
 ## Tools
 
@@ -40,7 +44,8 @@ evict other users' tables. Numeric ids of 16+ digits are typed as float and lose
 
 ## Security
 
-Every id is random, opaque and owner-bound; an unknown, expired or foreign id gives the same "not found". Cell values
+Every id is random, opaque and owner-bound; an unknown, expired or foreign id gives the same "not found". A file id
+is looked up in the file store under the caller's account id, so another account's file is never read. Cell values
 come from the user's file and may hold injection text, so each result carries a `notice` saying they are data.
 
 Toggle: `"data"` in the Capabilities page (stored in `.data/armory/settings.db`).
