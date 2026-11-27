@@ -114,11 +114,27 @@ class EquationSpec(InputModel):
 
 RootEquation = Equation | EquationSpec
 
-# Tool definitions are sent to the model on every round, so only tool_math_solve spells these two shapes out.
-# Both are still validated in full.
+# Tool definitions are sent to the model on every round, so only tool_math_solve lists the controls and the binding
+# shapes. Both are still validated in full.
 SharedEquation = Annotated[RootEquation, WithJsonSchema({
     "anyOf": [{"type": "string"}, {"type": "object"}],
     "description": "Equation string, or the controls object that tool_math_solve's equation accepts.",
+})]
+
+# tool_math_solve's own equation: the controls are listed in text, which costs far less than their schemas.
+DescribedEquation = Annotated[RootEquation, WithJsonSchema({
+    "anyOf": [{"type": "string"}, {"type": "object"}],
+    "description": (
+        "Expression or equality string, e.g. y = m * b / 2 + x. Or an object {expression: string or list of "
+        "equalities, ...controls}, controls:\n"
+        "solve_for: [names]. domain: complex|real. precision: 15-100. syntax: math|latex. trace: bool.\n"
+        "method: symbolic|auto|numeric|certified (certified: exact real rational-polynomial roots).\n"
+        "numerical: {initial_guesses: [{x: 1}], bounds: {x: [0, 2]}}, with method auto or numeric (certified takes "
+        "bounds only); roots are partial and approximate.\n"
+        "assumptions: {x: {real, positive, nonnegative, nonzero, integer: bool, min, max: number}}.\n"
+        "split_cases: bool. case_limit: 2-8. units, output_units: {name: unit}. result_unit: unit.\n"
+        "Use explicit multiplication; complex numbers use i/I."
+    ),
 })]
 
 

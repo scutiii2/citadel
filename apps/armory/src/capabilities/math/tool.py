@@ -10,7 +10,7 @@ from pydantic import Field
 
 from src.capabilities.math import domain
 from src.capabilities.math.contract import (Binding, CalculusOptions, ContinuationInput, MatrixOptions,
-                                            RootEquation, SharedEquation, SolveResult, TableFormulaInput)
+                                            DescribedEquation, SharedEquation, SolveResult, TableFormulaInput)
 from src.capabilities.math.utils.replies import replies
 from src.commands import command
 from src.server import mcp
@@ -27,12 +27,7 @@ from src.services.identity_context import current_uid
     annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
 )
 async def tool_math_solve(
-    equation: Annotated[RootEquation, Field(
-        description=("Expression/equality string, e.g. y = m * b / 2 + x, or object with expression, solve_for, domain (real/complex), "
-                     "precision (15–100), method (symbolic/auto/numeric/certified), assumptions, split_cases, units/output_units, trace, and numerical hints. "
-                     "expression may be a list of equalities. Certified mode supports exact real rational-polynomial roots. "
-                     "Numerical searches need supplied hints and return partial approximate roots. Use explicit multiplication; complex numbers use i/I."),
-    )],
+    equation: DescribedEquation,
     data: Annotated[list[Binding], Field(
         description=(
             "Bindings; use [] when none. Constant: {type:'constant',name:'m',value:5}. "

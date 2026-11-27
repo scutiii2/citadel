@@ -256,9 +256,12 @@ The existing roster filters hide it when its math tools are unavailable.
 
 Ember routes standalone mathematics to Mathematician and attached-table work to
 Analyst, using only the current available roster. Analyst can use math tools for
-derived formulas over owned numeric table pages; it retains table discovery and
-token-usage tools. Reviewer already permits math tools and now receives explicit
-instructions for independent mathematical checks from the original problem.
+derived formulas over owned numeric table pages with `tool_math_solve`,
+`tool_math_batch` and `tool_math_table`; it retains table discovery and
+token-usage tools. Reviewer checks mathematics independently from the original
+problem. Its tools are limited to mathematics, tables, file listing and
+inspection, web search and page reading, repositories, email, generators,
+private extensions and ticket filing. Attached images and PDF pages still reach it.
 Ember retains its existing tool scope and delegates calculations.
 
 These are tracked defaults. Per-machine agent overrides can shadow them; update

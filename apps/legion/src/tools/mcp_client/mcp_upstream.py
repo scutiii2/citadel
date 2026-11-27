@@ -379,4 +379,6 @@ def warn_unmatched_tool_globs() -> None:
     names = [unprefixed(t.name) for t in client.list_tools()]
     agent = agent_spec.current()
     for glob in dict.fromkeys(agent.tools.unmatched(names)):
+        if glob.startswith(private_turn.TOOL_PREFIX):
+            continue  # a private extension joins per turn, so none is listed at startup
         _log.warning("agent %s: tools glob %r matches no tool on any MCP connection", agent.id, glob)

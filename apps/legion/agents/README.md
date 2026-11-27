@@ -45,9 +45,10 @@ validated changes.
 
 `mathematician.json` defines the delegable mathematics specialist on port 29620.
 It permits `tool_math_*` and Stronghold’s `stronghold__tool_ticket_createTicket`.
-Data Analyst also permits math tools for attached-table formulas and reads the
-requester’s token usage with `stronghold__tool_usage_summary`. Ember routes using the live
-roster; Reviewer independently checks math through its existing permitted tools.
+Data Analyst also permits `tool_math_solve`, `tool_math_batch` and `tool_math_table` for
+attached-table formulas and reads the requester’s token usage with
+`stronghold__tool_usage_summary`. Ember routes using the live roster; Reviewer checks math
+independently and is offered only the tools listed in `reviewer.json`.
 Armory's Mathematics capability must be enabled for math tools to be offered.
 
 `transcriber.json` is a tool-free, non-delegable helper on port 29630 that writes
