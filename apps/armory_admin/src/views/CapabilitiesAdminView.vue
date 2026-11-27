@@ -173,11 +173,12 @@ onMounted(load);
                 <PanelHelp v-if="state !== 'online'" :title="STATE_LABELS[state]"><p>{{ STATE_HELP[state] }}</p></PanelHelp></div></td>
               <td>{{ c.tools.length }}<template v-if="!c.loaded"> · not loaded yet</template></td>
               <td>
+                <!-- The switch comes first so it stays in one column whether or not a row has Restart. -->
                 <div class="controls">
+                  <ToggleSwitch :checked="c.enabled" :disabled="pending.has(c.name) || (c.missing && !c.enabled)" :aria-label="`${c.label ?? c.name} online`" @change="onToggle(c, $event)" />
                   <button v-if="c.enabled && !c.missing" type="button" class="admin-icon restart" data-test="restart" :disabled="pending.has(c.name)" :aria-label="`Restart ${c.label ?? c.name}`" title="Restart: load its code from disk again" @click="setOnline(c, true)">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" /></svg>
                   </button>
-                  <ToggleSwitch :checked="c.enabled" :disabled="pending.has(c.name) || (c.missing && !c.enabled)" :aria-label="`${c.label ?? c.name} online`" @change="onToggle(c, $event)" />
                 </div>
               </td>
             </tr>
