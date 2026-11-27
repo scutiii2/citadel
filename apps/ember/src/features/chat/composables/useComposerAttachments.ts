@@ -124,16 +124,16 @@ export function useComposerAttachments() {
     return event.dataTransfer?.types.includes("Files") ?? false;
   }
 
-  // The whole composer is the drop target (suggestions and chips included),
-  // but dragged text or links are left to the browser.
+  // The composer and the chat around it take file drops; dragged text or links
+  // are left to the browser.
   function onDragOver(event: DragEvent): void {
     if (!hasFiles(event)) return;
-    event.preventDefault();
-    dragging.value = true;
+    event.preventDefault(); // even without the permission: the browser must not open the file
+    dragging.value = auth.hasPermission("files.upload");
   }
 
   function onDragLeave(event: DragEvent): void {
-    // Moving over a child element also fires dragleave on the form.
+    // Moving over a child element also fires dragleave on the drop zone.
     if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) dragging.value = false;
   }
 

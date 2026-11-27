@@ -343,7 +343,11 @@ function restore(question: string): void {
   setDraft(restoreAttachments(question));
 }
 
-defineExpose({ setDraft, focus, insertText, restore });
+// The chat view hands over files dragged anywhere on the chat, and shows `fileDragging`.
+defineExpose({
+  setDraft, focus, insertText, restore,
+  onFileDragOver: onDragOver, onFileDragLeave: onDragLeave, onFileDrop: onDrop, fileDragging: dragging,
+});
 
 /** ↑ and ↓ browse the questions asked before, ready to edit and resend.
  * Starts only from an empty box; once browsing, the arrows still move the

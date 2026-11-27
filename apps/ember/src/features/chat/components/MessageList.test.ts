@@ -525,6 +525,14 @@ describe("the running clock", () => {
     expect(wrapper.find(".live .elapsed").exists()).toBe(true);
   });
 
+  it("sits at the top of the answer with the bar and the token count, above everything else", () => {
+    const wrapper = live({ since: T0, liveTokens: { total: 850, estimated: false } });
+
+    const top = wrapper.get(".live").element.firstElementChild!;
+
+    for (const part of [".thinking-bar", ".elapsed", "[data-test=live-tokens]"]) expect(top.querySelector(part)).not.toBeNull();
+  });
+
   it("is not shown without a start time", () => {
     expect(live({ since: null }).find(".elapsed").exists()).toBe(false);
     expect(live().find(".elapsed").exists()).toBe(false);

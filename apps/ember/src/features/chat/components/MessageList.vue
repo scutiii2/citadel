@@ -367,6 +367,14 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
       </template>
 
       <div v-if="busy" class="assistant live">
+        <!-- First, so the wait is read above the answer it belongs to. -->
+        <div class="progress">
+          <ThinkingBar v-if="!streaming" />
+          <ElapsedTime v-if="since" :since="since" class="elapsed" />
+          <span v-if="liveTokens && liveTokens.total > 0" class="elapsed live-tokens" data-test="live-tokens">
+            {{ liveTokens.estimated ? "~" : "" }}{{ compactNumber(liveTokens.total) }} tokens
+          </span>
+        </div>
         <PlanPanel :plans="plans ?? []" />
         <ToolSteps v-if="steps.length" :steps="steps" live />
         <BardAudio v-for="clip in bardClips(steps)" :key="clip.fileId" v-bind="clip" />
@@ -430,11 +438,6 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
         <span v-if="activity" class="activity" role="status"><span class="dot" />{{ activity }}</span>
         <MarkdownContent v-if="streaming" :text="hideDownloadMarkers(streaming)" />
         <span v-else-if="!activity" class="activity" role="status"><span class="dot" />thinking ...</span>
-        <ThinkingBar v-if="!streaming" />
-        <ElapsedTime v-if="since" :since="since" class="elapsed" />
-        <span v-if="liveTokens && liveTokens.total > 0" class="elapsed live-tokens" data-test="live-tokens">
-          {{ liveTokens.estimated ? "~" : "" }}{{ compactNumber(liveTokens.total) }} tokens
-        </span>
       </div>
       <div v-else-if="working" class="assistant live" role="status" data-test="working">
         <span class="activity"><span class="dot" />{{ working }}</span>
@@ -791,6 +794,13 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
 .live > .activity,
 .live > .elapsed {
   justify-self: start;
+}
+/* The bar sits level with the round mark beside it. */
+.progress :deep(.thinking-bar) {
+  margin-top: 12px;
+}
+.progress:empty {
+  display: none;
 }
 .activity {
   display: inline-flex;

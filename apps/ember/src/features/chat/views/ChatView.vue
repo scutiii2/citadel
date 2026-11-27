@@ -147,6 +147,16 @@ function closeCommandForm(): void {
   formSchema.value = null;
 }
 
+// Files can be dropped anywhere on the chat; the composer attaches them. Whatever handled a drag on the way
+// up (the composer itself, a form's own file field) has already called preventDefault.
+function onChatDragOver(event: DragEvent): void {
+  if (!event.defaultPrevented) input.value?.onFileDragOver(event);
+}
+function onChatDrop(event: DragEvent): void {
+  if (!event.defaultPrevented) input.value?.onFileDrop(event);
+  else if (input.value) input.value.fileDragging = false;
+}
+
 /** A question ember_api did not take (no entry agent, limit reached ...) goes
  * back into the box, as typed, along with its files. */
 async function onSend(question: string): Promise<void> {
@@ -392,7 +402,12 @@ useChatShortcuts({
       </svg>
     </button>
 
-    <div class="main">
+    <div
+      :class="['main', { 'file-drag': input?.fileDragging }]"
+      @dragover="onChatDragOver"
+      @dragleave="input?.onFileDragLeave($event)"
+      @drop="onChatDrop"
+    >
       <div class="mobile-header">
       <button ref="historyButton" type="button" class="menu" title="Chats" aria-label="Chats" aria-controls="chat-history" :aria-expanded="drawerOpen" @click="drawerOpen = !drawerOpen">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -557,6 +572,16 @@ useChatShortcuts({
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+/* Dashed edge round the whole chat while a file is over it; it never takes the pointer. */
+.main.file-drag::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  z-index: 8;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
 }
 .messages {
   flex: 1;

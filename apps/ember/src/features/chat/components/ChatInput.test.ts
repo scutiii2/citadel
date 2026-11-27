@@ -424,6 +424,23 @@ describe("dropping files anywhere on the composer", () => {
     expect(wrapper.find(".box").classes()).toContain("dragging");
   });
 
+  it("takes the drags the chat around it hands over", async () => {
+    const wrapper = mountInput();
+    const input = wrapper.vm as unknown as {
+      onFileDragOver(event: unknown): void; onFileDrop(event: unknown): void; fileDragging: boolean;
+    };
+    const dropped = file("notes.txt");
+    const event = (files: File[] = []) => ({ dataTransfer: drag(["Files"], files), preventDefault: () => undefined });
+
+    input.onFileDragOver(event());
+    expect(input.fileDragging).toBe(true);
+    input.onFileDrop(event([dropped]));
+    await flushPromises();
+
+    expect(input.fileDragging).toBe(false);
+    expect(upload).toHaveBeenCalledExactlyOnceWith(dropped);
+  });
+
   it("leaves dragged text alone", async () => {
     const wrapper = mountInput();
     const over = new Event("dragover", { bubbles: true, cancelable: true });

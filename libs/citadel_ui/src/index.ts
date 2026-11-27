@@ -21,6 +21,7 @@ export { default as StatusFilters } from "./components/admin/StatusFilters.vue";
 export { useDraftPanel } from "./composables/useDraftPanel";
 export { DEFAULT_THEME, THEME_LABELS, initTheme, useTheme, type Theme } from "./composables/useTheme";
 export { copyText } from "./utils/clipboard";
+export { installFileDropGuard } from "./utils/fileDrop";
 export { ADMIN_APPS, adminAppUrl, type AdminApp } from "./utils/siblings";
 export { default as ActionsScope } from "./components/ActionsScope.vue";
 export { PAGE_ACTIONS_KEY, useHeaderHelp } from "./composables/useHeaderHelp";
