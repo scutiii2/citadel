@@ -9,7 +9,19 @@ See [capability conventions](../README.md) for integration rules.
 All six tools accept exactly two public inputs. MCP injects progress context;
 callers never supply identity or a progress callback parameter.
 
-Results carry `structured_conditions` alongside readable conditions. Each fact
+### What a caller receives
+
+A model reads a result again on every later round, so a reply to an identified account leaves
+out empty fields and what only a continuation needs: `structured_conditions`, expression
+trees, `timings`, `resources`, `execution`, `engine` and `provenance`. Status,
+completeness, verification, values, readable conditions, certificates, diagnostics and a
+requested trace stay. A reply with something to reuse carries a `result_id` (each batch or
+table row has its own); Armory keeps the full result in memory under it for 30 minutes, bound
+to the account, at most 128 per account and 32 MB in all, oldest dropped first. A restart
+drops them. A caller with no account identity receives the full result. Progress
+notifications always carry full records.
+
+Full results carry `structured_conditions` alongside readable conditions. Each fact
 includes `source`, `predicate`, and `reusable`. Expression and predicate trees
 are allowlisted, bounded to depth 16 and 256 nodes per fact. Unsupported/private
 facts become opaque and cannot be used for continuation. `MathValue.expression`
@@ -19,17 +31,19 @@ such as `"1/3"` and `"sqrt(2)"`; symbolic names are forbidden in constant values
 Set `approximate: true` only for explicitly approximate source values. That flag
 propagates through calculations and subsequent continuations.
 
-Use `tool_math_continue` with the complete previous result:
+Use `tool_math_continue` with the previous result's `result_id`:
 
 ```json
 {
   "equation": "z=y+1",
-  "data": {"previous": "<previous SolveResult object>", "solution_index": 0, "bindings": []}
+  "data": {"previous": "r_Xw3kQ0pLm2Zs", "solution_index": 0, "bindings": []}
 }
 ```
 
-Replace the placeholder with the actual JSON object, or its JSON text, which is what a
-`{"$ref": "step_id"}` in Legion's `run_tools` passes. `solution_index` selects one
+`previous` also takes the earlier reply itself, as an object or its JSON text (what a
+`{"$ref": "step_id"}` in Legion's `run_tools` passes), or a complete full result. A
+shortened result with its `result_id` removed is refused, because continuing from it would
+drop restrictions. An expired or foreign id answers `invalid`. `solution_index` selects one
 solution family. Overrides can specialize its parameters but cannot change its
 selected root or remove original restrictions. For scalar results use
 `slot: "value"` and optional `value_name` (default `value`). Units are restored to

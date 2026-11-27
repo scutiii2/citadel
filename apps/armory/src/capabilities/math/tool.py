@@ -9,11 +9,12 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from src.capabilities.math import domain
-from src.capabilities.math.contract import (BatchResult, Binding, CalculusOptions, ContinuationInput,
-                                            MatrixOptions, RootEquation, SharedEquation, SolveResult,
-                                            TableFormulaInput)
+from src.capabilities.math.contract import (Binding, CalculusOptions, ContinuationInput, MatrixOptions,
+                                            RootEquation, SharedEquation, SolveResult, TableFormulaInput)
+from src.capabilities.math.utils.replies import replies
 from src.commands import command
 from src.server import mcp
+from src.services.identity_context import current_uid
 
 
 @command(name="solve", description="Calculate an expression or solve recursive equation constraints")
@@ -41,7 +42,7 @@ async def tool_math_solve(
         ),
         max_length=64,
     )],
-) -> SolveResult:
+) -> dict[str, Any]:
     """Evaluate arithmetic or solve equations over complex numbers, preserving all
     solution branches and free parameters. Supported syntax: + - * / ^ **,
     parentheses, sin/cos/tan, inverse/hyperbolic variants, exp/log/sqrt/abs,
@@ -50,9 +51,11 @@ async def tool_math_solve(
     search, and calculation trace. Verification describes candidate checks;
     completeness separately states whether additional solutions may exist.
     Parametric results retain conditions; unresolved or timeout results do not
-    establish absence of solutions. No input is executed as code or stored.
+    establish absence of solutions. No input is executed as code. Replies leave
+    out empty fields and internal evidence, and carry a result_id (kept 30
+    minutes) that tool_math_continue accepts.
     """
-    return await domain.desk.solve(equation, data)
+    return replies.reply(await domain.desk.solve(equation, data), current_uid())
 
 
 @command(name="batch", description="Evaluate the same formula over independent records")
@@ -68,7 +71,7 @@ async def tool_math_batch(
         "Each record has its own recursive data bindings; id is optional. Errors stay local and order is preserved."
     ))],
     ctx: Context,
-) -> BatchResult:
+) -> dict[str, Any]:
     """Evaluate a formula or system for up to 32 records with two active workers.
     Return each record's solutions, verification, and diagnostics. Mathematical
     inconsistency is a valid per-record answer. A 60-second batch deadline and
@@ -76,28 +79,32 @@ async def tool_math_batch(
     """
     async def progress(event):
         await ctx.report_progress(event.completed, event.total, event.model_dump_json())
-    return await domain.desk.batch(equation, data, progress=progress)
+    return replies.reply(await domain.desk.batch(equation, data, progress=progress), current_uid())
 
 
 @command(name="continue", description="Continue from one prior result with its conditions and units")
 @mcp.tool(meta={"keywords": ["math", "continue", "previous", "result", "reuse", "substitute", "equation"],
                 "display_label": "Continuing from a result"},
           annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
-async def tool_math_continue(equation: SharedEquation, data: ContinuationInput) -> SolveResult:
-    """Reuse a selected prior solution or scalar value. Pass previous result in
-    data.previous, select solution_index or slot:value and optional value_name.
+async def tool_math_continue(equation: SharedEquation, data: ContinuationInput) -> dict[str, Any]:
+    """Reuse a selected prior solution or scalar value. Pass the earlier result's
+    result_id in data.previous, select solution_index or slot:value and optional value_name.
     Extra bindings resolve parameters without dropping original restrictions.
     Approximate reuse needs allow_approximate:true and remains partial.
     Opaque conditions cannot be safely reused; supply original problem instead.
     """
-    return await domain.desk.continue_from(equation, data)
+    owner = current_uid()
+    restored = replies.restore(data, owner)
+    if isinstance(restored, SolveResult):
+        return replies.reply(restored, owner)
+    return replies.reply(await domain.desk.continue_from(equation, restored), owner)
 
 
 @command(name="table", description="Apply a formula to an owned attached table page")
 @mcp.tool(meta={"keywords": ["math", "table", "formula", "columns", "rows", "csv", "calculate"],
                 "display_label": "Calculating table rows"},
           annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
-async def tool_math_table(equation: SharedEquation, data: TableFormulaInput, ctx: Context) -> BatchResult:
+async def tool_math_table(equation: SharedEquation, data: TableFormulaInput, ctx: Context) -> dict[str, Any]:
     """Map variables to exact numeric column names from an attached table_id.
     data includes columns, shared bindings, offset, and limit (1–32). Set
     data.total=true to also get the exact sum of the page's row values in
@@ -111,7 +118,8 @@ async def tool_math_table(equation: SharedEquation, data: TableFormulaInput, ctx
 
     async def progress(event):
         await ctx.report_progress(event.completed, event.total, event.model_dump_json())
-    return await domain.desk.table(equation, data, registry=tables.registry, owner=current_username(), progress=progress)
+    result = await domain.desk.table(equation, data, registry=tables.registry, owner=current_username(), progress=progress)
+    return replies.reply(result, current_uid())
 
 
 @command(name="matrix", description="Compute exact bounded matrix operations")
@@ -121,21 +129,21 @@ async def tool_math_table(equation: SharedEquation, data: TableFormulaInput, ctx
 async def tool_math_matrix(
     operation: Literal["add", "subtract", "multiply", "transpose", "determinant", "inverse", "rank", "rref", "solve"],
     data: MatrixOptions,
-) -> SolveResult:
+) -> dict[str, Any]:
     """Calculate with one or two matrices, each at most 8 by 8. Entries are
     finite numbers or restricted numeric constant expressions. data also accepts
     precision and syntax:math/latex. solve interprets matrices as [A,b] for Ax=b.
     Structural operations require exact algebraic entries. Singular systems may
     be inconsistent or parametric; no inverse is returned for singular matrices.
     """
-    return await domain.desk.matrix(operation, data)
+    return replies.reply(await domain.desk.matrix(operation, data), current_uid())
 
 
 @command(name="calculus", description="Differentiate, integrate or take a limit with domain evidence")
 @mcp.tool(meta={"keywords": ["math", "calculus", "derivative", "differentiate", "integral", "integrate", "limit"],
                 "display_label": "Working the calculus"},
           annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
-async def tool_math_calculus(expression: str, data: CalculusOptions) -> SolveResult:
+async def tool_math_calculus(expression: str, data: CalculusOptions) -> dict[str, Any]:
     """Differentiate (order 1–8), integrate or take a limit of restricted scalar
     expressions. data includes operation, variable, domain, precision, optional
     finite real integration bounds, and syntax:math/latex. A limit needs point
@@ -145,4 +153,4 @@ async def tool_math_calculus(expression: str, data: CalculusOptions) -> SolveRes
     Definite integrals require proven closed-interval continuity; improper
     integrals unsupported.
     """
-    return await domain.desk.calculus(expression, data)
+    return replies.reply(await domain.desk.calculus(expression, data), current_uid())

@@ -19,7 +19,7 @@
     ]},
     {"name": "continue", "tool": "tool_math_continue", "params": [
       {"name": "equation", "required": true, "default": null, "description": "Next equation string or structured controls."},
-      {"name": "data", "required": true, "default": null, "description": "previous result object; solution_index or slot:value/value_name; optional bindings. Approximate reuse requires allow_approximate:true. Opaque facts cannot be reused."}
+      {"name": "data", "required": true, "default": null, "description": "previous: the earlier result_id (or a complete result object); solution_index or slot:value/value_name; optional bindings. Approximate reuse requires allow_approximate:true. Opaque facts cannot be reused."}
     ]},
     {"name": "table", "tool": "tool_math_table", "params": [
       {"name": "equation", "required": true, "default": null, "description": "Shared equation string or structured controls."},

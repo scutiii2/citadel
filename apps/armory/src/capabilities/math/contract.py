@@ -384,10 +384,21 @@ class CalculusRequest(InputModel):
     data: CalculusOptions
 
 
+RESULT_ID_PREFIX = "r_"
+
+
+class ResultRef(InputModel):
+    """An earlier result named by the id Armory kept it under."""
+
+    result_id: Annotated[str, Field(min_length=3, max_length=64)]
+
+
 class ContinuationInput(InputModel):
     # Validated in full, but described in one line: its whole schema would be sent to the model on every round.
-    previous: Annotated[SolveResult, WithJsonSchema(
-        {"type": "object", "description": "A complete earlier math result object, passed back unchanged."})]
+    previous: Annotated[ResultRef | SolveResult, WithJsonSchema({
+        "anyOf": [{"type": "string"}, {"type": "object"}],
+        "description": "The earlier math result's result_id (r_...), or a complete result object.",
+    })]
     solution_index: StrictInt = Field(default=0, ge=0, le=255)
     slot: Literal["solution", "value"] = "solution"
     value_name: Name = "value"
@@ -396,9 +407,20 @@ class ContinuationInput(InputModel):
 
     @field_validator("previous", mode="before")
     @classmethod
-    def read_json_text(cls, value):
-        """Legion's run_tools hands an earlier step's result over as JSON text; unreadable text fails validation."""
-        return json.loads(value) if isinstance(value, str) else value
+    def read_previous(cls, value):
+        """A result id, a result carrying one, or a complete result. Legion's run_tools hands an earlier step's
+        result over as JSON text; unreadable text fails validation."""
+        if isinstance(value, str):
+            if value.strip().startswith(RESULT_ID_PREFIX):
+                return ResultRef(result_id=value.strip())
+            value = json.loads(value)
+        if isinstance(value, dict):
+            if "result_id" in value:
+                return ResultRef(result_id=value["result_id"])
+            if "structured_conditions" not in value:
+                # A shortened result: continuing from it would silently drop the restrictions it left out.
+                raise ValueError("Pass the earlier result's result_id; this object is not a complete result.")
+        return value
 
 
 class ContinuationRequest(InputModel):

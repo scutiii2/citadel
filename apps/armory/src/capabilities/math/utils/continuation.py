@@ -7,7 +7,8 @@ import json
 import sympy as sp
 from pydantic import ValidationError
 
-from src.capabilities.math.contract import ContinuationInput, EquationSpec, MAX_BATCH_INPUT_BYTES, SolveRequest
+from src.capabilities.math.contract import (ContinuationInput, EquationSpec, MAX_BATCH_INPUT_BYTES, ResultRef,
+                                            SolveRequest)
 from src.capabilities.math.utils.conditions import decode_expression, decode_predicate, encode_condition
 from src.capabilities.math.utils.parser import MathInputError, MathParser
 
@@ -22,6 +23,8 @@ def build_continuation(equation, data) -> SolveRequest:
     except (ValidationError, ValueError, TypeError, AttributeError, RecursionError) as error:
         raise MathInputError("Invalid bounded continuation input.") from error
     previous = spec.previous
+    if isinstance(previous, ResultRef):
+        raise MathInputError("The result_id was not resolved to a result.")
     if spec.slot == "value":
         if previous.value is None:
             raise MathInputError("Previous result has no scalar value to reuse.")
