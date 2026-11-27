@@ -6,7 +6,7 @@
     {"name": "tool_math_continue", "purpose": "Continue one selected prior solution/value while preserving units, domain facts, and approximation scope.", "connection": "Local bounded SymPy workers", "commands": ["continue"]},
     {"name": "tool_math_table", "purpose": "Apply a formula to a caller-owned numeric attached table page with progress.", "connection": "Existing table registry and bounded SymPy workers", "commands": ["table"]},
     {"name": "tool_math_matrix", "purpose": "Exact arithmetic, inverse, determinant, rank, reduction and solving for matrices up to 8 by 8.", "connection": "Local bounded SymPy workers", "commands": ["matrix"]},
-    {"name": "tool_math_calculus", "purpose": "Differentiate or integrate restricted expressions with domain and branch evidence.", "connection": "Local bounded SymPy workers", "commands": ["calculus"]}
+    {"name": "tool_math_calculus", "purpose": "Differentiate, integrate or take a limit of restricted expressions with domain and branch evidence.", "connection": "Local bounded SymPy workers", "commands": ["calculus"]}
   ],
   "commands": [
     {"name": "solve", "tool": "tool_math_solve", "params": [
@@ -31,7 +31,7 @@
     ]},
     {"name": "calculus", "tool": "tool_math_calculus", "params": [
       {"name": "expression", "required": true, "default": null, "description": "Restricted scalar expression, <=4096 characters."},
-      {"name": "data", "required": true, "default": null, "description": "operation differentiate/integrate, variable, optional derivative order1–8, domain real/complex, finite real integration bounds, precision15–100, syntax math/latex. Retain domain and branch conditions."}
+      {"name": "data", "required": true, "default": null, "description": "operation differentiate/integrate/limit, variable, optional derivative order1–8, domain real/complex, finite real integration bounds, limit point (constant, oo or -oo) and direction both/left/right, precision15–100, syntax math/latex. Retain domain and branch conditions."}
     ]}
   ],
   "workflow": [

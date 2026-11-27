@@ -131,7 +131,8 @@ class AdvancedCalculator:
             domain = continuous_domain(original, variable, sp.S.Reals) if self.options.domain == "real" else None
             if domain is not None and domain != sp.S.Reals:
                 conditions.append(encode_condition(domain.as_relational(variable), "domain"))
-        except (NotImplementedError, ValueError, TypeError):
+        except (NotImplementedError, ValueError, TypeError, AttributeError):
+            # AttributeError: a periodic domain, such as tan's, has no relational form in SymPy.
             domain_known = False
             conditions.append(encode_condition(sp.Contains(original, sp.S.Reals, evaluate=False), "domain"))
         if domain is sp.S.EmptySet or (self.options.domain == "real" and expression.is_real is False):
@@ -140,6 +141,8 @@ class AdvancedCalculator:
             if original.has(sp.Abs, sp.asin, sp.acos, sp.atan):
                 return SolveResult(status="unresolved", message="Complex calculus for absolute values and inverse trigonometric branches is unsupported.")
             self._complex_branches(original, variable, conditions)
+        if self.options.operation == "limit":
+            return self._limit(original, expression, variable, domain, conditions)
         bounds = self.options.bounds
         if bounds is not None:
             lower, upper = (self.constant(bound) for bound in bounds)
@@ -174,7 +177,7 @@ class AdvancedCalculator:
                     if output_domain != sp.S.Reals:
                         conditions.append(encode_condition(output_domain.as_relational(variable), "domain"))
                         conditional = True
-                except (NotImplementedError, TypeError, ValueError):
+                except (NotImplementedError, TypeError, ValueError, AttributeError):
                     conditional = True
                     conditions.append(encode_condition(sp.Contains(output, sp.S.Reals, evaluate=False), "domain"))
             else:
@@ -197,6 +200,44 @@ class AdvancedCalculator:
             result.integration_constant = name
             result.message += f" Add arbitrary constant {name} on each connected domain component."
         return result
+
+    def _limit(self, original, expression, variable, domain, conditions):
+        """A real limit at a finite point or at infinity; both sides must agree unless one side is asked for."""
+        def unresolved(message):
+            return SolveResult(status="unresolved", structured_conditions=conditions,
+                               conditions=[record.text for record in conditions], message=message)
+
+        if expression.free_symbols - {variable}:
+            return unresolved("A limit needs all other parameters resolved.")
+        text = str(self.options.point).strip()
+        if text in ("oo", "-oo"):
+            point = sp.oo if text == "oo" else -sp.oo
+            # (side name, SymPy direction, a sample point inside that approach)
+            sides = [("towards " + text, "-" if text == "oo" else "+", sp.Integer(1000 if text == "oo" else -1000))]
+        else:
+            point = self.constant(self.options.point)
+            if point.is_real is not True:
+                raise MathInputError("A limit point must be a finite real constant, oo or -oo.")
+            step = sp.Rational(1, 10**30)
+            sides = [(name, sign, probe) for name, sign, probe in
+                     (("from the left", "-", point - step), ("from the right", "+", point + step))
+                     if self.options.direction in ("both", "left" if sign == "-" else "right")]
+        values = []
+        for name, sign, probe in sides:
+            outside = domain is not None and domain.contains(probe) is sp.S.false
+            # Numeric evaluation: an exact substitution can build huge powers, as (1+x)**(1/x) does.
+            if outside or original.evalf(30, subs={variable: probe}).has(sp.I):
+                return unresolved(f"The expression is not real {name}; ask for the side where it is defined.")
+            found = sp.limit(expression, variable, point, sign)
+            if found.has(sp.Limit, sp.AccumBounds, sp.nan, sp.zoo, sp.I):
+                return unresolved(f"No single real limit {name}: it does not exist or could not be determined.")
+            values.append(sp.simplify(found))
+        if len(values) == 2 and values[0] != values[1] and sp.simplify(values[0] - values[1]) != 0:
+            return unresolved(f"The two-sided limit does not exist: from the left {values[0]}, from the right {values[1]}.")
+        return SolveResult(status="unique", completeness="complete", value=self.value(values[-1]),
+                           structured_conditions=conditions, conditions=[record.text for record in conditions],
+                           verification=Verification(status="unverified"),
+                           message="Limit computed symbolically; it was not checked by an independent method.")
 
     @staticmethod
     def _complex_branches(expression, variable, conditions):

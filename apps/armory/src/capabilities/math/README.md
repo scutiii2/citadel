@@ -78,9 +78,23 @@ use `matrix`; rank/reduction include `rank` and `pivots`.
 {"operation":"solve", "data":{"matrices":[[[2,0],[0,4]],[[1],[1]]],"precision":30}}
 ```
 
-`tool_math_calculus(expression, data)` accepts `operation` (`differentiate` or
-`integrate`), `variable`, `domain` (default real), `precision` (15–100), optional
-derivative `order` (1–8), and optional finite real integration `bounds`.
+`tool_math_calculus(expression, data)` accepts `operation` (`differentiate`,
+`integrate` or `limit`), `variable`, `domain` (default real), `precision`
+(15–100), optional derivative `order` (1–8), and optional finite real integration
+`bounds`.
+
+A limit needs `point`, a real constant, `"oo"` or `"-oo"`, and takes `direction`
+`both` (default), `left` or `right` at a finite point. It works in the real domain
+with no parameter other than `variable`. It is unresolved when the two sides
+differ, when no single real value exists, or when the expression is not real on
+the side approached. An infinite limit is returned as `oo` or `-oo`. SymPy
+computes the value and nothing checks it independently, so verification is
+`unverified`.
+
+```json
+{"expression":"(1 - cos(x))/x^2", "data":{"operation":"limit","variable":"x","point":0}}
+```
+
 Indefinite integrals return a primitive in `value` and `integration_constant`;
 add that arbitrary constant on each connected valid domain component. Candidate
 primitives are verified by differentiation. Original denominator restrictions
@@ -155,7 +169,7 @@ if __name__ == "__main__":
 | `tool_math_continue` | Reuse one selected prior solution with exact values, units, and structured restrictions. | Local isolated SymPy workers |
 | `tool_math_table` | Apply a formula to a caller-owned attached table page. | Existing table registry and math workers |
 | `tool_math_matrix` | Exact bounded matrix arithmetic, reduction, inversion, and linear solving. | Local isolated SymPy workers |
-| `tool_math_calculus` | Differentiate or integrate with domain and branch evidence. | Local isolated SymPy workers |
+| `tool_math_calculus` | Differentiate, integrate or take a limit with domain and branch evidence. | Local isolated SymPy workers |
 
 ## Slash commands
 

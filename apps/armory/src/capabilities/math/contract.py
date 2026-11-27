@@ -6,6 +6,7 @@ import json
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field_validator, model_validator
+from pydantic.json_schema import WithJsonSchema
 
 MAX_INPUT_BYTES = 65_536
 MAX_OUTPUT_BYTES = 262_144
@@ -337,10 +338,12 @@ class MatrixRequest(InputModel):
 
 
 class CalculusOptions(InputModel):
-    operation: Literal["differentiate", "integrate"]
+    operation: Literal["differentiate", "integrate", "limit"]
     variable: Name
     order: StrictInt = Field(default=1, ge=1, le=8)
     bounds: tuple[Seed, Seed] | None = None
+    point: Seed | None = Field(default=None, description="limit only: the value approached, a real constant, oo or -oo.")
+    direction: Literal["both", "left", "right"] = Field(default="both", description="limit only: the side of a finite point.")
     domain: Literal["real", "complex"] = "real"
     precision: StrictInt = Field(default=15, ge=15, le=100)
     syntax: Literal["math", "latex"] = "math"
@@ -349,8 +352,14 @@ class CalculusOptions(InputModel):
     def validate_operation(self):
         if self.variable in RESERVED:
             raise ValueError("Calculus variable must not be reserved.")
-        if self.operation == "differentiate" and self.bounds is not None:
-            raise ValueError("Derivative does not accept integration bounds.")
+        if self.operation != "integrate" and self.bounds is not None:
+            raise ValueError("Only integration accepts bounds.")
+        if (self.operation == "limit") != (self.point is not None):
+            raise ValueError("A limit needs a point; no other operation accepts one.")
+        if self.operation == "limit" and (self.domain != "real" or self.order != 1):
+            raise ValueError("A limit needs the real domain and order one.")
+        if self.operation != "limit" and self.direction != "both":
+            raise ValueError("Only a limit accepts a direction.")
         if self.operation == "integrate" and self.order != 1:
             raise ValueError("Integration order must be one.")
         if self.bounds is not None and self.domain != "real":
@@ -365,7 +374,9 @@ class CalculusRequest(InputModel):
 
 
 class ContinuationInput(InputModel):
-    previous: SolveResult
+    # Validated in full, but described in one line: its whole schema would be sent to the model on every round.
+    previous: Annotated[SolveResult, WithJsonSchema(
+        {"type": "object", "description": "A complete earlier math result object, passed back unchanged."})]
     solution_index: StrictInt = Field(default=0, ge=0, le=255)
     slot: Literal["solution", "value"] = "solution"
     value_name: Name = "value"

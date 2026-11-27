@@ -122,13 +122,16 @@ async def tool_math_matrix(
     return await domain.desk.matrix(operation, data)
 
 
-@command(name="calculus", description="Differentiate or integrate with domain evidence")
+@command(name="calculus", description="Differentiate, integrate or take a limit with domain evidence")
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
 async def tool_math_calculus(expression: str, data: CalculusOptions) -> SolveResult:
-    """Differentiate (order 1–8) or integrate restricted scalar expressions.
-    data includes operation, variable, domain, precision, optional finite real
-    bounds, and syntax:math/latex. Indefinite integrals return primitive plus
-    integration_constant; retain domain/branch conditions. Definite integrals
-    require proven closed-interval continuity; improper integrals unsupported.
+    """Differentiate (order 1–8), integrate or take a limit of restricted scalar
+    expressions. data includes operation, variable, domain, precision, optional
+    finite real integration bounds, and syntax:math/latex. A limit needs point
+    (real constant, oo or -oo), takes direction both/left/right, and works in one
+    call even where repeated derivatives would not. Indefinite integrals return
+    primitive plus integration_constant; retain domain/branch conditions.
+    Definite integrals require proven closed-interval continuity; improper
+    integrals unsupported.
     """
     return await domain.desk.calculus(expression, data)
