@@ -33,6 +33,8 @@ export default defineConfig({
     // color-scheme). Below these versions the CSS minifier rewrites them into
     // a prefers-color-scheme query, which the toggle can't override.
     cssTarget: ['chrome123', 'firefox120', 'safari17.5'],
+    // The content security policy has no data: source for fonts, so KaTeX's small ones must stay files.
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf)$/.test(file) ? false : undefined),
   },
   // `pnpm test`: unit tests sit beside their source as *.test.ts. jsdom gives
   // the stores and components a browser-like document and localStorage.

@@ -7,6 +7,44 @@ function render(text: string): HTMLElement {
   return host;
 }
 
+describe("renderMarkdown math", () => {
+  it.each([
+    "\\[\n\\boxed{\\lim_{x\\to0}\\frac{\\tan(\\sin x)}{x^7}=\\frac1{30}}\n\\]",
+    "$$\na_1 * b_2 * |x|\n$$",
+    "so \\[ a_{1} \\] holds",
+  ])("typesets display math: %s", (source) => {
+    const host = render(source);
+
+    expect(host.querySelector(".math-block .katex-display")).not.toBeNull();
+    expect(host.querySelector("em, table, .katex-error")).toBeNull();
+    expect(host.querySelector("math semantics annotation")).not.toBeNull();
+  });
+
+  it("typesets inline math, in text and in a table", () => {
+    const host = render("at \\(x_1\\) and *then*\n\n| \\(x\\) |\n| --- |\n| \\(0.1\\) |");
+
+    expect(host.querySelectorAll(".katex")).toHaveLength(3);
+    expect(host.querySelector(".katex-display")).toBeNull();
+    expect(host.querySelector("em")?.textContent).toBe("then");
+  });
+
+  it.each(["costs $5 and $10", "`\\(x\\)`", "```\n\\[ x \\]\n```", "unfinished \\[ x + 1", "$$\nstill streaming"])(
+    "leaves this as text: %s", (source) => {
+      expect(render(source).querySelector(".katex")).toBeNull();
+    });
+
+  it("does not let a formula add links, images or oversized boxes", () => {
+    const host = render("\\(\\href{javascript:alert(1)}{x}\\) \\(\\includegraphics{https://example.com/a.png}\\) \\(\\rule{900em}{900em}\\)");
+
+    expect(host.querySelector("a, img")).toBeNull();
+    expect(host.innerHTML).not.toContain("900em;");
+  });
+
+  it("shows a broken formula instead of failing the reply", () => {
+    expect(render("before \\(\\frac{1}\\) after").textContent).toContain("after");
+  });
+});
+
 describe("renderMarkdown code blocks", () => {
   it("wraps each fenced block with a Copy button that survives sanitizing", () => {
     const host = render("```js\nconst a = 1;\n```\n\ntext\n\n```\nsecond\n```");

@@ -73,6 +73,17 @@ async function onClick(event: MouseEvent): Promise<void> {
   border-radius: var(--radius-md);
   background: var(--code-bg);
 }
+.markdown :deep(.math-block) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  /* KaTeX draws a little outside its line box; without this a vertical scrollbar appears. */
+  overflow-y: hidden;
+  padding: 0.25em 0;
+}
+.markdown :deep(.math-block .katex-display) {
+  margin: 0.25em 0;
+}
 .markdown :deep(code) {
   font-family: var(--mono);
   font-size: 0.9em;

@@ -1,9 +1,11 @@
 import DOMPurify from "dompurify";
 import MarkdownIt from "markdown-it";
+import "katex/dist/katex.min.css";
+import { markdownMath } from "./markdownMath";
 
 // html: false - raw HTML in a model reply is shown as text, never parsed.
 // DOMPurify below is the second guard, for anything markdown-it itself emits.
-const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
+const md = new MarkdownIt({ html: false, linkify: true, breaks: true }).use(markdownMath);
 
 // Links from a reply open in a new tab and can't reach back into this page.
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -21,5 +23,6 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) =>
 
 /** Markdown to sanitized HTML, safe to bind with v-html. */
 export function renderMarkdown(text: string): string {
-  return DOMPurify.sanitize(md.render(text), { ADD_ATTR: ["target"] });
+  // semantics and annotation carry KaTeX's MathML copy of a formula, which screen readers use.
+  return DOMPurify.sanitize(md.render(text), { ADD_ATTR: ["target", "encoding"], ADD_TAGS: ["semantics", "annotation"] });
 }
