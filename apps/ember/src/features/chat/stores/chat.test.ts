@@ -782,6 +782,18 @@ describe("askTriage (a typed question to the Triage Assistant)", () => {
     expect(client.append).not.toHaveBeenCalled();
   });
 
+  it("shows what was spent so the question could run", async () => {
+    const chat = await openChat(FOUR);
+    const notice = "A free 6-hour reset was used so this question could run.";
+    vi.mocked(triageClient.ask).mockResolvedValue({ kind: "yes_no", answer: "no", yes: 0.1, confidence: 0.9, uncertain: false, notice });
+    client.append.mockResolvedValue(undefined as never);
+
+    await chat.askTriage(FORM);
+    await flushPromises();
+
+    expect(chat.notices.map((n) => n.message)).toEqual([notice]);
+  });
+
   it("refuses a question while an answer is still coming", async () => {
     const chat = await openChat(FOUR);
     vi.mocked(triageClient.ask).mockReturnValue(new Promise(() => {}));

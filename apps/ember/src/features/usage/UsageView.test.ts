@@ -528,3 +528,12 @@ it("exports the loaded report period while a different period is pending or fail
   expect(download).toHaveBeenLastCalledWith(expect.stringContaining("usage-30d-"), expect.stringContaining("30 days"), "text/markdown");
   w.unmount();
 });
+
+it("shows the account's free resets under the limits", async () => {
+  mine.mockResolvedValue({ ...usage(), resets: [{ id: "r_1", kind: "weekly", granted_at: "2026-10-01T00:00:00", expires_at: null }], auto_use: false });
+
+  const wrapper = await mountView();
+
+  expect(wrapper.get(".resets").classes()).toContain("panel");
+  expect(wrapper.get(".resets").text()).toContain("Weekly reset");
+});

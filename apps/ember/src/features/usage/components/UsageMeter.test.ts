@@ -95,6 +95,35 @@ describe("UsageMeter", () => {
     expect((await setup()).wrapper.find("button").exists()).toBe(false);
   });
 
+  const withReset = (limit: number): MyUsage => ({
+    ...usage(window(5, limit), window(5, limit)),
+    resets: [{ id: "r_1", kind: "both", granted_at: "2026-11-01T00:00:00", expires_at: null }],
+    auto_use: false,
+  });
+
+  it("shows with a free reset even when no limit is set", async () => {
+    mine.mockResolvedValue(withReset(0));
+    const { wrapper } = await setup();
+
+    expect(button(wrapper).attributes("aria-label")).toBe("Usage limits: none set, free resets available");
+    await button(wrapper).trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get(".panel").text()).toContain("No limit is set.");
+    expect(wrapper.get(".panel").text()).toContain("6-hour and weekly reset");
+  });
+
+  it("leaves Escape to a dialog inside the panel", async () => {
+    mine.mockResolvedValue(withReset(100));
+    const { wrapper } = await setup();
+    await button(wrapper).trigger("click");
+    await flushPromises();
+
+    await wrapper.get("dialog").trigger("keydown", { key: "Escape" });
+
+    expect(wrapper.find(".panel").exists()).toBe(true);
+  });
+
   it("never shows one account the numbers of another", async () => {
     const { wrapper } = await setup();
     mine.mockReturnValue(new Promise(() => undefined));

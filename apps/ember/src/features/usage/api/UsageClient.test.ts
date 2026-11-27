@@ -42,6 +42,16 @@ describe("usageClient", () => {
     expect(request).toHaveBeenCalledExactlyOnceWith("GET", "/api/usage/records?days=7&since=2026-10-01&agent=calc&limit=100");
   });
 
+  it("spends a reset and sets the automatic switch", async () => {
+    await usageClient.spendReset("r_1");
+    await usageClient.setAutoReset(true);
+
+    expect(request.mock.calls).toEqual([
+      ["POST", "/api/usage/resets/r_1/use"],
+      ["PUT", "/api/usage/auto-reset", { enabled: true }],
+    ]);
+  });
+
   it("escapes what it puts in the address", async () => {
     await usageClient.mine(7, "2026-10-01&days=1");
 

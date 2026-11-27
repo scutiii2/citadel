@@ -22,6 +22,13 @@ describe("TurnNotices", () => {
     ]);
   });
 
+  it("shows a notice with its own text as it is", () => {
+    const message = "A free weekly reset was used so this question could run.";
+    const w = mount(TurnNotices, { props: { notices: [{ id: "usage-reset", label: "", error: "", message }] } });
+
+    expect(w.get("li").text()).toBe(message);
+  });
+
   it("emits dismiss", async () => {
     const w = mount(TurnNotices, { props: { notices: NOTICES } });
 

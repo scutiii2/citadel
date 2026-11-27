@@ -1,16 +1,19 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
-import { usageClient, type MyUsage } from "../api/UsageClient";
+import { usageClient } from "../api/UsageClient";
+import type { UsageOverview } from "../../../api/contracts/usage";
 import { useAuthStore } from "../../../stores/auth";
 import { formatUtc } from "../../../utils/time";
 import { usagePercent } from "../../../utils/analytics/usageFormat";
 
-/** The account's 6-hour and weekly token limits, read once for everything that shows them (the header's ring and
- * the chat list's gauges). A failed read keeps the old numbers; the Usage page is where errors belong. */
+/** The account's token limits, free resets and automatic switch, as the header's ring and the Usage page show them;
+ * the chat view reads them again when an answer ends. A failed read keeps the old numbers; the Usage page is where
+ * errors belong. */
 export const useUsageLimitsStore = defineStore("usageLimits", () => {
   const auth = useAuthStore();
-  const usage = ref<MyUsage | null>(null);
-  let seq = 0;
+  const usage = ref<UsageOverview | null>(null);
+  let seq = 0; // the newest read: an older answer is dropped
+  let epoch = 0; // the signed-in account
 
   async function load(): Promise<void> {
     const mine = (seq += 1);
@@ -22,9 +25,22 @@ export const useUsageLimitsStore = defineStore("usageLimits", () => {
     }
   }
 
+  /** Sends a change and shows what the server answers with. A refusal is thrown to the caller. */
+  async function change(request: () => Promise<UsageOverview>): Promise<void> {
+    const mine = epoch;
+    const result = await request();
+    if (mine !== epoch) return;
+    seq += 1; // a read still on its way may hold the numbers from before the change
+    usage.value = result;
+  }
+
+  const spend = (id: string) => change(() => usageClient.spendReset(id));
+  const setAutoUse = (enabled: boolean) => change(() => usageClient.setAutoReset(enabled));
+
   // Another account must never see these, nor a late answer for the one before.
   watch(() => auth.account?.id, () => {
     seq += 1;
+    epoch += 1;
     usage.value = null;
   }, { flush: "sync" });
 
@@ -40,7 +56,7 @@ export const useUsageLimitsStore = defineStore("usageLimits", () => {
       .map((entry) => ({ ...entry, percent: usagePercent(entry.window) }));
   });
 
-  return { windows, load };
+  return { usage, windows, load, spend, setAutoUse };
 });
 
 export type LimitWindow = ReturnType<typeof useUsageLimitsStore>["windows"][number];

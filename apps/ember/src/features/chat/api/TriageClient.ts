@@ -53,6 +53,8 @@ interface Common {
   resolved_by?: string;
   /** Every model call, in order; only when the question asked for a trace. */
   rounds?: TriageRound[];
+  /** Set when a free usage reset was spent so the question could run. */
+  notice?: string;
 }
 
 interface YesNoAnswer extends Common {

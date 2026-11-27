@@ -8,6 +8,8 @@ import ActionButton from "../../components/ui/buttons/ActionButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import LineChart from "../../components/analytics/LineChart.vue";
 import UsageCall from "./components/UsageCall.vue";
+import UsageResets from "./components/UsageResets.vue";
+import { useUsageLimitsStore } from "./stores/usageLimits";
 import UsageHeatmap from "../../components/analytics/UsageHeatmap.vue";
 import { useAuthStore } from "../../stores/auth";
 import { downloadText, exportFileName } from "../../utils/browser/textDownload";
@@ -18,6 +20,7 @@ import { formatCost, usagePercent as percent } from "../../utils/analytics/usage
 import { favoriteAgent, hourLabel, monthStart, peakHour, utcDay } from "./utils/usageStats";
 
 const auth = useAuthStore();
+const limits = useUsageLimitsStore();
 
 // "This month" runs from the 1st (UTC); the others are the last n days.
 const RANGES = [
@@ -188,6 +191,7 @@ watch([range, groupBy], load);
 onMounted(() => {
   void load();
   void loadYear();
+  if (auth.hasPermission("chat.use")) void limits.load(); // the resets section reads these
 });
 </script>
 
@@ -227,6 +231,8 @@ onMounted(() => {
             </div>
           </div>
         </div>
+
+        <UsageResets class="panel" @changed="load" />
 
         <div class="stats">
           <div class="stat"><strong>{{ tokens(usage.report.total_tokens) }}</strong><span>tokens</span></div>

@@ -16,6 +16,7 @@ const LIMITS: LimitField[] = [
   { key: "weekly_token_limit", label: "Tokens per account in a week", help: "0 = unlimited." },
   { key: "max_context_tokens_per_chat", label: "Longest chat context (tokens)", help: "A chat is summarized before it passes this. 0 = no cap." },
   { key: "auto_summarize_ratio", label: "Summarize at this share of the context (0 to 1)", step: "0.05" },
+  { key: "cached_token_weight", label: "Share of cached input counted toward limits (0 to 1)", help: "A model re-reads earlier text from its cache at a lower price. 0.1 counts a tenth of it, 1 counts all of it. Reports still show every token.", step: "0.05" },
 ];
 
 let nextKey = 0;

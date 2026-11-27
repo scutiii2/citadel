@@ -6,14 +6,17 @@ import { ApiError } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import { downloadText } from "../utils/downloadText";
 import UsageView from "./UsageView.vue";
+import { usageAllowanceClient } from "../api/UsageAllowanceClient";
+import AllowanceDrawer from "../components/usage/AllowanceDrawer.vue";
 
 vi.mock("../api/UsageClient", () => ({ usageClient: { allAccounts: vi.fn(), account: vi.fn(), records: vi.fn() } }));
+vi.mock("../api/UsageAllowanceClient", () => ({ usageAllowanceClient: { list: vi.fn(), grant: vi.fn(), clear: vi.fn(), boost: vi.fn(), removeReset: vi.fn(), removeBoost: vi.fn() } }));
 vi.mock("../utils/downloadText", () => ({ downloadText: vi.fn(), exportFileName: (s: string) => s + ".md" }));
 const api = vi.mocked(usageClient);
 const users = [
-  { account_id: 2, username: "alice", tokens: 123, turns: 1, last_used_at: null },
-  { account_id: 3, username: "bob", tokens: 456, turns: 2, last_used_at: null },
-  { account_id: 4, username: "empty", tokens: 0, turns: 0, last_used_at: null },
+  { account_id: 2, username: "alice", is_active: true, tokens: 123, turns: 1, last_used_at: null },
+  { account_id: 3, username: "bob", is_active: true, tokens: 456, turns: 2, last_used_at: null },
+  { account_id: 4, username: "empty", is_active: true, tokens: 0, turns: 0, last_used_at: null },
 ];
 const report = (tokens = 123): MyUsage => ({
   six_hour: { used: tokens, limit: 1000, reset_at: null }, weekly: { used: tokens, limit: 0, reset_at: null },
@@ -155,4 +158,33 @@ it("distinguishes summary errors from zero usage and supports retry", async () =
   await wrapper.get("button.summary-retry").trigger("click"); await flushPromises();
   await select("empty");
   expect(wrapper.get(".usage-details").text()).toContain("No usage in this period");
+});
+
+function asManager() {
+  useAuthStore().account = { id: 1, username: "root", email: "r@example.com", email_verified: true, roles: [], permissions: ["usage.all.view", "settings.manage"] };
+  vi.mocked(usageAllowanceClient.list).mockResolvedValue([]);
+}
+
+it("shows the allowance actions and section only to a settings manager", async () => {
+  await show(); await select("alice");
+  expect(wrapper.find('[aria-label="Send resets"]').exists()).toBe(false);
+  expect(usageAllowanceClient.list).not.toHaveBeenCalled();
+  wrapper.unmount();
+  asManager();
+  await show(); await select("alice");
+  for (const name of ["Send resets", "Reset usage", "Boost limits"]) expect(wrapper.find(`button[aria-label="${name}"]`).exists()).toBe(true);
+  expect(usageAllowanceClient.list).toHaveBeenCalledTimes(1);
+  expect(wrapper.text()).toContain("No unused resets.");
+});
+
+it("opens the chosen action and shows its result", async () => {
+  asManager();
+  await show();
+  await wrapper.get('button[aria-label="Reset usage"]').trigger("click");
+  const drawer = wrapper.getComponent(AllowanceDrawer);
+  expect(drawer.props("action")).toBe("clear");
+  drawer.vm.$emit("done", { kind: "ok", text: "Usage reset for 1 account." });
+  await flushPromises();
+  expect(drawer.props("action")).toBeNull();
+  expect(wrapper.text()).toContain("Usage reset for 1 account.");
 });

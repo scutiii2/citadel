@@ -135,7 +135,9 @@ async def ask(
     platform: PortcullisClient = Depends(get_platform),
 ) -> dict[str, Any]:
     """Asks the Triage Assistant one yes or no, multiple choice or score question about a text. Counts toward the usage limits."""
-    await _check(usage, who)
+    admitted = await usage.admit(who.uid)
+    if admitted.block is not None:
+        raise limit_reached(admitted.block)
     options = [Option(o.title.lower(), o.description) for o in body.options]
     try:
         outcome = await triage.ask(_caller(who), body.kind, body.text, body.question, options, body.trace, body.levels)
@@ -155,7 +157,7 @@ async def ask(
     picked = outcome.answer.get("answer") or outcome.answer.get("choice") or outcome.answer.get("score")
     flag = ", uncertain" if outcome.answer.get("uncertain") else ""
     await platform.log_action(who.uid, "triage.ask", f"Asked the Triage Assistant a {shape} question: {picked}{flag}")
-    return outcome.answer
+    return {**outcome.answer, "notice": admitted.notice} if admitted.notice else outcome.answer
 
 
 def _caller(who: Requester) -> Caller:

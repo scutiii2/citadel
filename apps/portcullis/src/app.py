@@ -64,6 +64,7 @@ from src.routes import (
     traffic as traffic_routes,
     triage,
     usage,
+    usage_allowances,
     user_extensions,
 )
 from src.services.agent_directory import AgentDirectory, HttpRegistrySource
@@ -269,6 +270,7 @@ def create_app(
     app.include_router(shares.router)
     app.include_router(shares.public_router)
     app.include_router(shares.page_router)
+    app.include_router(usage_allowances.router)
     app.include_router(usage.router)
     app.include_router(settings_routes.router)
     app.include_router(mcp.router)

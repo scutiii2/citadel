@@ -4,7 +4,7 @@ import { usageSettingsClient, type UsageSettings } from "../api/UsageSettingsCli
 import UsageSettingsView from "./UsageSettingsView.vue";
 
 const SETTINGS: UsageSettings = {
-  usage: { six_hour_token_limit: 1000000, weekly_token_limit: 5000000, max_context_tokens_per_chat: 150000, auto_summarize_ratio: 0.6 },
+  usage: { six_hour_token_limit: 1000000, weekly_token_limit: 5000000, max_context_tokens_per_chat: 150000, auto_summarize_ratio: 0.6, cached_token_weight: 0.1 },
   pricing: { currency: "USD", models: { sonnet: { input: 3, output: 15 } } },
   stored: { usage: false, pricing: true },
 };
@@ -36,7 +36,7 @@ describe("UsageSettingsView", () => {
     await wrapper.get('[data-test="save"]').trigger("click");
     await flushPromises();
     expect(send).toHaveBeenCalledWith({
-      usage: { six_hour_token_limit: 1000000, weekly_token_limit: 0, max_context_tokens_per_chat: 150000, auto_summarize_ratio: 0.6 },
+      usage: { six_hour_token_limit: 1000000, weekly_token_limit: 0, max_context_tokens_per_chat: 150000, auto_summarize_ratio: 0.6, cached_token_weight: 0.1 },
     });
     expect(wrapper.get('[data-test="notice"]').text()).toContain("next question");
     wrapper.unmount();
@@ -69,6 +69,17 @@ describe("UsageSettingsView", () => {
     expect(wrapper.get('[data-test="problem"]').text()).toContain("different");
     await rows[1].get('[data-test="price-remove"]').trigger("click");
     expect(wrapper.find('[data-test="problem"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("edits the share of cached input that counts", async () => {
+    const send = vi.spyOn(usageSettingsClient, "save").mockResolvedValue(SETTINGS);
+    const wrapper = await mounted();
+    expect(wrapper.text()).toContain("Share of cached input counted toward limits (0 to 1)");
+    await wrapper.get('[data-test="cached_token_weight"]').setValue("0.25");
+    await wrapper.get('[data-test="save"]').trigger("click");
+    await flushPromises();
+    expect(send.mock.calls[0]![0].usage?.cached_token_weight).toBe(0.25);
     wrapper.unmount();
   });
 

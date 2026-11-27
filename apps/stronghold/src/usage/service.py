@@ -10,13 +10,15 @@ from __future__ import annotations
 import asyncio
 import math
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from src.clock import utcnow
 from src.document_store import DocumentStore
 from src.schema.models import UsageRecordDoc, checked
+from src.usage.allowance import Allowance, NothingToReset, Reset, ResetNotFound
+from src.usage.allowances import AllowanceStore
 from src.usage.settings import Pricing, UsageSettings
 
 COLLECTION = "usage_records"
@@ -28,17 +30,49 @@ _DAYS_AT_ONCE = 16
 _PURGE_MAX_PAGES = 200
 
 
+LABELS = {"six_hour": "6-hour", "weekly": "weekly"}
+
+
 @dataclass(frozen=True)
 class LimitBlock:
     reason: str
     reset_at: datetime
+    resettable: bool = False  # an unused free reset could unblock the account
 
 
 @dataclass(frozen=True)
 class Window:
-    used: int
-    limit: int  # 0 = unlimited
+    used: int  # counted tokens
+    limit: int  # effective; 0 = unlimited
     reset_at: datetime | None
+    base_limit: int = 0
+    boost: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class Admission:
+    block: LimitBlock | None  # None: the question may go on
+    spend: tuple[Reset, ...] = ()  # automatic use is on and these would unblock it
+
+
+@dataclass(frozen=True)
+class Admitted:
+    block: LimitBlock | None
+    notice: str | None = None  # what was spent, to tell the user
+
+
+def counted_tokens(row: dict[str, Any], weight: float) -> int:
+    """A row's tokens as the limits count them: cached input only at `weight`."""
+    total = row["total_tokens"]
+    cached = min(row.get("cached_input_tokens") or 0, total)
+    return total - math.floor(cached * (1 - weight))
+
+
+def spent_notice(resets: tuple[Reset, ...]) -> str:
+    if len(resets) == 2:
+        return "Free 6-hour and weekly resets were used so this question could run."
+    word = "6-hour and weekly" if resets[0].kind == "both" else LABELS[resets[0].kind]
+    return f"A free {word} reset was used so this question could run."
 
 
 def period_start(days: int, since_date: date | None = None) -> tuple[datetime, int]:
@@ -63,6 +97,8 @@ class UsageService:
         self._store = store
         self._settings = settings
         self._pricing = pricing
+        self.allowances = AllowanceStore(store)
+        self._admitting: dict[str, asyncio.Lock] = {}
 
     async def record(self, owner: str, turn_id: str, kind: str, chat_id: str | None, rows: list[dict[str, Any]]) -> int:
         """Stores one row per agent call; returns the tokens recorded."""
@@ -96,30 +132,112 @@ class UsageService:
         kept = [doc for doc in docs if datetime.fromisoformat(doc["created_at"]) >= since]
         return sorted(kept, key=lambda doc: (doc["created_at"], doc["id"]))
 
-    @staticmethod
-    def _window(rows: list[dict[str, Any]], span: timedelta, limit: int) -> Window:
-        since = utcnow() - span
-        inside = [(datetime.fromisoformat(r["created_at"]), r["total_tokens"]) for r in rows]
-        inside = [(at, tokens) for at, tokens in inside if at >= since]
-        reset_at = min(at for at, _ in inside) + span if inside else None
-        return Window(used=sum(tokens for _, tokens in inside), limit=limit, reset_at=reset_at)
+    def _window(self, rows: list[dict[str, Any]], name: str, span: timedelta, base: int,
+                allowance: Allowance, now: datetime) -> Window:
+        since, cleared = now - span, allowance.cleared[name]
+        inside = [(datetime.fromisoformat(r["created_at"]), r) for r in rows]
+        inside = [(at, r) for at, r in inside if at >= since and (cleared is None or at > cleared)]
+        boost = allowance.boost(name, now) if base else None
+        return Window(
+            used=sum(counted_tokens(r, self._settings.cached_token_weight) for _, r in inside),
+            limit=allowance.limit(name, base, now),
+            reset_at=min(at for at, _ in inside) + span if inside else None,
+            base_limit=base,
+            boost={"percent": boost.percent, "ends_at": boost.ends_at} if boost else None,
+        )
 
-    async def windows(self, owner: str) -> dict[str, Window]:
-        rows = await self._rows(owner, utcnow() - WEEK)
+    async def windows(self, owner: str, allowance: Allowance | None = None) -> dict[str, Window]:
+        now = utcnow()
+        rows = await self._rows(owner, now - WEEK)
+        allowance = allowance or await self.allowances.read(owner)
         s = self._settings
         return {
-            "six_hour": self._window(rows, SIX_HOURS, s.six_hour_token_limit),
-            "weekly": self._window(rows, WEEK, s.weekly_token_limit),
+            "six_hour": self._window(rows, "six_hour", SIX_HOURS, s.six_hour_token_limit, allowance, now),
+            "weekly": self._window(rows, "weekly", WEEK, s.weekly_token_limit, allowance, now),
         }
 
+    async def overview(self, owner: str) -> dict[str, Any]:
+        """The windows, unused resets and switch, as the account's own page shows them."""
+        allowance = await self.allowances.read(owner)
+        windows = await self.windows(owner, allowance)
+        return {
+            **{name: asdict(window) for name, window in windows.items()},
+            "resets": [asdict(reset) for reset in allowance.live_resets(utcnow())],
+            "auto_use": allowance.auto_use,
+            "cached_token_weight": self._settings.cached_token_weight,
+        }
+
+    async def admission(self, owner: str) -> Admission:
+        """Whether a question may go on. The tighter 6-hour window is named first. Changes nothing."""
+        allowance = await self.allowances.read(owner)
+        windows = await self.windows(owner, allowance)
+        blocked = [name for name, w in windows.items() if w.limit and w.used >= w.limit and w.reset_at]
+        if not blocked:
+            return Admission(None)
+        plan = allowance.plan(blocked, utcnow())
+        block = LimitBlock(f"{LABELS[blocked[0]]} token limit reached", windows[blocked[0]].reset_at, bool(plan))
+        return Admission(block, plan if allowance.auto_use else ())
+
     async def check(self, owner: str) -> LimitBlock | None:
-        """The tighter 6-hour window first, then the weekly backstop."""
-        windows = await self.windows(owner)
-        for key, label in (("six_hour", "6-hour"), ("weekly", "weekly")):
-            window = windows[key]
-            if window.limit and window.used >= window.limit and window.reset_at:
-                return LimitBlock(reason=f"{label} token limit reached", reset_at=window.reset_at)
-        return None
+        return (await self.admission(owner)).block
+
+    async def admit(self, owner: str) -> Admitted:
+        """`admission`, spending the account's resets when it asked for that. Saved before the question goes on."""
+        async with self._admitting.setdefault(owner, asyncio.Lock()):
+            admission = await self.admission(owner)
+            if admission.block is None or not admission.spend:
+                return Admitted(admission.block)
+            now = utcnow()
+            try:
+                async with self.allowances.change(owner, now) as allowance:
+                    for reset in admission.spend:
+                        allowance.use(reset.id, now)
+            except ResetNotFound:  # removed or expired just now: nothing was saved
+                return Admitted((await self.admission(owner)).block)
+            return Admitted((await self.admission(owner)).block, spent_notice(admission.spend))
+
+    async def use_reset(self, owner: str, reset_id: str) -> None:
+        async with self._admitting.setdefault(owner, asyncio.Lock()):
+            now = utcnow()
+            async with self.allowances.change(owner, now) as allowance:
+                reset = allowance.find(reset_id, now)
+                windows = await self.windows(owner, allowance)
+                if not any(windows[name].used for name in reset.covers):
+                    raise NothingToReset()
+                allowance.use(reset_id, now)
+
+    async def set_auto_use(self, owner: str, enabled: bool) -> None:
+        async with self.allowances.change(owner, utcnow()) as allowance:
+            allowance.auto_use = enabled
+
+    async def grant(self, owner: str, kind: str, count: int, expires_at: datetime | None) -> None:
+        now = utcnow()
+        async with self.allowances.change(owner, now) as allowance:
+            allowance.grant(kind, count, expires_at, now)
+
+    async def clear(self, owner: str, windows: tuple[str, ...]) -> None:
+        now = utcnow()
+        async with self.allowances.change(owner, now) as allowance:
+            allowance.clear(windows, now)
+
+    async def boost(self, owner: str, windows: tuple[str, ...], percent: int, ends_at: datetime) -> None:
+        now = utcnow()
+        async with self.allowances.change(owner, now) as allowance:
+            allowance.add_boost(windows, percent, ends_at, now)
+
+    async def remove_reset(self, owner: str, reset_id: str) -> None:
+        async with self.allowances.change(owner, utcnow()) as allowance:
+            allowance.remove_reset(reset_id)
+
+    async def remove_boost(self, owner: str, boost_id: str) -> None:
+        async with self.allowances.change(owner, utcnow()) as allowance:
+            allowance.remove_boost(boost_id)
+
+    async def allowance_list(self) -> list[dict[str, Any]]:
+        now = utcnow()
+        return [{"uid": a.owner, "auto_use": a.auto_use,
+                 "resets": [asdict(r) for r in a.live_resets(now)], "boosts": [asdict(b) for b in a.live_boosts(now)]}
+                for a in await self.allowances.all()]
 
     @staticmethod
     def _filtered(rows: list[dict[str, Any]], agent: str | None, provider: str | None) -> list[dict[str, Any]]:
@@ -233,6 +351,7 @@ class UsageService:
 
     async def purge_owner(self, owner: str) -> int:
         """Delete every row of one account (used when the account is deleted). Returns the count."""
+        await self.allowances.delete(owner)
         removed = 0
         for _ in range(_PURGE_MAX_PAGES):
             docs = await self._store.query(COLLECTION, {"owner": owner}, limit=_PAGE)

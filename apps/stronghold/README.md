@@ -56,6 +56,10 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/skills/...` | Learned skills kept in Stronghold’s Brain. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
 | `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `stack`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
 
+Free resets, limit boosts and cached-token weighting: `src/usage/allowance.py` holds the rules and one
+`usage_allowances` document per account holds the state. Administrators use `/admin/usage-allowances` through
+Portcullis (`settings.manage`). A chat turn and a Triage Assistant question spend a reset when the account asked for it.
+
 ## Support tickets
 
 Stronghold records tickets, groups, and counters in Treasury collections `tickets`, `ticket_groups`, and `ticket_counters`. It serves reporter and staff routes at `/tickets` and `/ticket-admin`. Deleting an account removes its tickets and read receipts.

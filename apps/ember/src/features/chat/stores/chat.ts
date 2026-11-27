@@ -761,6 +761,7 @@ export const useChatStore = defineStore("chat", () => {
     if (busy.value || chatLoading.value || working.value) throw new Error("Wait for the current answer to finish.");
     if (active.value?.messagesLoaded === false) throw new Error("This chat did not load, so nothing can be added to it.");
     sendError.value = "";
+    notices.value = [];
     working.value = "Asking the Triage Assistant ...";
     const began = Date.now();
     clockStart.value = began;
@@ -776,6 +777,9 @@ export const useChatStore = defineStore("chat", () => {
           role: "assistant", kind: "triage", content: triageAnswerText(answer), duration_s: seconds, at: new Date().toISOString(),
         };
         conversation.messages.push(answered);
+        if (answer.notice && started === generation) {
+          notices.value = [{ id: "usage-reset", label: "", error: "", message: answer.notice }];
+        }
         conversation.updatedAt = Date.now();
         const { id, title } = conversation;
         enqueue(async () => {

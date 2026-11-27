@@ -83,7 +83,7 @@ function query(days: number, since: string | undefined, extra: Record<string, st
 }
 
 /** portcullis's usage routes. */
-export interface AccountUsage { account_id: number; username: string; tokens: number; turns: number; last_used_at: string | null; }
+export interface AccountUsage { account_id: number; username: string; is_active: boolean; tokens: number; turns: number; last_used_at: string | null; }
 export const usageClient = {
   allAccounts: (days: number, since?: string) => apiRequest<AccountUsage[]>("GET", `/api/admin/usage?${period(days, since)}`),
   account: (accountId: number, days: number, since?: string, options: UsageFilters & { groupBy?: UsageGroupBy } = {}) =>

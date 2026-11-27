@@ -12,7 +12,6 @@ import ChatRow from "./ChatRow.vue";
 import ChatSection from "./ChatSection.vue";
 import PopupMenu from "../../../components/ui/menus/PopupMenu.vue";
 import type { MenuPoint } from "../../../components/ui/menus/menuPoint";
-import UsageGauges from "./UsageGauges.vue";
 
 // locked: a turn is running - switching or starting chats is blocked.
 // query / searchActive / hits: the search box and, once it holds enough
@@ -25,7 +24,7 @@ const props = withDefaults(
     locked: boolean;
     /** The chat list is still being fetched. */
     loading?: boolean;
-    /** An answer is being written: the usage gauges refresh when it ends. */
+    /** An answer is being written. */
     busy?: boolean;
     query?: string;
     searchActive?: boolean;
@@ -552,7 +551,6 @@ watch(
         Delete all chats
       </button>
     </div>
-    <UsageGauges class="gauges-pinned" :busy="busy" />
     <ConfirmModal
       v-if="pendingDelete"
       open
@@ -583,21 +581,6 @@ watch(
 .top {
   display: flex;
   gap: 6px;
-}
-/* The token gauges stay at the bottom edge: pushed down when the list is short,
-   stuck there while a long list scrolls. The shadow fills the sidebar's bottom padding. */
-.gauges-pinned {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  margin-top: auto;
-  background: var(--surface);
-  box-shadow: 0 12px 0 var(--surface);
-}
-/* The footer already takes the free space; two auto margins would split it and strand the footer mid-sidebar. */
-.footer + .gauges-pinned,
-.select-bar + .gauges-pinned {
-  margin-top: 0;
 }
 .new-chat,
 .new-folder {

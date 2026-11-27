@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.schema.models import ChatDoc, ChatFolderDoc, ChatMessagesDoc, Doc, ShareDoc, UsageRecordDoc
+from src.schema.models import ChatDoc, ChatFolderDoc, ChatMessagesDoc, Doc, ShareDoc, UsageAllowanceDoc, UsageRecordDoc
 
 STATE = "schema_state"
 
@@ -28,6 +28,7 @@ CATALOG: tuple[Collection, ...] = (
     Collection("chat_folders", "chats", "<owner uid>:<folder id>", ChatFolderDoc, "/chats/accounts/{uid}"),
     Collection("shared_chats", "shares", "sha256 of the link token", ShareDoc, "/shares/accounts/{uid}"),
     Collection("usage_records", "usage", "<owner uid>:<random>", UsageRecordDoc, "/usage/accounts/{uid}"),
+    Collection("usage_allowances", "usage", "<owner uid>", UsageAllowanceDoc, "/usage/accounts/{uid}"),
     Collection("prompt_templates", "templates", "<owner uid>:<template id>", None, "/templates/accounts/{uid}"),
     Collection("account_agents", "agents", "<owner uid>", None, "/account-agents/accounts/{uid}"),
     Collection("user_extensions", "extensions", "<owner uid>:<slug>", None, "/user-extensions/accounts/{uid}"),

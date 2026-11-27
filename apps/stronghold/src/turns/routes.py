@@ -241,11 +241,11 @@ async def start_turn(
     if turns.is_running(who.uid, chat_id):
         raise _busy()
     try:
-        block = await usage.check(who.uid)
+        admission = await usage.admission(who.uid)
     except DbGatewayError as error:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Usage storage is unavailable") from error
-    if block is not None:
-        raise limit_reached(block)
+    if admission.block is not None and not admission.spend:
+        raise limit_reached(admission.block)
     trusted = body.trusted
 
     question = {"role": "user", "content": body.question, "at": message_time()}
@@ -266,6 +266,17 @@ async def start_turn(
     switched_off = await _switched_off_agents(request.app.state.store, directory, who)
     private_items, private_skipped = await _private_extensions(request, who)
     try:
+        turns.ensure_capacity(who.uid, chat_id)  # before spending: a reset is not used for a turn that cannot start
+        notices: tuple[dict[str, str], ...] = ()
+        if admission.block is not None:
+            try:
+                admitted = await usage.admit(who.uid)
+            except DbGatewayError as error:
+                raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Usage storage is unavailable") from error
+            if admitted.block is not None:
+                raise limit_reached(admitted.block)
+            if admitted.notice:
+                notices = ({"id": "usage-reset", "label": "", "error": "", "message": admitted.notice},)
         options = TurnOptions(
             limits=await _own_limits(request, who),
             caveman=body.caveman,
@@ -281,6 +292,7 @@ async def start_turn(
             can_elicit=body.can_elicit,
             private_extensions=private_items,
             private_skipped=private_skipped,
+            notices=notices,
         )
         turn = turns.start(who.uid, chat_id, agent, _caller(who), options)
     except TurnConflict as error:

@@ -73,6 +73,16 @@ class UsageRecordDoc(Doc):
     total_tokens: int | None = Field(default=None, ge=0)
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+
+
+class UsageAllowanceDoc(Doc):
+    """`usage_allowances`: one account's free resets, limit boosts, cleared times and automatic-use switch."""
+
+    resets: list[dict[str, Any]]
+    boosts: list[dict[str, Any]]
+    cleared: dict[str, str | None]
+    auto_use: bool
 
 
 def checked(model: type[Doc], doc: dict[str, Any]) -> dict[str, Any]:

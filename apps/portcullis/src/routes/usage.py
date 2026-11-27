@@ -45,6 +45,19 @@ async def my_usage_records(request: Request, account: Account = Depends(require_
     return await pass_on(request, stronghold, account, "/usage/records")
 
 
+@router.post("/api/usage/resets/{reset_id}/use")
+async def use_reset(request: Request, reset_id: str = Path(pattern=r"^r_[A-Za-z0-9]{1,40}$"),
+                    account: Account = Depends(require_chat),
+                    stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
+    return await pass_on(request, stronghold, account, f"/usage/resets/{reset_id}/use")
+
+
+@router.put("/api/usage/auto-reset")
+async def set_auto_reset(request: Request, account: Account = Depends(require_chat),
+                         stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
+    return await pass_on(request, stronghold, account, "/usage/auto-reset")
+
+
 @router.get("/api/admin/usage")
 async def all_usage(request: Request, admin: Account = Depends(require_admin),
                     stronghold: StrongholdForwarder = Depends(get_stronghold),
@@ -58,8 +71,9 @@ async def all_usage(request: Request, admin: Account = Depends(require_admin),
     rows = []
     for account in accounts:
         entry = totals.get(account.uid, {})
-        rows.append({"account_id": account.id, "username": account.username, "tokens": entry.get("tokens", 0),
-                     "turns": entry.get("turns", 0), "last_used_at": entry.get("last_used_at")})
+        rows.append({"account_id": account.id, "username": account.username, "is_active": account.is_active,
+                     "tokens": entry.get("tokens", 0), "turns": entry.get("turns", 0),
+                     "last_used_at": entry.get("last_used_at")})
     rows.sort(key=lambda row: (-row["tokens"], row["username"], row["account_id"]))
     return Response(json.dumps(rows), media_type="application/json")
 

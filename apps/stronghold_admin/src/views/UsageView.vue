@@ -10,6 +10,9 @@ import { StatTile } from "@citadel/ui";
 import { RecordDrawer } from "@citadel/ui";
 import SegmentedControl from "../components/SegmentedControl.vue";
 import UsageDetails from "../components/usage/UsageDetails.vue";
+import AccountAllowances from "../components/usage/AccountAllowances.vue";
+import AllowanceDrawer from "../components/usage/AllowanceDrawer.vue";
+import { ACTION_LABELS, type AllowanceAction, type AllowanceOutcome } from "../utils/allowance";
 import { useAuthStore } from "../stores/auth";
 import { downloadText, exportFileName } from "../utils/downloadText";
 import { errorMessage, formatUtc } from "../utils/errors";
@@ -18,6 +21,24 @@ import { monthStart, utcDay } from "../utils/usageStats";
 import "@citadel/ui/admin.css";
 
 const auth = useAuthStore();
+const canManage = computed(() => auth.hasPermission("settings.manage"));
+const ALLOWANCE_ACTIONS: { id: AllowanceAction; icon: string }[] = [
+  { id: "resets", icon: "M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z" },
+  { id: "clear", icon: "M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" },
+  { id: "boost", icon: "M13 2 3 14h9l-1 8 10-12h-9z" },
+];
+const action = ref<AllowanceAction | null>(null);
+const outcome = ref<AllowanceOutcome | null>(null);
+
+function openAction(next: AllowanceAction) {
+  outcome.value = null;
+  action.value = next;
+}
+
+function actionDone(result: AllowanceOutcome) {
+  action.value = null;
+  outcome.value = result;
+}
 const RANGES = [
   { value: "month", label: "This month", days: 30 },
   { value: "7d", label: "7 days", days: 7 },
@@ -161,6 +182,8 @@ watch(() => auth.account?.id, () => {
   ++summaryRequest;
   accounts.value = [];
   selected.value = null;
+  action.value = null;
+  outcome.value = null;
   clearDetail();
   summaryLoading.value = false;
   summaryError.value = "";
@@ -185,11 +208,18 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
           <PanelHelp title="Usage">
             <p>Review each user's token usage and account limits for the chosen period.</p>
             <p>Open a user to see their usage by agent, provider, gateway or model, and to export it as Markdown.</p>
+            <p v-if="canManage">Send free resets, reset usage or boost limits with the buttons here; open a user to remove their resets and boosts.</p>
           </PanelHelp>
+          <template v-if="canManage">
+            <button v-for="item in ALLOWANCE_ACTIONS" :key="item.id" type="button" class="admin-icon" :aria-label="ACTION_LABELS[item.id]" :title="ACTION_LABELS[item.id]" aria-haspopup="dialog" :disabled="!accounts.length" @click="openAction(item.id)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="item.icon" /></svg>
+            </button>
+          </template>
           <div class="ranges"><SegmentedControl v-model="range" :options="RANGES" label="Period" aria-label="Period" /></div>
           <AdminSearch ref="searchField" v-model="search" label="Search users" />
         </div>
       </header>
+      <ActionMessage v-if="outcome" :kind="outcome.kind" :text="outcome.text" class="admin-panel-text" />
       <ActionMessage v-if="summaryError" kind="error" :text="`Could not load user usage: ${summaryError}`" class="admin-panel-text"><button type="button" class="chip summary-retry" @click="loadSummary">Retry</button></ActionMessage>
       <p v-else-if="summaryLoading" class="admin-panel-text muted" role="status">Loading user usage…</p>
       <p v-else-if="accounts.length === 0" class="admin-panel-text muted">No accounts.</p>
@@ -220,10 +250,12 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 19h16" /></svg>
         </button>
       </div>
+      <AccountAllowances v-if="canManage && selected" :key="selected.account_id" :account-id="selected.account_id" :username="selected.username" @changed="loadDetails" />
       <p v-if="detailLoading" class="muted" role="status">Loading usage for {{ selected?.username }}…</p>
       <ActionMessage v-else-if="detailError" kind="error" :text="`Could not load usage for ${selected?.username}: ${detailError}`"><button type="button" class="chip detail-retry" @click="loadDetails">Retry</button></ActionMessage>
       <UsageDetails v-if="loaded" :username="loaded.username" :usage="loaded.usage" :year="year" :records="records" :records-failed="recordsFailed" :year-failed="yearFailed" :loading="detailLoading" :group-by="groupBy" @group="groupBy = $event" />
     </RecordDrawer>
+    <AllowanceDrawer v-if="canManage" :action="action" :accounts="accounts" :fallback-focus="() => searchField?.focus()" @close="action = null" @done="actionDone" />
   </PageLayout>
 </template>
 

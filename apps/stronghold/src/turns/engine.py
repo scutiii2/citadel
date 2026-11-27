@@ -114,6 +114,8 @@ class TurnOptions:
     private_extensions: tuple[dict[str, Any], ...] = field(default=(), repr=False)
     # Enabled ones left out because their headers cannot be read: {id, label, error}.
     private_skipped: tuple[dict[str, str], ...] = ()
+    # Other things to tell the user before the answer: {id, label, error, message}.
+    notices: tuple[dict[str, str], ...] = ()
 
 
 def _iso(value: Any) -> str | None:
@@ -354,15 +356,19 @@ class TurnRegistry:
 
     # --- control -------------------------------------------------------------
 
+    def ensure_capacity(self, owner: str, chat_id: str) -> None:
+        """Raises when a turn for this chat could not start now."""
+        if self.is_running(owner, chat_id):
+            raise TurnConflict(chat_id)
+        if len(self.running_chat_ids(owner)) >= self._max_running:
+            raise TooManyTurns(owner)
+
     def start(
         self, owner: str, chat_id: str, agent: AgentEntry, caller: Caller, options: TurnOptions | None = None
     ) -> Turn:
         """Starts answering the chat's last message (the caller saved the
         question first). Returns at once; the work runs as a task."""
-        if self.is_running(owner, chat_id):
-            raise TurnConflict(chat_id)
-        if len(self.running_chat_ids(owner)) >= self._max_running:
-            raise TooManyTurns(owner)
+        self.ensure_capacity(owner, chat_id)
         turn = Turn(owner=owner, chat_id=chat_id, agent=agent, caller=caller, options=options or TurnOptions(),
                     requester_token=current_requester_token() or caller.requester_token)
         self._turns[(owner, chat_id)] = turn
@@ -623,8 +629,9 @@ class TurnRegistry:
             ):
                 await self._publish(turn, _clamped(event))
 
-        if turn.options.private_skipped:
-            await self._publish(turn, {"type": "notice", "notices": [dict(n) for n in turn.options.private_skipped]})
+        notices = [*turn.options.private_skipped, *turn.options.notices]
+        if notices:
+            await self._publish(turn, {"type": "notice", "notices": [dict(n) for n in notices]})
         await self._compact_stack(turn)
         if turn.cancel_requested:
             await self._finish(turn, "⏹️ Cancelled.", status="cancelled", error=None, cancelled=True)

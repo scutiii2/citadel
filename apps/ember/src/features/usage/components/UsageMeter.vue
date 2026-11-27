@@ -5,6 +5,7 @@ import { computed, onMounted, ref, useId, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { ProgressRing } from "@citadel/ui";
 import { resetText, useUsageLimitsStore } from "../stores/usageLimits";
+import UsageResets from "./UsageResets.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { useOutsideClose } from "../../../composables/useOutsideClose";
 
@@ -24,7 +25,9 @@ const panelId = useId();
 
 const percent = computed(() => Math.max(0, ...store.windows.map((w) => w.percent)));
 const almost = computed(() => percent.value >= ALMOST);
+const hasResets = computed(() => (store.usage?.resets?.length ?? 0) > 0);
 const label = computed(() => {
+  if (!store.windows.length) return "Usage limits: none set, free resets available";
   const parts = store.windows.map((w) => `${w.title.toLowerCase()} ${w.percent}%`);
   return `Usage limits: ${parts.join(", ")}${almost.value ? ", almost used up" : ""}`;
 });
@@ -37,6 +40,14 @@ function toggle(): void {
 function close(refocus = false): void {
   open.value = false;
   if (refocus) trigger.value?.focus();
+}
+
+/** Escape closes the panel, except from a question inside it, which answers the key itself. */
+function onEscape(event: KeyboardEvent): void {
+  if ((event.target as Element).closest("dialog")) return;
+  event.preventDefault();
+  event.stopPropagation();
+  close(true);
 }
 
 onMounted(() => void store.load());
@@ -52,7 +63,7 @@ useOutsideClose(root, open, () => close());
 </script>
 
 <template>
-  <div v-if="store.windows.length" ref="root" class="usage-meter" @keydown.esc.stop.prevent="close(true)">
+  <div v-if="store.windows.length || hasResets" ref="root" class="usage-meter" @keydown.esc="onEscape">
     <button
       ref="trigger"
       type="button"
@@ -76,7 +87,8 @@ useOutsideClose(root, open, () => close());
         <p class="note">{{ w.window.used.toLocaleString() }} of {{ w.window.limit.toLocaleString() }} tokens</p>
         <p v-if="resetText(w)" class="note">{{ resetText(w) }}</p>
       </div>
-      <p class="note">An administrator sets these limits.</p>
+      <p class="note">{{ store.windows.length ? "An administrator sets these limits." : "No limit is set." }}</p>
+      <UsageResets />
       <RouterLink v-if="detailsLink" to="/usage" class="details" @click="close()">Usage details</RouterLink>
     </section>
   </div>
@@ -108,7 +120,9 @@ useOutsideClose(root, open, () => close());
   right: 0;
   display: grid;
   gap: 10px;
-  width: 260px;
+  width: 280px;
+  max-height: calc(100dvh - 72px);
+  overflow-y: auto;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -118,6 +132,13 @@ useOutsideClose(root, open, () => close());
 h2 {
   margin: 0;
   font-size: 0.88rem;
+}
+.panel :deep(.resets) {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.panel :deep(.resets h3) {
+  font-size: 0.85rem;
 }
 .head {
   display: flex;

@@ -29,6 +29,7 @@ import { useChatRoute } from "../composables/useChatRoute";
 import { useChatShortcuts } from "../composables/useChatShortcuts";
 import { useFolderCollapse } from "../composables/useFolderCollapse";
 import { useQuestionRetry } from "../composables/useQuestionRetry";
+import { useUsageLimitsStore } from "../../usage/stores/usageLimits";
 import { useSidebarCollapse } from "../composables/useSidebarCollapse";
 import { agentLabelFor } from "../utils/agentLabels";
 import { builtinCommand, type BuiltinCommand } from "../utils/builtinCommands";
@@ -135,6 +136,12 @@ const formCommand = ref<CommandInfo | null>(null);
 const formSchema = ref<JsonSchema | null>(null);
 const input = ref<InstanceType<typeof ChatInput> | null>(null);
 const triageOpen = ref(false);
+// An answer that ends has used tokens: read the limits again, for the header's ring.
+const usageLimits = useUsageLimitsStore();
+// A Triage Assistant question uses tokens too, and may have spent a free reset.
+watch(() => busy.value || !!working.value, (running) => {
+  if (!running) void usageLimits.load();
+});
 const retry = useQuestionRetry({ activeId, messages }, () => input.value);
 
 function startRetry(index: number): void {

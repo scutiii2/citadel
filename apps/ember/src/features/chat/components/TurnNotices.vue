@@ -9,7 +9,8 @@ defineEmits<{ dismiss: [] }>();
   <div v-if="notices.length" class="notices" role="status">
     <ul>
       <li v-for="n in notices" :key="n.id">
-        <strong>{{ n.label }}</strong> wasn't used in this answer: {{ n.error }}
+        <template v-if="n.message">{{ n.message }}</template>
+        <template v-else><strong>{{ n.label }}</strong> wasn't used in this answer: {{ n.error }}</template>
       </li>
     </ul>
     <button type="button" @click="$emit('dismiss')">Dismiss</button>

@@ -6,6 +6,7 @@ export interface UsageLimits {
   weekly_token_limit: number;
   max_context_tokens_per_chat: number;
   auto_summarize_ratio: number;
+  cached_token_weight: number;
 }
 
 export interface ModelPrices {

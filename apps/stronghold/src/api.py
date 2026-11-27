@@ -21,6 +21,7 @@ from src.extensions.probe import ExtensionProbe
 from src.agents.gateway import AgentGateway, McpAgentGateway
 from src.attachments import routes as attachments_routes
 from src.usage import settings_routes as usage_settings_routes
+from src.usage import allowance_routes as usage_allowance_routes
 from src.attachments.services import ArmoryUploads
 from src.bard import routes as bard_routes
 from src import ready
@@ -237,6 +238,7 @@ def create_app(
     app.include_router(shares_routes.router)
     app.include_router(tickets_routes.router)
     app.include_router(usage_settings_routes.router)
+    app.include_router(usage_allowance_routes.router)
     app.include_router(tickets_routes.admin_router)
     app.include_router(triage_routes.router)
     app.include_router(turns_routes.router)

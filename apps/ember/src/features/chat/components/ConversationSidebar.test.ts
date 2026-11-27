@@ -1,10 +1,8 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatSearchHit } from "../api/ChatsClient";
 import type { ChatFolder } from "../api/FoldersClient";
 import type { Conversation } from "../../../api/types";
-import { usageClient } from "../../usage/api/UsageClient";
 import { ConfirmModal } from "@citadel/ui";
 import ConversationSidebar from "./ConversationSidebar.vue";
 
@@ -17,11 +15,6 @@ beforeAll(() => {
     this.removeAttribute("open");
   };
 });
-
-// The gauges at the bottom read the account usage; not under test here.
-vi.mock("../../usage/api/UsageClient", () => ({ usageClient: { mine: vi.fn(() => new Promise(() => {})) } }));
-
-const mine = vi.mocked(usageClient.mine);
 
 const chat = (id: string, title = `Chat ${id}`): Conversation => ({
   id,
@@ -56,8 +49,6 @@ function mountSidebar(props: Partial<Props> = {}) {
   return wrapper;
 }
 
-beforeEach(() => setActivePinia(createPinia()));
-
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
   document.body.innerHTML = "";
@@ -79,17 +70,6 @@ const menuButton = (wrapper: ReturnType<typeof mountSidebar>, index = 0) => wrap
 const menuItem = (label: string) =>
   [...document.body.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find((b) => b.textContent?.includes(label));
 const openMenu = () => document.body.querySelector('[role="menu"]');
-
-it("keeps the token gauges as the last thing in the sidebar, pinned to the bottom", async () => {
-  const window = { used: 1, limit: 10, reset_at: null };
-  mine.mockResolvedValueOnce({ six_hour: window, weekly: window } as never);
-  const wrapper = mountSidebar();
-  await flushPromises();
-
-  const gauges = wrapper.get(".gauges-pinned");
-  expect(gauges.classes()).toContain("gauges");
-  expect(wrapper.get("aside.sidebar").element.lastElementChild).toBe(gauges.element);
-});
 
 describe("the search box", () => {
   it("shows once there are chats, and reports what is typed", async () => {
@@ -421,16 +401,6 @@ describe("select mode", () => {
     await bar(wrapper).findAll("button").at(-1)!.trigger("click"); // Cancel
 
     expect(wrapper.find("input.rename").exists()).toBe(false);
-  });
-
-  it("tells the usage gauges when an answer ends", async () => {
-    mine.mockClear();
-    const wrapper = mountSidebar({ busy: true });
-    expect(mine).toHaveBeenCalledOnce();
-
-    await wrapper.setProps({ busy: false });
-
-    expect(mine).toHaveBeenCalledTimes(2);
   });
 
   it("shows the running dot beside the box", async () => {

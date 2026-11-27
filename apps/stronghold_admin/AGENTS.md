@@ -2,7 +2,7 @@
 
 Project note: `Brain/Projects/stronghold_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder), once it exists.
 
-Vue 3 + TypeScript admin app for Stronghold. All API calls go through Portcullis. Pages: Overview (counts and shortcuts), Usage, Analytics, Tickets, Usage settings (token limits and pricing, `/api/admin/stronghold-usage-settings`), Brain settings (memory and sharing limits, `/api/admin/stronghold-brain-settings`) and Tool services.
+Vue 3 + TypeScript admin app for Stronghold. All API calls go through Portcullis. Pages: Overview (counts and shortcuts), Usage (with `settings.manage`: free resets, usage reset and limit boosts), Analytics, Tickets, Usage settings (token limits and pricing, `/api/admin/stronghold-usage-settings`), Brain settings (memory and sharing limits, `/api/admin/stronghold-brain-settings`) and Tool services.
 
 ## Rules
 - Shared UI lives in `libs/citadel_ui` (`@citadel/ui`, a pnpm workspace package): PageLayout, ToggleSwitch, BaseModal, ConfirmModal, ThemeSelect, AdminSearch, RecordDrawer, StatusFilters, DraftActions, `useTheme`, base styles (`@citadel/ui/base.css`), `admin.css`. Fix it there once; every admin app picks it up on its next build. Keep app-specific code in the app. Run `pnpm install` at the Citadel root, not inside an app.

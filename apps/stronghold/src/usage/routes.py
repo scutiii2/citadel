@@ -11,10 +11,11 @@ from datetime import date, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from src.clock import utcnow
 from src.requester import Requester, current_requester
+from src.usage.allowance import NothingToReset, ResetNotFound
 from src.usage.service import MAX_REPORT_DAYS, UsageService
 
 router = APIRouter(prefix="/usage", tags=["usage"])
@@ -53,6 +54,7 @@ class UsageRow(BaseModel):
     model: str | None = Field(default=None, max_length=120)
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
     total_tokens: int = Field(gt=0)
     started_at: datetime | None = None
     finished_at: datetime | None = None
@@ -79,6 +81,32 @@ async def check(requester: Requester = Depends(current_requester), usage: UsageS
     return {"block": asdict(block) if block else None}
 
 
+class AutoReset(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: StrictBool
+
+
+@router.put("/auto-reset")
+async def set_auto_reset(body: AutoReset, requester: Requester = Depends(current_requester),
+                         usage: UsageService = Depends(get_usage)) -> dict[str, Any]:
+    await usage.set_auto_use(requester.uid, body.enabled)
+    return await usage.overview(requester.uid)
+
+
+@router.post("/resets/{reset_id}/use")
+async def use_reset(reset_id: Annotated[str, Path(pattern=r"^r_[A-Za-z0-9]{1,40}$")],
+                    requester: Requester = Depends(current_requester),
+                    usage: UsageService = Depends(get_usage)) -> dict[str, Any]:
+    try:
+        await usage.use_reset(requester.uid, reset_id)
+    except ResetNotFound as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
+    except NothingToReset as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+    return await usage.overview(requester.uid)
+
+
 @router.post("/records", status_code=status.HTTP_201_CREATED)
 async def record(body: RecordBody, requester: Requester = Depends(current_requester),
                  usage: UsageService = Depends(get_usage)) -> dict[str, int]:
@@ -93,10 +121,8 @@ async def my_usage(
     requester: Requester = Depends(current_requester), usage: UsageService = Depends(get_usage),
 ) -> dict[str, Any]:
     since = check_since(since)
-    windows = await usage.windows(requester.uid)
     return {
-        "six_hour": asdict(windows["six_hour"]),
-        "weekly": asdict(windows["weekly"]),
+        **await usage.overview(requester.uid),
         "report": await usage.report(requester.uid, days, since, group_by=group_by, agent=agent, provider=provider),
     }
 

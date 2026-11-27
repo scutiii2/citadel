@@ -1,5 +1,5 @@
 import { apiRequest } from "../../../api/http";
-import type { UsageWindow } from "../../../api/contracts/usage";
+import type { UsageOverview } from "../../../api/contracts/usage";
 
 export type UsageGroupBy = "agent" | "provider" | "gateway" | "model";
 
@@ -60,9 +60,7 @@ export interface UsageReport {
   groups: UsageGroup[];
 }
 
-export interface MyUsage {
-  six_hour: UsageWindow;
-  weekly: UsageWindow;
+export interface MyUsage extends UsageOverview {
   report: UsageReport;
 }
 
@@ -94,4 +92,7 @@ export const usageClient = {
       "GET",
       `/api/usage/records?${query(days, since, { agent: options.agent, provider: options.provider, limit: options.limit })}`,
     ),
+  /** Spends one free reset; answers with the new windows and resets. */
+  spendReset: (id: string) => apiRequest<UsageOverview>("POST", `/api/usage/resets/${encodeURIComponent(id)}/use`),
+  setAutoReset: (enabled: boolean) => apiRequest<UsageOverview>("PUT", "/api/usage/auto-reset", { enabled }),
 };

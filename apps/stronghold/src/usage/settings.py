@@ -20,6 +20,8 @@ class UsageSettings:
     # model's window, if smaller) a chat is summarized before the next question is sent.
     max_context_tokens_per_chat: int = 150_000
     auto_summarize_ratio: float = 0.6
+    # How much of a row's cached input counts toward the limits: a provider bills a cache read at about a tenth.
+    cached_token_weight: float = 0.1
 
     @classmethod
     def from_config(cls, raw: dict) -> UsageSettings:
@@ -35,7 +37,11 @@ class UsageSettings:
         ratio = raw.get("auto_summarize_ratio", cls.auto_summarize_ratio)
         if isinstance(ratio, bool) or not isinstance(ratio, (int, float)) or not 0 < ratio <= 1:
             raise ValueError("usage.auto_summarize_ratio must be above 0 and at most 1")
-        return cls(**limits, max_context_tokens_per_chat=context, auto_summarize_ratio=float(ratio))
+        weight = raw.get("cached_token_weight", cls.cached_token_weight)
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not 0 <= weight <= 1:
+            raise ValueError("usage.cached_token_weight must be 0 to 1")
+        return cls(**limits, max_context_tokens_per_chat=context, auto_summarize_ratio=float(ratio),
+                   cached_token_weight=float(weight))
 
 
 @dataclass(frozen=True)

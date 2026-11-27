@@ -161,11 +161,13 @@ export interface PendingElicitation {
   url?: string;
 }
 
-/** A private extension a turn could not use, and why. */
+/** Something to tell the user about a turn: a private extension it could not use and why, or a ready sentence. */
 export interface TurnNotice {
   id: string;
   label: string;
   error: string;
+  /** Shown as it is, instead of the extension sentence. */
+  message?: string;
 }
 
 /** Events of a turn ember_api runs, as its /events stream sends them. The
