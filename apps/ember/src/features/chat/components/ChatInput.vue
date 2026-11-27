@@ -513,7 +513,7 @@ function onKeydown(event: KeyboardEvent): void {
       Earlier question {{ recallIndex + 1 }} of {{ history.length }} · ↑ older · ↓ newer
     </p>
     <span :id="messageLabelId" class="message-label">Message</span>
-    <div :class="['box', { dragging, 'draft-locked': draftLocked }]">
+    <div :class="['box', { working: busy, dragging, 'draft-locked': draftLocked }]">
       <input ref="fileInput" type="file" multiple hidden @change="onPick" />
       <!-- Inside the box, above the text: what will be sent with it. -->
       <ul v-if="attachments.length" class="attachments">
@@ -783,11 +783,33 @@ button.dictation.ending { color: var(--danger); }
   padding: 10px 10px 8px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  --box-fill: var(--surface);
+  background: var(--box-fill);
 }
 .box:focus-within {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
+/* An answer is being written: the border takes the thinking bar's gradient and turns.
+ * The negative margin pays for the wider border, so nothing inside moves. */
+.box.working {
+  margin: -1px;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--box-fill), var(--box-fill)) padding-box,
+    conic-gradient(from var(--box-turn), var(--accent), var(--box-dim), var(--accent), var(--box-dim), var(--accent)) border-box;
+  --box-dim: color-mix(in srgb, var(--accent) 25%, var(--bg));
+  animation: box-turn 2.4s linear infinite;
+}
+/* Focus stays visible without hiding the turning border. */
+.box.working:focus-within {
+  outline: 1px solid var(--muted);
+}
+@property --box-turn {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes box-turn { to { --box-turn: 360deg; } }
 /* A file is being dragged over: dashed and tinted, so it reads as a drop target and not as focus. */
 .box.dragging {
   border-style: dashed;
@@ -957,7 +979,7 @@ textarea {
 }
 @media (max-width: 767px) {
   .composer { padding: 8px 12px; }
-  .box { padding: 8px; border-radius: var(--radius-lg); background: var(--bg); }
+  .box { padding: 8px; border-radius: var(--radius-lg); --box-fill: var(--bg); }
   textarea { padding: 6px 4px; }
   .tools { gap: 2px; margin-left: 0; }
   .toolbox { position: static; display: block; }

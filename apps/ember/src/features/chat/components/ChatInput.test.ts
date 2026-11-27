@@ -1316,3 +1316,8 @@ it("warns that requests are standalone only while independent prompts is on", as
   await wrapper.setProps({ independent: true });
   expect(wrapper.get(".independent-note").text()).toContain("does not include the earlier messages");
 });
+
+it("turns the message box border while an answer is written", () => {
+  expect(mountInput({ busy: true }).get(".box").classes()).toContain("working");
+  expect(mountInput().get(".box").classes()).not.toContain("working");
+});

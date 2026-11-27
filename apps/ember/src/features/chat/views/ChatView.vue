@@ -447,6 +447,7 @@ useChatShortcuts({
         :accuracy="contextAccuracy"
         @update:accuracy="chat.setContextAccuracy"
         :locked="busy || !!working"
+        :busy="busy"
         @export="exportActive"
         @share="shareOpen = true"
         @summarize="summarizeActive"

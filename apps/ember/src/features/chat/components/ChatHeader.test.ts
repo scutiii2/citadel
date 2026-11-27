@@ -225,3 +225,8 @@ it("does not offer public sharing without chat.share", () => {
   useAuthStore().account!.permissions = [];
   expect(iconButton(mountHeader(), "Share")).toBeUndefined();
 });
+
+it("runs the thinking bar along its bottom edge only while an answer is written", () => {
+  expect(mountHeader({ busy: true }).find(".thinking-bar").exists()).toBe(true);
+  expect(mountHeader().find(".thinking-bar").exists()).toBe(false);
+});

@@ -36,7 +36,6 @@ import ToolSteps from "./ToolSteps.vue";
 import UsageChip from "./UsageChip.vue";
 import WelcomeCard from "./WelcomeCard.vue";
 import { useMessageScroll } from "../composables/useMessageScroll";
-import ThinkingBar from "../../../components/ui/status/ThinkingBar.vue";
 
 const props = defineProps<{
   conversationId?: string | null;
@@ -264,7 +263,6 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
       <div v-if="busy" class="assistant live">
         <!-- First, so the wait is read above the answer it belongs to. -->
         <div class="progress">
-          <ThinkingBar v-if="!streaming" />
           <ElapsedTime v-if="since" :since="since" class="elapsed" />
           <span v-if="liveTokens && liveTokens.total > 0" class="elapsed live-tokens" data-test="live-tokens">
             {{ liveTokens.estimated ? "~" : "" }}{{ compactNumber(liveTokens.total) }} tokens
@@ -616,9 +614,16 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
 .live > .elapsed {
   justify-self: start;
 }
-/* The bar sits level with the round mark beside it. */
-.progress :deep(.thinking-bar) {
-  margin-top: 12px;
+/* The clock and the token count, level with the round mark beside them. */
+.progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 28px;
+}
+.progress > .elapsed {
+  margin-top: 0;
 }
 .progress:empty {
   display: none;

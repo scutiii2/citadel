@@ -8,6 +8,7 @@ import type { ContextAccuracy } from "../utils/contextAccuracy";
 import { useAuthStore } from "../../../stores/auth";
 import ActionButton from "../../../components/ui/buttons/ActionButton.vue";
 import ContextPanel from "./ContextPanel.vue";
+import ThinkingBar from "../../../components/ui/status/ThinkingBar.vue";
 import StackMenu from "./StackMenu.vue";
 import EntryAgentTag from "./EntryAgentTag.vue";
 import PopupMenu from "../../../components/ui/menus/PopupMenu.vue";
@@ -29,6 +30,8 @@ const props = defineProps<{
   /** How the next questions are counted; with it the panel shows an Estimate / Exact switch. */
   accuracy?: ContextAccuracy;
   locked: boolean;
+  /** An answer is being written: the bar along the header's bottom edge moves. */
+  busy?: boolean;
 }>();
 
 const emit = defineEmits<{ export: []; share: []; summarize: []; clear: []; "update:accuracy": [value: ContextAccuracy] }>();
@@ -159,6 +162,7 @@ function choose(id: string): void {
       </ActionButton>
     </template>
     <PopupMenu v-if="menuAt" :items="items" :x="menuAt.x" :y="menuAt.y" label="Chat actions" @select="choose" @close="closeMenu" />
+    <ThinkingBar v-if="busy" class="busy-bar" />
   </header>
 </template>
 
@@ -172,6 +176,16 @@ function choose(id: string): void {
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
+}
+/* Over the bottom border, out of the flow: appearing moves nothing. */
+.chat-header .busy-bar {
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  margin: 0;
 }
 .title {
   min-width: 0;
@@ -223,7 +237,7 @@ button.context[aria-expanded="true"] {
   height: 5px;
   overflow: hidden;
   border-radius: var(--radius-full);
-  background: var(--code-bg);
+  background: var(--border);
 }
 .meter i {
   display: block;
