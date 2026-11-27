@@ -83,7 +83,8 @@ Ember, Portcullis `POST /api/attachments/file`, Stronghold `POST /attachments/fi
 Portcullis and Stronghold allow a body large enough for 20 MB in base64 on this path. Permission stays `files.upload`.
 
 The reply has one shape: `file_id`, `filename`, `kind`, `size`, `pages` (optional), `expires_at`, `text`, `char_count`,
-`truncated`. Stronghold makes the text preview as it does now.
+`truncated`, and until Part 4 `table`. `file_id` and `expires_at` are null when the file could not be stored.
+Stronghold makes the text preview as it does now.
 
 Reference line:
 
@@ -100,7 +101,8 @@ Until parts 3 and 4: audio and "Read with OCR" keep their current routes, and fo
 `/upload/table` so the `table_id` line still appears.
 
 If the store is unavailable and the text is readable, the text is attached without a file id. An image or audio file shows
-an error.
+an error. When Armory refuses a file, a text, code, Word or spreadsheet file is still attached as text; a PDF, image or
+audio file shows the reason.
 
 The old Portcullis and Stronghold routes stay, so an older installed Ember keeps working.
 
@@ -140,7 +142,7 @@ refused.
 | Part | Test files |
 |---|---|
 | 1 | Armory: new `test_user_files.py`, `test_pdf_domain.py`, `test_pdf_routes.py`, `test_upload_pdf_route.py`. Legion: `test_images.py`. Portcullis: `test_capability_files.py` |
-| 2 | Armory: `test_upload_routes.py`. Stronghold: `test_attachments.py`. Portcullis: `test_attachment_pdf.py`, `test_attachments.py`. Legion: `test_images.py`, `test_delegation.py`. Ember: `ChatInput.test.ts`, `MessageList.test.ts`, `attachments.test.ts` |
+| 2 | Stronghold: `test_attachments.py`. Portcullis: `test_attachments.py`. Legion: `test_images.py`, `test_delegation.py`. Ember: `ChatInput.test.ts`, `MessageList.test.ts`, `attachments.test.ts` |
 | 3 | Stronghold: new `test_mcp_file_tools.py`, `test_tool_services_client.py`. Ember: `ChatInput.test.ts` |
 | 4 | Armory: `tests/tables`, `test_upload_table_route.py`, `tests/math/test_tool.py`. Ember: `ChatInput.test.ts` |
 
@@ -149,7 +151,7 @@ refused.
 | Part | Redeploy |
 |---|---|
 | 1 | Armory, Armory Admin, Portcullis, Legion |
-| 2 | Armory, Stronghold, Portcullis, Legion, Ember |
+| 2 | Stronghold, Portcullis, Legion, Ember |
 | 3 | Armory, Stronghold, Legion, Ember |
 | 4 | Armory, Stronghold, Legion, Ember |
 
