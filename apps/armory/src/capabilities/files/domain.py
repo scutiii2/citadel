@@ -21,7 +21,7 @@ class FilesDesk:
 
     def _entry(self, files, file) -> FileEntry:
         return FileEntry(file_id=file.file_id, name=untrusted.fence(file.name, source="file name"), kind=file.kind,
-                         pages=file.pages, size=file.size, expires_at=file.expires_at,
+                         pages=file.pages, size=file.size, expires_at=file.expires_at, kept=bool(file.holders),
                          download_url=files.download_url(file))
 
     def _run(self, action):

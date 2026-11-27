@@ -7,12 +7,14 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import re
 import secrets
 import shutil
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Collection
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 WORK_DIR_NAME = "_work"
 DATA_NAME_RE = re.compile(r"f_[0-9a-f]{32}")
+
+# Said by every store when an account's cap would be passed.
+FULL_MESSAGE = "Your files would use more than {mb} MB. Delete old chats or files to free space."
 
 
 def new_file_id() -> str:
@@ -46,6 +51,8 @@ class SessionFileStore:
         self._clock = clock
         self._index: dict[str, Any] = {}
         self._reserved: dict[str, int] = {}
+        # Holds and hand deletion rewrite or remove the same sidecar.
+        self._holding = asyncio.Lock()
 
     # --- errors, one per capability ---------------------------------------
 
@@ -87,6 +94,7 @@ class SessionFileStore:
             for meta in self._root.glob("*/f_*.json"):
                 try:
                     file = self.file_class(**json.loads(meta.read_text("utf-8")))
+                    file = replace(file, holders=tuple(file.holders))  # JSON has no tuples
                 except (OSError, ValueError, TypeError):
                     logger.warning("Skipping unreadable sidecar %s", meta)
                     continue
@@ -129,20 +137,72 @@ class SessionFileStore:
     def _valid_id(self, file_id: str) -> bool:
         return True
 
+    def _live(self, file: Any) -> bool:
+        """A file a chat holds never expires."""
+        return bool(file.holders) or file.expires_at > self._clock()
+
+    def _view(self, file: Any) -> Any:
+        """What callers see: a held file always shows a full lifetime ahead, so a reader that hides expired files
+        keeps showing it."""
+        return replace(file, expires_at=self._clock() + self._ttl) if file.holders else file
+
     def get(self, file_id: str, session: str | None) -> Any:
-        """The file, if it exists, has not expired, and ``session`` may see it (None = any)."""
+        """The file, if it is live and ``session`` may see it (None = any)."""
         file = self._index.get(file_id)
-        if not self._valid_id(file_id) or file is None or file.expires_at <= self._clock() or (session is not None and file.session != session):
+        if not self._valid_id(file_id) or file is None or not self._live(file) or (session is not None and file.session != session):
             raise self._not_found(file_id)
-        return file
+        return self._view(file)
 
     def list(self, session: str) -> list[Any]:
-        now = self._clock()
-        files = [f for f in self._index.values() if f.session == session and f.expires_at > now]
+        files = [self._view(f) for f in self._index.values() if f.session == session and self._live(f)]
         return sorted(files, key=lambda f: f.created_at)
 
     def session_usage(self, session: str) -> int:
         return sum(f.size for f in self.list(session))
+
+    # --- chat holds --------------------------------------------------------
+
+    async def hold(self, session: str, chat_id: str, file_ids: Collection[str]) -> list[str]:
+        """`chat_id` keeps those of `session`'s live files; other ids are ignored. Returns the ids held."""
+        held = []
+        async with self._holding:
+            for file_id in file_ids:
+                file = self._index.get(file_id)
+                if file is None or file.session != session or not self._live(file):
+                    continue
+                if chat_id not in file.holders:
+                    await self._save_holders(file, {*file.holders, chat_id})
+                held.append(file_id)
+        return held
+
+    async def release(self, session: str, chat_ids: Collection[str] | None) -> int:
+        """Drops the holds of `chat_ids` (None: of every chat) and deletes the files no chat holds any more.
+        Returns how many were deleted. Safe to repeat."""
+        removed = 0
+        async with self._holding:
+            for file in [f for f in self._index.values() if f.session == session and f.holders]:
+                kept = set() if chat_ids is None else set(file.holders) - set(chat_ids)
+                if len(kept) == len(file.holders):
+                    continue
+                if kept:
+                    await self._save_holders(file, kept)
+                elif await self._remove(file):
+                    removed += 1
+                else:
+                    raise self._delete_failed()
+        return removed
+
+    async def _save_holders(self, file: Any, chat_ids: set[str]) -> None:
+        updated = replace(file, holders=tuple(sorted(chat_ids)))
+        meta = self._meta_path(file)
+
+        def write() -> None:
+            part = meta.with_name(meta.name + ".part")
+            part.write_text(json.dumps(asdict(updated)), "utf-8")
+            os.replace(part, meta)
+
+        await asyncio.to_thread(write)
+        self._index[file.file_id] = updated
 
     # --- removal -----------------------------------------------------------
 
@@ -162,14 +222,14 @@ class SessionFileStore:
         return True
 
     async def delete(self, file_id: str, session: str | None) -> None:
-        if not await self._remove(self.get(file_id, session)):
-            raise self._delete_failed()
+        async with self._holding:
+            if not await self._remove(self.get(file_id, session)):
+                raise self._delete_failed()
 
     async def sweep(self) -> int:
-        """Delete every expired file. Returns how many were removed."""
-        now = self._clock()
+        """Delete every expired file no chat holds. Returns how many were removed."""
         removed = 0
-        for file in [f for f in self._index.values() if f.expires_at <= now]:
+        for file in [f for f in self._index.values() if not self._live(f)]:
             if await self._remove(file):
                 removed += 1
         return removed

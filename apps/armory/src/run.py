@@ -62,6 +62,7 @@ async def _serve() -> None:
         from src.environment_routes import install_environment_routes
         from src.file_routes import install_file_routes
         from src.help_routes import install_help_routes
+        from src.holds_routes import install_holds_routes
         from src.upload_routes import install_upload_routes
 
         enabled_capabilities = [
@@ -101,6 +102,8 @@ async def _serve() -> None:
         install_upload_routes(app)
         # Where Portcullis previews a stored file and a signed link downloads one. See file_routes.py.
         install_file_routes(app)
+        # Where Stronghold says which files its chats keep. See holds_routes.py.
+        install_holds_routes(app)
         # Where a caller fetches a file a tool offered it (via portcullis); a plain route checked against
         # service assertions and signed requester identity. See download_routes.py.
         install_download_routes(app)

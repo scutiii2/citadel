@@ -45,11 +45,13 @@ class FileInfo(BaseModel):
     pages: int
     size: int
     expires_at: float
+    kept: bool = False  # held by a chat, so it does not expire while that chat exists
 
     @classmethod
     def of(cls, file: StoredFile) -> FileInfo:
         return cls(
-            file_id=file.file_id, name=file.name, kind=file.kind, pages=file.pages, size=file.size, expires_at=file.expires_at
+            file_id=file.file_id, name=file.name, kind=file.kind, pages=file.pages, size=file.size, expires_at=file.expires_at,
+            kept=bool(file.holders),
         )
 
 

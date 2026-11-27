@@ -31,3 +31,7 @@ tool makes. Files belong to the signed-in account; the internal token never gran
 
 The capability ID is `files`. Restart Armory, refresh capabilities, and switch Files online. Uploads do not need this
 capability: `POST /upload/file` is a core route. Switching the capability off removes these tools and image viewing.
+
+Chats keep files. Stronghold calls `POST /holds` and `POST /holds/release` (core routes, Stronghold only); a held file
+never expires and is deleted when the last chat holding it is removed. The same holds apply to media downloads. A
+listing marks a held file `kept`. Held files count toward the account's size cap.

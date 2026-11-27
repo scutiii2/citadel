@@ -36,6 +36,7 @@ class FileInfo(BaseModel):
     size: int
     duration: float | None = None
     expires_at: float
+    kept: bool = False  # held by a chat, so it does not expire while that chat exists
     download_url: str
 
     @classmethod
@@ -48,6 +49,7 @@ class FileInfo(BaseModel):
             size=stored.size,
             duration=stored.duration,
             expires_at=stored.expires_at,
+            kept=bool(stored.holders),
             download_url=download_url,
         )
 

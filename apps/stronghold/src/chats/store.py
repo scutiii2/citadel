@@ -11,15 +11,19 @@ nothing is deleted, so a deleted chat never keeps a working link.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import secrets
 import uuid
+from collections.abc import Awaitable
 from datetime import UTC, datetime
 from typing import Any
 
+from src.chats.file_holds import ChatFileHolds
+from src.chats.file_refs import file_ids
 from src.clock import utcnow
 from src.schema.models import ChatDoc, ChatFolderDoc, ChatMessagesDoc, checked
-from src.document_store import DocumentStore
+from src.document_store import DbGatewayError, DocumentStore
 from src.shares.store import ShareStore
 
 CHATS = "chats"
@@ -40,6 +44,9 @@ MAX_HITS = 50
 # Characters of context kept before and after the match in a snippet.
 SNIPPET_BEFORE = 40
 SNIPPET_AFTER = 90
+
+logger = logging.getLogger(__name__)
+
 # A question's attached files travel inside its text; their bodies are not what someone
 # remembers typing, so they are left out of the search.
 _ATTACHMENT = re.compile(r"\[\[ATTACHMENT [^\]]*\]\]\n[\s\S]*?\n\[\[/ATTACHMENT\]\]")
@@ -128,9 +135,10 @@ def _match(details: dict[str, Any], messages: list[ChatMessage], pattern: re.Pat
 
 
 class ChatStore:
-    def __init__(self, store: DocumentStore, shares: ShareStore) -> None:
+    def __init__(self, store: DocumentStore, shares: ShareStore, holds: ChatFileHolds | None = None) -> None:
         self._store = store
         self._shares = shares
+        self._holds = holds
 
     # --- reading ---------------------------------------------------------------------------
 
@@ -174,8 +182,24 @@ class ChatStore:
         if stack_tool_used:
             doc["stack_tool_used"] = True
         doc.update(title=title, agent_id=agent_id, message_count=len(messages), updated_at=now)
-        await self._save(doc, messages)
+        await self._save_messages(doc, messages)
         return {**_details(doc), "messages": messages}
+
+    async def _save_messages(self, doc: dict[str, Any], messages: list[ChatMessage]) -> None:
+        """Saves a transcript and queues the holds on the files it mentions."""
+        ids = file_ids(messages) if self._holds else []
+        if ids:
+            doc["holds_files"] = True  # so removing this chat releases them
+        await self._save(doc, messages)
+        if ids:
+            await self._queue(self._holds.hold(doc["owner"], doc["chat_id"], ids))
+
+    async def _queue(self, call: Awaitable[None]) -> None:
+        """A call that cannot be queued never fails the chat action."""
+        try:
+            await call
+        except DbGatewayError as error:
+            logger.warning("A chat file hold was not queued: %s", error)
 
     async def _save(self, doc: dict[str, Any], messages: list[ChatMessage] | None = None) -> None:
         if messages is not None:
@@ -193,7 +217,7 @@ class ChatStore:
         doc.update(message_count=len(messages), updated_at=_now())
         if agent_id is not None:
             doc["agent_id"] = agent_id
-        await self._save(doc, messages)
+        await self._save_messages(doc, messages)
         return {**_details(doc), "messages": messages}
 
     async def update(self, owner: str, chat_id: str, changes: dict[str, Any]) -> dict[str, Any]:
@@ -239,8 +263,11 @@ class ChatStore:
     async def _remove(self, owner: str, chat_ids: list[str]) -> None:
         await self._shares.revoke_chats(owner, chat_ids)  # first: if this fails nothing is deleted
         for chat_id in chat_ids:
+            doc = await self._store.get(CHATS, _key(owner, chat_id)) if self._holds else None
             await self._store.delete(MESSAGES, _key(owner, chat_id))
             await self._store.delete(CHATS, _key(owner, chat_id))
+            if doc is not None and doc.get("holds_files"):
+                await self._queue(self._holds.release(owner, chat_id))
 
     async def generation(self, owner: str, chat_id: str) -> str | None:
         doc = await self._store.get(CHATS, _key(owner, chat_id))
@@ -261,6 +288,7 @@ class ChatStore:
     async def purge_owner(self, owner: str) -> None:
         """Everything a deleted account kept: chats, transcripts and folders (its share links go with its
         shares purge)."""
+        held = self._holds is not None and any(d.get("holds_files") for d in await self._all(CHATS, owner))
         for collection in (MESSAGES, CHATS, FOLDERS):
             for _ in range(_PURGE_MAX_PAGES):
                 docs = await self._store.query(collection, {"owner": owner}, limit=_PAGE)
@@ -268,6 +296,8 @@ class ChatStore:
                     break
                 for doc in docs:
                     await self._store.delete(collection, doc["key"])
+        if held:
+            await self._queue(self._holds.release_account(owner))
 
     # --- search ----------------------------------------------------------------------------
 

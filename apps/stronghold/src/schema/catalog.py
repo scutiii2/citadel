@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.schema.models import ChatDoc, ChatFolderDoc, ChatMessagesDoc, Doc, ShareDoc, UsageAllowanceDoc, UsageRecordDoc
+from src.schema.models import ChatDoc, ChatFileHoldDoc, ChatFolderDoc, ChatMessagesDoc, Doc, ShareDoc, UsageAllowanceDoc, UsageRecordDoc
 
 STATE = "schema_state"
 
@@ -26,6 +26,8 @@ CATALOG: tuple[Collection, ...] = (
     Collection("chats", "chats", "<owner uid>:<chat id>", ChatDoc, "/chats/accounts/{uid}"),
     Collection("chat_messages", "chats", "<owner uid>:<chat id>", ChatMessagesDoc, "/chats/accounts/{uid}"),
     Collection("chat_folders", "chats", "<owner uid>:<folder id>", ChatFolderDoc, "/chats/accounts/{uid}"),
+    # The purge route puts one release here; it leaves when Armory accepts it.
+    Collection("chat_file_holds", "chats", "<owner uid>:<chat id or *>", ChatFileHoldDoc, "/chats/accounts/{uid}"),
     Collection("shared_chats", "shares", "sha256 of the link token", ShareDoc, "/shares/accounts/{uid}"),
     Collection("usage_records", "usage", "<owner uid>:<random>", UsageRecordDoc, "/usage/accounts/{uid}"),
     Collection("usage_allowances", "usage", "<owner uid>", UsageAllowanceDoc, "/usage/accounts/{uid}"),

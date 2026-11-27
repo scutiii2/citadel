@@ -21,6 +21,7 @@ from src.capabilities.media_downloader.utils.policy.url_policy import UrlPolicy
 from src.capabilities.media_downloader.utils.store.file_store import FileStore, StoredFile
 from src.capabilities.media_downloader.utils.store.names import mime_for, safe_filename
 from src.services.link_signing import LinkSigner
+from src.services.session_file_store import FULL_MESSAGE
 
 _STATE_BY_EVENT = {"queued": "queued", "progress": "downloading", "processing": "processing", "done": "done", "error": "error"}
 
@@ -114,7 +115,7 @@ class DownloadService:
             )
         if self._store.session_usage(session) + estimate > self._limits.max_session_bytes:
             raise DownloaderError(
-                ErrorCode.LIMIT_EXCEEDED, "Your files would use more space than allowed. Delete some files or wait for them to expire."
+                ErrorCode.LIMIT_EXCEEDED, FULL_MESSAGE.format(mb=self._limits.max_session_bytes // (1024 * 1024))
             )
 
     async def _run_download(self, session: str, url: str, preset: Preset, emit: Emit, cancel: threading.Event) -> dict:

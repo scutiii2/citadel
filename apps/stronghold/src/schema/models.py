@@ -8,7 +8,7 @@ because older documents must keep reading; fields named here are the ones code r
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -47,6 +47,15 @@ class ChatFolderDoc(Doc):
     name: str = Field(min_length=1, max_length=60)
     position: int = Field(ge=0)
     created_at: str
+
+
+class ChatFileHoldDoc(Doc):
+    """`chat_file_holds`: a call to Armory still to be sent."""
+
+    chat_id: str | None
+    op: Literal["hold", "release", "release_all"]
+    file_ids: list[str]
+    version: str = Field(min_length=1)
 
 
 class ShareDoc(Doc):

@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from src.services.file_errors import ErrorCode, FileError
-from src.services.session_file_store import DATA_NAME_RE, WORK_DIR_NAME, SessionFileStore, new_file_id
+from src.services.session_file_store import DATA_NAME_RE, FULL_MESSAGE, WORK_DIR_NAME, SessionFileStore, new_file_id
 
 MB = 1024 * 1024
 
@@ -32,6 +32,7 @@ class StoredFile:
     size: int
     created_at: float
     expires_at: float
+    holders: tuple[str, ...] = ()  # the chats that keep this file
 
 
 @dataclass(frozen=True)
@@ -104,7 +105,7 @@ class FileStore(SessionFileStore):
             self.discard(pending)
             raise FileError(
                 ErrorCode.LIMIT_EXCEEDED,
-                f"Your files would use more than {self._max_session_bytes // MB} MB. Delete some files or wait for them to expire.",
+                FULL_MESSAGE.format(mb=self._max_session_bytes // MB),
             )
         # Synchronously reserve space before any further awaits
         self._reserved[pending.session] = self._reserved.get(pending.session, 0) + size

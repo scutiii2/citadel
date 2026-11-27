@@ -18,7 +18,7 @@ POLICY = {
     },
     "armory": {
         "portcullis": Rule(("/mcp", "/upload", "/download", "/files", "/media", "/pdf", "/admin", "/capabilities", "/commands", "/tickets/tags"), True),
-        "stronghold": Rule(("/mcp", "/upload"), True),
+        "stronghold": Rule(("/mcp", "/upload", "/holds"), True),
         "legion": Rule(("/mcp",), True),
     },
     "legion": {

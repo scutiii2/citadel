@@ -29,6 +29,9 @@ from src.citadel_auth.ready import Probe
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, ServiceCatalog, CatalogTransport, logical_url, advertised_url, from_env
 from src.citadel_auth.treasury import register_in_background
 from src.chats import routes as chats_routes
+from src.chats.armory_holds import ArmoryHolds
+from src.chats.file_holds import ChatFileHolds
+from src.chats.hold_sender import HoldSender
 from src.chats.store import ChatStore
 from src.config import Settings, load_settings
 from src.brain import files_routes as brain_files_routes
@@ -149,7 +152,8 @@ def create_app(
         app.state.connections = ToolServices(app.state.tool_store, app.state.tool_http, tool_origins or catalog.outside_origin)
         app.state.dictation = DictationRelay()
         app.state.shares = ShareStore(app.state.store)
-        app.state.chats = ChatStore(app.state.store, app.state.shares)
+        app.state.file_holds = ChatFileHolds(app.state.store)
+        app.state.chats = ChatStore(app.state.store, app.state.shares, app.state.file_holds)
         app.state.stacks = StackStore(
             app.state.store, await asyncio.to_thread(load_limits, data_settings), app.state.chats.generation,
         )
@@ -197,6 +201,8 @@ def create_app(
             await migrate_schema()
         else:
             schema_task = asyncio.create_task(migrate_schema())
+        hold_sender = HoldSender(app.state.file_holds, ArmoryHolds(armory_client, keyring), app.state.chats.exists)
+        hold_task = asyncio.create_task(hold_sender.run())
         app.state.mcp = build_server(app, settings.host)
         mcp_app = app.state.mcp.streamable_http_app()
         mount = Route("/mcp", LegionOnlyMcp(mcp_app))
@@ -212,6 +218,8 @@ def create_app(
                 registration.cancel()
                 await asyncio.gather(schema_task, registration, return_exceptions=True)
             await app.state.turns.shutdown()
+            hold_task.cancel()
+            await asyncio.gather(hold_task, return_exceptions=True)
             for client in clients:
                 await client.aclose()
 

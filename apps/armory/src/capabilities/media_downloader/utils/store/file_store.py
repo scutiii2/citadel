@@ -13,7 +13,7 @@ from pathlib import Path
 
 from src.capabilities.media_downloader.utils.config import MB
 from src.capabilities.media_downloader.utils.errors import DownloaderError, ErrorCode
-from src.services.session_file_store import WORK_DIR_NAME, SessionFileStore, new_file_id
+from src.services.session_file_store import FULL_MESSAGE, WORK_DIR_NAME, SessionFileStore, new_file_id
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ class StoredFile:
     duration: float | None
     created_at: float
     expires_at: float
+    holders: tuple[str, ...] = ()  # the chats that keep this file
 
 
 class FileStore(SessionFileStore):
@@ -72,7 +73,7 @@ class FileStore(SessionFileStore):
             await asyncio.to_thread(source.unlink, True)
             raise DownloaderError(
                 ErrorCode.LIMIT_EXCEEDED,
-                f"Your files would use more than {self._max_session_bytes // MB} MB. Delete some files or wait for them to expire.",
+                FULL_MESSAGE.format(mb=self._max_session_bytes // MB),
             )
         # Reserve space synchronously, before any further await.
         self._reserved[session] = self._reserved.get(session, 0) + size

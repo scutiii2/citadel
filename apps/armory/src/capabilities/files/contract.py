@@ -9,6 +9,7 @@ class FileEntry(BaseModel):
     pages: int
     size: int
     expires_at: float
+    kept: bool = False  # held by a chat, so it does not expire while that chat exists
     download_url: str
 
 
