@@ -10,7 +10,8 @@ from pydantic import Field
 
 from src.capabilities.math import domain
 from src.capabilities.math.contract import (BatchResult, Binding, CalculusOptions, ContinuationInput,
-                                            MatrixOptions, RootEquation, SolveResult, TableFormulaInput)
+                                            MatrixOptions, RootEquation, SharedEquation, SolveResult,
+                                            TableFormulaInput)
 from src.commands import command
 from src.server import mcp
 
@@ -61,7 +62,7 @@ async def tool_math_solve(
     annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
 )
 async def tool_math_batch(
-    equation: Annotated[RootEquation, Field(description="Shared equation string or structured controls, exactly as tool_math_solve accepts.")],
+    equation: SharedEquation,
     data: Annotated[list[Any], Field(min_length=1, max_length=32, description=(
         "Independent records: [{id:'row1',data:[{type:'constant',name:'x',value:5}]}]. "
         "Each record has its own recursive data bindings; id is optional. Errors stay local and order is preserved."
@@ -80,7 +81,7 @@ async def tool_math_batch(
 
 @command(name="continue", description="Continue from one prior result with its conditions and units")
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
-async def tool_math_continue(equation: RootEquation, data: ContinuationInput) -> SolveResult:
+async def tool_math_continue(equation: SharedEquation, data: ContinuationInput) -> SolveResult:
     """Reuse a selected prior solution or scalar value. Pass previous result in
     data.previous, select solution_index or slot:value and optional value_name.
     Extra bindings resolve parameters without dropping original restrictions.
@@ -92,7 +93,7 @@ async def tool_math_continue(equation: RootEquation, data: ContinuationInput) ->
 
 @command(name="table", description="Apply a formula to an owned attached table page")
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
-async def tool_math_table(equation: RootEquation, data: TableFormulaInput, ctx: Context) -> BatchResult:
+async def tool_math_table(equation: SharedEquation, data: TableFormulaInput, ctx: Context) -> BatchResult:
     """Map variables to exact numeric column names from an attached table_id.
     data includes columns, shared bindings, offset, and limit (1–32).
     Only current caller's tables are accessible. Raw stored cells bypass display

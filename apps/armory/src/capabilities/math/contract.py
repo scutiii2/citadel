@@ -114,6 +114,13 @@ class EquationSpec(InputModel):
 
 RootEquation = Equation | EquationSpec
 
+# Tool definitions are sent to the model on every round, so only tool_math_solve spells these two shapes out.
+# Both are still validated in full.
+SharedEquation = Annotated[RootEquation, WithJsonSchema({
+    "anyOf": [{"type": "string"}, {"type": "object"}],
+    "description": "Equation string, or the controls object that tool_math_solve's equation accepts.",
+})]
+
 
 class NamedBinding(InputModel):
     name: Name
@@ -158,6 +165,8 @@ class EquationBinding(NamedBinding):
 Binding = Annotated[ConstantBinding | VariableBinding | EquationBinding, Field(discriminator="type")]
 EquationValue.model_rebuild()
 EquationBinding.model_rebuild()
+SharedBinding = Annotated[Binding, WithJsonSchema(
+    {"type": "object", "description": "One binding, as in tool_math_solve's data."})]
 
 
 class SolveRequest(InputModel):
@@ -382,7 +391,7 @@ class ContinuationInput(InputModel):
     solution_index: StrictInt = Field(default=0, ge=0, le=255)
     slot: Literal["solution", "value"] = "solution"
     value_name: Name = "value"
-    bindings: list[Binding] = Field(default_factory=list, max_length=MAX_BINDINGS)
+    bindings: list[SharedBinding] = Field(default_factory=list, max_length=MAX_BINDINGS)
     allow_approximate: bool = False
 
     @field_validator("previous", mode="before")
@@ -419,7 +428,7 @@ class BatchProgress(BaseModel):
 class TableFormulaInput(InputModel):
     table_id: Annotated[str, Field(min_length=1, max_length=128)]
     columns: dict[Name, Annotated[str, Field(min_length=1, max_length=256)]] = Field(min_length=1, max_length=16)
-    bindings: list[Binding] = Field(default_factory=list, max_length=32)
+    bindings: list[SharedBinding] = Field(default_factory=list, max_length=32)
     offset: StrictInt = Field(default=0, ge=0, le=200000)
     limit: StrictInt = Field(default=32, ge=1, le=32)
 
