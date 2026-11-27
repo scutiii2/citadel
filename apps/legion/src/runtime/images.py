@@ -1,6 +1,6 @@
 """Attached images the model is shown.
 
-A chat message names an uploaded image as `[Image file_id: <id> | 1 pages | image ...]`. At the start of a turn the
+A chat message names an uploaded image as `[File file_id: <id> | image | 1 pages ...]`. At the start of a turn the
 newest of those are fetched from Armory as the asking user and held for the turn; the provider loops put them in front of
 the question. An image cannot be checked for confidential data, so agent_config marks such a turn confidential.
 """
@@ -22,7 +22,11 @@ _log = logging.getLogger(__name__)
 
 TOOL_NAME = "tool_files_view"  # Armory's tool; Legion calls it itself and offers it to no model
 MAX_IMAGES = 4
-_REFERENCE = re.compile(r"\[(?:Image|PDFMerger) file_id: ([A-Za-z0-9_-]{1,100}) \| \d+ pages \| image(?= \||\])")
+# `[File file_id: X | image | …]`, and the older `[Image|PDFMerger file_id: X | N pages | image …]`.
+_REFERENCE = re.compile(
+    r"\[(?:File file_id: (?=[A-Za-z0-9_-]{1,100} \| image(?: \||\]))"
+    r"|(?:Image|PDFMerger) file_id: (?=[A-Za-z0-9_-]{1,100} \| \d+ pages \| image(?: \||\])))"
+    r"([A-Za-z0-9_-]{1,100})")
 
 
 @dataclass(frozen=True)

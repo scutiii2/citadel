@@ -115,3 +115,11 @@ def test_a_turn_shows_images_to_user_facing_agents_and_keeps_them_on_trusted_gat
     assert [block["source"]["data"] for block in shown if block["type"] == "image"] == ["QUJD" for _ in seen]
     assert observed["confidential"] is bool(seen)
     assert images.anthropic_content("after") == "after"
+
+
+def test_the_file_line_names_images_only_when_its_kind_is_image():
+    def line(file_id, kind):
+        return f"[File file_id: {file_id} | {kind} | 1 pages | expires_at: 1.5 | preserve this file_id]"
+
+    question = line("new", "image") + line("doc", "pdf") + ref("old")
+    assert images.references(question, []) == ["new", "old"]

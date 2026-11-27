@@ -3,7 +3,7 @@
  * agent sees the same thing and saved chats render the same in both apps.
  * The chat view pulls the blocks back out to show them collapsed. */
 
-import type { AttachmentTable } from "../../api/files/AttachmentsClient";
+import type { AttachmentFile, AttachmentTable } from "../../api/files/AttachmentsClient";
 import type { ChatMessage } from "../../api/types";
 
 export interface AttachmentBlock {
@@ -24,8 +24,6 @@ function attachmentBlock(a: AttachmentBlock): string {
 export const FILE_ONLY_QUESTION = "Please review the attached file(s).";
 
 /** Files whose whole content the agent's data tools can read. */
-export const PDF_FILE = /\.(pdf|png|jpe?g|webp|tiff?|gif|heic)$/i;
-
 export const TABLE_FILE = /\.(csv|xlsx)$/i;
 
 /** Audio the agent can transcribe with Scribe. */
@@ -55,6 +53,22 @@ export function tableHeader(table: AttachmentTable | null): string {
   const names = table.columns.slice(0, MAX_LISTED_COLUMNS).map((name) => name.replace(/\s+/g, " "));
   const more = table.columns.length > MAX_LISTED_COLUMNS ? ", ..." : "";
   return `[table_id: ${table.table_id} | ${table.rows} rows | columns: ${names.join(", ")}${more} | the text below is only a preview of the start of the file; use the data tools with this table_id for the whole file]\n`;
+}
+
+/** The first line of a stored attachment: the id the file tools need and what the file is. */
+export function fileHeader(f: { file_id: string | null; kind: string; pages: number | null; expires_at: number | null }): string {
+  const pages = f.pages ? ` | ${f.pages} pages` : "";
+  return `[File file_id: ${f.file_id} | ${f.kind}${pages} | expires_at: ${f.expires_at} | preserve this file_id when delegating]`;
+}
+
+/** What one uploaded file puts into the question: its id line, the table line, then the preview. */
+export function fileText(file: AttachmentFile): string {
+  const id = file.file_id ? `${fileHeader(file)}\n` : "";
+  const table = TABLE_FILE.test(file.filename) ? tableHeader(file.table) : "";
+  const preview = file.text || (file.kind === "image"
+    ? "[No text preview available; inspect the original image when needed.]"
+    : "[No text preview available; the original file is available for inspection.]");
+  return id + table + preview;
 }
 
 /** The question as sent: the typed text, then every attachment. */

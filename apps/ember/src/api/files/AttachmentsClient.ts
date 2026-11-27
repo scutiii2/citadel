@@ -1,12 +1,5 @@
 import { apiRequest } from "../http";
 
-interface AttachmentText {
-  filename: string;
-  text: string;
-  char_count: number;
-  truncated: boolean;
-}
-
 /** What mcp_server kept of an attached .csv / .xlsx for the data tools. */
 export interface AttachmentTable {
   table_id: string;
@@ -17,11 +10,19 @@ export interface AttachmentTable {
   notes: string[];
 }
 
-interface AttachmentPdf extends AttachmentText {
-  file_id: string;
-  pages: number;
+/** One uploaded file. `file_id` is null when it could not be stored and only its text is attached. */
+export interface AttachmentFile {
+  filename: string;
+  file_id: string | null;
   kind: string;
-  expires_at: number;
+  size: number;
+  pages: number | null;
+  expires_at: number | null;
+  text: string;
+  char_count: number;
+  truncated: boolean;
+  /** The data tools' copy of a .csv / .xlsx, when one was made. */
+  table: AttachmentTable | null;
 }
 
 interface AttachmentAudio {
@@ -94,29 +95,12 @@ export const attachmentsClient = {
       filename: file.name, data: await toBase64(file),
     });
   },
-  async pdf(file: File): Promise<AttachmentPdf> {
-    if (file.size > MAX_ATTACHMENT_BYTES) throw new Error("Too large - the limit is 15 MB");
-    return apiRequest<AttachmentPdf>("POST", "/api/attachments/pdf", {
-      filename: file.name, data: await toBase64(file),
-    });
-  },
-  /** Text ember_api extracted from the file; the file itself isn't kept. */
-  async text(file: File): Promise<AttachmentText> {
+  /** Every file but audio goes up one way: the original is kept and a text preview comes back. */
+  async file(file: File): Promise<AttachmentFile> {
     if (file.size > MAX_ATTACHMENT_BYTES) {
       throw new Error(`Too large - the limit is ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB`);
     }
-    return apiRequest<AttachmentText>("POST", "/api/attachments/text", {
-      filename: file.name,
-      data: await toBase64(file),
-    });
-  },
-
-  /** Uploads the whole file so the agent's data tools can read every row. */
-  async table(file: File): Promise<AttachmentTable> {
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      throw new Error(`Too large - the limit is ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB`);
-    }
-    return apiRequest<AttachmentTable>("POST", "/api/attachments/table", {
+    return apiRequest<AttachmentFile>("POST", "/api/attachments/file", {
       filename: file.name,
       data: await toBase64(file),
     });

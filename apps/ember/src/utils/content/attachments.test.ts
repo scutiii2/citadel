@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../../api/types";
-import { AUDIO_FILE, audioHeader, DOCUMENT_FILE, documentHeader, questionHistory, splitAttachments, tableHeader, TABLE_FILE, withAttachments } from "./attachments";
+import { AUDIO_FILE, audioHeader, DOCUMENT_FILE, documentHeader, fileHeader, fileText, questionHistory, splitAttachments, tableHeader, TABLE_FILE, withAttachments } from "./attachments";
 
 const user = (content: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ role: "user", content, ...extra });
 const assistant = (content: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ role: "assistant", content, ...extra });
@@ -117,5 +117,33 @@ describe("Reader documents", () => {
     const header = documentHeader({ file_id: "b".repeat(32), page_count: 3, expires_at: 99 });
     expect(header).toContain(`[Document file_id: ${"b".repeat(32)} | 3 pages | expires_at: 99 |`);
     expect(header).toContain("tool_ocr_parse");
+  });
+});
+
+describe("stored files", () => {
+  const stored = {
+    filename: "photo.png", file_id: "f_1", kind: "image", size: 3, pages: 1, expires_at: 99,
+    text: "", char_count: 0, truncated: false, table: null,
+  };
+
+  it("writes one id line, with pages only when the file has them", () => {
+    expect(fileHeader(stored)).toBe("[File file_id: f_1 | image | 1 pages | expires_at: 99 | preserve this file_id when delegating]");
+    expect(fileHeader({ ...stored, kind: "text", pages: null })).toContain("[File file_id: f_1 | text | expires_at: 99 |");
+  });
+
+  it("puts the id line first, then the preview or why there is none", () => {
+    expect(fileText(stored).split("\n")).toEqual([fileHeader(stored), "[No text preview available; inspect the original image when needed.]"]);
+    expect(fileText({ ...stored, filename: "n.md", kind: "text", pages: null, text: "hello" }).endsWith("\nhello")).toBe(true);
+  });
+
+  it("attaches only the text when the file could not be stored", () => {
+    expect(fileText({ ...stored, filename: "n.md", file_id: null, kind: "text", pages: null, expires_at: null, text: "hello" })).toBe("hello");
+  });
+
+  it("keeps the table line for spreadsheets", () => {
+    const sheet = { ...stored, filename: "sales.csv", kind: "table", pages: null, text: "a,b",
+      table: { table_id: "tbl-1", filename: "sales.csv", rows: 1, columns: ["a", "b"], sheet: null, notes: [] } };
+    expect(fileText(sheet)).toContain("[table_id: tbl-1 |");
+    expect(fileText({ ...sheet, table: null })).toContain("could not be loaded");
   });
 });

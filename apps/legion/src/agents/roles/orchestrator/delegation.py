@@ -68,10 +68,10 @@ _attachments: ContextVar[str] = ContextVar("delegation_pdf_attachments", default
 def bind_attachments(question: str, history: list[dict[str, Any]]) -> Token:
     # Carry only file metadata, never the extracted document text or unrelated history.
     sources = [str(item.get("content", "")) for item in history if item.get("role") == "user"] + [question]
-    pattern = r'\[\[ATTACHMENT filename="([^"]*)" chars="\d+" truncated="(?:true|false)"\]\]\n(\[(?:PDFMerger|Image) file_id:[^\n]*\])'
+    pattern = r'\[\[ATTACHMENT filename="([^"]*)" chars="\d+" truncated="(?:true|false)"\]\]\n(\[(?:File|PDFMerger|Image) file_id:[^\n]*\])'
     references = list(dict.fromkeys(f"{name}: {header}" for source in sources for name, header in re.findall(pattern, source)))
     # Nested delegates inherit the references appended by the preceding hop.
-    references += [f"{name}: {header}" for source in sources for name, header in re.findall(r'^([^\n]+): (\[(?:PDFMerger|Image) file_id:[^\n]*\])$', source, re.MULTILINE)]
+    references += [f"{name}: {header}" for source in sources for name, header in re.findall(r'^([^\n]+): (\[(?:File|PDFMerger|Image) file_id:[^\n]*\])$', source, re.MULTILINE)]
     return _attachments.set("\n".join(dict.fromkeys(references)))
 
 

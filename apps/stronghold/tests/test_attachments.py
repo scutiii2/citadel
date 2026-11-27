@@ -41,7 +41,7 @@ def logged(platform) -> dict[str, str]:
 
 
 @pytest.mark.parametrize("path, name", [("text", "a.txt"), ("table", "a.csv"), ("pdf", "a.pdf"), ("audio", "a.mp3"),
-                                        ("document", "a.pdf"), ("dictate", "a.webm"), ("dictate/partial", "a.webm")])
+                                        ("document", "a.pdf"), ("dictate", "a.webm"), ("dictate/partial", "a.webm"), ("file", "a.txt")])
 def test_every_route_needs_the_requester(client: TestClient, armory, tools, path: str, name: str) -> None:
     assert post(client, path, name, headers=ANONYMOUS).status_code == 400
     assert not armory.requests and not any(t.requests for t in tools.values())
@@ -328,3 +328,88 @@ def test_reader_rejection_is_a_400_and_outage_is_a_502(client: TestClient, tools
     refused = post(client, "document", "a.pdf")
     assert refused.status_code == 502
     assert refused.json()["detail"] == "Reader refused the token. Check Stronghold Admin."
+
+
+# --- file (every kind) ----------------------------------------------------------------------
+
+_KINDS = {".png": ("image", 1), ".pdf": ("pdf", 2), ".csv": ("table", 0), ".mp3": ("audio", 0)}
+
+
+def armory_files(request: httpx.Request) -> httpx.Response:
+    if request.url.path == "/upload/table":
+        return httpx.Response(200, json=TABLE)
+    name = request.content.split(b'filename="')[1].split(b'"')[0].decode()
+    kind, pages = _KINDS.get(name[name.rfind("."):], ("text", 0))
+    return httpx.Response(200, json={"file_id": "f_1", "name": name, "kind": kind, "pages": pages, "size": 3,
+                                     "expires_at": 2000000000})
+
+
+def test_a_text_file_is_stored_and_previewed(client: TestClient, armory, platform) -> None:
+    armory.handler = armory_files
+
+    response = post(client, "file", "C:\\Users\\me\\notes.md", b"# hi")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"filename": "notes.md", "text": "# hi", "char_count": 4, "truncated": False,
+                               "file_id": "f_1", "kind": "text", "size": 4, "pages": None,
+                               "expires_at": 2000000000, "table": None}
+    sent = armory.requests[-1]
+    assert sent.url.path == "/upload/file" and requester(sent)["username"] == "ana"
+    assert caller(sent, "armory") == "stronghold"
+    assert "attachments.file" in logged(platform)
+
+
+def test_an_image_has_pages_and_no_preview(client: TestClient, armory) -> None:
+    armory.handler = armory_files
+
+    result = post(client, "file", "photo.png", b"png").json()
+
+    assert (result["kind"], result["pages"], result["text"], result["table"]) == ("image", 1, "", None)
+
+
+def test_a_spreadsheet_is_also_registered_as_a_table(client: TestClient, armory) -> None:
+    armory.handler = armory_files
+
+    result = post(client, "file", "sales.csv", b"region,units\nEU,1\n").json()
+
+    assert result["table"]["table_id"] == "tbl-1" and result["file_id"] == "f_1"
+    assert sorted(r.url.path for r in armory.requests) == ["/upload/file", "/upload/table"]
+
+
+def test_a_failed_table_leaves_the_file_attached(client: TestClient, armory) -> None:
+    armory.handler = lambda r: (httpx.Response(400, json={"error": "no header"}) if r.url.path == "/upload/table"
+                                else armory_files(r))
+
+    result = post(client, "file", "sales.csv", b"x\n").json()
+
+    assert result["file_id"] == "f_1" and result["table"] is None
+
+
+def test_without_the_store_readable_text_is_still_attached(client: TestClient, armory, platform) -> None:
+    armory.handler = down
+
+    result = post(client, "file", "notes.md", b"# hi").json()
+
+    assert (result["file_id"], result["text"], result["expires_at"]) == (None, "# hi", None)
+    assert "attachments.file" not in logged(platform)
+    for name in ("photo.png", "voice.mp3", "scan.pdf"):  # nothing readable: the failure shows
+        refused = post(client, "file", name, b"%PDF-scan")
+        assert refused.status_code == 502 and refused.json()["detail"] == "File storage is unavailable", name
+
+
+def test_a_refusal_shows_for_a_picture_but_text_is_still_attached(client: TestClient, armory) -> None:
+    armory.handler = lambda r: httpx.Response(400, json={"error": "Your files would use more than 500 MB."})
+
+    refused = post(client, "file", "photo.png", b"png")
+
+    assert refused.status_code == 400 and "500 MB" in refused.json()["detail"]
+    assert post(client, "file", "notes.md", b"# hi").json()["file_id"] is None
+
+
+def test_files_that_cannot_be_used_never_reach_armory(client: TestClient, armory) -> None:
+    unknown = post(client, "file", "movie.mp4", b"\x00\x01")
+    binary = post(client, "file", "binary.txt", bytes(range(128, 256)) * 10)
+
+    assert unknown.status_code == 400 and "Can't read '.mp4' files" in unknown.json()["detail"]
+    assert binary.status_code == 400
+    assert armory.requests == []

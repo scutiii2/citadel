@@ -406,3 +406,18 @@ def test_dispatch_turns_a_structured_question_into_text(monkeypatch):
     delegation.dispatch({"agent_id": "calc", "question": "plain"}, 0)
 
     assert seen == ['{"text": "héllo", "n": [1, 2]}', "plain"]
+
+
+def test_file_references_survive_delegation():
+    question = ('Look\n[[ATTACHMENT filename="notes.md" chars="4" truncated="false"]]\n'
+                '[File file_id: f_notes | text | expires_at: 1]\nsecret text\n[[/ATTACHMENT]]')
+    token = delegation.bind_attachments(question, [])
+    try:
+        assert delegation._attachments.get() == "notes.md: [File file_id: f_notes | text | expires_at: 1]"
+        nested = delegation.bind_attachments("notes.md: [File file_id: f_notes | text | expires_at: 1]", [])
+        try:
+            assert "f_notes" in delegation._attachments.get()
+        finally:
+            delegation.reset_attachments(nested)
+    finally:
+        delegation.reset_attachments(token)

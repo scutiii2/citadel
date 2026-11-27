@@ -473,7 +473,7 @@ Operations, approvals and runtime skill marking remain deferred.
 
 ## Attached images
 
-A user message names an uploaded image as `[Image file_id: <id> | ...]`. At the start of a turn the entry agent, an
+A user message names an uploaded image as `[File file_id: <id> | image | ...]` (older chats say `[Image file_id: <id> | ...]`). At the start of a turn the entry agent, an
 orchestrator or a delegable specialist fetches the newest four such images (this question and earlier user messages) from
 Armory's `tool_files_view`, as the asking user, and sends them to the model in front of the question
 (`src/runtime/images.py`). Internal helpers get none. It needs Armory's `files` capability. Armory hides the tool from tool lists, so no model is offered it,

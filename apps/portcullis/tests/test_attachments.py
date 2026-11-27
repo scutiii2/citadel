@@ -16,7 +16,7 @@ from tests.test_permission_split import limited_account
 from tests.test_registration import as_admin
 
 ROUTES = [("text", "a.txt"), ("table", "a.csv"), ("pdf", "a.pdf"), ("audio", "a.mp3"), ("document", "a.pdf"),
-          ("dictate", "a.webm"), ("dictate/partial", "a.webm")]
+          ("dictate", "a.webm"), ("dictate/partial", "a.webm"), ("file", "a.txt")]
 
 
 def body(name: str = "a.txt", data: bytes = b"abc") -> dict:
@@ -84,6 +84,25 @@ def test_a_big_body_is_not_cut_off_on_the_way(client: TestClient, upstream: Fake
 
 
 # --- bard speak and voices ------------------------------------------------------------------
+
+
+def test_a_20_mb_upload_is_passed_on_with_a_long_timeout(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+    upstream.handler = lambda r: httpx.Response(200, json={"ok": True})
+
+    response = client.post("/api/attachments/file", json=body("a.mp3", b"x" * (20 * 1024 * 1024)))
+
+    assert response.status_code == 200
+    assert upstream.requests[-1].extensions["timeout"]["read"] == 150.0
+
+
+def test_an_upload_keeps_the_reason_storage_failed(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+    upstream.handler = lambda r: httpx.Response(502, json={"detail": "File storage is unavailable"})
+
+    response = client.post("/api/attachments/file", json=body("a.png"))
+
+    assert response.status_code == 502 and response.json() == {"detail": "File storage is unavailable"}
 
 
 def test_speech_needs_a_login(client: TestClient, upstream: FakeUpstream) -> None:
