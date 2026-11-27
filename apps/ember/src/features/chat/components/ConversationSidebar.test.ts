@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatSearchHit } from "../api/ChatsClient";
 import type { ChatFolder } from "../api/FoldersClient";
@@ -54,6 +55,8 @@ function mountSidebar(props: Partial<Props> = {}) {
   mounted.push(wrapper);
   return wrapper;
 }
+
+beforeEach(() => setActivePinia(createPinia()));
 
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();

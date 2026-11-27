@@ -6,6 +6,7 @@ import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useHeaderHelp } from "@citadel/ui";
 import AccountMenu from "./AccountMenu.vue";
+import UsageMeter from "../../features/usage/components/UsageMeter.vue";
 import EmberLogo from "./EmberLogo.vue";
 import { useSidebar } from "../../composables/useSidebar";
 import { useLogout } from "../../composables/useLogout";
@@ -40,6 +41,7 @@ const menuGroups = computed(() => {
   const open = pageVisibility.ready ? visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden) : [];
   return MENU_GROUPS.map((group) => group.flatMap((to) => open.filter((p) => p.to === to))).filter((g) => g.length > 0);
 });
+const canSeeUsage = computed(() => menuGroups.value.some((group) => group.some((p) => p.to === "/usage")));
 
 const EXTRA_TITLES: Record<string, string> = { "/overview": "Overview", "/account": "Account" };
 /** The page's name: the nav entry with the longest matching path, else a fixed name. */
@@ -81,6 +83,7 @@ const title = computed(() => {
       >
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M9.5 9.2a2.6 2.6 0 1 1 3.7 2.4c-.8.4-1.2 1-1.2 1.9M12 17h.01" /></svg>
       </button>
+      <UsageMeter :details-link="canSeeUsage" />
       <AccountMenu
         placement="below"
         :username="auth.account.username"

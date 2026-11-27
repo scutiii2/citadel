@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { usageClient, type MyUsage } from "../../usage/api/UsageClient";
 import { type UsageWindow } from "../../../api/contracts/usage";
@@ -21,6 +22,7 @@ async function mountGauges(busy = false) {
 }
 
 beforeEach(() => {
+  setActivePinia(createPinia());
   vi.clearAllMocks();
   mine.mockResolvedValue(usage(window(25_000, 100_000), window(900_000, 1_000_000)));
 });
