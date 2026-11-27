@@ -23,10 +23,14 @@ class PlanSession:
         self.catalog = snapshot
         self.failures = 0
         self.closed = False
+        # The orchestrator's own tools, set by the provider loop: they run like any other call, approvals included.
+        self.direct: frozenset[str] = frozenset()
 
     async def handle(self, name: str, arguments: Any, depth: int, request_id: str | None,
                      on_event: OnEvent | None) -> tuple[str, bool] | None:
         if name != submit_plan.TOOL_NAME:
+            if name in self.direct:
+                return None
             if name == "ask_user" and questions.current().enabled and not self.closed:
                 return None
             return f"Tool {name!r} is not offered in this plan-mode round.", False

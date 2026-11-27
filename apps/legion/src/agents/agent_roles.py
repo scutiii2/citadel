@@ -88,7 +88,8 @@ def system_prompt_for(caveman: bool = False, roster: Sequence[RosterEntry] = (),
     prompt = _compose_system_prompt(agent_spec.current(), roster_block(roster)) if roster else SYSTEM_PROMPT
     if catalog_text is not None:
         prompt = _compose_system_prompt(agent_spec.current(), "Architect catalog:\n" + (catalog_text or "(none running)"))
-        prompt += ("\n\nPlan mode: use only ask_user and submit_plan. Answer directly when no architect is needed. "
+        prompt += ("\n\nPlan mode: reach other agents only through submit_plan. Call ask_user and your own tools directly. "
+                   "Answer directly when no architect is needed. "
                    "Every submitted brief must stand alone. After results arrive, write the final reply.")
     return f"{prompt}\n\n{CAVEMAN_INSTRUCTIONS}" if caveman else prompt
 

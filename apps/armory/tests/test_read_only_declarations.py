@@ -22,11 +22,14 @@ READ_ONLY = {
     "media": {"tool_media_probe", "tool_media_status", "tool_media_listFiles", "tool_media_packages"},
     "pdf": {"tool_pdf_inspect", "tool_pdf_listFiles"},
     "repo": {"tool_repo_listRepos", "tool_repo_log", "tool_repo_diff", "tool_repo_grep"},
+    "data": {"tool_tables_listTables", "tool_tables_describe", "tool_tables_rows", "tool_tables_aggregate",
+             "tool_tables_valueCounts"},
+    "server": {"tool_srv_listApps", "tool_srv_readAppLogs"},
     "web": {"tool_web_search", "tool_web_readPage"},
 }
 # Capabilities whose tools change something, spend credits or crawl, or run commands: none may declare it.
 # generator joined it when its tools gained email_to (they can send mail).
-NEVER = ("server_manager", "tables", "firecrawl", "email", "generator")
+NEVER = ("firecrawl", "email", "generator")
 
 
 @pytest.fixture

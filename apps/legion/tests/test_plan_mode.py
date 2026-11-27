@@ -26,15 +26,48 @@ def plan_spec(monkeypatch):
     return spec
 
 
+TICKET = "stronghold__tool_ticket_createTicket"
+
+
+def catalog_tools(*names):
+    return [SimpleNamespace(name=name, description="", input_schema={"type": "object", "properties": {}}, meta=None)
+            for name in names]
+
+
+def allow(monkeypatch, spec, *globs):
+    monkeypatch.setattr(agent_spec, "_current", replace(spec, tools=replace(spec.tools, allow=globs)))
+
+
 @pytest.mark.parametrize("provider", [anthropic_provider, openai_provider])
-def test_only_plan_and_questions_are_offered(monkeypatch, plan_spec, provider):
-    monkeypatch.setattr(provider, "list_tools", lambda *_: pytest.fail("plan mode listed capability tools"))
+@pytest.mark.parametrize("globs,own", [(("stronghold__tool_ticket_*",), {TICKET}), ((), set())])
+def test_plan_mode_offers_the_plan_questions_and_only_the_agents_named_tools(
+        monkeypatch, plan_spec, provider, globs, own):
+    allow(monkeypatch, plan_spec, *globs)
+    monkeypatch.setattr(provider, "list_tools", lambda *_: catalog_tools(TICKET, "main__tool_mem_delete"))
     token = questions.bind(questions.QuestionPolicy(True))
     try:
         names = {s["name"] for s in provider._tool_schemas(roster=[MagicMock()])}
-        assert names == {"ask_user", "submit_plan"}
+        assert names == {"ask_user", "submit_plan"} | own
     finally:
         questions.reset(token)
+
+
+@pytest.mark.parametrize("provider", [anthropic_provider, openai_provider])
+def test_the_planner_calls_its_own_tool_before_and_after_a_plan(monkeypatch, plan_spec, provider):
+    allow(monkeypatch, plan_spec, "stronghold__tool_ticket_*")
+    stream = setup_provider(monkeypatch, provider, [
+        [(TICKET, {"title": "before"})], [("submit_plan", {"steps": [step()]})], [(TICKET, {"title": "after"})], "Filed"])
+    monkeypatch.setattr(provider, "list_tools", lambda *_: catalog_tools(TICKET))
+    called = []
+    monkeypatch.setattr(provider, "_dispatch", lambda name, arguments, depth: called.append((name, arguments)) or "T-1")
+    monkeypatch.setattr(provider.approvals, "review", AsyncMock(return_value=None))
+    monkeypatch.setattr(delegation, "call", lambda *args: "Finished code")
+    result = asyncio.run(provider.run_chat("build", []))
+    assert result.response == "Filed"
+    assert called == [(TICKET, {"title": "before"}), (TICKET, {"title": "after"})]
+    last = stream.call_args_list[-1].kwargs.get("tools")
+    assert TICKET in [tool["name"] for tool in last]
+    assert provider.approvals.review.await_count == 2
 
 
 def setup_provider(monkeypatch, provider, batches):

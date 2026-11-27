@@ -151,7 +151,8 @@ def test_wildcard_refuses_a_delegate_without_block_all_support():
 def test_call_tool_reaches_a_built_in_tool_the_model_named_without_the_prefix():
     tools = [_tool("tool_web_search")]
     with patch.object(mcp_upstream.client, "list_tools", return_value=tools), \
-            patch.object(mcp_upstream.client, "call_tool", return_value=SimpleNamespace(content=[SimpleNamespace(text="ok")])) as call:
+            patch.object(mcp_upstream.client, "call_tool", return_value=SimpleNamespace(content=[SimpleNamespace(text="ok")], is_error=False,
+                                                                        structured_content={})) as call:
         assert mcp_upstream.call_tool("tool_web_search", {"query": "x"}) == "ok"
         assert call.call_args.args[0] == "main__tool_web_search"
         # A name nothing lists is passed on as it was, so the registry reports it.

@@ -30,7 +30,8 @@ async def test_every_tool_declares_read_only_hint():
 @pytest.mark.anyio
 async def test_tools_that_change_things_are_not_marked_read_only():
     by_name = {t.name: t for t in await mcp.list_tools()}
-    for name in ("tool_srv_startApp", "tool_srv_stopApp", "tool_srv_restartApp", "tool_media_download", "tool_media_package"):
+    for name in ("tool_srv_startApp", "tool_srv_stopApp", "tool_srv_restartApp", "tool_media_download", "tool_media_package",
+                 "tool_scrape_page", "tool_scrape_map", "tool_scrape_crawl"):
         assert by_name[name].annotations.readOnlyHint is False, name
-    for name in ("tool_tables_rows", "tool_scrape_page", "tool_srv_listApps"):
+    for name in ("tool_tables_rows", "tool_srv_listApps"):
         assert by_name[name].annotations.readOnlyHint is True, name
