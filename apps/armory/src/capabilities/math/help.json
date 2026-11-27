@@ -23,7 +23,7 @@
     ]},
     {"name": "table", "tool": "tool_math_table", "params": [
       {"name": "equation", "required": true, "default": null, "description": "Shared equation string or structured controls."},
-      {"name": "data", "required": true, "default": null, "description": "Actual attached table_id, columns mapping variable to exact numeric column name, optional shared bindings, offset, limit1–32. Follow source.next_offset."}
+      {"name": "data", "required": true, "default": null, "description": "Actual attached table_id, columns mapping variable to exact numeric column name, optional shared bindings, offset, limit1–32, optional total:true for the exact sum of the page's row values. Follow source.next_offset."}
     ]},
     {"name": "matrix", "tool": "tool_math_matrix", "params": [
       {"name": "operation", "required": true, "default": null, "description": "add/subtract/multiply/transpose/determinant/inverse/rank/rref/solve."},

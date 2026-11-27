@@ -54,10 +54,15 @@ After attaching a numeric CSV/Excel table and obtaining its real `table_id`, cal
   "data": {
     "table_id": "<attached table id>",
     "columns": {"d": "Distance", "t": "Time"},
-    "bindings": [], "offset": 0, "limit": 32
+    "bindings": [], "offset": 0, "limit": 32, "total": true
   }
 }
 ```
+
+`total: true` adds `total` to the result: the exact sum of the page's row values, with
+their unit. It covers one page; for a longer table, add each page's total. It gives no
+value, only the reason, when any row failed, is approximate, has conditions or has more
+than one value.
 
 Column names must match exactly and reference numeric columns. Access uses current
 request identity and the existing table registry's expiry/ownership rules. Values

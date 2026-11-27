@@ -99,7 +99,9 @@ async def tool_math_continue(equation: SharedEquation, data: ContinuationInput) 
           annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False))
 async def tool_math_table(equation: SharedEquation, data: TableFormulaInput, ctx: Context) -> BatchResult:
     """Map variables to exact numeric column names from an attached table_id.
-    data includes columns, shared bindings, offset, and limit (1–32).
+    data includes columns, shared bindings, offset, and limit (1–32). Set
+    data.total=true to also get the exact sum of the page's row values in
+    `total`, instead of adding them with another call.
     Only current caller's tables are accessible. Raw stored cells bypass display
     rounding. Partial row results stream through MCP progress when requested.
     Follow source.next_offset for remaining rows; missing cells fail per row.

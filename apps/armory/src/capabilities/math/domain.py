@@ -63,10 +63,12 @@ class MathDesk:
         return SolveResult.model_validate(await self._runner.run(request))
 
     async def table(self, equation, data, *, registry, owner, progress=None) -> BatchResult:
+        from src.capabilities.math.utils.page_total import PageTotal
         from src.capabilities.math.utils.table_bridge import TableBridge
 
+        bridge = TableBridge(registry, owner)
         try:
-            records, source = await asyncio.to_thread(TableBridge(registry, owner).prepare, data)
+            records, source = await asyncio.to_thread(bridge.prepare, data)
             source = TablePageInfo.model_validate(source.model_dump())
         except (ValueError, ValidationError) as error:
             return BatchResult(status="invalid", message=str(error)[:512])
@@ -74,6 +76,9 @@ class MathDesk:
             return BatchResult(status="completed", source=source, message="No rows in requested table page.")
         result = await self.batch(equation, records, progress=progress)
         result.source = source
+        if bridge.spec.total and result.records:
+            bound = {binding["name"] for binding in records[0]["data"]}
+            result.total = await PageTotal(self.solve).add(equation, result, bound)
         return result
 
     async def batch(self, equation: RootEquation, data: list[Any], *, progress: Callable[[BatchProgress], Awaitable[None]] | None = None) -> BatchResult:

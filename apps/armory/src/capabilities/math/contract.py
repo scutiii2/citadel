@@ -426,11 +426,12 @@ class BatchProgress(BaseModel):
 
 
 class TableFormulaInput(InputModel):
-    table_id: Annotated[str, Field(min_length=1, max_length=128, description="A table_id, or the file_id of an uploaded CSV or Excel file.")]
+    table_id: Annotated[str, Field(min_length=1, max_length=128, description="The file_id (f_...) of an uploaded CSV or Excel file (preferred: it lasts longer), or a table_id.")]
     columns: dict[Name, Annotated[str, Field(min_length=1, max_length=256)]] = Field(min_length=1, max_length=16)
     bindings: list[SharedBinding] = Field(default_factory=list, max_length=32)
     offset: StrictInt = Field(default=0, ge=0, le=200000)
     limit: StrictInt = Field(default=32, ge=1, le=32)
+    total: bool = Field(default=False, description="Also return the exact sum of this page's row values.")
 
 
 class TablePageInfo(BaseModel):
@@ -441,6 +442,12 @@ class TablePageInfo(BaseModel):
     next_offset: int | None = None
 
 
+class TableTotal(BaseModel):
+    rows: int
+    value: MathValue | None = None
+    message: str
+
+
 class BatchResult(BaseModel):
     status: Literal["completed", "partial", "invalid", "limited"]
     records: list[BatchRow] = Field(default_factory=list, max_length=32)
@@ -449,4 +456,5 @@ class BatchResult(BaseModel):
     progress_delivered: int = 0
     progress_errors: int = 0
     source: TablePageInfo | None = None
+    total: TableTotal | None = None  # tool_math_table with data.total
     message: str

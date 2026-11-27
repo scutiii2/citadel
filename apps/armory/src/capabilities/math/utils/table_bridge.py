@@ -7,10 +7,12 @@ class TableBridge:
     def __init__(self, registry, owner):
         self.registry = registry
         self.owner = owner
+        self.spec: TableFormulaInput | None = None  # the validated request, once prepared
 
     def prepare(self, data):
         """Run on a thread: registry locks and bounded row copies stay off the loop."""
         spec = TableFormulaInput.model_validate(data.model_dump() if hasattr(data, "model_dump") else data)
+        self.spec = spec
         table = self.registry.get(spec.table_id, self.owner)
         if table is None:
             raise ValueError("Table unavailable for current caller.")
