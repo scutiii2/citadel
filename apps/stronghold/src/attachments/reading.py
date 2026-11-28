@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from fastapi import HTTPException
 
 from src.attachments.extraction import MAX_TEXT_CHARS
 from src.tool_services.client import ToolServices
+
+logger = logging.getLogger(__name__)
 
 BUDGET_SECONDS = 110  # under Portcullis's 150 s upload timeout, which also covers the Armory store
 _PAGE_MARK = "<PAGE>"  # Reader puts one before each page
@@ -38,6 +41,13 @@ async def transcribe_with_scribe(connections: ToolServices, suffix: str, content
     try:
         async with asyncio.timeout(BUDGET_SECONDS):
             result = await connections.post_file("/connections/scribe/transcribe", f"audio{suffix}", content)
-    except (HTTPException, TimeoutError):
+    except HTTPException as error:
+        logger.warning("Scribe transcription failed: status %s, request refused or service unavailable", error.status_code)
         return None
-    return _usable(result.get("text"))
+    except TimeoutError:
+        logger.warning("Scribe transcription failed: status timeout, time budget exceeded")
+        return None
+    text = _usable(result.get("text"))
+    if text is None:
+        logger.warning("Scribe transcription failed: status 200, no usable transcript")
+    return text

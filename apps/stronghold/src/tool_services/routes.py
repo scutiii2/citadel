@@ -232,6 +232,8 @@ async def _probe(http: httpx.AsyncClient, address: str, headers: dict[str, str],
                     return {"ok": False, "code": str(health.status_code), "message": "The token was refused."}
                 if not health.is_success:
                     return {"ok": False, "code": str(health.status_code), "message": f"Health returned HTTP {health.status_code}."}
+                if path.startswith("/api/transcribe") and (await _read_json(health)).get("ready") is False:
+                    return {"ok": False, "code": "NOT_READY", "message": "Scribe is not ready. Check its speech engine configuration."}
             async with http.stream(method, address + path, headers=headers, json={} if json_body else None,
                                    follow_redirects=False) as answer:
                 if answer.status_code in (401, 403):
