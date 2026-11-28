@@ -226,7 +226,7 @@ async def run_chat(
         if cancellation.is_cancelled(request_id):
             raise ChatCancelled()
         # What could reach an untrusted gateway is checked first: confidential text goes only to trusted ones.
-        await confidentiality.protect_turn(question + _last_assistant_text(history), request_id)
+        await confidentiality.protect_turn(question, earlier=[message["content"] for message in history])
         if spec.id == transcripts.AGENT_ID:
             model = model_tiers.clamp_default(MODEL, getattr(_PROVIDER_MODULE, "DEFAULT_MODEL", None), spec.id).model
             result = await transcripts.write_down(question, _one_model_call(model, request_id, depth))
@@ -268,8 +268,6 @@ async def run_chat(
             resolution = dataclasses.replace(resolution, note="; ".join(n for n in (auto_note, resolution.note) if n))
         provider_question = question
         switches: list[dict[str, str]] = []
-        if private and confidentiality.has_untrusted_gateway():
-            confidentiality.mark("private")  # the user's own MCP servers hold private data: trusted gateways only
         if depth == 0 and agent_spec.current().memory_recall:
             if cancellation.is_cancelled(request_id):
                 raise ChatCancelled()
@@ -279,8 +277,8 @@ async def run_chat(
             if cancellation.is_cancelled(request_id):
                 raise ChatCancelled()
             provider_question = await skill_recall.with_skills(question, provider_question, on_event)
-        if provider_question != question and confidentiality.has_untrusted_gateway():
-            confidentiality.mark("recall")  # recalled notes and skills are the user's own: trusted gateways only
+        if provider_question != question:
+            await confidentiality.protect_turn(provider_question, "recall")
         # Attached images are shown to agents that answer people's questions, not to internal helpers.
         wanted, omitted = images.references(question, history)
         attached = images.Attached()
@@ -291,9 +289,9 @@ async def run_chat(
         provider_question = attached.note(provider_question)
         audio_files = transcripts.references(question, history)
         if audio_files and (spec.orchestrator or spec.delegable) and not tool_filter.is_blocked(images.TOOL_NAME):
-            if confidentiality.has_untrusted_gateway():
-                confidentiality.mark("audio")  # nothing checks speech for private data: trusted gateways only
+            heard_from = len(provider_question)
             provider_question = await transcripts.add(provider_question, audio_files)
+            await confidentiality.protect_turn(provider_question[heard_from:], "audio")
         images_token = images.bind(attached)
         async def call(module: Any, model: str | None) -> ChatResult:
             if inspect.iscoroutinefunction(module.run_chat):
@@ -355,14 +353,6 @@ async def run_chat(
         delegation.reset_usage(usage_token)
         cancellation.clear(request_id)
         cancellation.reset_request(request_token)
-
-
-def _last_assistant_text(history: list[dict[str, Any]]) -> str:
-    """The assistant's last message, clipped: a short follow-up ("yes, send it") means what that message was about."""
-    for message in reversed(history):
-        if message.get("role") == "assistant" and isinstance(message.get("content"), str):
-            return "\n\n" + message["content"][-1500:]
-    return ""
 
 
 def run_interpret(text: str) -> ChatResult:

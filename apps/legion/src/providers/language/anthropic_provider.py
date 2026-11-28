@@ -501,7 +501,7 @@ async def run_chat(
                 # A closed plan keeps its tools defined (the API refuses a history with tool blocks and no tools);
                 # PlanSession refuses any further call.
                 outcomes = await runner.run([Call(block.id, block.name, block.input) for block in blocks])
-                if switch := await confidentiality.protect_round(route, [o.text for o in outcomes], request_id):
+                if switch := await confidentiality.protect_round(route, [o.text for o in outcomes]):
                     if on_event:
                         await on_event(step_event("gateway_switch", **switch.as_dict()))
                     messages = _strip_thinking(messages)

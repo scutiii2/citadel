@@ -498,7 +498,8 @@ the orchestrator or a delegable agent asks the `transcriber` agent for each file
 adds the words to the question as data (`src/runtime/transcripts.py`). The transcriber fetches the file from Armory's
 `tool_files_view`, sends it to its own gateway and keeps the transcript in memory per user and file. WAV and MP3 only.
 Its gateway must be an OpenAI-compatible Chat Completions one with the `audio` capability on (**Hears audio** on the
-Model gateways page); it ships pointing at `gemini`. Such a turn is confidential: trusted gateways only. A file that
+Model gateways page); it ships pointing at `gemini`. The transcriber's own turn uses trusted gateways only; the turn
+that asked stays confidential only when the transcript holds a secret. A file that
 cannot be transcribed is named to the model. A turn with every tool blocked hears nothing.
 
 ## Trusted gateways and confidential data
@@ -512,22 +513,26 @@ FreeLLMAPI, Bedrock and Vertex, start untrusted until an admin marks them. Code:
   `llm.fallback_gateways`) are all untrusted is refused (409). Untrusting or deleting a gateway that is the only trusted
   one of an enabled agent is refused too, naming the agents. Decision agents have no chat gateway and are not checked.
 - **Confidential data goes only to trusted gateways.** The `confidentiality-checker` agent
-  (`agents/confidentiality-checker.json`, decision provider, strategy `jev-only`) says whether text holds credentials,
-  personal identifiers, bank or card numbers, health, legal or financial details, or private messages and documents
-  (`src/runtime/confidentiality.py`). The check runs at the start of a turn, and again on each round of tool results,
-  only while the agent has an untrusted gateway to protect from. A confidential turn moves to the first trusted
-  gateway of the agent (the step list shows a gateway switch with reason `confidential`) and stays on trusted ones:
+  (`agents/confidentiality-checker.json`, decision provider, strategy `jev-only`) says whether text holds secret data:
+  credentials, personal identifiers (ID, passport, tax numbers), bank or card numbers, health details, or anything the
+  user calls secret (`src/runtime/confidentiality.py`). Other personal mail, documents, source code and business
+  material may go to an untrusted gateway. The check reads the question and the whole history at the start of a turn,
+  then recalled notes and skills, audio transcripts and each round of tool results (the user's own MCP servers
+  included), only while the agent has an untrusted gateway to protect from. A confidential turn moves to the first
+  trusted gateway of the agent (the step list shows a gateway switch with reason `confidential`) and stays on trusted ones:
   failover never picks an untrusted gateway. Delegated agents inherit the mark (`ask(confidential=true)`).
 - **It fails closed.** A checker that is missing, disabled, unreachable, slow or unsure counts as confidential. When
   no trusted gateway can take a confidential turn (credentials missing, in cooldown), the turn ends with an error and
   nothing is sent to an untrusted one.
-- **Marked without a check:** a turn that recalls memory notes or skills, or carries the user's own MCP servers
-  (private extensions), is confidential at once when the agent has an untrusted gateway, because those are the
-  user's own data. A confidential turn also skips untrusted decision gateways (Laya, Jev) for the Router and other
-  decision agents, and ends with an error when none is left.
-- **Not covered:** text that only appears after the last tool result of a turn; the check reads at most 4,000
-  characters (start and end) of what it is given. FreeLLMAPI's decision gateway is listed on the page but no strategy
-  asks it.
+- **Whole texts.** The checker reads 4,000 characters at a time (200 overlap, four at once). One text over 40,000
+  characters is not read and counts as confidential. A part found public is remembered by its digest until Legion
+  restarts, so a long chat is read once.
+- **Marked without a check:** a turn that shows a picture, which no checker can read. A confidential turn also skips
+  untrusted decision gateways (Laya, Jev) for the Router and other decision agents, and ends with an error when none
+  is left.
+- **Not covered:** the checker is a model and can miss a secret; text that only appears after the last tool result of
+  a turn; the names and descriptions of the user's own MCP tools. FreeLLMAPI's decision gateway is listed on the page
+  but no strategy asks it.
 
 ## Secrets, budgets and insights
 

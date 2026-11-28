@@ -421,7 +421,7 @@ async def run_chat(
                 outcomes = await runner.run(calls)
                 if planning and planning.closed:  # no further plan or question; the agent's own tools stay
                     schemas = [s for s in schemas if s["name"] in planning.direct]
-                if switch := await confidentiality.protect_round(route, [o.text for o in outcomes], request_id):
+                if switch := await confidentiality.protect_round(route, [o.text for o in outcomes]):
                     if on_event:
                         await on_event(step_event("gateway_switch", **switch.as_dict()))
                     messages = _strip_reasoning(messages)

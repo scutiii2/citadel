@@ -46,7 +46,7 @@ const today = computed(() => {
   return { users: rows("tokens.user."), agents: rows("tokens.agent.") };
 });
 const tiers = ["light", "standard", "heavy", "none"];
-const reasons: [string, string][] = [["check", "Found by the check"], ["tool_result", "Found in tool results"], ["recall", "Recalled notes or skills"], ["private", "Private extensions"]];
+const reasons: [string, string][] = [["check", "Found by the check"], ["tool_result", "Found in tool results"], ["recall", "Found in recalled notes or skills"], ["audio", "Found in transcripts"]];
 </script>
 
 <template>
@@ -83,7 +83,7 @@ const reasons: [string, string][] = [["check", "Found by the check"], ["tool_res
             <span v-for="tier in tiers" :key="tier" class="chip-text">{{ tier === "none" ? "default" : tier }} {{ n("router.tier." + tier) }}</span></p>
         </section>
         <section class="group" aria-labelledby="conf-title">
-          <h3 id="conf-title">Confidential data <PanelHelp title="Confidential data">A confidential turn uses only trusted gateways. Refused means no trusted gateway could take it, so nothing was sent. Failed closed means the check could not answer (Jev down or slow) and the turn was treated as confidential.</PanelHelp></h3>
+          <h3 id="conf-title">Confidential data <PanelHelp title="Confidential data">A confidential turn uses only trusted gateways. Checks run counts the pieces of text the checker read. Refused means no trusted gateway could take it, so nothing was sent. Failed closed means the check could not answer (Jev down or slow) and the turn was treated as confidential.</PanelHelp></h3>
           <div class="tiles">
             <StatTile label="Checks run" :value="n('confidential.checks')" />
             <StatTile label="Turns marked confidential" :value="sumOf('confidential.marked.')" />
