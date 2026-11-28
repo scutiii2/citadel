@@ -209,6 +209,7 @@ class ChatResult:
     # False for an entry turn answered entirely by a delegated specialist.
     model_executed: bool = True
     status: str | None = None
+    no_answer: bool = False
     units: list[dict[str, Any]] = field(default_factory=list)
 
 

@@ -62,20 +62,21 @@ class LlmOptions:
         limits = budgets.current()
         return TurnGuard(self._llm.max_turn_tokens or limits.turn_tokens, self._llm.max_turn_seconds or limits.turn_seconds)
 
-    def _effort(self) -> str:
-        return _effort_override.get() or self._llm.reasoning_effort
+    def _effort(self, forced: str | None = None) -> str:
+        return forced or _effort_override.get() or self._llm.reasoning_effort
 
-    def _sent(self, model: str) -> list[str]:
+    def _sent(self, model: str, effort: str | None = None) -> list[str]:
         sent = []
         if self._llm.temperature is not None and (model, "temperature") not in self._dropped:
             sent.append("temperature")
-        if self._effort() != "off" and (model, "reasoning") not in self._dropped:
+        if self._effort(effort) != "off" and (model, "reasoning") not in self._dropped:
             sent.append("reasoning")
         return sent
 
-    def extra_kwargs(self, model: str) -> dict[str, Any]:
+    def extra_kwargs(self, model: str, effort: str | None = None) -> dict[str, Any]:
+        """The optional request fields for `model`. `effort` replaces the turn's reasoning effort for one request."""
         kwargs: dict[str, Any] = {}
-        for option in self._sent(model):
+        for option in self._sent(model, effort):
             if option == "temperature":
                 if self._provider_id == "anthropic":
                     # The anthropic SDK's messages.stream() has no temperature keyword (a TypeError, not a 400).
@@ -83,17 +84,17 @@ class LlmOptions:
                 else:
                     kwargs["temperature"] = self._llm.temperature
             elif self._provider_id == "anthropic":
-                kwargs["output_config"] = {"effort": self._effort()}
+                kwargs["output_config"] = {"effort": self._effort(effort)}
             else:
-                kwargs["reasoning"] = {"effort": self._effort()}
+                kwargs["reasoning"] = {"effort": self._effort(effort)}
         return kwargs
 
-    def drop_rejected(self, message: str, model: str) -> bool:
+    def drop_rejected(self, message: str, model: str, effort: str | None = None) -> bool:
         """True when `message` (a 400's text) names an option we sent; that
         option is then never sent again to that model (other models still get
         it). False = not ours, re-raise."""
         text = message.lower()
-        for option in self._sent(model):
+        for option in self._sent(model, effort):
             if any(marker in text for marker in _MARKERS[option]):
                 self._dropped.add((model, option))
                 _log.warning("agent %s: model %s rejected %s; no longer sending it to it", self._agent_id, model, option)

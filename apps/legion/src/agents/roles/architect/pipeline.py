@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import asdict, replace
@@ -87,6 +88,14 @@ async def run(spec: AgentSpec, brief: str, complete: Callable[[str], ChatResult]
             prompt = handler.plan_prompt(brief, prefetch, spec) + f"\nMaximum units: {spec.limits.max_units}."
             for attempt in range(2):
                 answer = await interpret(prompt)
+                try:
+                    if spec.kind == "task" and json.loads(answer.response) == {"unavailable": True}:
+                        response = "The requested ability is unavailable: no suitable specialist is available."
+                        if on_event:
+                            await on_event({"type": "token", "text": response})
+                        return replace(answer, response=response, model_executed=False, delegated_usage=list(usage))
+                except (ValueError, TypeError):
+                    pass
                 try:
                     planned = handler.parse_plan(answer.response, spec)
                     break

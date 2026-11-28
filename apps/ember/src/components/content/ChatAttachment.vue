@@ -30,7 +30,7 @@ watch(() => props.attachment, () => { failed.value = false; enlarged.value = fal
     </BaseModal>
   </div>
   <details v-else class="attachment">
-    <summary>📎 {{ attachment.filename }} ({{ attachment.chars.toLocaleString() }} characters{{ attachment.truncated ? ", cut short" : "" }})</summary>
+    <summary>📎 {{ attachment.filename }}<template v-if="/^\[File file_id: [^\]]+ \| audio \| listen(?: \||\])/.test(attachment.text)"> (not transcribed yet)</template><template v-else-if="attachment.chars > 0"> ({{ attachment.chars.toLocaleString() }} characters{{ attachment.truncated ? ", cut short" : "" }})</template></summary>
     <pre>{{ attachment.text }}</pre>
   </details>
 </template>

@@ -329,9 +329,10 @@ async def run_chat(
             lambda: ProviderCounter(_OpenAIRequestCounter(client, model_name), model_name),
         )
 
-    async def result(response: str) -> ChatResult:
+    async def result(response: str, no_answer: bool = False) -> ChatResult:
         return ChatResult(
             response=response,
+            no_answer=no_answer,
             tools_used=tools_used,
             tool_calls=tool_calls,
             provider_id=PROVIDER_ID,
@@ -410,7 +411,11 @@ async def run_chat(
 
                 function_calls = [item for item in response.output if getattr(item, "type", "") == "function_call"]
                 if not function_calls:
-                    return await result("".join(text_parts) or response.output_text)
+                    answer = "".join(text_parts) or response.output_text or ""
+                    if not answer.strip():
+                        stop_message = "The model returned no visible answer. Please try again or choose another model."
+                        break
+                    return await result(answer)
 
                 guard.check_tokens(total_tokens, budget_cached_tokens)
                 if text_parts and on_event:
@@ -444,7 +449,7 @@ async def run_chat(
     if on_event:
         await on_event(step_event("token_reset"))
         await on_event(step_event("token", text=stop_message))
-    return await result(stop_message)
+    return await result(stop_message, no_answer=True)
 
 
 def run_interpret(text: str, model: str | None = None) -> ChatResult:

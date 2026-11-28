@@ -338,7 +338,9 @@ async def run_chat(
         if review_requested is True:
             tool_filter.reset(reserved_filter_token)
             reserved_filter_token = None
-            result.response = await review_enforcement.finish(question, history, result.response, on_event, request_id, depth)
+            result.response = await review_enforcement.finish(
+                question, history, result.response, on_event, request_id, depth,
+                no_answer=result.no_answer, records=result.tool_calls)
             if on_event:
                 await on_event({"type": "token", "text": result.response})
         result.delegated_usage = delegated_usage

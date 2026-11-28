@@ -6,7 +6,7 @@
   },
   "token_limits": {
     "default": {
-      "max_output_tokens": 2048,
+      "max_output_tokens": 8192,
       "max_context_tokens": 100000,
       "max_tool_rounds": 15
     },

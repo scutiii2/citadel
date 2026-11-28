@@ -366,6 +366,7 @@ async def run_chat(
                        batch_tools=run_tools.batchable([s["name"] for s in schemas], _LOCAL_TOOLS)
                        if run_tools.TOOL_NAME in {s["name"] for s in schemas} else frozenset())
     empty_answer_retried = False
+    retry_low_effort = False
     stop_message = 'Reached maximum tool-call rounds without a final answer.'
     # The full prompt just sent (all resent history + this round's tool
     # results), not a sum across rounds like total_tokens - this is what
@@ -381,9 +382,10 @@ async def run_chat(
             lambda: ProviderCounter(_AnthropicRequestCounter(client, model_name), model_name),
         )
 
-    async def result(response: str) -> ChatResult:
+    async def result(response: str, no_answer: bool = False) -> ChatResult:
         return ChatResult(
             response=response,
+            no_answer=no_answer,
             tools_used=tools_used,
             tool_calls=tool_calls,
             provider_id=PROVIDER_ID,
@@ -413,13 +415,18 @@ async def run_chat(
                     token_limits.enforce_context_limit(PROVIDER_ID, [system_prompt, *messages], route.current)
                     text_parts: list[str] = []
                     try:
+                        forced_effort = "low" if retry_low_effort else None
+                        extra = options.extra_kwargs(model_name, forced_effort)
+                        maximum = options.max_tokens(token_limits.max_output_tokens(PROVIDER_ID, route.current))
+                        if retry_low_effort:
+                            maximum = min(maximum, max(1, guard.max_tokens - total_tokens + 9 * cached_input_tokens // 10))
                         async with client.messages.stream(
                             model=model_name,
-                            max_tokens=options.max_tokens(token_limits.max_output_tokens(PROVIDER_ID, route.current)),
+                            max_tokens=maximum,
                             system=system,
                             messages=_with_history_breakpoint(messages) if use_cache else messages,
                             tools=tools,
-                            **options.extra_kwargs(model_name),
+                            **extra,
                         ) as stream:
                             async for is_text, chunk in _stream_pieces(stream):
                                 if is_text:
@@ -433,7 +440,7 @@ async def run_chat(
                         # 422 without a kind: the provider refused the request itself.
                         # If it names an option we sent, drop that option and repeat the round.
                         if isinstance(error, GatewayCallError) and error.status == 422 and classify(error) is None:
-                            if not text_parts and options.drop_rejected(str(error), model_name):
+                            if not text_parts and options.drop_rejected(str(error), model_name, forced_effort):
                                 continue
                         switch = route.advance(error)
                         if switch is None:
@@ -479,6 +486,10 @@ async def run_chat(
                         if empty_answer_retried or response.stop_reason not in ("end_turn", "max_tokens"):
                             break
                         guard.check_tokens(total_tokens, cached_input_tokens)
+                        if response.stop_reason == "max_tokens":
+                            if extra.get("output_config", {}).get("effort") == "low":
+                                break
+                            retry_low_effort = True
                         empty_answer_retried = True
                         # Keep completed tool results in history; only repeat the model round.
                         # Do not resend an empty assistant message or private thinking blocks.
@@ -526,7 +537,7 @@ async def run_chat(
     if on_event:
         await on_event(step_event("token_reset"))
         await on_event(step_event("token", text=stop_message))
-    return await result(stop_message)
+    return await result(stop_message, no_answer=True)
 
 
 def run_interpret(text: str, model: str | None = None) -> ChatResult:

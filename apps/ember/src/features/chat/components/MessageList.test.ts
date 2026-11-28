@@ -22,6 +22,18 @@ const assistant = (content: string, extra: Partial<ChatMessage> = {}): ChatMessa
 const FOUR = [user("q1"), assistant("a1"), user("q2"), assistant("a2")];
 const FILE = { filename: "f.txt", chars: 3, truncated: false, text: "abc" };
 
+describe("attachment labels", () => {
+  it("uses stored listen marker and hides zero counts", () => {
+    const audio = { filename: "voice.wav", chars: 0, truncated: false,
+      text: "[File file_id: f_voice | audio | listen | expires_at: 1]" };
+    const empty = { filename: "empty.txt", chars: 0, truncated: false, text: "" };
+    const wrapper = mountList({ messages: [user(withAttachments("Listen", [audio, empty]))] });
+    expect(wrapper.text()).toContain("voice.wav (not transcribed yet)");
+    expect(wrapper.text()).not.toContain("0 characters");
+    wrapper.unmount();
+  });
+});
+
 describe("image attachments", () => {
   for (const [label, text] of [
     ["PDFMerger", "[PDFMerger file_id: f_photo | 1 pages | image | expires_at: 2000000000]"],

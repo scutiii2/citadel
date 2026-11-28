@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict
 from typing import Any
 
@@ -16,6 +17,14 @@ from src.runtime import questions
 
 # Leave room under portcullis's five-minute streaming ask read timeout.
 PLAN_STEP_TIMEOUT_SECONDS = 270
+
+
+def _item_text(brief: str) -> str:
+    text = re.sub(r"\[\[/?ATTACHMENT[^\]]*\]\]|\[(?:File file_id|table_id):[^\]]*\]", " ", brief, flags=re.IGNORECASE)
+    text = " ".join(text.split())
+    if len(text) <= 300:
+        return text
+    return text[:299].rsplit(" ", 1)[0].rstrip() + "…" if " " in text[:299] else text[:299] + "…"
 
 
 class PlanSession:
@@ -53,7 +62,7 @@ class PlanSession:
     async def _execute(self, submitted: Plan, depth: int, request_id: str | None,
                        on_event: OnEvent | None) -> dict[str, NodeResult]:
         checklist = plan.Checklist()
-        items = [{"text": step.brief[:300], "status": "pending"} for step in submitted.steps]
+        items = [{"text": _item_text(step.brief), "status": "pending"} for step in submitted.steps]
 
         async def update() -> None:
             if plan.current().offered:
@@ -79,7 +88,7 @@ class PlanSession:
             result = results[step.id]
             item["status"] = "done"
             if result.status != "done":
-                item["text"] = f"{result.status}: {step.brief}"[:300]
+                item["text"] = f"{result.status}: {_item_text(step.brief)}"
         await update()
         return results
 

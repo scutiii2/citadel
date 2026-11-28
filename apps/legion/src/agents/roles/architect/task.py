@@ -59,7 +59,13 @@ class TaskArchitect:
             f"Plan how specialist agents answer the brief. Return ONLY a JSON object with a units list of 1 to {spec.limits.max_units} entries. "
             "If there are more parts, group related parts into units while preserving every part. "
             "Each unit needs id, agent, spec, depends_on, effect, tier_hint. agent must be one id from the "
-            "workers list, chosen by what it is for. Use one unit when one specialist covers the brief; add "
+            "workers list. Assign a unit only when the worker's 'for' text covers that work; never substitute an unrelated worker. "
+            + ('If no worker covers any requested work, return only {"unavailable": true} instead of a plan; '
+               'the answer will state that the ability is unavailable. ' if spec.kind == "task" else "")
+            + ("Arithmetic derived from attached table data, such as totals or tax on a total, belongs to "
+               "data-analyst in the same unit as the table work, not to a separate mathematician unit. "
+               if "data-analyst" in spec.workers else "")
+            + "Use one unit when one specialist covers the brief; add "
             "more only when the work has separate parts or one result feeds the next. "
             "spec is the complete, self-contained question for that agent: copy ids, table_id lines, numbers "
             "and pasted data verbatim. depends_on lists unit ids whose results this unit needs. "
