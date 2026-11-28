@@ -12,10 +12,12 @@ approval) runs alone, in order, so a write never overlaps a neighbour and approv
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from src.citadel_auth.failure import parse as parse_failure
 from src.providers.base_provider import OnEvent, ToolCallRecord, dispatch_with_progress, step_event
 from src.providers.turn_guard import TurnGuard
 from src.runtime import approvals, counters, questions, run_tools, tool_batch_settings, turn_effects
@@ -35,6 +37,7 @@ class Outcome:
     ok: bool
     # What the step card shows when it differs from what the model receives.
     shown: str | None = None
+    diagnostic: str | None = None
 
 
 class ToolRound:
@@ -100,11 +103,26 @@ class ToolRound:
             text = await dispatch_with_progress(self.dispatch, self.on_event, call.id, call.name, call.arguments, self.depth)
             return Outcome(text, True)
         except Exception as error:
-            return Outcome(f"Tool '{call.name}' failed: {error}", False)
+            category = next((cls.__name__ for cls in (TimeoutError, PermissionError, ConnectionError, ValueError, RuntimeError)
+                             if isinstance(error, cls)), "Exception")
+            return Outcome(f"Tool '{call.name}' failed: {error}", False, diagnostic=f"{category} during tool dispatch")
 
     async def _finish(self, call: Call, outcome: Outcome) -> Outcome:
         if isinstance(outcome.text, FailedToolText):
             outcome.ok = False
+        if call.name == "tool_tables_describe" and not outcome.ok:
+            value = call.arguments.get("table_id") if isinstance(call.arguments, dict) else None
+            kind = "file_id" if isinstance(value, str) and value.startswith("f_") else "table_id"
+            failure = parse_failure(outcome.text) if isinstance(outcome.text, FailedToolText) else None
+            if failure:
+                reason = f"[{int(failure.code)}] {failure.code.name}"
+            elif "Table not found or expired." in outcome.text:
+                reason = "Table not found or expired"
+            else:
+                reason = outcome.diagnostic or "unrecognized upstream error"
+            message = f"{call.name} failed ({kind}): {reason}."
+            logging.getLogger(__name__).warning(message)
+            outcome.shown = message
         if isinstance(outcome.text, NumberedFailureText):
             self.guard.note_result(call.name, call.arguments, outcome.text)
         await self._emit("step_end", id=call.id, ok=outcome.ok, result=outcome.shown or outcome.text)

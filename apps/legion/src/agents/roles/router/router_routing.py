@@ -1,6 +1,7 @@
 """Entry-turn routing orchestration; Router recommends, Legion authorizes and dispatches."""
 from __future__ import annotations
 
+import logging
 from uuid import uuid4
 
 from src.agents import agent_routing, agent_spec
@@ -28,7 +29,7 @@ def _summary(result, chosen, tier, roster, spec):
     return text
 
 
-async def route_turn(question, history, on_event, request_id, depth, explicit_tier=None):
+async def route_turn(question, history, on_event, request_id, depth, explicit_tier=None, *, allow_dispatch=True):
     spec = agent_spec.current()
     if depth or not spec.entry or not spec.orchestrator or spec.internal_role:
         return None, None, ""
@@ -51,7 +52,7 @@ async def route_turn(question, history, on_event, request_id, depth, explicit_ti
         tiers=[RouteTier(tier=t.tier, id=t.id, use_for=t.use_for) for t in model_tiers.own_tiers()])
     request = RouteRequest(subject=subject, candidates=[candidate(e) for e in roster], entry=entry,
         explicit_tier=explicit_tier, request_id=request_id or uuid4().hex,
-        choose_agent=not approvals.current().needs_approval(delegation.TOOL_NAME),
+        choose_agent=allow_dispatch and not approvals.current().needs_approval(delegation.TOOL_NAME),
         choose_tier=not explicit_tier and not (history and not brief and len(question.strip()) < 20))
     step_id = f"routing-{uuid4().hex[:8]}"
     if on_event:
@@ -67,7 +68,8 @@ async def route_turn(question, history, on_event, request_id, depth, explicit_ti
                 rows[0]["routing"]["trace"] = result.trace
         delegation.record_usage(rows)
     tier = result.model_tier if result and request.choose_tier and not result.size.uncertain else None
-    chosen = result.agent.choice if result else None
+    chosen = result.agent.choice if result and request.choose_agent else None
+    logging.getLogger(__name__).info("Router decision: agent=%s choose_agent=%s tier=%s", chosen, request.choose_agent, tier)
     counters.add("router.turns")
     if result is None:
         counters.add("router.unavailable")
@@ -82,9 +84,8 @@ async def route_turn(question, history, on_event, request_id, depth, explicit_ti
     if result is None:
         return None, None, ""
     note = f"router tier: {result.size.choice} -> {tier}" if tier else ""
-    if (not request.choose_agent or result.agent.uncertain or chosen in (None, "none")):
+    if not request.choose_agent or result.agent.uncertain or chosen in (None, "none"):
         return None, tier, note
-    # Rebuild the authorized roster before dispatch: tool switches and running peers may have changed.
     current = auto_route.routable(await agent_routing.roster_for())
     target = next((e for e in current if e.id == chosen and any(c.id == e.id for c in request.candidates)), None)
     if target is None:

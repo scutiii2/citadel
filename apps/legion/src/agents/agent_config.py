@@ -18,7 +18,7 @@ import anyio
 from dotenv import dotenv_values
 
 from src.agents import agent_spec
-from src.agents.roles.orchestrator import auto_route, delegation, memory_recall, skill_recall, skill_reflection
+from src.agents.roles.orchestrator import auto_route, delegation, memory_recall, review_enforcement, skill_recall, skill_reflection
 from src.agents.roles.router import router_routing
 from src.agents.roles.orchestrator import plan as plan_policy
 
@@ -224,6 +224,7 @@ async def run_chat(
     limits_token = token_limits.bind_user_limits(limits)
     # The checker reads secrets to judge them, so its own turn asks trusted gateways only.
     confidential_token = confidentiality.bind(confidential or spec.id == confidentiality.AGENT_ID)
+    reserved_filter_token = None
     try:
         if cancellation.is_cancelled(request_id):
             raise ChatCancelled()
@@ -238,6 +239,8 @@ async def run_chat(
             from src.agents.roles.architect import pipeline
 
             model = model_tiers.resolve("heavy", model_tiers.own_tiers(), MODEL, spec.id).model
+            if tool_filter.REVIEW_RESERVED in tool_filter.blocked():
+                spec = dataclasses.replace(spec, workers=tuple(worker for worker in spec.workers if worker != "reviewer"))
             result = await pipeline.run(spec, question, lambda text: _PROVIDER_MODULE.run_interpret(text, model),
                                         request_id=request_id, depth=depth, delegated_by=delegated_by, on_event=on_event)
             delegation.record_usage(result.delegated_usage)
@@ -248,12 +251,13 @@ async def run_chat(
             from src.tools.mcp_client import mcp_upstream
 
             await mcp_upstream.prefetch_private(private)
-        # A confident classifier pick sends the question straight to a specialist, and this
-        # agent's own model never runs (agents/auto_route.py; off unless configured).
-        # A settled Router pick answers the turn through that specialist, plan mode or not; otherwise it
-        # only picks the model tier of this agent's own call (the planner's, for the orchestrator).
+        review_requested = await review_enforcement.requested(question, history) if depth == 0 and spec.orchestrator else False
+        if review_requested is True:
+            reserved_filter_token = tool_filter.bind(tool_filter.blocked() | {tool_filter.REVIEW_RESERVED, "agent:reviewer"})
+        elif review_requested is None:
+            _log.warning("Review request classification was undecided; using orchestrator")
         routed, routed_tier, auto_note = await router_routing.route_turn(
-            question, history, on_event, request_id, depth, model_tier)
+            question, history, on_event, request_id, depth, model_tier, allow_dispatch=review_requested is False)
         if routed is not None:
             routed.delegated_usage = delegated_usage
             return routed
@@ -295,9 +299,13 @@ async def run_chat(
             provider_question = await transcripts.add(provider_question, audio_files)
             await confidentiality.protect_turn(provider_question[heard_from:], "audio")
         images_token = images.bind(attached)
+        async def draft_event(event):
+            if on_event and event.get("type") != "token":
+                await on_event(event)
+        provider_events = draft_event if review_requested is True and on_event else on_event
         async def call(module: Any, model: str | None) -> ChatResult:
             if inspect.iscoroutinefunction(module.run_chat):
-                return await module.run_chat(provider_question, history, model, request_id, depth, on_event=on_event, caveman=caveman)
+                return await module.run_chat(provider_question, history, model, request_id, depth, on_event=provider_events, caveman=caveman)
             # Phase 1: openai_provider is still sync - run it off the event
             # loop thread so a slow completion doesn't block other requests
             # this ai_agent process is serving. on_event is dropped here on
@@ -327,6 +335,12 @@ async def run_chat(
         finally:
             turn_effects.reset(effects_token)
             images.reset(images_token)
+        if review_requested is True:
+            tool_filter.reset(reserved_filter_token)
+            reserved_filter_token = None
+            result.response = await review_enforcement.finish(question, history, result.response, on_event, request_id, depth)
+            if on_event:
+                await on_event({"type": "token", "text": result.response})
         result.delegated_usage = delegated_usage
         if switches:
             result.gateway_switches = [*switches, *result.gateway_switches]
@@ -340,6 +354,8 @@ async def run_chat(
             skill_reflection.schedule(question, result, request_id)
         return result
     finally:
+        if reserved_filter_token is not None:
+            tool_filter.reset(reserved_filter_token)
         confidentiality.reset(confidential_token)
         token_limits.reset_user_limits(limits_token)
         llm_options.reset_effort(effort_token)

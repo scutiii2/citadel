@@ -41,6 +41,7 @@ def is_blocked(name: str) -> bool:
 # A specialist the asking user switched off rides in the same set as "agent:<id>",
 # so it reaches delegates and old agents' fail-closed check without a new argument.
 AGENT_PREFIX = "agent:"
+REVIEW_RESERVED = "internal:reviewer-reserved"
 
 
 def agent_blocked(agent_id: str) -> bool:

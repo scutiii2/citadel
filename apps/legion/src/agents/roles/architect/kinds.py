@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from src.agents.roles.architect.task import TaskArchitect
 from src.agents.roles.architect.types import NodeResult, Unit, UnitPlan
+from src.runtime import tool_filter
 
 
 class ReviewArchitect(TaskArchitect):
@@ -15,12 +16,19 @@ class ReviewArchitect(TaskArchitect):
         "answer, add a last unit by the same specialist that depends on the reviewer and rewrites it. "
     )
 
+    def guidance_for_plan(self) -> str:
+        if tool_filter.REVIEW_RESERVED in tool_filter.blocked():
+            return "Prepare the answer using the available workers; an independent review follows automatically. "
+        return self.guidance
+
     def assemble_prompt(self, brief: str, plan: UnitPlan, results: dict[str, NodeResult]) -> str:
         return super().assemble_prompt(brief, plan, results).replace(
             "Write the final reply", "Cite the source each claim came from and mark claims only one source supports. "
             "Write the final reply", 1)
 
     def check_plan(self, units: list[Unit]) -> None:
+        if tool_filter.REVIEW_RESERVED in tool_filter.blocked():
+            return
         reviews = [unit for unit in units if unit.agent_id == "reviewer"]
         if len(units) < 2 or not reviews:
             raise ValueError("a review plan needs a unit that answers and a reviewer unit that checks it")

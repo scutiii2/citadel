@@ -17,6 +17,7 @@ from typing import Mapping, Sequence
 
 from src.agents import agent_spec, prompt_config
 from src.agents.agent_spec import AgentSpec, RosterEntry
+from src.runtime import tool_filter
 
 # The shared texts (identity wording, default instructions, roster intro,
 # caveman rule) come from configs/config_prompts.json over the defaults in
@@ -91,6 +92,9 @@ def system_prompt_for(caveman: bool = False, roster: Sequence[RosterEntry] = (),
         prompt += ("\n\nPlan mode: reach other agents only through submit_plan. Call ask_user and your own tools directly. "
                    "Answer directly when no architect is needed. "
                    "Every submitted brief must stand alone. After results arrive, write the final reply.")
+    if agent_spec.current().orchestrator and tool_filter.REVIEW_RESERVED in tool_filter.blocked():
+        prompt += ("\n\nAn independent reviewer will automatically review your completed answer. "
+                   "Do not delegate to Reviewer or say Reviewer is unavailable; prepare the answer for that review.")
     return f"{prompt}\n\n{CAVEMAN_INSTRUCTIONS}" if caveman else prompt
 
 
