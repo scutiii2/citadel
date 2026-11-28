@@ -24,6 +24,12 @@ keeps the table under the file id. This works until the file itself expires; the
 | `tool_tables_aggregate` | sum / mean / count / min / max per group (up to 2 group columns), optional filter, sort, limit. |
 | `tool_tables_valueCounts` | How often each value appears in a column. |
 
+For derived values, pass `operator` (`+`, `-`, `*`, `/`) and `second_column` together in a measure.
+Both columns must be numeric. For example, `{"fn":"sum","column":"units","operator":"*","second_column":"unit_price"}`
+sums per-row revenue. Sort by `sum(units*unit_price)`; group by a unique order id and set `limit` for top N orders.
+Empty operands and division by zero exclude the row from the affected measure, not from other measures.
+The result message counts each affected row once.
+
 ## Slash commands
 
 `/data list`, `/data describe table_id=...`, `/data head table_id=... limit=10`,

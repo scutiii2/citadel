@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from src.gateway.conversation.errors import GatewayError
+from src.gateway.conversation.tool_schema import model_schema
 
 TIERS = ("light", "standard", "heavy", "extreme")
 TOP = {"gateway", "model", "tier", "system", "messages", "tools", "tool_choice", "schema", "reasoning", "max_tokens",
@@ -153,7 +154,7 @@ def _tools(value: Any, limits: Limits) -> list[dict[str, Any]]:
         parameters = tool.get("parameters", {"type": "object", "properties": {}})
         if not isinstance(parameters, dict):
             raise bad("tool parameters must be a JSON schema object.")
-        out.append({"name": name, "description": _text(tool.get("description", ""), "tool description", 4000, empty=True), "parameters": parameters})
+        out.append({"name": name, "description": _text(tool.get("description", ""), "tool description", 4000, empty=True), "parameters": model_schema(parameters)})
     return out
 
 
@@ -199,7 +200,7 @@ def parse_request(data: Any, limits: Limits) -> ChatRequest:
             raise bad("schema is {\"name\", \"schema\", \"strict\"?} with a JSON schema object.")
         if tools:
             raise bad("send either tools or a schema, not both.")
-        schema = {"name": schema["name"], "schema": schema["schema"], "strict": schema.get("strict", False)}
+        schema = {"name": schema["name"], "schema": model_schema(schema["schema"]), "strict": schema.get("strict", False)}
     reasoning = data.get("reasoning")
     if reasoning is not None:
         if not isinstance(reasoning, dict) or set(reasoning) - {"effort", "budget_tokens"}:

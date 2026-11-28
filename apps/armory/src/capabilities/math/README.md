@@ -18,8 +18,11 @@ completeness, verification, values, readable conditions, certificates, diagnosti
 requested trace stay. A reply with something to reuse carries a `result_id` (each batch or
 table row has its own); Armory keeps the full result in memory under it for 30 minutes, bound
 to the account, at most 128 per account and 32 MB in all, oldest dropped first. A restart
-drops them. A caller with no account identity receives the full result. Progress
-notifications always carry full records.
+drops them. For `tool_math_batch` and `tool_math_table`, clean final records contain only
+`id`, `values` and `result_id`. Named solutions use variable names in `values`; a scalar
+expression uses `values.value`. Other records retain the indexed `result` with status,
+conditions, verification and diagnostics. A caller with no account identity receives
+full records. Progress notifications always carry full records.
 
 Full results carry `structured_conditions` alongside readable conditions. Each fact
 includes `source`, `predicate`, and `reusable`. Expression and predicate trees

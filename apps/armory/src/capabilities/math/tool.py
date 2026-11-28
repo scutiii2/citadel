@@ -68,8 +68,8 @@ async def tool_math_batch(
     ctx: Context,
 ) -> dict[str, Any]:
     """Evaluate a formula or system for up to 32 records with two active workers.
-    Return each record's solutions, verification, and diagnostics. Mathematical
-    inconsistency is a valid per-record answer. A 60-second batch deadline and
+    Clean final records contain id, values and result_id; other records retain
+    status, conditions, verification and diagnostics under result. A 60-second batch deadline and
     aggregate input/output caps apply; retry unfinished records in smaller batches.
     """
     async def progress(event):
@@ -106,7 +106,8 @@ async def tool_math_table(equation: SharedEquation, data: TableFormulaInput, ctx
     `total`, instead of adding them with another call.
     Only current caller's tables are accessible. Raw stored cells bypass display
     rounding. Partial row results stream through MCP progress when requested.
-    Follow source.next_offset for remaining rows; missing cells fail per row.
+    Clean final records contain id, values and result_id; other rows carry
+    result.status and diagnostics. Follow source.next_offset for remaining rows.
     """
     from src.capabilities.tables.utils import tables
     from src.services.identity_context import current_username

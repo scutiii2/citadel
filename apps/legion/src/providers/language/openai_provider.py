@@ -21,6 +21,7 @@ from src.providers.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec
 from src.agents.roles.orchestrator import ask_user, delegation, plan, plan_runner, submit_plan
 from src.providers.gateway_failover import GatewayRoute, classify
+from src.gateway.conversation.tool_schema import model_schema
 
 from src.runtime import approvals, questions
 from src.runtime import confidentiality, images, run_tools
@@ -182,6 +183,8 @@ def _tool_schemas(roster: Sequence[RosterEntry] = ()) -> list[dict[str, Any]]:
         schemas.append({"type": "function", "name": submit_plan.TOOL_NAME,
                         "description": submit_plan.tool_description(),
                         "parameters": submit_plan.tool_parameters(), "display_label": "Plan"})
+    for schema in schemas:
+        schema["parameters"] = model_schema(schema["parameters"])
     return schemas
 
 
@@ -302,6 +305,7 @@ async def run_chat(
     # never reported usage should say "unknown" (see ChatResult.total_tokens),
     # not "zero tokens".
     total_tokens: int | None = None
+    budget_cached_tokens = 0
     input_tokens: int | None = None
     output_tokens: int | None = None
     meter = LiveUsage(on_event)
@@ -393,6 +397,8 @@ async def run_chat(
                 round_tokens = getattr(usage, "total_tokens", None) if usage is not None else None
                 if round_tokens is not None:
                     total_tokens = (total_tokens or 0) + round_tokens
+                    details = getattr(usage, "input_tokens_details", None)
+                    budget_cached_tokens += getattr(details, "cached_tokens", None) or 0
                 round_input = getattr(usage, "input_tokens", None) if usage is not None else None
                 if round_input is not None:
                     input_tokens = (input_tokens or 0) + round_input
@@ -401,12 +407,12 @@ async def run_chat(
                     output_tokens = (output_tokens or 0) + round_output
                 await meter.round_done(round_tokens)
                 context_tokens = getattr(usage, "input_tokens", None) if usage is not None else None
-                guard.check_tokens(total_tokens)
 
                 function_calls = [item for item in response.output if getattr(item, "type", "") == "function_call"]
                 if not function_calls:
                     return await result("".join(text_parts) or response.output_text)
 
+                guard.check_tokens(total_tokens, budget_cached_tokens)
                 if text_parts and on_event:
                     await on_event(step_event("token_reset"))
 

@@ -176,7 +176,10 @@ def response(reply: dict[str, Any]) -> SimpleNamespace:
     sent, written = int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0)
     return SimpleNamespace(
         output=output, output_text="".join(texts),
-        usage=SimpleNamespace(input_tokens=sent, output_tokens=written, total_tokens=sent + written),
+        usage=SimpleNamespace(
+            input_tokens=sent, output_tokens=written, total_tokens=sent + written,
+            input_tokens_details=SimpleNamespace(cached_tokens=int(usage.get("cached_input_tokens") or 0)),
+        ),
     )
 
 

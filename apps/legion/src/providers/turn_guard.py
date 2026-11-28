@@ -15,11 +15,13 @@ class TurnStopped(Exception):
 
 
 class TurnGuard:
-    """Bound elapsed time, reported tokens, and identical calls within one turn.
+    """Bound elapsed time, weighted tokens, and identical calls within one turn.
 
-    Usage is reported at round boundaries, so a token cap may overshoot by
-    one response. Timeouts interrupt async waits; synchronous tools already
-    running on a worker cannot be forcibly undone.
+    Count cache-read input tokens at one tenth for the budget only. Usage
+    arrives at round boundaries, so the cap may overshoot by one response.
+    Check before running tools or retrying, not before returning a final answer.
+    Timeouts interrupt async waits; synchronous tools already running on a
+    worker cannot be forcibly undone.
     """
 
     def __init__(self, max_tokens: int = 100_000, max_seconds: float = 300) -> None:
@@ -33,8 +35,9 @@ class TurnGuard:
         """Apply the turn deadline to the entire provider loop. Waiting on a server's question does not count."""
         return deadlines.deadline(self.max_seconds)
 
-    def check_tokens(self, total: int | None) -> None:
-        if total is not None and total >= self.max_tokens:
+    def check_tokens(self, total: int | None, cached: int = 0) -> None:
+        # Compare in tenths of a token so the boundary is exact.
+        if total is not None and 10 * total - 9 * cached >= 10 * self.max_tokens:
             raise TurnStopped(f"Stopped: this turn reached its token budget ({self.max_tokens:,} tokens).")
 
     @staticmethod

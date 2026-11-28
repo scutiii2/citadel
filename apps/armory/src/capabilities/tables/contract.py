@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Cell = str | int | float | None
 
@@ -31,6 +31,16 @@ class Measure(BaseModel):
     fn: Literal["sum", "mean", "count", "min", "max"] = Field(
         description="sum and mean need a number column; min and max need a number or date column; count counts non-empty cells."
     )
+    operator: Literal["+", "-", "*", "/"] | None = Field(
+        default=None, description="Compute column operator second_column per row before aggregating. Both must be numeric."
+    )
+    second_column: str | None = Field(default=None, description="Right-hand column. Give together with operator.")
+
+    @model_validator(mode="after")
+    def check_operands(self) -> Measure:
+        if (self.operator is None) != (self.second_column is None):
+            raise ValueError("operator and second_column must be given together.")
+        return self
 
 
 class TableInfo(BaseModel):

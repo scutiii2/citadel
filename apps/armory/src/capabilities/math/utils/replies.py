@@ -12,8 +12,8 @@ from collections import OrderedDict
 from collections.abc import Callable
 from typing import Any
 
-from src.capabilities.math.contract import (RESULT_ID_PREFIX, BatchResult, ContinuationInput, ResultRef,
-                                            SolveResult)
+from src.capabilities.math.contract import (RESULT_ID_PREFIX, BatchResult, BatchRow, ContinuationInput,
+                                            MathValue, ResultRef, SolveResult)
 
 _VALUE = {"expression": True}
 _SOLUTION = {"structured_conditions": True, "value": _VALUE, "values": {"__all__": _VALUE}}
@@ -86,9 +86,19 @@ class MathReplies:
             return self._short(result, owner)
         data = _without_empty(result.model_dump(mode="json", exclude={"records"}, exclude_none=True))
         if result.records:
-            data["records"] = [{"index": row.index, "id": row.id, "result": self._short(row.result, owner)}
-                               for row in result.records]
+            data["records"] = [self._row(row, owner) for row in result.records]
         return data
+
+    def _row(self, row: BatchRow, owner: str) -> dict[str, Any]:
+        values = _clean_values(row.result)
+        if values:
+            return {
+                "id": row.id,
+                "values": {name: value.model_dump(mode="json", exclude=_VALUE, exclude_none=True)
+                           for name, value in values.items()},
+                "result_id": self._store.put(owner, row.result),
+            }
+        return {"index": row.index, "id": row.id, "result": self._short(row.result, owner)}
 
     def restore(self, data: ContinuationInput, owner: str) -> ContinuationInput | SolveResult:
         """`data` with a result_id replaced by the result it names, or the result that explains why it cannot."""
@@ -106,6 +116,22 @@ class MathReplies:
         if result.solutions or result.value is not None:
             data = {"result_id": self._store.put(owner, result), **data}
         return data
+
+
+def _clean_values(result: SolveResult) -> dict[str, MathValue]:
+    if (result.status != "unique" or result.completeness != "complete" or result.verification.status != "exact"
+            or result.conditions or result.diagnostics or result.trace or result.cases or result.free_parameters
+            or result.assumptions or result.certificate or (result.normalization and result.normalization.notes)
+            or len(result.solutions) > 1):
+        return {}
+    if result.solutions:
+        solution = result.solutions[0]
+        if solution.conditions or solution.verification.status != "exact":
+            return {}
+        if solution.value is not None:
+            return {"value": solution.value}
+        return solution.values
+    return {"value": result.value} if result.value is not None else {}
 
 
 def _without_empty(data: dict[str, Any]) -> dict[str, Any]:

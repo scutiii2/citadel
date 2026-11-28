@@ -77,9 +77,11 @@ typos are caught at startup.
 Anthropic and OpenAI turns default to a 100,000-token budget and a 300-second
 deadline. Set `llm.max_turn_tokens` (positive integer) and
 `llm.max_turn_seconds` (0.001 to 86,400) beside `max_tool_rounds` to override
-them per agent. Tokens include input and output summed across rounds, checked
-when a response reports usage; one response can exceed the cap. A third consecutive tool
-call with the same name and arguments ends the turn before it executes.
+them per agent. The budget sums input and output across rounds, counting cache-read input
+at one tenth. Reported usage, the live meter and daily counts still use full token counts.
+Usage arrives after each response. If the budget is reached, Legion returns a finished
+answer but does not run another tool or model round. A third consecutive tool call
+with the same name and arguments ends the turn before it executes.
 Deadlines interrupt async waits; a synchronous tool already running cannot
 be undone. These budgets apply to each agent turn independently.
 

@@ -165,14 +165,22 @@ def _coerce(column: str, kind: str, value: str | float) -> Any:
     return str(value).lower()
 
 
-def _measure_column(table: Table, measure: Measure) -> int:
+_ARITHMETIC = {"+": operator.add, "-": operator.sub, "*": operator.mul, "/": operator.truediv}
+
+
+def _measure_plan(table: Table, measure: Measure) -> tuple[str, int, int | None]:
     index = _column(table, measure.column)
     kind = table.kinds[index]
+    if measure.second_column is not None:
+        right = _column(table, measure.second_column)
+        if kind != "number" or table.kinds[right] != "number":
+            raise ValueError("A computed measure needs two number columns.")
+        return f"{measure.fn}({table.columns[index]}{measure.operator}{table.columns[right]})", index, right
     if measure.fn in ("sum", "mean") and kind != "number":
         raise ValueError(f"{measure.fn} needs a number column; {table.columns[index]!r} is {kind}.")
     if measure.fn in ("min", "max") and kind == "text":
         raise ValueError(f"{measure.fn} needs a number or date column; {table.columns[index]!r} is text.")
-    return index
+    return f"{measure.fn}({table.columns[index]})", index, None
 
 
 class _Accumulator:
@@ -315,23 +323,37 @@ class TableDesk:
             raise ValueError(f"Give between 1 and {MAX_MEASURES} measures.")
         _check_limit(limit, MAX_GROUPS)
         group_indexes = [_column(table, name) for name in group_by]
-        plan = [(measure.fn, _measure_column(table, measure)) for measure in measures]
-        labels = [f"{fn}({table.columns[index]})" for fn, index in plan]
+        plans = [_measure_plan(table, measure) for measure in measures]
+        labels = [label for label, _, _ in plans]
+        operands = [(table.data[left], table.data[right] if right is not None else None, measure.operator)
+                    for (_, left, right), measure in zip(plans, measures, strict=True)]
 
+        skipped = 0
         groups: dict[tuple, list[_Accumulator]] = {}
         for row in _matching(table, conditions or []):
             key = tuple(table.data[index][row] for index in group_indexes)
             accumulators = groups.get(key)
             if accumulators is None:
-                accumulators = groups[key] = [_Accumulator() for _ in plan]
-            for accumulator, (_fn, index) in zip(accumulators, plan, strict=True):
-                accumulator.add(table.data[index][row])
+                accumulators = groups[key] = [_Accumulator() for _ in measures]
+            row_skipped = False
+            for accumulator, (left, right, op) in zip(accumulators, operands, strict=True):
+                value = left[row]
+                if op is not None and right is not None:
+                    other = right[row]
+                    if value is None or other is None or (op == "/" and other == 0):
+                        row_skipped = True
+                        continue
+                    value = _ARITHMETIC[op](value, other)
+                accumulator.add(value)
+            skipped += row_skipped
 
         if not group_indexes and not groups:
-            groups[()] = [_Accumulator() for _ in plan]
-        items = [(key, [acc.result(fn) for acc, (fn, _i) in zip(accs, plan, strict=True)]) for key, accs in groups.items()]
+            groups[()] = [_Accumulator() for _ in measures]
+        items = [(key, [acc.result(m.fn) for acc, m in zip(accs, measures, strict=True)]) for key, accs in groups.items()]
         items = _sorted(items, _sort_position(table, sort_by, group_indexes, labels), descending)
         shown = items[:limit]
+        skipped_note = (f" Skipped {skipped} rows in computed measures due to empty operands or division by zero."
+                        if any(m.operator is not None for m in measures) else "")
         capped = f" Showing the first {limit}; narrow with a condition or a smaller limit." if len(items) > limit else ""
         return AggregateResult(
             table_id=table.id,
@@ -340,7 +362,7 @@ class TableDesk:
             groups=[GroupRow(keys=[_show(k) for k in key], values=[_show(v) for v in values]) for key, values in shown],
             total_groups=len(items),
             shown=len(shown),
-            message=f"{len(items)} groups.{capped}",
+            message=f"{len(items)} groups.{capped}{skipped_note}",
         )
 
     def top_n(

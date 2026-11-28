@@ -21,6 +21,7 @@ from src.providers.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec
 from src.agents.roles.orchestrator import ask_user, delegation, plan, plan_runner, submit_plan
 from src.providers.gateway_failover import GatewayRoute, classify
+from src.gateway.conversation.tool_schema import model_schema
 
 from src.runtime import approvals, questions
 from src.runtime import confidentiality, images, run_tools
@@ -192,6 +193,8 @@ def _tool_schemas(roster: Sequence[RosterEntry] = ()) -> list[dict[str, Any]]:
     if plan_mode:
         schemas.append({"name": submit_plan.TOOL_NAME, "description": submit_plan.tool_description(),
                         "input_schema": submit_plan.tool_parameters(), "display_label": "Plan"})
+    for schema in schemas:
+        schema["input_schema"] = model_schema(schema["input_schema"])
     return schemas
 
 
@@ -451,7 +454,6 @@ async def run_chat(
                 cached_input_tokens += _usage_count(response.usage, "cache_read_input_tokens")
                 await meter.round_done(prompt_tokens + response.usage.output_tokens)
                 context_tokens = prompt_tokens
-                guard.check_tokens(total_tokens)
 
                 if response.stop_reason != "tool_use":
                     answer = "".join(block.text for block in response.content if block.type == "text")
@@ -476,6 +478,7 @@ async def run_chat(
                             stop_message = "The model declined this request without providing an explanation."
                         if empty_answer_retried or response.stop_reason not in ("end_turn", "max_tokens"):
                             break
+                        guard.check_tokens(total_tokens, cached_input_tokens)
                         empty_answer_retried = True
                         # Keep completed tool results in history; only repeat the model round.
                         # Do not resend an empty assistant message or private thinking blocks.
@@ -493,6 +496,7 @@ async def run_chat(
                         await on_event(step_event("token", text=answer))
                     return await result(answer)
 
+                guard.check_tokens(total_tokens, cached_input_tokens)
                 if text_parts and on_event:
                     await on_event(step_event("token_reset"))
                 messages.append({"role": "assistant", "content": response.content})
