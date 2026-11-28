@@ -524,7 +524,7 @@ FreeLLMAPI, Bedrock and Vertex, start untrusted until an admin marks them. Code:
 - **It fails closed.** A checker that is missing, disabled, unreachable, slow or unsure counts as confidential. When
   no trusted gateway can take a confidential turn (credentials missing, in cooldown), the turn ends with an error and
   nothing is sent to an untrusted one.
-- **Whole texts.** The checker reads 4,000 characters at a time (200 overlap, four at once). One text over 40,000
+- **Whole texts.** The checker reads 4,000 characters at a time (200 overlap, four at once). One text over 100,000
   characters is not read and counts as confidential. A part found public is remembered by its digest until Legion
   restarts, so a long chat is read once.
 - **Marked without a check:** a turn that shows a picture, which no checker can read. A confidential turn also skips

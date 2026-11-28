@@ -27,7 +27,7 @@ AGENT_ID = "confidentiality-checker"
 TIMEOUT_SECONDS = 8
 PIECE_CHARS = 4000  # what the checker reads at once
 OVERLAP_CHARS = 200  # so a secret on a boundary is whole in one piece
-MAX_CHARS = 40_000  # a longer text is not read: it counts as confidential
+MAX_CHARS = 100_000  # a longer text is not read: it counts as confidential
 PARALLEL = 4
 MAX_REMEMBERED = 4096
 
