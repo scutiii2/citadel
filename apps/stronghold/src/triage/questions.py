@@ -1,9 +1,9 @@
 """Typed questions for the Triage Assistant, asked straight from the chat page.
 
 The user fills in a form (a yes/no question, a multiple choice question whose
-options have descriptions, or a score question whose levels have descriptions). This module turns that into the JSON question Laya
-reads (legion/src/providers/decision/provider.py) and sends it to the Triage Assistant
-without the orchestrator. Option titles are written by the `title-writer` agent:
+options have descriptions, or a score question whose levels have descriptions). This module turns that into the JSON
+question Legion's decision agents read (legion/src/providers/decision/provider.py) and sends it to the Triage
+Assistant without the orchestrator. Option titles are written by the `title-writer` agent:
 one plain model call that sees only the descriptions.
 """
 
@@ -21,10 +21,10 @@ from src.agents.gateway import AgentCallError, AgentGateway, Caller
 
 logger = logging.getLogger(__name__)
 
-DECISION_PROVIDER = "decision"
+TRIAGE_AGENT_ID = "triage-assistant"
 TITLE_AGENT_ID = "title-writer"
 QID = "q"
-TEXT_MAX = 4000  # Laya's own gateway limit
+TEXT_MAX = 4000  # the Triage form's limit; Laya reads no more
 QUESTION_MAX = 300
 DESCRIPTION_MAX = 300
 MIN_OPTIONS = 2
@@ -105,7 +105,7 @@ def parse_titles(response: str, count: int) -> list[str]:
 def build_request(
     kind: Kind, text: str, question: str, options: list[Option], trace: bool = False, levels: list[str] | None = None,
 ) -> str:
-    """ai_agent's Laya question format: one question, id `q`. `levels` (score only) are the level
+    """Legion's decision question format: one question, id `q`. `levels` (score only) are the level
     descriptions, lowest first."""
     if kind == "yes_no":
         spec: dict[str, Any] = {
@@ -116,8 +116,7 @@ def build_request(
         spec = {"type": "score", "instructions": question, "criteria": list(levels or [])}
     else:
         spec = {"type": "choice", "instructions": question, "criteria": {o.title: o.description for o in options}}
-    # local_only: Laya's configured service strategy answers locally; the text never goes on to the fallback classifier (Jev).
-    request: dict[str, Any] = {"text": text, "questions": {QID: spec}, "local_only": True}
+    request: dict[str, Any] = {"text": text, "questions": {QID: spec}}
     if trace:
         request["trace"] = True
     return json.dumps(request)
@@ -193,7 +192,7 @@ class TriageQuestions:
         levels: list[str] | None = None,
     ) -> AskOutcome:
         """Asks the Triage Assistant directly (no orchestrator) and returns the readable answer."""
-        agent = await self._directory.find_by_provider(DECISION_PROVIDER)
+        agent = await self._directory.get(TRIAGE_AGENT_ID)
         if agent is None:
             raise TriageUnavailable("the Triage Assistant is not running")
         try:

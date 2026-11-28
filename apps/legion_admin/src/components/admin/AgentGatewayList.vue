@@ -20,9 +20,11 @@ const props = defineProps<{
   provider: string;
   defaultGateway: string;
   busy: boolean;
+  /** A decision agent's list: decision gateways only, with their trust, and no model override. */
+  decision?: boolean;
 }>();
 const emit = defineEmits<{ "update:modelValue": [rows: GatewayRow[]]; pick: [provider: string, gateway: string] }>();
-const providers = computed(() => Object.keys(props.catalog).filter((id) => id !== "decision"));
+const providers = computed(() => props.decision ? ["decision"] : Object.keys(props.catalog).filter((id) => id !== "decision"));
 const primaryValue = (row: GatewayRow) => `${props.provider}|${effective(row)}`;
 
 function pickPrimary(event: Event): void {
@@ -38,6 +40,7 @@ const effective = (row: GatewayRow) => row.gateway || props.defaultGateway;
 /** A backup may speak another protocol than the primary: the agent then moves a turn to it when the first protocol has no gateway left. */
 const everyGateway = computed(() => [...props.gateways, ...providers.value.filter((id) => id !== props.provider).flatMap((id) => props.catalog[id] ?? [])]);
 const protocolOf = (gatewayId: string): string => providers.value.find((id) => props.catalog[id]?.some((g) => g.id === gatewayId)) ?? props.provider;
+const isTrusted = (gatewayId: string): boolean => props.catalog[props.provider]?.find((g) => g.id === gatewayId)?.trusted === true;
 const available = computed(() => everyGateway.value.filter((gateway) =>
   !props.modelValue.some((row) => effective(row) === gateway.id)));
 
@@ -102,8 +105,9 @@ function drop(key: number): void {
 
 <template>
   <div ref="root" class="gateway-editor">
-    <div class="heading">Gateways</div>
-    <p class="hint">Tried in order. The first gateway is primary. Gateways come from Connections. A backup of another protocol takes a turn over only when no gateway of the primary's protocol is left.</p>
+    <div class="heading">{{ decision ? 'Models' : 'Gateways' }}</div>
+    <p v-if="decision" class="hint">Asked in order; the next one when a model fails or is unsure. List untrusted models first and trusted ones last, with at least one trusted. Models come from Connections.</p>
+    <p v-else class="hint">Tried in order. The first gateway is primary. Gateways come from Connections. A backup of another protocol takes a turn over only when no gateway of the primary's protocol is left.</p>
     <ol class="gateway-list" aria-label="Gateway priority">
       <li
         v-for="(row, index) in modelValue" :key="row.key" :data-row-key="row.key"
@@ -119,17 +123,18 @@ function drop(key: number): void {
           </button>
           <span class="position">{{ index + 1 }}</span>
           <span :class="['role', { first: index === 0 }]">{{ index === 0 ? 'Primary' : protocolOf(effective(row)) === provider ? 'Backup' : `Backup · ${protocolOf(effective(row))}` }}</span>
+          <span v-if="decision" class="role" data-test="trust">{{ isTrusted(effective(row)) ? 'Trusted' : 'Untrusted' }}</span>
           <label class="gateway-field">
             <span class="sr-only">{{ index === 0 ? 'Primary gateway' : `Backup gateway ${index}` }}</span>
             <select v-if="index === 0" :value="primaryValue(row)" data-test="gateway" :disabled="busy" @change="pickPrimary">
               <option v-if="effective(row) && !gateways.some((g) => g.id === effective(row))" :value="primaryValue(row)">{{ effective(row) }} (unavailable)</option>
-              <optgroup v-for="id in providers" :key="id" :label="id">
+              <optgroup v-for="id in providers" :key="id" :label="decision ? 'Decision models' : id">
                 <option v-for="gateway in catalog[id]" :key="gateway.id" :value="`${id}|${gateway.id}`">{{ gateway.label }}</option>
               </optgroup>
             </select>
             <select v-else :value="row.gateway" data-test="backup-gateway" :disabled="busy" @change="update(row.key, 'gateway', $event)">
               <option v-if="row.gateway && !everyGateway.some((g) => g.id === row.gateway)" :value="row.gateway">{{ row.gateway }} (unavailable)</option>
-              <optgroup v-for="id in providers" :key="id" :label="id === provider ? `${id} (same protocol)` : id">
+              <optgroup v-for="id in providers" :key="id" :label="decision ? 'Decision models' : id === provider ? `${id} (same protocol)` : id">
                 <option v-for="gateway in catalog[id]" :key="gateway.id" :value="gateway.id" :disabled="usedElsewhere(gateway.id, row.key)">{{ gateway.label }}</option>
               </optgroup>
             </select>
@@ -142,7 +147,7 @@ function drop(key: number): void {
           </button>
         </div>
         <div class="row-model">
-          <label class="model-field"><span>Model override <span class="optional">(optional)</span></span>
+          <label v-if="!decision" class="model-field"><span>Model override <span class="optional">(optional)</span></span>
             <input :value="row.model" :data-test="index === 0 ? 'model' : 'backup-model'" type="text" placeholder="Automatic" :disabled="busy" autocomplete="off" @input="update(row.key, 'model', $event)" />
           </label>
           <button type="button" class="remove-gateway" data-test="remove-gateway" :disabled="busy || modelValue.length === 1" :aria-label="`Remove ${effective(row)} from this agent`" @click="remove(row.key)">Remove</button>
@@ -150,8 +155,8 @@ function drop(key: number): void {
       </li>
     </ol>
     <div class="list-footer">
-      <button type="button" class="add-gateway" data-test="add-gateway" :disabled="busy || !available.length || modelValue.length >= MAX_GATEWAYS" @click="add">＋ Add gateway</button>
-      <p class="hint">Drag or use arrows to reorder. At most {{ MAX_GATEWAYS }} gateways. Changes apply when you save.</p>
+      <button type="button" class="add-gateway" data-test="add-gateway" :disabled="busy || !available.length || modelValue.length >= MAX_GATEWAYS" @click="add">＋ Add {{ decision ? 'model' : 'gateway' }}</button>
+      <p class="hint">Drag or use arrows to reorder. At most {{ MAX_GATEWAYS }} {{ decision ? 'models' : 'gateways' }}. Changes apply when you save.</p>
     </div>
     <p class="sr-only" role="status" aria-live="polite">{{ announcement }}</p>
   </div>
@@ -171,7 +176,7 @@ function drop(key: number): void {
 .role { font-size: 0.75em; padding: 1px 6px; border-radius: var(--radius-sm); color: var(--muted); background: var(--code-bg); }
 .role.first { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 .gateway-field { flex: 1; min-width: 0; }
-.row-model { display: flex; align-items: flex-end; gap: 8px; padding-left: 24px; }
+.row-model { display: flex; align-items: flex-end; justify-content: flex-end; gap: 8px; padding-left: 24px; }
 .model-field { display: grid; flex: 1; min-width: 0; gap: 3px; font-size: 0.85em; color: var(--muted); }
 .optional { font-size: 0.9em; }
 input, select { width: 100%; min-width: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); font: inherit; }

@@ -45,7 +45,6 @@ const role = ref<"orchestrator" | "router" | "specialist">("specialist");
 const planTool = ref(true);
 const skillLearning = ref(false);
 const provider = ref("anthropic");
-const decisionStrategy = ref<"laya-only" | "jev-only" | "both">("both");
 const minConfidence = ref("");
 const gatewayRows = ref<GatewayRow[]>([{ key: 0, gateway: "", model: "" }]);
 const gateway = computed({
@@ -77,7 +76,7 @@ const localError = ref("");
 const isDecision = computed(() => provider.value === "decision");
 const gateways = computed(() => props.providers[provider.value] ?? []);
 // What a provider uses when the agent names no gateway (ai_agent: agent_spec._DEFAULT_GATEWAY).
-const DEFAULT_GATEWAY: Record<string, string> = { anthropic: "claude", openai: "gpt" };
+const DEFAULT_GATEWAY: Record<string, string> = { anthropic: "claude", openai: "gpt", decision: "laya" };
 /** The model each tier resolves to on the chosen gateway, and whether the range allows it. */
 const tierPreview = computed(() => {
   const gatewayId = gateway.value || DEFAULT_GATEWAY[provider.value];
@@ -130,11 +129,16 @@ function joined(globs: string[] | undefined): string {
   return (globs ?? []).join(", ");
 }
 
+/** What a decision agent asks when nothing else is chosen. */
+const defaultRows = (): GatewayRow[] => isDecision.value
+  ? [{ key: 0, gateway: "laya", model: "" }, { key: 1, gateway: "jev", model: "" }]
+  : [{ key: 0, gateway: "", model: "" }];
+
 const initialDraft = ref("");
 function draftSignature(): string {
   return JSON.stringify([
     id.value, label.value, port.value, url.value, enabled.value, entry.value,
-    role.value, planTool.value, skillLearning.value, provider.value, decisionStrategy.value, minConfidence.value,
+    role.value, planTool.value, skillLearning.value, provider.value, minConfidence.value,
     gatewayRows.value.map(({ gateway, model }) => [gateway, model]),
     effort.value, minTier.value, maxTier.value, identity.value, temperature.value,
     maxTokens.value, maxToolRounds.value, maxTurnTokens.value, maxTurnSeconds.value, maxEffort.value, persona.value,
@@ -162,9 +166,8 @@ watch(
     planTool.value = a?.plan_tool !== false;
     skillLearning.value = a?.skill_learning === true;
     provider.value = a?.llm?.provider ?? providerIds.value[0] ?? "anthropic";
-    decisionStrategy.value = a?.llm?.strategy ?? "both";
     minConfidence.value = a?.llm?.min_confidence === undefined ? "" : String(a.llm.min_confidence);
-    gatewayRows.value = [
+    gatewayRows.value = isDecision.value && !a?.llm?.gateway ? defaultRows() : [
       { key: 0, gateway: a?.llm?.gateway ?? "", model: a?.llm?.model ?? "" },
       ...(a?.llm?.fallback_gateways ?? []).map((choice, index) => ({
         key: index + 1,
@@ -200,7 +203,7 @@ watch(role, (value) => {
 // Synchronous so loading another agent can set its provider before hydrating
 // that agent's own rows, without a queued watcher clearing the new draft.
 watch(provider, () => {
-  gatewayRows.value = [{ key: 0, gateway: "", model: "" }];
+  gatewayRows.value = defaultRows();
   if (isDecision.value) {
     entry.value = false;
     if (role.value === "orchestrator") role.value = "specialist";
@@ -247,6 +250,15 @@ function buildConfig(): AgentConfig | null {
       return null;
     }
   }
+  const decisionNames = gatewayRows.value.map((row) => row.gateway || "laya");
+  if (isDecision.value && new Set(decisionNames).size !== decisionNames.length) {
+    localError.value = "Each gateway can appear only once.";
+    return null;
+  }
+  const decisionList = () => ({
+    gateway: decisionNames[0]!,
+    ...(decisionNames.length > 1 ? { fallback_gateways: decisionNames.slice(1).map((gateway) => ({ gateway })) } : {}),
+  });
   const { id: _id, error: _error, overridden: _overridden, ...kept } = props.initial ?? { id: "" };
   const llm: AgentConfig["llm"] = { ...(kept.llm ?? {}), provider: provider.value };
   const setOrDrop = (key: string, value: string): void => {
@@ -272,13 +284,12 @@ function buildConfig(): AgentConfig | null {
   const confidence = isDecision.value ? optionalNumber(minConfidence.value, "Minimum confidence", 0.0001, 1, false) : undefined;
   if (confidence === null) return null;
   if (isDecision.value) {
-    // Decision agents choose a strategy instead of language model settings.
-    for (const key of ["gateway", "model", "fallback_gateways", "reasoning_effort", "max_tier", "min_tier", "max_effort", "temperature", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds"]) delete llm[key];
-    llm.strategy = decisionStrategy.value;
+    // A decision agent has a model list and a confidence, not language model settings.
+    for (const key of ["gateway", "model", "fallback_gateways", "strategy", "reasoning_effort", "max_tier", "min_tier", "max_effort", "temperature", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds"]) delete llm[key];
+    Object.assign(llm, decisionList());
     if (confidence === undefined) delete llm.min_confidence;
     else llm.min_confidence = confidence;
   } else {
-    delete llm.strategy;
     delete llm.min_confidence;
     setOrDrop("reasoning_effort", effort.value === "off" ? "" : effort.value);
     setOrDrop("min_tier", minTier.value);
@@ -319,7 +330,7 @@ function buildConfig(): AgentConfig | null {
     config.skill_learning = false;
     config.plan_tool = false;
     config.tools = { allow: [], deny: ["*"] };
-    config.llm = { provider: "decision", strategy: decisionStrategy.value, ...(confidence === undefined ? {} : { min_confidence: confidence }) };
+    config.llm = { provider: "decision", ...decisionList(), ...(confidence === undefined ? {} : { min_confidence: confidence }) };
   } else {
     delete config.decision;
   }
@@ -404,22 +415,14 @@ function previewPrompt(): void {
           </label>
         </div>
         <div v-if="isDecision" class="grid">
-          <label class="field"><span>Decision strategy</span>
-            <select v-model="decisionStrategy" data-test="decision-strategy" :disabled="busy">
-              <option value="laya-only">Laya only</option>
-              <option value="jev-only">Jev only</option>
-              <option value="both">Laya, then Jev if needed</option>
-            </select>
-          </label>
           <label class="field"><span>Minimum confidence</span>
             <input v-model="minConfidence" data-test="min-confidence" type="text" inputmode="decimal" autocomplete="off" placeholder="Each model's own" :disabled="busy" />
             <small>Leave blank to use each model's own thresholds (Laya per model, Jev 0.9). Or enter a number above 0 and at most 1.</small>
           </label>
         </div>
         <p v-if="!isDecision && !hasGateways" class="muted" data-test="no-gateway">No gateway is set up yet. Add one under Connections, then pick it here.</p>
-        <AgentGatewayList v-if="!isDecision" v-model="gatewayRows" :gateways="gateways" :catalog="providers" :provider="provider"
+        <AgentGatewayList v-model="gatewayRows" :gateways="gateways" :catalog="providers" :provider="provider" :decision="isDecision"
           :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" @pick="pickGateway" />
-        <label v-else class="field"><span>Model</span><input v-model="model" data-test="model" type="text" disabled placeholder="convaiinnovations/laya" /></label>
         </div>
         <div v-if="!isDecision" class="group">
         <h3>Effort and tiers</h3>
@@ -481,8 +484,10 @@ function previewPrompt(): void {
       </section>
 
       <section v-show="tab === 'behaviour'" id="agent-panel-behaviour" class="pane" role="tabpanel" aria-labelledby="agent-tab-behaviour">
+      <AgentGatewayList v-if="isRouter" v-model="gatewayRows" :gateways="gateways" :catalog="providers" provider="decision" decision
+        default-gateway="laya" :busy="busy" @pick="pickGateway" />
       <RouterPolicyForm v-if="isRouter" v-model="decision" :busy="busy" />
-      <template v-else>
+      <template v-if="!isRouter">
         <div class="group">
         <h3>Persona</h3>
         <label class="field"><span>Identity (replaces the shared identity line)</span><textarea v-model="identity" data-test="identity" rows="2" placeholder="Empty = the shared identity from Shared prompts" /></label>

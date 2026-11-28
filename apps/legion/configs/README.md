@@ -17,7 +17,7 @@ the cooldown durations, and enables no backups by itself.
 - **`config_tuning.json`** - `token_limits` supplies output/context/tool-round caps
   per provider and gateway (`src/providers/token_limits.py`). `classifier` supplies
   `timeout_seconds`, `max_input_chars`, and `auto_tier` / `auto_route` settings:
-  `enabled`, `strategy` (`laya-only`, `jev-only`, `both`), and `min_confidence`
+  `enabled` and `min_confidence` (both features ask the Router agent's model list)
   (0-100). Auto tier also maps request sizes to model tiers. Features default off;
   the example selects confidence 80. Gateway endpoints/models live in
   `gateways/decision/`, and Laya's internal service strategy is read there on

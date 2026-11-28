@@ -6,7 +6,7 @@ Provider implementations now live in `../providers/`:
 - `language/anthropic_provider.py` and `language/openai_provider.py`: language
   model tool/streaming loops, using `../tools/mcp_client/` for upstream tools.
 - `decision/contract.py`: typed request and gateway result types.
-- `decision/strategy.py`: `laya-only`, `jev-only`, `both`, local-only enforcement
+- `decision/strategy.py`: asks an agent's model list in order, local-only enforcement
   and per-question fallback. `decision/provider.py` adapts JSON requests to the
   agent transport; decision agents do not generate prose or call tools.
 - `decision/gateways/`: Laya HTTP and TypeSafe Jev clients. Laya owns its internal

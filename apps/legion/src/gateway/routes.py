@@ -87,6 +87,25 @@ def _needs_message(agents: list[str]) -> str:
             + ": give them another trusted gateway first.")
 
 
+async def _decision_agents_broken(gateway_id: str, data: dict[str, Any] | None) -> list[str]:
+    """Decision agents whose list would break if the entry were saved as `data`, or deleted (None)."""
+    from src.agents import agent_store
+
+    def check() -> list[str]:
+        trusted = None
+        if data is not None:
+            old = gateway.decision_store().all().get(gateway_id) or {}
+            trusted = trust.decision(gateway_id, {**old, **data})
+        return agent_store.agents_breaking_order(gateway_id, trusted)
+
+    return await asyncio.to_thread(check)
+
+
+def _order_message(agents: list[str]) -> str:
+    return ("This would break the model list of " + ", ".join(agents) + ": untrusted models come first and at least "
+            "one must be trusted. Change those agents first.")
+
+
 def _forget() -> None:
     from src.providers import gateway_client
     from src.providers.decision import gateway_client as decision_client
@@ -120,6 +139,8 @@ def register(mcp: MCPServer) -> None:
         if request.method == "DELETE":
             if request.path_params["kind"] == "conversation" and (agents := await _agents_needing(gid)):
                 return JSONResponse({"error": _needs_message(agents)}, status_code=409)
+            if request.path_params["kind"] == "decision" and (agents := await _decision_agents_broken(gid, None)):
+                return JSONResponse({"error": _order_message(agents)}, status_code=409)
             deleted = await asyncio.to_thread(store.delete, gid)
             _forget()
             return JSONResponse({"ok": True} if deleted else {"error": "No such gateway."}, status_code=200 if deleted else 404)
@@ -130,6 +151,9 @@ def register(mcp: MCPServer) -> None:
         if request.path_params["kind"] == "conversation" and isinstance(data, dict) and data.get("trusted") is False:
             if agents := await _agents_needing(gid):
                 return JSONResponse({"error": _needs_message(agents)}, status_code=409)
+        if request.path_params["kind"] == "decision" and isinstance(data, dict):
+            if agents := await _decision_agents_broken(gid, data):
+                return JSONResponse({"error": _order_message(agents)}, status_code=409)
         try:
             saved = await asyncio.to_thread(store.put, gid, data)
         except ValueError as error:

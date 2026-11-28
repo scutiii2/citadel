@@ -432,10 +432,11 @@ def main(argv: list[str] | None = None) -> int:
     load_env()
     sys.path.insert(0, str(PROJECT))
     from types import SimpleNamespace
+    from src.agents.agent_spec import OLD_DECISION_STRATEGIES
     from src.providers.decision import provider
 
     chosen = "laya-only" if args.baseline else args.strategy
-    laya = SimpleNamespace(answer=lambda raw: provider.answer(raw, chosen, .9), prepare=provider.prepare)
+    laya = SimpleNamespace(answer=lambda raw: provider.answer(raw, OLD_DECISION_STRATEGIES[chosen], .9), prepare=provider.prepare)
     print(f"using decision strategy {chosen}...", flush=True)
     laya.prepare()
     rows: list[Row] = []

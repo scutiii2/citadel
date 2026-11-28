@@ -19,7 +19,6 @@ class Message(BaseModel):
 class RouterPolicy(Message):
     choose_agent: bool = True
     choose_tier: bool = True
-    strategy: Literal["laya-only", "jev-only", "both"] = "both"
     min_confidence: float | None = Field(default=None, gt=0, le=1)
     deadline_seconds: float = Field(default=10, ge=1, le=30)
     remote_timeout_seconds: float = Field(default=3, gt=0, le=30)
@@ -37,7 +36,6 @@ class RouterPolicy(Message):
 
     def summary(self) -> dict:
         return {"choose_agent": self.choose_agent, "choose_tier": self.choose_tier,
-                "strategy": self.strategy,
                 "deadline_seconds": self.deadline_seconds}
 
 

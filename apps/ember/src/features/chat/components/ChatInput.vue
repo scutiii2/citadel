@@ -127,7 +127,6 @@ const { state: dictationState, error: dictationError, supported: dictationSuppor
 const dictationActive = computed(() => draftLocked.value);
 const toolConnections = useToolConnectionsStore();
 const scribeUnavailable = computed(() => toolConnections.reason("scribe"));
-const readerUnavailable = computed(() => toolConnections.reason("reader"));
 const connectionNotice = ref("");
 
 function startOrStopDictation(): void {
@@ -161,7 +160,7 @@ const {
   removeAttachment, canRead, readWithOcr, restoreAttachments, showsPicture, onPick, onDragOver, onDragLeave, onDrop, onPaste,
 } = useComposerAttachments();
 
-// shortcut: counts one file; Legion shares the limit across a turn's scans and tells the model what it left out.
+// shortcut: counts one file; Legion shares the limit across a turn's PDFs and tells the model what it left out.
 function pagesNote(pages = 0): string {
   return pages > MAX_SCAN_PAGES ? `first ${MAX_SCAN_PAGES} of ${pages} pages attached` : "pages attached";
 }
@@ -532,9 +531,8 @@ function onKeydown(event: KeyboardEvent): void {
             <small v-if="a.ocr === 'error'">(OCR failed: {{ a.error }})</small>
             <small v-if="a.expired">(file expired: attach it again so tools can read it)</small>
           </span>
-          <button v-if="canRead(a)" type="button" class="ocr" :disabled="a.ocr === 'reading'"
-            :title="readerUnavailable || undefined" @click="readWithOcr(a.id)">
-            {{ a.ocr === "reading" ? "Sending to OCR …" : readerUnavailable ? "Attach pages" : a.ocr === "error" ? "Retry OCR" : "Read with OCR" }}
+          <button v-if="canRead(a)" type="button" class="ocr" :disabled="a.ocr === 'reading'" @click="readWithOcr(a.id)">
+            {{ a.ocr === "reading" ? "Sending to OCR …" : a.ocr === "error" ? "Retry OCR" : "Read with OCR" }}
           </button>
           <button v-if="!showsPicture(a)" type="button" :aria-label="`Remove ${a.filename}`" @click="removeAttachment(a.id)">×</button>
         </li>

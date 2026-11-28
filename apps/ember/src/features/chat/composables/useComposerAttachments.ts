@@ -29,8 +29,6 @@ export function useComposerAttachments() {
     error: string;
     pages?: number;
     kind?: string;
-    /** Armory kept the original, so its pages can be shown to the model. */
-    stored?: boolean;
     /** The original file, kept only while Reader can still be asked to read it. */
     source?: File;
     ocr?: "reading" | "error";
@@ -66,54 +64,45 @@ export function useComposerAttachments() {
       const live = attachments.value[attachments.value.length - 1]!; // the reactive copy
       // Every file goes up the same way. Each on its own: one slow or broken file doesn't hold up the rest.
       void attachmentsClient.file(file).then((result) => {
-        const text = fileText(result);
+        // Every stored PDF shows the model its pages, not only a scan.
+        const shown = result.kind === "pdf" && result.file_id !== null && !!result.pages;
+        const read = shown ? "pages" : (result.read ?? undefined);
         Object.assign(live, {
           state: "ready",
-          text,
+          text: shown ? markScan(fileText(result)) : fileText(result),
           chars: result.char_count,
           truncated: result.truncated,
           rows: result.table?.rows ?? 0,
           columns: result.table?.columns.length ?? 0,
           pages: result.pages ?? undefined,
           kind: result.kind,
-          stored: result.file_id !== null,
-          read: result.read ?? undefined,
-          // Kept for "Read with OCR". A scan was already handled at upload.
-          source: DOCUMENT_FILE.test(file.name) && !result.read ? file : undefined,
+          read,
+          // Kept for "Read with OCR": only a file nothing has read yet.
+          source: DOCUMENT_FILE.test(file.name) && !read ? file : undefined,
         });
       }).catch((err: unknown) => Object.assign(live, { state: "error", error: errorMessage(err) }));
     }
   }
 
-  const canShowPages = (a: PendingAttachment): boolean => a.kind === "pdf" && a.stored === true;
-
-  /** Whether the button shows. Without Reader, only attaching a stored PDF's pages is left. */
+  /** Whether "Read with OCR" shows. */
   function canRead(a: PendingAttachment): boolean {
-    return a.state === "ready" && !!a.source && !a.read && (!connections.reason("reader") || canShowPages(a));
+    return a.state === "ready" && !!a.source && !a.read && !connections.reason("reader");
   }
 
-  function showPages(a: PendingAttachment): void {
-    Object.assign(a, { text: markScan(a.text), read: "pages", ocr: undefined });
-  }
-
-  /** Only on the user's request: Reader's text replaces the preview, else the model is shown the pages. */
+  /** Only on the user's request: Reader's text replaces the preview. */
   async function readWithOcr(id: number): Promise<void> {
     const live = attachments.value.find((a) => a.id === id);
     if (!live || !canRead(live) || live.ocr === "reading") return;
-    if (connections.reason("reader")) return showPages(live);
     live.ocr = "reading";
     try {
       const result = await attachmentsClient.document(live.source!);
-      if (result.read === "reader") {
-        Object.assign(live, {
-          text: withReadText(live.text, result.text), chars: result.char_count, truncated: result.truncated,
-          read: "reader", ocr: undefined,
-        });
-      } else if (canShowPages(live)) {
-        showPages(live);
-      } else {
+      if (result.read !== "reader") {
         throw new Error(live.kind === "image" ? "Reader could not read it. The model still sees the image." : "Reader could not read it.");
       }
+      Object.assign(live, {
+        text: withReadText(live.text, result.text), chars: result.char_count, truncated: result.truncated,
+        read: "reader", ocr: undefined,
+      });
     } catch (err: unknown) {
       live.ocr = "error";
       live.error = errorMessage(err);

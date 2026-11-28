@@ -5,7 +5,7 @@ One tracked gateway preset per `gateways/<provider>/<gateway>.json`, beside
 `openai`, or `decision`); the filename without `.json` is the gateway id used by an agent's
 `llm.gateway`. A gateway supporting both protocols can have a file in each
 provider directory. Decision has `laya.json` and `jev.json`; agents select an
-arrangement strategy instead of a single `llm.gateway`.
+ordered list of them in `llm.gateway` and `llm.fallback_gateways`.
 
 Each file contains the gateway block directly, without provider or gateway
 wrapper keys. For example, `anthropic/claude.json`:
@@ -55,4 +55,4 @@ legacy file; copy any subsequent gateway changes back into that file first.
 Provider folder `decision/` holds `laya.json` and `jev.json`, each with only a `label`. The two
 ids name entries saved in DecisionGateway (built into Legion, `src/gateway/decision`): `laya` is the
 local Laya model service, `jev` is TypeSafe's cloud API. Address, key, model, strategy and window
-are set there. Agents choose `laya-only`, `jev-only` or `both`; that arrangement stays in Legion.
+are set there. Each agent lists the gateways it asks, in order; that list stays in Legion.

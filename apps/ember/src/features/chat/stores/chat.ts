@@ -769,7 +769,7 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
-  /** Puts a typed question to the Triage Assistant (Laya) directly, without the orchestrator. The
+  /** Puts a typed question to the Triage Assistant directly, without the orchestrator. The
    * question shows in the chat at once and the answer follows it, like a command's result. Resolves
    * as soon as the question is in the chat (the form can close); it throws only when the question
    * cannot be taken. If the Assistant fails, the question is taken back out and `sendError` says why. */

@@ -38,6 +38,12 @@ class AgentStoreError(Exception):
         self.status = status
 
 
+def _decision_trusted(gateway_id: str) -> bool:
+    from src.providers.decision import gateway_client as decision_client
+
+    return decision_client.is_trusted(gateway_id)
+
+
 def gateway_catalog(saved_only: bool = False) -> dict[str, list[dict[str, Any]]]:
     """Providers and gateways from gateways/<provider>/<gateway>.json.
     Decision presets list Laya and Jev without language tiers. Credentials
@@ -59,12 +65,15 @@ def gateway_catalog(saved_only: bool = False) -> dict[str, list[dict[str, Any]]]
                 tiers = [{"tier": name, "id": tier.id} for name, tier in llm_config.tiers(provider, gateway_id).items()]
             except (KeyError, ValueError):
                 tiers = []
-            gateways.append({
+            item = {
                 "id": gateway_id,
                 "label": entry.get("label") or gateway_id,
                 "model": entry.get("model") if isinstance(entry.get("model"), str) else "",
                 "tiers": tiers,
-            })
+            }
+            if provider == "decision":
+                item["trusted"] = _decision_trusted(gateway_id)
+            gateways.append(item)
         catalog[provider] = gateways
     return _saved(catalog) if saved_only else catalog
 
@@ -85,7 +94,8 @@ def _saved(catalog: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str,
             tiers = {} if provider == "decision" else llm_config.tiers(provider, gid)  # decision gateways have no tiers
             kept.append({"id": gid, "label": saved.get("label") or gid,
                          "model": saved.get("model") if isinstance(saved.get("model"), str) else "",
-                         "tiers": [{"tier": name, "id": tier.id} for name, tier in tiers.items()]})
+                         "tiers": [{"tier": name, "id": tier.id} for name, tier in tiers.items()],
+                         **({"trusted": _decision_trusted(gid)} if provider == "decision" else {})})
         result[provider] = kept
     return result
 
@@ -113,6 +123,7 @@ def get_agent(agent_id: str, directory: Path = agent_spec.AGENTS_DIR) -> dict[st
 
 def create_agent(agent_id: str, data: dict[str, Any], directory: Path = agent_spec.AGENTS_DIR) -> dict[str, Any]:
     with _LOCK:
+        data = agent_spec.upgrade_decision(data)
         _path_of(agent_id, directory)
         if agent_id in _ids(directory):
             raise AgentStoreError(f"agent {agent_id!r} already exists", 409)
@@ -123,6 +134,7 @@ def create_agent(agent_id: str, data: dict[str, Any], directory: Path = agent_sp
 
 def update_agent(agent_id: str, data: dict[str, Any], directory: Path = agent_spec.AGENTS_DIR) -> dict[str, Any]:
     with _LOCK:
+        data = agent_spec.upgrade_decision(data)
         _effective(agent_id, directory)
         _validate_change(agent_id, data, directory)
         _save_override(agent_id, data, directory)
@@ -247,6 +259,11 @@ def _validate_change(agent_id: str, data: dict[str, Any], directory: Path) -> Ag
 
 def _check_gateway(spec: AgentSpec) -> None:
     if spec.llm.provider == "decision":
+        known = {entry["id"] for source in (gateway_catalog(), gateway_catalog(saved_only=True))
+                 for entry in source.get("decision", [])}
+        for name in spec.llm.gateway_names:
+            if name not in known:
+                raise AgentStoreError(f"{spec.id}.json: {name!r} is not a decision gateway")
         return
     gateway = spec.llm.gateway
     if gateway is None and not spec.llm.fallback_gateways:
@@ -278,6 +295,13 @@ def _check_trusted(spec: AgentSpec) -> None:
     """An enabled agent always has a trusted gateway, so confidential data has somewhere to go."""
     from src.providers import gateway_client
 
+    if spec.llm.provider == "decision":
+        from src.providers.decision import gateway_client as decision_client, rules
+
+        problem = rules.order_problem(spec.id, spec.llm.gateway_names, decision_client.is_trusted) if spec.enabled else None
+        if problem:
+            raise AgentStoreError(f"{spec.id}.json: {problem}", 409)
+        return
     names = _gateway_names(spec)
     if spec.enabled and names and not any(gateway_client.is_trusted(name) for name in names):
         raise AgentStoreError(
@@ -301,6 +325,31 @@ def agents_losing_trust(gateway_id: str, directory: Path = agent_spec.AGENTS_DIR
                 name != gateway_id and gateway_client.is_trusted(name) for name in names):
             lost.append(agent_id)
     return lost
+
+
+def agents_breaking_order(gateway_id: str, trusted: bool | None, directory: Path = agent_spec.AGENTS_DIR) -> list[str]:
+    """Enabled decision agents whose list is allowed now and would not be after the decision gateway `gateway_id`
+    got the trust `trusted`, or was deleted (None)."""
+    from src.providers.decision import gateway_client as decision_client, rules
+
+    def after(name: str) -> bool:
+        return bool(trusted) if name == gateway_id else decision_client.is_trusted(name)
+
+    broken = []
+    for agent_id in _ids(directory):
+        try:
+            spec = _load_spec(agent_id, _effective(agent_id, directory))
+        except AgentStoreError:
+            continue
+        names = spec.llm.gateway_names
+        if not spec.enabled or spec.llm.provider != "decision" or gateway_id not in names:
+            continue
+        if rules.order_problem(spec.id, names, decision_client.is_trusted):
+            continue
+        left = names if trusted is not None else tuple(name for name in names if name != gateway_id)
+        if rules.order_problem(spec.id, left, after):
+            broken.append(agent_id)
+    return broken
 
 
 def _other_specs(agent_id: str, directory: Path) -> list[AgentSpec]:

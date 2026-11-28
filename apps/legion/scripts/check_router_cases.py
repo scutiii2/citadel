@@ -59,13 +59,13 @@ def evaluate(*, live=False):
     for name, subject, expected_agent, expected_size in CASES:
         request = RouteRequest(subject=subject, candidates=candidates, request_id=f"evaluation-{name}",
                                entry=RouteCandidate(id="ember", label="Ember", tiers=tiers))
+        policy, models = RouterPolicy(), ("laya", "jev") if live else ("laya",)
         if live:
-            engine, policy = RouterEngine(), RouterPolicy()
+            engine = RouterEngine()
         else:
             engine = RouterEngine(gateways={"laya": FixtureGateway(expected_agent, expected_size)})
-            policy = RouterPolicy(strategy="laya-only")
         started = time.monotonic()
-        result = engine.route(request, policy)
+        result = engine.route(request, policy, models=models)
         actual_agent = None if result.agent.uncertain else result.agent.choice
         actual_size = None if result.size.uncertain else result.size.choice
         row = {"case": name, "agent": actual_agent, "size": actual_size, "tier": result.model_tier,
@@ -80,8 +80,8 @@ def evaluate(*, live=False):
                 if len(subject) > 16000:
                     raise ValueError("input_too_long")
                 choices = {c.id: c.focus for c in candidates} | {"none": "The general assistant should answer"}
-                agent = strategy.ask_choice(subject, choices, "Which specialist fits?", strategy="jev-only", min_confidence=60, timeout=3)
-                size = strategy.ask_choice(subject, questions.SIZE_CRITERIA, questions.SIZE_QUESTION, strategy="jev-only", min_confidence=60, timeout=3)
+                agent = strategy.ask_choice(subject, choices, "Which specialist fits?", models=("jev",), min_confidence=60, timeout=3)
+                size = strategy.ask_choice(subject, questions.SIZE_CRITERIA, questions.SIZE_QUESTION, models=("jev",), min_confidence=60, timeout=3)
                 direct = {"agent": agent.choice if agent.confidence >= 60 else None,
                           "size": size.choice if size.confidence >= 60 else None, "remote_calls": 2}
             except (DecisionError, ValueError):

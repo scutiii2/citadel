@@ -83,7 +83,8 @@ def _resolve() -> tuple[str, Any]:
     module = importlib.import_module(module_name)
     # No saved gateway is no startup error: Legion starts first and gateways are added on the Model gateways page.
     spec = agent_spec.current()
-    for index, choice in enumerate(spec.llm.fallback_gateways):
+    # A decision agent's list names decision gateways: they have no template file or credentials to check here.
+    for index, choice in enumerate(spec.llm.fallback_gateways if provider_id != "decision" else ()):
         where = f"{spec.source or spec.id}: llm.fallback_gateways[{index}].gateway"
         try:
             # tiers() finds a gateway in gateways/ or saved on the Model gateways page, which may have no file.
@@ -221,7 +222,8 @@ async def run_chat(
     exact_token = context_breakdown.bind_exact(exact_context)
     effort_token = llm_options.bind_effort(effort.effort)
     limits_token = token_limits.bind_user_limits(limits)
-    confidential_token = confidentiality.bind(confidential)
+    # The checker reads secrets to judge them, so its own turn asks trusted gateways only.
+    confidential_token = confidentiality.bind(confidential or spec.id == confidentiality.AGENT_ID)
     try:
         if cancellation.is_cancelled(request_id):
             raise ChatCancelled()
@@ -373,7 +375,8 @@ def status() -> dict[str, Any]:
     spec = agent_spec.current()
     primary = spec.llm.gateway or agent_spec.default_gateway(PROVIDER_ID)
     gateways = []
-    for name in (primary, *(choice.gateway for choice in spec.llm.fallback_gateways)):
+    others = () if PROVIDER_ID == "decision" else tuple(choice.gateway for choice in spec.llm.fallback_gateways)
+    for name in (primary, *others):
         key = cooldown.gateway_key(gateway_protocols.protocol_of(name, PROVIDER_ID) if name != primary else PROVIDER_ID, name)
         remaining = cooldown.seconds_remaining(key)
         credentials = _PROVIDER_MODULE.has_api_key() if name == primary else _PROVIDER_MODULE.has_api_key(name)

@@ -15,7 +15,7 @@ import { errorMessage } from "../../../utils/errors";
 import { BaseModal } from "@citadel/ui";
 import SegmentedControl from "../../../components/ui/forms/SegmentedControl.vue";
 
-/** A form for a typed question to the Triage Assistant (Laya), asked directly and not through the
+/** A form for a typed question to the Triage Assistant, asked directly and not through the
  * orchestrator. A multiple choice option is a description plus a one-word title; a small model
  * writes the titles from the descriptions on request. `submit` asks and saves the exchange in the
  * chat; the dialog closes when it resolves and shows what it throws. */

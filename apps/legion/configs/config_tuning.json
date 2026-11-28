@@ -24,7 +24,6 @@
     "max_input_chars": 16000,
     "auto_tier": {
       "enabled": false,
-      "strategy": "both",
       "min_confidence": 80,
       "tiers": {
         "tiny": "light",
@@ -35,7 +34,6 @@
     },
     "auto_route": {
       "enabled": false,
-      "strategy": "both",
       "min_confidence": 80
     }
   }

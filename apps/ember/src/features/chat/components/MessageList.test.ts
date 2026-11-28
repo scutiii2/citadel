@@ -537,10 +537,10 @@ describe("a triage question and its answer", () => {
     expect(wrapper.findAll(".msg")[1]!.get(".command-result strong").text()).toBe("Yes");
   });
 
-  it("says a local model answered it, not a direct tool call", () => {
+  it("says the Triage Assistant answered it, not a direct tool call", () => {
     const wrapper = mountList({ messages: triage({ duration_s: 0.8 }) });
 
-    expect(wrapper.find(".usage .chip").text()).toBe("Triage Assistant · local model · 0.8 s");
+    expect(wrapper.find(".usage .chip").text()).toBe("Triage Assistant · 0.8 s");
   });
 
   it("has no copy, regenerate or branch buttons", () => {

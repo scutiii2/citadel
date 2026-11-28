@@ -52,7 +52,7 @@ def _editable(raw: dict[str, Any]) -> dict[str, Any]:
         for feature, defaults in (("auto_tier", AutoTierSettings()), ("auto_route", AutoRouteSettings())):
             value = classifier.get(feature, {})
             if isinstance(value, dict):
-                section[feature] = {k: value.get(k, getattr(defaults, k)) for k in ("strategy", "min_confidence")}
+                section[feature] = {"min_confidence": value.get("min_confidence", defaults.min_confidence)}
         out["classifier"] = section
     out["budgets"] = {**budgets.DEFAULTS, **(raw["budgets"] if isinstance(raw.get("budgets"), dict) else {})}
     out["tool_batch"] = {**tool_batch_settings.DEFAULTS, **(raw["tool_batch"] if isinstance(raw.get("tool_batch"), dict) else {})}

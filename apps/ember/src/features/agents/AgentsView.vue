@@ -160,7 +160,6 @@ onMounted(() => void refresh());
       <p class="full-description">{{ opened.focus || 'No description.' }}</p>
       <AgentLlm :agent="opened" />
       <p v-if="opened.internal_role === 'router'" class="full-description">
-        Laya English → typed-decisions<span v-if="opened.decision?.fallback"> → Jev fallback</span>.
         <template v-if="opened.decision?.fallback_available === false">Fallback unavailable.</template>
         <template v-if="opened.decision?.local_status === 'not_loaded'">Local models load on first use.</template>
         <template v-if="opened.decision?.local_status === 'unavailable'">Local models unavailable.</template>

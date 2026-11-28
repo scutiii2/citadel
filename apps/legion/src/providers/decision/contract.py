@@ -16,8 +16,6 @@ class DecisionRequest:
     questions: dict[str, dict[str, Any]]
     # None: each gateway applies its own thresholds (Laya: per model and option count; Jev: 0.9).
     min_confidence: float | None = None
-    # Only gateways that keep the text on this machine may answer.
-    local_only: bool = False
 
 
 @dataclass(frozen=True)

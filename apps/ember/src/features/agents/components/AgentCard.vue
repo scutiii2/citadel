@@ -41,7 +41,6 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
       <span v-if="agent.architect?.workers.length" class="architect-workers">Builds with: {{ agent.architect.workers.join(", ") }}</span>
       <AgentLlm :agent="agent" />
       <span v-if="agent.internal_role === 'router'" class="decision-chain">
-      Laya English → typed-decisions<span v-if="agent.decision?.fallback"> → Jev fallback</span>.
       <span v-if="agent.decision?.fallback_available === false" class="fallback"><span aria-hidden="true">△</span> Fallback unavailable.</span>
       <template v-if="agent.decision?.local_status === 'not_loaded'">Local models load on first use.</template>
       <template v-if="agent.decision?.local_status === 'unavailable'">Local models unavailable.</template>

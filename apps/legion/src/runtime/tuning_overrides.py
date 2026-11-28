@@ -59,7 +59,6 @@ for _field, _rule in {
 _add(r"gateway_failover\.(?:quota|auth|unavailable)_cooldown_seconds", Rule("number", 0, 604_800))
 _add(r"classifier\.timeout_seconds", Rule("number", 0, 60, low_open=True))
 _add(r"classifier\.max_input_chars", Rule("int", 1, 1_000_000))
-_add(r"classifier\.auto_(?:tier|route)\.strategy", Rule("enum"))
 _add(r"classifier\.auto_(?:tier|route)\.min_confidence", Rule("int", 1, 100))
 for _field, _rule in {
     "parallel": Rule("bool"), "max_parallel": Rule("int", 1, 16), "batch_tool": Rule("bool"),
@@ -86,12 +85,6 @@ def _rule_for(path: str) -> Rule:
 def check(path: str, value: Any) -> bool | int | float | str:
     """The value as it will be stored, or TuningError."""
     rule = _rule_for(path)
-    if rule.kind == "enum":
-        from src.providers.decision import strategy
-
-        if not isinstance(value, str) or value not in strategy.STRATEGIES:
-            raise TuningError(f"{path} must be one of {', '.join(strategy.STRATEGIES)}")
-        return value
     if rule.kind == "bool":
         if not isinstance(value, bool):
             raise TuningError(f"{path} must be true or false")

@@ -39,6 +39,9 @@ TIERS = ("light", "standard", "heavy", "extreme")
 # The gateway each provider uses when a file names none - pinned in the env
 # so .env's AI_AGENT_GATEWAY cannot silently re-point the agent.
 _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "decision": "laya"}
+# The retired llm.strategy values, as the decision model lists they meant.
+OLD_DECISION_STRATEGIES = {"laya-only": ("laya",), "jev-only": ("jev",), "both": ("laya", "jev")}
+DEFAULT_DECISION_MODELS = ("laya", "jev")
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 _TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "role", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "decision", "kind", "workers", "prefetch", "limits"}
@@ -82,8 +85,12 @@ class LlmSpec:
     # agent; None = no cap. Its own reasoning_effort is never above it.
     max_effort: str | None = None
     fallback_gateways: tuple[GatewayChoice, ...] = ()
-    strategy: str | None = None
     min_confidence: float | None = None
+
+    @property
+    def gateway_names(self) -> tuple[str, ...]:
+        """The gateways the file names, in the order they are tried: the primary, then the fallbacks."""
+        return tuple(name for name in (self.gateway, *(choice.gateway for choice in self.fallback_gateways)) if name)
 
 
 @dataclass(frozen=True)
@@ -188,9 +195,9 @@ class AgentSpec:
         return "router" if self.role == "router" else None
 
     def effective_gateway(self) -> str | None:
-        """The gateway to report in usage rows: the file's own gateway (None
-        = the provider used directly)."""
-        return self.llm.gateway
+        """The gateway to report in usage rows: the file's own gateway (None = the provider used directly, and
+        for a decision agent, which may be answered by any model of its list)."""
+        return None if self.llm.provider == "decision" else self.llm.gateway
 
 
 class _Checker:
@@ -339,6 +346,31 @@ def upgrade_legacy(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def upgrade_decision(data: dict[str, Any]) -> dict[str, Any]:
+    """A decision agent's retired `llm.strategy` (the Router's `decision.strategy` wins) rewritten as its model
+    list. A list already there wins. An unknown old value without a list is left for load_file to reject."""
+    llm = data.get("llm") if isinstance(data, dict) else None
+    if not isinstance(llm, dict) or llm.get("provider") != "decision":
+        return data
+    policy = data.get("decision")
+    old = llm.get("strategy")
+    if data.get("role") == "router" and isinstance(policy, dict):
+        old = policy.get("strategy", old)
+    listed = "gateway" in llm or "fallback_gateways" in llm
+    names = DEFAULT_DECISION_MODELS if old is None else OLD_DECISION_STRATEGIES.get(str(old))
+    if not listed and names is None:
+        return data
+    llm = {key: value for key, value in llm.items() if key != "strategy"}
+    if not listed:
+        llm["gateway"] = names[0]
+        if names[1:]:
+            llm["fallback_gateways"] = list(names[1:])
+    result = {**data, "llm": llm}
+    if isinstance(policy, dict) and "strategy" in policy:
+        result["decision"] = {key: value for key, value in policy.items() if key != "strategy"}
+    return result
+
+
 def read_overrides(directory: Path) -> dict[str, dict[str, Any]]:
     """The overrides for `directory`; {} when there are none."""
     db = overrides_path_for(directory)
@@ -350,7 +382,7 @@ def read_overrides(directory: Path) -> dict[str, dict[str, Any]]:
     if not all(isinstance(entry, dict) for entry in data.values()):
         raise AgentSpecError(f"{db}: agent_overrides must hold agent objects")
     # Overrides predate required roles: no legacy field meant a specialist.
-    return {key: {"role": "specialist", **upgrade_legacy(entry)} for key, entry in data.items()}
+    return {key: upgrade_decision({"role": "specialist", **upgrade_legacy(entry)}) for key, entry in data.items()}
 
 
 def agent_ids(directory: Path) -> list[str]:
@@ -374,7 +406,7 @@ def load_file(path: Path) -> AgentSpec:
             raise check.fail("file", f"cannot be read as JSON ({error})") from error
     if not isinstance(data, dict):
         raise check.fail("file", "must contain a JSON object")
-    data = upgrade_legacy(data)
+    data = upgrade_decision(upgrade_legacy(data))
     check.keys(data, _TOP_KEYS)
     role = data.get("role")
     if role not in ROLES:
@@ -428,21 +460,17 @@ def load_file(path: Path) -> AgentSpec:
     provider = llm_data.get("provider")
     if provider not in PROVIDERS:
         raise check.fail("llm.provider", f"must be one of: {', '.join(PROVIDERS)}")
-    from src.providers.decision.strategy import STRATEGIES
-
-    strategy = llm_data.get("strategy")
     min_confidence = llm_data.get("min_confidence")
+    if "strategy" in llm_data:
+        raise check.fail("llm.strategy", f"is retired (once one of: {', '.join(OLD_DECISION_STRATEGIES)}); "
+                                         "name llm.gateway and llm.fallback_gateways")
     if provider == "decision":
-        strategy = strategy or "both"
-        if strategy not in STRATEGIES:
-            raise check.fail("llm.strategy", f"must be one of: {', '.join(STRATEGIES)}")
         # Unset: each gateway applies its own thresholds.
         min_confidence = check.number(llm_data, "min_confidence", 0.0001, 1.0, "llm.")
-        for key in ("gateway", "model", "fallback_gateways"):
-            if key in llm_data:
-                raise check.fail(f"llm.{key}", "the decision provider has no gateway, model or fallback_gateways; pick llm.strategy")
-    elif strategy is not None or min_confidence is not None:
-        raise check.fail("llm.strategy", "and llm.min_confidence are only for the decision provider")
+        if "model" in llm_data:
+            raise check.fail("llm.model", "a decision agent uses each gateway's saved model")
+    elif min_confidence is not None:
+        raise check.fail("llm.min_confidence", "is only for the decision provider")
 
     effort = llm_data.get("reasoning_effort", "off")
     if effort not in REASONING_EFFORTS:
@@ -459,8 +487,6 @@ def load_file(path: Path) -> AgentSpec:
     fallback_data = llm_data.get("fallback_gateways", [])
     if not isinstance(fallback_data, list):
         raise check.fail("llm.fallback_gateways", "must be a list")
-    if provider == "decision" and fallback_data:
-        raise check.fail("llm.fallback_gateways", "Laya does not support gateway failover")
     if len(fallback_data) >= MAX_GATEWAYS:
         raise check.fail("llm.fallback_gateways", f"allows at most {MAX_GATEWAYS - 1} fallbacks, {MAX_GATEWAYS} gateways with the primary")
     primary = check.text(llm_data, "gateway", None, "llm.") or _DEFAULT_GATEWAY[provider]
@@ -473,6 +499,8 @@ def load_file(path: Path) -> AgentSpec:
         if not isinstance(entry, dict):
             raise check.fail(prefix[:-1], "must be a gateway name or object")
         check.keys(entry, {"gateway", "model"}, prefix)
+        if provider == "decision" and "model" in entry:
+            raise check.fail(prefix + "model", "a decision agent uses each gateway's saved model")
         name = check.text(entry, "gateway", None, prefix)
         if not name or not name.strip():
             raise check.fail(prefix + "gateway", "must be a non-empty string")
@@ -482,7 +510,7 @@ def load_file(path: Path) -> AgentSpec:
         choices.append(GatewayChoice(name, check.text(entry, "model", None, prefix) or None))
     llm = LlmSpec(
         provider=provider,
-        gateway=check.text(llm_data, "gateway", None, "llm.") or None,
+        gateway=primary if provider == "decision" else check.text(llm_data, "gateway", None, "llm.") or None,
         model=check.text(llm_data, "model", None, "llm.") or None,
         temperature=check.number(llm_data, "temperature", 0.0, 2.0, "llm."),
         reasoning_effort=effort,
@@ -494,7 +522,7 @@ def load_file(path: Path) -> AgentSpec:
         max_tier=max_tier,
         max_effort=max_effort,
         fallback_gateways=tuple(choices),
-        strategy=strategy, min_confidence=min_confidence,
+        min_confidence=min_confidence,
     )
 
     tools_data = check.section(data, "tools")
@@ -536,9 +564,8 @@ def load_file(path: Path) -> AgentSpec:
                 or check.boolean(data, "plan_tool", True) or "*" not in tools.deny):
             raise check.fail("role", "router requires the decision provider, no entry, no delegation, no tools, memory or plan")
         try:
-            # llm.strategy/min_confidence are the defaults; an explicit `decision` entry overrides them.
-            policy = RouterPolicy.model_validate(
-                {"strategy": llm.strategy, "min_confidence": llm.min_confidence, **data.get("decision", {})})
+            # llm.min_confidence is the default; an explicit `decision` entry overrides it.
+            policy = RouterPolicy.model_validate({"min_confidence": llm.min_confidence, **data.get("decision", {})})
         except ValueError as error:
             raise check.fail("decision", str(error)) from error
     elif "decision" in data:

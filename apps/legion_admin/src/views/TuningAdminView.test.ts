@@ -14,8 +14,8 @@ const view = (overrides: TuningView["overrides"] = {}): TuningView => {
     tool_batch: { parallel: true, max_parallel: 8, batch_tool: true, max_steps: 10, max_result_chars: 20000, max_total_chars: 60000 },
     classifier: {
       timeout_seconds: 3, max_input_chars: 16000,
-      auto_tier: { strategy: "both", min_confidence: 80 },
-      auto_route: { strategy: "both", min_confidence: 80 },
+      auto_tier: { min_confidence: 80 },
+      auto_route: { min_confidence: 80 },
     },
   };
   return { defaults, overrides, effective: defaults };
@@ -64,13 +64,10 @@ it("marks a changed field and resets it with null", async () => {
   expect(tuningClient.save).toHaveBeenCalledWith({ "gateway_failover.quota_cooldown_seconds": null });
 });
 
-it("selects a decision strategy and saves it", async () => {
+it("offers no decision strategy", async () => {
   const wrapper = await show(view());
-  vi.mocked(tuningClient.save).mockResolvedValue(view({ "classifier.auto_tier.strategy": "laya-only" }));
-  await wrapper.get('[data-path="classifier.auto_tier.strategy"]').setValue("laya-only");
-  await wrapper.get('[data-test="save"]').trigger("click");
-  await flushPromises();
-  expect(tuningClient.save).toHaveBeenCalledWith({ "classifier.auto_tier.strategy": "laya-only" });
+  expect(wrapper.find('[data-path="classifier.auto_tier.strategy"]').exists()).toBe(false);
+  expect(wrapper.find('[data-path="classifier.auto_tier.min_confidence"]').exists()).toBe(true);
 });
 
 it("shows the refusal and keeps the draft", async () => {

@@ -1222,9 +1222,18 @@ describe("reading a stored document", () => {
     expect(await sent(wrapper)).toContain("| pdf | 12 pages | scan |");
   });
 
-  it("replaces a text PDF's preview with what Reader read", async () => {
-    readDocument.mockResolvedValue({ filename: "scan.pdf", text: "OCR words", char_count: 9, truncated: false, read: "reader" });
-    const wrapper = await attach({ text: "old preview", char_count: 11 });
+  it("attaches a text PDF's pages by itself and keeps its preview", async () => {
+    const wrapper = await attach({ text: "typed", char_count: 5 });
+    expect(wrapper.find(".attachments li").text()).toContain("pages attached");
+    expect(wrapper.find("button.ocr").exists()).toBe(false);
+    const question = await sent(wrapper);
+    expect(question).toContain("| pdf | 2 pages | scan |");
+    expect(question).toContain("typed");
+  });
+
+  it("replaces an image's preview with what Reader read", async () => {
+    readDocument.mockResolvedValue({ filename: "photo.png", text: "OCR words", char_count: 9, truncated: false, read: "reader" });
+    const wrapper = await attach({ filename: "photo.png", kind: "image", pages: 1, text: "old preview", char_count: 11 });
     expect(wrapper.find("button.ocr").text()).toBe("Read with OCR");
     await wrapper.find("button.ocr").trigger("click");
     await flushPromises();
@@ -1232,15 +1241,6 @@ describe("reading a stored document", () => {
     const question = await sent(wrapper);
     expect(question).toContain("preserve this file_id when delegating]\nOCR words");
     expect(question).not.toContain("old preview");
-  });
-
-  it("attaches the pages without asking the server when Reader is not ready", async () => {
-    noReader();
-    const wrapper = await attach({ text: "typed", char_count: 5 });
-    expect(wrapper.find("button.ocr").text()).toBe("Attach pages");
-    await wrapper.find("button.ocr").trigger("click");
-    expect(readDocument).not.toHaveBeenCalled();
-    expect(await sent(wrapper)).toContain("| pdf | 2 pages | scan |");
   });
 
   it("offers no button on an image without Reader", async () => {

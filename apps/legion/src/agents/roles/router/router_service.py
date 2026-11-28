@@ -12,16 +12,21 @@ from src.agents.roles.router.router_engine import RouterEngine
 from src.runtime import usage_log
 from src.citadel_auth import current_caller
 from src.providers import cancellation
-from src.providers.decision import gateway_client as decision_gateway, strategy
+from src.providers.decision import gateway_client as decision_gateway
 
 _engine = RouterEngine()
 
 
 def status_summary() -> dict:
-    policy = agent_spec.current().decision
-    local_status = "loaded" if decision_gateway.is_reachable("laya") else "unavailable"
-    return {**policy.summary(), "local_status": local_status,
-            "fallback_available": "jev" in strategy._ORDER[policy.strategy] and decision_gateway.is_usable("jev")}
+    spec = agent_spec.current()
+    names = spec.llm.gateway_names
+    summary = spec.decision.summary()
+    local = next((name for name in names if decision_gateway.is_local(name)), None)
+    if local:
+        summary["local_status"] = "loaded" if decision_gateway.is_reachable(local) else "unavailable"
+    # False only when there is a second model and none after the first can be asked.
+    summary["fallback_available"] = len(names) < 2 or any(decision_gateway.is_usable(name) for name in names[1:])
+    return summary
 
 
 async def route(raw: dict, headers) -> dict:
@@ -56,7 +61,7 @@ async def route(raw: dict, headers) -> dict:
     result = None
     try:
         with anyio.move_on_after(policy.deadline_seconds):
-            result = await anyio.to_thread.run_sync(partial(_engine.route, request, policy,
+            result = await anyio.to_thread.run_sync(partial(_engine.route, request, policy, models=spec.llm.gateway_names,
                 cancelled=lambda: cancelled.is_set() or cancellation.is_cancelled(request.request_id),
                 on_usage=observed), abandon_on_cancel=True)
     finally:

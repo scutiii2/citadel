@@ -257,10 +257,10 @@ describe("UsageChip on an answer that ran several agents", () => {
 describe("UsageChip on a triage answer", () => {
   const reply = (extra: Partial<ChatMessage> = {}): ChatMessage => ({ role: "assistant", kind: "triage", content: "ok", ...extra });
 
-  it("names the Triage Assistant as a local model, with the time", () => {
+  it("names the Triage Assistant, with the time", () => {
     const wrapper = mount(UsageChip, { props: { message: reply({ duration_s: 0.8 }) } });
 
-    expect(wrapper.find("button").text()).toBe("Triage Assistant · local model · 0.8 s");
+    expect(wrapper.find("button").text()).toBe("Triage Assistant · 0.8 s");
   });
 
   it("explains in the detail panel that Ember was not involved", async () => {
@@ -268,6 +268,6 @@ describe("UsageChip on a triage answer", () => {
 
     await wrapper.find("button").trigger("click");
 
-    expect(rows(wrapper)["Run as"]).toBe("Asked the Triage Assistant (a local model) directly, not through Ember");
+    expect(rows(wrapper)["Run as"]).toBe("Asked the Triage Assistant directly, not through Ember");
   });
 });

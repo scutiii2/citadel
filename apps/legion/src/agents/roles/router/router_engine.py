@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from src.agents.agent_spec import DEFAULT_DECISION_MODELS
 from src.agents.roles.router.router_contract import DecisionOutcome, RouterPolicy, RouteRequest, RouteResponse, VoterUsage
 from src.providers.decision import questions as decision_questions, strategy
 from src.providers.decision.contract import DecisionRequest, DecisionError
@@ -70,8 +71,8 @@ class RouterEngine:
             candidates = picks if len(kept) >= len(candidates) else kept
         return candidates
 
-    def route(self, request: RouteRequest, policy: RouterPolicy, *, cancelled=lambda: False,
-              clock=time.monotonic, on_usage=None) -> RouteResponse:
+    def route(self, request: RouteRequest, policy: RouterPolicy, *, models=DEFAULT_DECISION_MODELS,
+              cancelled=lambda: False, clock=time.monotonic, on_usage=None) -> RouteResponse:
         deadline = clock() + policy.deadline_seconds
         usage = []
 
@@ -131,7 +132,7 @@ class RouterEngine:
 
             def ask(asked):
                 return strategy.run(
-                    policy.strategy, DecisionRequest(request.subject, asked, policy.min_confidence, local_only=False),
+                    models, DecisionRequest(request.subject, asked, policy.min_confidence),
                     gateways=self.gateways, on_usage=observed, check=check, remote_timeout=policy.remote_timeout_seconds)
 
             if batching:

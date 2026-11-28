@@ -1,23 +1,21 @@
-"""Runs a decision strategy over the gateway arrangement [laya, jev], both saved in DecisionGateway.
+"""Asks an ordered list of saved decision gateways.
 
-laya-only / jev-only ask one gateway. `both` asks laya first and jev only about the questions laya failed
-to settle (error, or confidence below the request's minimum). The agent wrapper picks the strategy; gateways
-never chain among themselves."""
+The list is the agent's own (llm.gateway, then llm.fallback_gateways). The next gateway is asked only about the
+questions the ones before it failed to settle (error, or confidence below the request's minimum); gateways never
+chain among themselves."""
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 import anyio.to_thread
 
 from src.providers.decision.contract import DecisionError, DecisionGateway, DecisionRequest
 
-STRATEGIES = ("laya-only", "jev-only", "both")
-ARRANGEMENT = ("laya", "jev")
-_ORDER = {"laya-only": ("laya",), "jev-only": ("jev",), "both": ARRANGEMENT}
+FALLBACK_SECONDS = 5.0  # the longest wait for one gateway while another one remains
 _EPSILON = 1e-9
 
 
@@ -38,10 +36,10 @@ class Choice:
     probabilities: dict[str, float] | None = None
 
 
-def default_gateways() -> dict[str, DecisionGateway]:
+def default_gateways(names: Sequence[str]) -> dict[str, DecisionGateway]:
     from src.providers.decision.gateways import saved
 
-    return {"laya": saved.laya(), "jev": saved.jev()}
+    return {name: saved.SavedGateway(name) for name in names}
 
 
 def _settled(answer: Mapping[str, Any] | None, minimum: float | None) -> bool:
@@ -51,36 +49,38 @@ def _settled(answer: Mapping[str, Any] | None, minimum: float | None) -> bool:
     return minimum is None or answer.get("answer_confidence", 0) >= minimum - _EPSILON
 
 
-def run(strategy: str, request: DecisionRequest, *, gateways: Mapping[str, DecisionGateway] | None = None,
+def run(models: Sequence[str], request: DecisionRequest, *, gateways: Mapping[str, DecisionGateway] | None = None,
         on_usage: Callable[[dict[str, Any]], None] | None = None,
         check: Callable[[], float] | None = None, remote_timeout: float | None = None) -> DecisionResult:
-    """`remote_timeout` caps each call to a gateway that is not local; local gateways only follow `check`."""
-    if strategy not in STRATEGIES:
-        raise ValueError(f"unknown decision strategy {strategy!r}; choose one of: {', '.join(STRATEGIES)}")
-    gateways = gateways if gateways is not None else default_gateways()
-    effective_strategy = "laya-only" if request.local_only else strategy
-    names = [n for n in _ORDER[effective_strategy] if not (request.local_only and not gateways[n].local)]
+    """Ask `models` from the top. `remote_timeout` caps each call to a gateway that is not local."""
     from src.providers.decision import gateway_client
     from src.runtime import confidentiality  # imports the providers, so not at the top
 
+    names = tuple(models)
+    gateways = gateways if gateways is not None else default_gateways(names)
     if confidentiality.current():
-        names = [n for n in names if gateway_client.is_trusted(n)]
+        names = tuple(name for name in names if gateway_client.is_trusted(name))
         if not names:
             raise DecisionError("this request holds confidential data and no trusted decision gateway can take it")
+    problems: list[str] = []
+    usable: list[tuple[str, DecisionGateway]] = []
+    for name in names:
+        gateway = gateways.get(name)
+        if gateway is None or not gateway.available():
+            problems.append(f"{name} is not available")
+        else:
+            usable.append((name, gateway))
     pending = dict(request.questions)
     answers: dict[str, dict[str, Any]] = {}
     tokens = 0
-    problems: list[str] = []
-    for name in names:
+    for index, (name, gateway) in enumerate(usable):
         if not pending:
             break
-        gateway = gateways[name]
-        if not gateway.available():
-            problems.append(f"{name} is not available")
-            continue
         limit = check() if check else None
         if remote_timeout is not None and not gateway.local:
             limit = remote_timeout if limit is None else min(limit, remote_timeout)
+        if index < len(usable) - 1:
+            limit = FALLBACK_SECONDS if limit is None else min(limit, FALLBACK_SECONDS)
         started, started_at = time.monotonic(), datetime.now(timezone.utc).isoformat()
         result = None
         try:
@@ -112,11 +112,11 @@ def run(strategy: str, request: DecisionRequest, *, gateways: Mapping[str, Decis
     return DecisionResult(answers, tokens, tuple(q for q in pending if q in answers))
 
 
-async def arun(strategy: str, request: DecisionRequest, **kwargs: Any) -> DecisionResult:
-    return await anyio.to_thread.run_sync(lambda: run(strategy, request, **kwargs))
+async def arun(models: Sequence[str], request: DecisionRequest, **kwargs: Any) -> DecisionResult:
+    return await anyio.to_thread.run_sync(lambda: run(models, request, **kwargs))
 
 
-def ask_choice(subject: str, criteria: Mapping[str, str], question: str, *, strategy: str, min_confidence: int,
+def ask_choice(subject: str, criteria: Mapping[str, str], question: str, *, models: Sequence[str], min_confidence: int,
                gateways: Mapping[str, DecisionGateway] | None = None,
                on_usage: Callable[[dict[str, Any]], None] | None = None, timeout: float | None = None) -> Choice:
     """One choice question: the answer with its confidence in percent (0-100)."""
@@ -124,7 +124,7 @@ def ask_choice(subject: str, criteria: Mapping[str, str], question: str, *, stra
         raise DecisionError("a choice needs at least two options")
     request = DecisionRequest(subject, {"answer": {"type": "choice", "instructions": question, "criteria": dict(criteria)}},
                               min_confidence=min_confidence / 100)
-    result = run(strategy, request, gateways=gateways, on_usage=on_usage,
+    result = run(models, request, gateways=gateways, on_usage=on_usage,
                  check=(lambda: timeout) if timeout else None)
     answer = result.answers["answer"]
     return Choice(answer["choice"], round(answer["answer_confidence"] * 100), result.tokens, answer["answered_by"],

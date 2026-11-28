@@ -111,7 +111,7 @@ class DockerDesk:
             name=name,
             lines=count,
             download_markers=[downloads.marker(offer, "LOGS")],
-            message=f"The last {count} lines of {name}{note}. The download link works for 10 minutes.",
+            message=f"The last {count} lines of {name}{note}. The download link works for {downloads.TTL_SECONDS // 60} minutes.",
         )
 
     def read_app_logs(self, name: str, lines: int = 200, contains: str | None = None) -> AppLogTextResult:

@@ -66,7 +66,7 @@ def tool_srv_getAppLogs(
 ) -> AppLogsResult:
     """Collect the newest `lines` log lines of a Docker app on this box as a
     file the person can download (the result carries a download card; the
-    link works for 10 minutes and only for the person who asked). The log is
+    link works for 60 minutes and only for the person who asked). The log is
     not shown here - say the file is ready. `tool_srv_listApps` shows the
     exact `name`."""
     return domain.desk.get_app_logs(name, lines)

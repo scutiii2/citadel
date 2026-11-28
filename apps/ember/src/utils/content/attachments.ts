@@ -32,7 +32,7 @@ export const AUDIO_FILE = /\.(mp3|wav|m4a|ogg|flac|webm)$/i;
 /** Images and PDFs Reader can read (it reads fewer formats than the file store keeps). */
 export const DOCUMENT_FILE = /\.(pdf|png|jpe?g|webp)$/i;
 
-/** How many scanned pages Legion shows the model per turn (its `images.MAX_PAGES`). */
+/** How many PDF pages Legion shows the model per turn (its `images.MAX_PAGES`). */
 export const MAX_SCAN_PAGES = 10;
 
 const MAX_LISTED_COLUMNS = 30;

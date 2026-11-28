@@ -147,14 +147,15 @@ async def is_confidential(*texts: str) -> bool:
 
 
 def _untrusted_decision_gateway() -> bool:
-    """Whether a decision gateway this agent asks (as the Router's helper, or as a decision agent) is not trusted."""
-    from src.providers.decision import gateway_client as decision_client, strategy
+    """Whether a decision gateway this agent asks (its own list, or the Router's for the orchestrator) is not
+    trusted."""
+    from src.providers.decision import gateway_client as decision_client, router_list
 
     spec = agent_spec.current()
     if spec.llm.provider == "decision":
-        names = strategy._ORDER.get(spec.llm.strategy or "both", ())
+        names = spec.llm.gateway_names
     else:
-        names = strategy._ORDER["both"] if spec.orchestrator else ()
+        names = router_list.router_models() if spec.orchestrator else ()
     return any(not decision_client.is_trusted(name) for name in names)
 
 

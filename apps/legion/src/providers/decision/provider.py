@@ -1,11 +1,12 @@
-"""Decision provider adapter: typed questions answered by Laya/Jev strategies, without generated text or tools."""
+"""Decision provider adapter: typed questions answered by the agent's list of decision models, without generated
+text or tools."""
 from __future__ import annotations
 
 import json
 import math
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 import anyio.to_thread
 
 from src.providers import cancellation
@@ -14,11 +15,11 @@ from src.providers.decision import strategy
 from src.providers.decision.contract import DecisionError, DecisionRequest
 
 PROVIDER_ID = "decision"
-DEFAULT_MODEL = "both"
+DEFAULT_MODEL = "decision"
 VENDOR_LABEL = "Decision (Laya, Jev)"
 SUPPORTS_STREAMING = True
 MAX_INPUT_CHARS = 16000
-_REQUEST_KEYS = {"text", "questions", "min_confidence", "trace", "local_only"}
+_REQUEST_KEYS = {"text", "questions", "min_confidence", "trace"}
 _log = logging.getLogger(__name__)
 
 
@@ -29,8 +30,6 @@ class Request:
     min_confidence: float | None
     # Keep the caller's request for gateway trace details.
     trace: bool = False
-    # Restrict the request to local decision gateways.
-    local_only: bool = False
 
 
 def _fail(message: str) -> ValueError:
@@ -91,10 +90,7 @@ def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS, default_confidence
     trace = data.get("trace", False)
     if not isinstance(trace, bool):
         raise _fail("trace must be true or false")
-    local_only = data.get("local_only", False)
-    if not isinstance(local_only, bool):
-        raise _fail("local_only must be true or false")
-    return Request(text, questions, None if min_confidence is None else float(min_confidence), trace, local_only)
+    return Request(text, questions, None if min_confidence is None else float(min_confidence), trace)
 
 
 # Per-question detail the Laya service reports; only a `trace` request carries it back to the caller.
@@ -105,37 +101,34 @@ def _compact(answer: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in answer.items() if key not in _TRACE_KEYS}
 
 
-def answer(raw: str, strategy_name: str, min_confidence: float | None = None) -> ChatResult:
+def answer(raw: str, models: Sequence[str], min_confidence: float | None = None) -> ChatResult:
     request = parse_request(raw, default_confidence=min_confidence)
     try:
-        result = strategy.run(strategy_name, DecisionRequest(request.text, request.questions,
-                                                           request.min_confidence, request.local_only))
+        result = strategy.run(tuple(models), DecisionRequest(request.text, request.questions, request.min_confidence))
     except DecisionError as error:
         raise ValueError(f"The decision models could not answer: {error}") from error
     answers = result.answers if request.trace else {qid: _compact(a) for qid, a in result.answers.items()}
     body = {"answers": answers, "tokens": result.tokens}
     return ChatResult(response=json.dumps(body), tools_used=[], tool_calls=[], provider_id=PROVIDER_ID,
-                      model=strategy_name, total_tokens=result.tokens, input_tokens=result.tokens, output_tokens=0)
+                      model="+".join(models), total_tokens=result.tokens, input_tokens=result.tokens, output_tokens=0)
 
 
 def has_api_key() -> bool:
     return True
 
 
-def _strategy() -> str:
+def _models() -> tuple[str, ...]:
     from src.agents import agent_spec
-    return agent_spec.current().llm.strategy or "both"
+    return agent_spec.current().llm.gateway_names
 
 
 def is_available() -> bool:
-    gateways = strategy.default_gateways()
-    return any(gateways[name].available() for name in strategy._ORDER[_strategy()])
+    return any(gateway.available() for gateway in strategy.default_gateways(_models()).values())
 
 
 def prepare() -> None:
-    gateways = strategy.default_gateways()
-    for name in strategy._ORDER[_strategy()]:
-        if not gateways[name].available():
+    for name, gateway in strategy.default_gateways(_models()).items():
+        if not gateway.available():
             _log.warning("The %s decision gateway is unavailable", name)
 
 
@@ -148,7 +141,7 @@ async def run_chat(
     if cancellation.is_cancelled(request_id):
         raise ChatCancelled()
     llm = agent_spec.current().llm
-    result = await anyio.to_thread.run_sync(answer, question, llm.strategy or "both", llm.min_confidence)
+    result = await anyio.to_thread.run_sync(answer, question, llm.gateway_names, llm.min_confidence)
     if cancellation.is_cancelled(request_id):
         raise ChatCancelled()
     if on_event is not None:

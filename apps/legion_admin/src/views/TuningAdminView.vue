@@ -29,7 +29,6 @@ interface Field {
 }
 interface Group { id: string; title: string; note: string; fields: Field[] }
 
-const STRATEGIES = ["laya-only", "jev-only", "both"];
 
 const GROUPS: Group[] = [
   {
@@ -77,9 +76,8 @@ const GROUPS: Group[] = [
   },
   ...(["auto_tier", "auto_route"] as const).map((feature): Group => ({
     id: feature, title: feature === "auto_tier" ? "Automatic model tier" : "Automatic specialist routing",
-    note: "Gateway strategy and confidence for this feature. Enable the feature in its configuration file.",
+    note: "Confidence for this feature. It asks the Router's models. Enable the feature in its configuration file.",
     fields: [
-      { path: `classifier.${feature}.strategy`, label: "Decision strategy", kind: "enum", options: STRATEGIES, help: "Which helper decides. laya-only asks Laya alone, jev-only asks Jev alone, both asks both (the default)." },
       { path: `classifier.${feature}.min_confidence`, label: "Minimum confidence", kind: "int", min: 0, max: 100, unit: "%", help: "How sure the helper must be before its decision is used, as a percentage. Below it, Legion does not use the decision." },
     ],
   })),

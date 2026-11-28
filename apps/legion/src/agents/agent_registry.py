@@ -292,6 +292,7 @@ def write_definitions(specs: Iterable[Any]) -> None:
             "llm": {
                 "provider": spec.llm.provider, "gateway": spec.llm.gateway, "model": spec.llm.model,
                 "tiers": _tiers_of(spec),
+                **({"fallbacks": list(spec.llm.gateway_names[1:])} if spec.llm.provider == "decision" else {}),
             },
         }
         for spec in specs

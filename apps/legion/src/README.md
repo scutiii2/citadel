@@ -7,7 +7,7 @@ checks the Laya service strategy when used, and manages the child processes.
   (`agent_config.py`), registry, store, prompts, events and automatic tier helper.
 - `agents/roles/orchestrator/`: delegation, plans, user questions, memory/skill
   recall and reflection, context summarization and automatic specialist routing.
-- `agents/roles/router/`: typed routing contract, strategy engine, service,
+- `agents/roles/router/`: typed routing contract, routing engine, service,
   trusted client and turn integration. Specialists need no separate package.
 - `providers/`: shared language limits, options, tiers, reasoning, cancellation,
   cooldown and failover. Language loops are in `providers/language/`.
@@ -21,8 +21,8 @@ checks the Laya service strategy when used, and manages the child processes.
   configuration, runtime tuning, filters and usage recording.
 
 Each definition requires role `orchestrator`, `router` or `specialist`.
-Language providers are `anthropic` and `openai`; decision strategies are
-`laya-only`, `jev-only` and `both`. Role controls privileges; provider kind
+Language providers are `anthropic` and `openai`; a `decision` agent lists the decision
+gateways it asks, in order. Role controls privileges; provider kind
 controls whether the agent generates language or answers typed questions.
 
 Runtime state lives at the app root: `.data/agent_registry.json`,

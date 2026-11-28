@@ -13,7 +13,7 @@ const CALC: AgentFile = {
 const PROVIDERS = {
   anthropic: [{ id: "claude", label: "Claude", model: "m", tiers: [{ tier: "light", id: "haiku" }, { tier: "standard", id: "sonnet" }, { tier: "heavy", id: "opus" }, { tier: "extreme", id: "fable" }] }, { id: "openrouter", label: "OpenRouter", model: "m", tiers: [] }],
   openai: [{ id: "gpt", label: "GPT", model: "m", tiers: [] }],
-  decision: [{ id: "laya", label: "Laya", model: "", tiers: [] }, { id: "jev", label: "Jev", model: "jev-latest", tiers: [] }],
+  decision: [{ id: "laya", label: "Laya", model: "", tiers: [], trusted: true }, { id: "jev", label: "Jev", model: "jev-latest", tiers: [], trusted: true }],
 };
 
 // jsdom has no <dialog> methods.
@@ -163,7 +163,7 @@ describe("per-agent gateway order", () => {
     wrapper.unmount();
   });
 
-  it("clears incompatible gateway choices when changing provider and omits fallbacks for Laya", async () => {
+  it("clears incompatible gateway choices when changing provider and starts a decision agent with Laya then Jev", async () => {
     configuredAgent();
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();
@@ -173,13 +173,14 @@ describe("per-agent gateway order", () => {
     expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("openai|gpt");
     expect(wrapper.find<HTMLInputElement>("[data-test=model]").element.value).toBe("");
     await wrapper.find("[data-test=model-type]").setValue("decision");
-    expect(wrapper.find("[data-test=add-gateway]").exists()).toBe(false);
-    await wrapper.find("[data-test=decision-strategy]").setValue("jev-only");
+    expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-test=trust]").map((tag) => tag.text())).toEqual(["Trusted", "Trusted"]);
+    expect(wrapper.find("[data-test=model]").exists()).toBe(false);
     await wrapper.find("[data-test=min-confidence]").setValue("0.85");
     await submit(wrapper);
     await flushPromises();
-    expect(update.mock.calls[0]![1].llm).toEqual({ provider: "decision", strategy: "jev-only", min_confidence: 0.85 });
-    expect(update.mock.calls[0]![1].llm).not.toHaveProperty("fallback_gateways");
+    expect(update.mock.calls[0]![1].llm).toEqual(
+      { provider: "decision", gateway: "laya", fallback_gateways: [{ gateway: "jev" }], min_confidence: 0.85 });
     wrapper.unmount();
   });
 });
@@ -204,23 +205,22 @@ describe("AgentsAdminView", () => {
   });
   it("edits Router policy while keeping its internal role and denied tools", async () => {
     const router: AgentFile = { id: "router", label: "Router", port: 29616, role: "router",
-      llm: { provider: "decision", strategy: "both", min_confidence: 0.9 }, decision: { strategy: "laya-only" }, delegable: false,
+      llm: { provider: "decision", gateway: "laya", min_confidence: 0.9 }, decision: {}, delegable: false,
       plan_tool: false, tools: { deny: ["*"] } };
     vi.mocked(agentsAdminClient.list).mockResolvedValue([EMBER, router]);
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(router);
     const wrapper = await mounted();
     expect(wrapper.get("[data-id=router]").text()).toContain("Internal router");
     await details(wrapper, "router");
-    expect(wrapper.get("dialog[open]").text()).toContain("Local Laya only");
+    expect(wrapper.get("dialog[open]").text()).toContain("Models asked in order: laya");
     await wrapper.get('dialog[open] [data-test="edit"]').trigger("click");
     await wrapper.find("[data-test=routing-deadline]").setValue("7");
     expect(wrapper.find("[data-test=allow]").exists()).toBe(false);
     expect(wrapper.find("[data-test=preview]").exists()).toBe(false);
-    expect(wrapper.find("[data-test=decision-strategy]").exists()).toBe(false);
     await submit(wrapper);
     await flushPromises();
     expect(update.mock.calls[0]![1]).toMatchObject({ role: "router", delegable: false,
-      decision: { deadline_seconds: 7, strategy: "laya-only" }, tools: { deny: ["*"] } });
+      llm: { provider: "decision", gateway: "laya" }, decision: { deadline_seconds: 7 }, tools: { deny: ["*"] } });
     expect(update.mock.calls[0]![1].decision).not.toHaveProperty("min_confidence");
     wrapper.unmount();
   });

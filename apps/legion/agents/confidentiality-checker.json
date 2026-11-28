@@ -7,7 +7,7 @@
   "delegable": false,
   "llm": {
     "provider": "decision",
-    "strategy": "jev-only"
+    "gateway": "jev"
   },
   "persona": "",
   "focus": "Internal: says whether a request holds secret data (credentials, personal identifiers, bank or card numbers, health details), so Legion sends it only to trusted gateways. Uses Jev only. Called directly, never delegated to.",

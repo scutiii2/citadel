@@ -5,6 +5,8 @@ export interface GatewayInfo {
   label: string;
   model: string;
   tiers: { tier: string; id: string }[];
+  /** Decision gateways only: whether confidential data may go to it. */
+  trusted?: boolean;
 }
 
 /** Provider id -> the gateways it can run through (from ai_agent's gateways/<provider>/<gateway>.json files). */
@@ -17,7 +19,6 @@ interface AgentGatewayChoice {
 
 interface AgentLlm {
   provider: string;
-  strategy?: "laya-only" | "jev-only" | "both";
   min_confidence?: number;
   gateway?: string;
   model?: string;
@@ -61,7 +62,6 @@ export interface AgentConfig {
 export interface RouterPolicy {
   choose_agent: boolean;
   choose_tier: boolean;
-  strategy: "laya-only" | "jev-only" | "both";
   min_confidence?: number;
   trace: boolean;
   deadline_seconds: number;

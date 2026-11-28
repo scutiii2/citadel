@@ -2,7 +2,7 @@
 
 The gateway holds the upstream addresses and keys (TypeSafe Jev, the Laya
 model service) and answers typed questions for a saved gateway id. Legion
-keeps only the arrangement: which saved gateway is asked first (strategy.py).
+keeps only each agent's list of gateway ids (strategy.py asks it).
 Calls are synchronous: every caller already runs decisions off the event loop.
 """
 
@@ -16,6 +16,7 @@ from src.gateway import trust
 from src.gateway.decision.contract import parse_request
 from src.gateway.decision.errors import GatewayError
 from src.gateway.decision.settings import Settings
+from src.gateway.decision.store import DEFAULT_TIMEOUT
 from src.providers.decision.contract import DecisionError
 
 # The service itself keeps reachability for 15 seconds.
@@ -58,10 +59,24 @@ def saved_gateways() -> dict[str, bool | None]:
     return _listed
 
 
+def _entry(gateway_id: str) -> dict[str, Any] | None:
+    saved = gateway.decision_store().all().get(gateway_id)
+    return saved if isinstance(saved, dict) else None
+
+
 def is_trusted(gateway_id: str) -> bool:
     """Whether confidential data may go to this decision gateway (src/gateway/trust.py)."""
-    saved = gateway.decision_store().all().get(gateway_id)
-    return trust.decision(gateway_id, saved if isinstance(saved, dict) else None)
+    return trust.decision(gateway_id, _entry(gateway_id))
+
+
+def is_local(gateway_id: str) -> bool:
+    """Whether the gateway runs on this machine's network: Laya, Ollama or a model service."""
+    return gateway_id == "laya" or (_entry(gateway_id) or {}).get("kind") in trust.DECISION_LOCAL_KINDS
+
+
+def timeout_of(gateway_id: str) -> float:
+    """The gateway's saved Timeout, in seconds."""
+    return float((_entry(gateway_id) or {}).get("timeout_s", DEFAULT_TIMEOUT))
 
 
 def is_usable(gateway_id: str) -> bool:

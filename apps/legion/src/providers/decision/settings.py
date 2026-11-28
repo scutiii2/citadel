@@ -15,6 +15,7 @@ _log = logging.getLogger(__name__)
 _SECTION = "classifier"
 FEATURES = ("auto_tier", "auto_route")
 _KNOWN = {"timeout_seconds", "max_input_chars", *FEATURES}
+# "strategy" is retired and ignored: the Router's model list is used.
 _AUTO_TIER_KNOWN = {"enabled", "strategy", "min_confidence", "tiers"}
 _AUTO_ROUTE_KNOWN = {"enabled", "strategy", "min_confidence"}
 
@@ -22,7 +23,6 @@ _AUTO_ROUTE_KNOWN = {"enabled", "strategy", "min_confidence"}
 @dataclass(frozen=True)
 class AutoTierSettings:
     enabled: bool = False
-    strategy: str = "both"
     min_confidence: int = 60
     tiers: tuple[tuple[str, str], ...] = DEFAULT_SIZE_TIERS
 
@@ -30,7 +30,6 @@ class AutoTierSettings:
 @dataclass(frozen=True)
 class AutoRouteSettings:
     enabled: bool = False
-    strategy: str = "both"
     min_confidence: int = 60
 
 
@@ -66,16 +65,6 @@ def _load_settings() -> ClassifierSettings:
                               auto_route=_auto_route_settings(raw.get("auto_route", {})))
 
 
-def _feature_strategy(raw: dict[str, Any], where: str) -> str:
-    if "strategy" not in raw:
-        return "both"
-    value = raw["strategy"]
-    if value not in strategy.STRATEGIES:
-        _log.warning("Invalid %s.strategy; using both", where)
-        return "both"
-    return value
-
-
 def _auto_route_settings(raw: Any) -> AutoRouteSettings:
     where = f"config_tuning.json {_SECTION}.auto_route"
     if not isinstance(raw, dict):
@@ -88,7 +77,7 @@ def _auto_route_settings(raw: Any) -> AutoRouteSettings:
     confidence = raw.get("min_confidence", AutoRouteSettings.min_confidence)
     if isinstance(confidence, bool) or not isinstance(confidence, int) or not 1 <= confidence <= 100:
         raise ValueError(f"{where}.min_confidence must be a percentage from 1 to 100")
-    return AutoRouteSettings(enabled=raw.get("enabled", False), strategy=_feature_strategy(raw, where), min_confidence=confidence)
+    return AutoRouteSettings(enabled=raw.get("enabled", False), min_confidence=confidence)
 
 
 def _auto_tier_settings(raw: Any) -> AutoTierSettings:
@@ -113,12 +102,13 @@ def _auto_tier_settings(raw: Any) -> AutoTierSettings:
         if size not in SIZE_CRITERIA or tier not in TIERS:
             raise ValueError(f"{where}.tiers maps a size ({', '.join(SIZE_CRITERIA)}) to a tier ({', '.join(TIERS)})")
         mapping[size] = tier
-    return AutoTierSettings(enabled=raw.get("enabled", False), strategy=_feature_strategy(raw, where), min_confidence=confidence, tiers=tuple(mapping.items()))
+    return AutoTierSettings(enabled=raw.get("enabled", False), min_confidence=confidence, tiers=tuple(mapping.items()))
 
-def available(feature: str) -> bool:
-    chosen = getattr(settings(), feature).strategy
-    gateways = strategy.default_gateways()
-    return any(gateways[name].available() for name in strategy._ORDER[chosen])
+def available() -> bool:
+    """Whether any model of the Router's list could answer."""
+    from src.providers.decision.router_list import router_models
+
+    return any(gateway.available() for gateway in strategy.default_gateways(router_models()).values())
 
 
 def reset_cache() -> None:

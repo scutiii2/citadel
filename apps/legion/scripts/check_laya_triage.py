@@ -30,7 +30,7 @@ def main() -> None:
     correct = 0
     uncertain = 0
     for text, expected in CASES:
-        result = provider.answer(json.dumps({"text": text, "questions": TRIAGE_QUESTIONS}), "laya-only", .9)
+        result = provider.answer(json.dumps({"text": text, "questions": TRIAGE_QUESTIONS}), ("laya",), .9)
         data = json.loads(result.response)
         category = data["answers"]["category"]["choice"]
         correct += category == expected

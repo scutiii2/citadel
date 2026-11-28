@@ -62,8 +62,8 @@ no address or key for either: both are entries of the decision gateway built int
 (`src/gateway/decision`), saved on the Legion admin app's **Connections** page, **Model gateways**, under those two ids
 (`.data/settings.db`, table `decision_gateways`). Laya's address, strategy and window, and Jev's model and key, are set on the entry there.
 
-An unreachable service warns, allowing `both` to fall through to Jev per request.
-Agent strategies are `laya-only`, `jev-only` and `both`; see
+An unreachable model is skipped, so the next one in an agent's list is asked.
+Each decision agent names its models in order; see
 [Decision question agents](#decision-question-agents).
 
 ## Agents
@@ -119,7 +119,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `enabled` | no | `true` | `false`: not spawned, not registered. |
 | `entry` | no | `false` | The orchestrator Ember opens a chat with. Exactly one enabled agent must set it. |
 | `llm.provider` | yes | none | `anthropic` or `openai` for language; `decision` for typed questions. |
-| `llm.strategy` | decision only | `both` | `laya-only`, `jev-only`, or `both`. |
+| `llm.gateway`, `llm.fallback_gateways` (decision) | decision only | `laya`, then `jev` | Saved decision gateways, asked in this order, at most 20, without a `model` field. Untrusted ones first, trusted ones last, at least one trusted. |
 | `llm.min_confidence` | decision only | unset | Above 0 and at most 1. Unset: each model applies its own thresholds. Per-request overrides are accepted. |
 | `llm.gateway` | no | provider default | A filename stem from `gateways/<provider>/<gateway>.json`. |
 | `llm.fallback_gateways` | no | `[]` | Ordered same-provider backup gateways, as names or `{gateway, model?}` objects. At most 19, so an agent holds 20 gateways with its primary. See Gateway failover below. |
@@ -335,12 +335,19 @@ Then set `agents_registry_url` in `apps/portcullis/configs/config_app.json` (see
 ## Decision question agents
 
 Agents with `llm.provider: "decision"` answer typed JSON questions without tools or
-text generation. Their `llm.strategy` is `laya-only`, `jev-only` or `both` (default),
+text generation. They name their models in `llm.gateway` and `llm.fallback_gateways` (saved decision
+gateways, at most 20, no `model` field; default `laya`, then `jev`),
 and their `llm.min_confidence` is unset by default, so each gateway uses its own
 thresholds: Laya per model and option count (English 0.90 / typed 0.80 for two options,
-0.75 / 0.55 for three or more), Jev 0.90. A number sets one bar for every gateway. With `both`, Laya answers first;
-Jev receives only questions that Laya fails to settle. `local_only: true` forces
-Laya only. An uncertain last answer stays marked `uncertain`. A later gateway's answer
+0.75 / 0.55 for three or more), Jev 0.90. A number sets one bar for every gateway. Models are asked in
+order; the next one receives only the questions the ones before it failed or were unsure about.
+A call waits at most the gateway's saved Timeout, and at most 5 seconds while another model remains.
+Untrusted models come first and trusted ones last, with at least one trusted;
+`confidentiality-checker` takes trusted models only, and its own turn asks nothing else.
+Saving a list that breaks this is refused, and so is a **Trusted** switch or a delete that would
+break one. A file or saved edit that still has `llm.strategy` or `decision.strategy` is read as the
+matching list: `laya-only` is `laya`, `jev-only` is `jev`, `both` is `laya`, then `jev`.
+An uncertain last answer stays marked `uncertain`. A later gateway's answer
 replaces an earlier one only when it settles the question or is at least as confident.
 Without `"trace": true` the answers leave out the service's `rounds`, `voters` and
 `options` detail.
@@ -348,13 +355,14 @@ Without `"trace": true` the answers leave out the service's `rounds`, `voters` a
 Confidence scales differ on purpose: agents and the router use a fraction (above 0, up to 1,
 unset by default); `classifier.auto_tier` and `classifier.auto_route` use a whole percentage
 (1 to 100). Zero is refused because the Laya service needs a value above zero. A router
-takes its `strategy` and `min_confidence` from `llm` unless its `decision` block sets them.
+takes its `min_confidence` from `llm` unless its `decision` block sets it. The Router, automatic model
+tier and automatic specialist routing ask the Router's list.
 
 Send `{"text": "...", "questions": {...}}`. Each question has a `type`, optional
 `instructions`, and `criteria`: a map of options for `choice`, an ordered list of
 levels for `score`, or false/true labels for `noul` (yes/no). Requests may override
 `min_confidence`. The wrapper accepts up to 16,000 characters; Laya's own window
-is 4,000, so longer requests need Jev or return unavailable with `laya-only`.
+is 4,000, so a longer request goes to the next model, and is unavailable when the list holds only `laya`.
 
 Laya runs in the separate LayaModel service, reached through DecisionGateway. Its internal
 strategy is set on the `laya` gateway entry there (`english-then-typed` by default). Callers and
@@ -487,7 +495,8 @@ when the agent has none. An image that expired (Armory keeps uploads for an hour
 the model as unavailable. A gateway without image support refuses the turn. Images are sent again on each follow-up turn,
 and the context estimate counts about 1,600 tokens for each.
 
-A PDF without readable text is named as `[File file_id: <id> | pdf | <n> pages | scan | ...]`. Legion then fetches its
+A PDF whose pages are wanted is named as `[File file_id: <id> | pdf | <n> pages | scan | ...]`; ember marks every stored
+PDF this way, with or without readable text. Legion then fetches its
 pages through the same tool, at most 10 pages per turn in total (newest file first, from page 1), apart from the four
 image slots. The model is told which pages it cannot see. The rules above for images apply to these pages.
 
@@ -513,7 +522,7 @@ FreeLLMAPI, Bedrock and Vertex, start untrusted until an admin marks them. Code:
   `llm.fallback_gateways`) are all untrusted is refused (409). Untrusting or deleting a gateway that is the only trusted
   one of an enabled agent is refused too, naming the agents. Decision agents have no chat gateway and are not checked.
 - **Confidential data goes only to trusted gateways.** The `confidentiality-checker` agent
-  (`agents/confidentiality-checker.json`, decision provider, strategy `jev-only`) says whether text holds secret data:
+  (`agents/confidentiality-checker.json`, decision provider, model list `jev`) says whether text holds secret data:
   credentials, personal identifiers (ID, passport, tax numbers), bank or card numbers, health details, or anything the
   user calls secret (`src/runtime/confidentiality.py`). Other personal mail, documents, source code and business
   material may go to an untrusted gateway. The check reads the question and the whole history at the start of a turn,
@@ -532,7 +541,7 @@ FreeLLMAPI, Bedrock and Vertex, start untrusted until an admin marks them. Code:
   is left.
 - **Not covered:** the checker is a model and can miss a secret; text that only appears after the last tool result of
   a turn; the names and descriptions of the user's own MCP tools. FreeLLMAPI's decision gateway is listed on the page
-  but no strategy asks it.
+  and no tracked list names it.
 
 ## Secrets, budgets and insights
 
@@ -571,9 +580,9 @@ that brief, the latest user message verbatim, and the authorized specialist rost
 If the helper is unavailable, times out, or returns an unusable brief, routing uses
 up to 600 characters of the previous assistant message instead. First messages
 need no summary call. Memory injection and full history are excluded from Router.
-The tracked `router.json` uses strategy `jev-only`, so the routing brief and the latest
-user message go to TypeSafe on every routed turn; set `llm.strategy` back to `both` or
-`laya-only` (through the Agents editor or the file) to keep routing text on this machine. It returns
+The tracked `router.json` lists `jev` only, so the routing brief and the latest
+user message go to TypeSafe on every routed turn; list a local model such as `laya`
+(through the Agents editor or the file) to keep routing text on this machine. It returns
 independent agent and size decisions.
 An uncertain agent choice stays with Ember; uncertain size uses the selected
 agent's default model. Explicit tiers and target limits still apply. Delegation
@@ -656,10 +665,10 @@ reports unavailability; automatic compaction keeps the history and continues.
 ### Decision gateway configuration
 
 The `classifier` tuning section contains `timeout_seconds`, `max_input_chars`,
-and the `auto_tier` / `auto_route` helper settings (`enabled`, `strategy`,
-`min_confidence`; auto tier also has a size-to-tier mapping). Strategy values are
-`laya-only`, `jev-only`, and `both`; these helper confidence thresholds use
-percentages from 0 to 100. Admin Tuning edits strategy and confidence; enable
+and the `auto_tier` / `auto_route` helper settings (`enabled`,
+`min_confidence`; auto tier also has a size-to-tier mapping). Both features ask the Router's
+model list; an old `strategy` value is ignored. These helper confidence thresholds use
+percentages from 0 to 100. Admin Tuning edits confidence; enable
 flags and tier mappings stay in the file. Router uses its agent's separate
 `decision` policy and does not mutate these helper settings.
 

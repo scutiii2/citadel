@@ -14,7 +14,7 @@ const shownStatus = computed<AgentStatus | undefined>(() => props.agent.enabled 
 const gatewayOrder = computed(() => {
   const llm = props.agent.llm;
   if (!llm) return "";
-  const defaults: Record<string, string> = { anthropic: "claude", openai: "gpt" };
+  const defaults: Record<string, string> = { anthropic: "claude", openai: "gpt", decision: "laya" };
   const primary = llm.gateway || defaults[llm.provider];
   return [primary, ...(llm.fallback_gateways ?? []).map((choice) =>
     typeof choice === "string" ? choice : choice.gateway)].filter(Boolean).join(" → ");
@@ -25,8 +25,8 @@ const present = (rows: { label: string; value: unknown }[]): Row[] =>
     .filter((row) => row.value !== "");
 const rows = computed(() => present([
   { label: "Provider", value: props.agent.llm?.provider },
-  { label: props.agent.llm?.provider === "decision" ? "Strategy" : props.agent.llm?.fallback_gateways?.length ? "Gateway order" : "Gateway",
-    value: props.agent.llm?.provider === "decision" ? props.agent.decision?.strategy ?? props.agent.llm.strategy ?? "both" : gatewayOrder.value },
+  { label: props.agent.llm?.provider === "decision" ? "Model order" : props.agent.llm?.fallback_gateways?.length ? "Gateway order" : "Gateway",
+    value: gatewayOrder.value },
   { label: "Model", value: props.agent.llm?.model },
   { label: "Effort", value: props.agent.llm?.reasoning_effort },
   { label: "Tier range", value: props.agent.llm?.min_tier || props.agent.llm?.max_tier
@@ -79,10 +79,10 @@ const sections = computed(() => [
     <template v-else>
       <p class="focus">{{ agent.focus || "No description." }}</p>
       <p v-if="agent.role === 'router'" class="focus">
-        {{ agent.decision?.strategy === "jev-only" ? "Jev only" : agent.decision?.strategy === "laya-only" ? "Local Laya only" : "Local Laya → Jev fallback" }}.
+        Models asked in order: {{ gatewayOrder }}.
         Agent and model decisions are configured in Edit.
-        <template v-if="decision?.fallback_available === false">Jev fallback unavailable: check the deployment credentials.</template>
-        <template v-if="decision?.local_status === 'unavailable'">Local checkpoints unavailable: prepare the cached models.</template>
+        <template v-if="decision?.fallback_available === false">No fallback model can be asked: check Model gateways.</template>
+        <template v-if="decision?.local_status === 'unavailable'">The local model is unavailable: check that its service is running.</template>
       </p>
       <section v-for="section in sections" :key="section.title" class="llm" :data-test="`section-${section.title}`">
         <h4>{{ section.title }}</h4>

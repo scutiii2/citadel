@@ -22,11 +22,10 @@ function update(key: keyof RouterPolicy, value: unknown) {
     <p class="hint">Chooses an agent and model tier. It has no tools, chat role or memory access.</p>
     <ToggleSwitch v-for="item in switches" :key="item.key" :checked="modelValue[item.key]" :disabled="busy"
       :data-test="`router-${item.key}`" @change="update(item.key, ($event.target as HTMLInputElement).checked)">{{ item.label }}</ToggleSwitch>
-    <p class="hint">Laya runs locally. Both tries Jev when Laya fails or is below the confidence threshold. Confidence scores are not measured accuracy.</p>
+    <p class="hint">The models and their order are set under Models above. The next one is asked when one fails or is below the confidence threshold. Confidence scores are not measured accuracy.</p>
     <div class="fields">
       <label>Routing deadline (seconds)<input :value="modelValue.deadline_seconds" type="number" min="1" max="30" step="any" required :disabled="busy" data-test="routing-deadline" @input="update('deadline_seconds', Number(($event.target as HTMLInputElement).value))" /></label>
       <label>Remote timeout (seconds)<input :value="modelValue.remote_timeout_seconds" type="number" min="0.01" max="30" step="any" required :disabled="busy" @input="update('remote_timeout_seconds', Number(($event.target as HTMLInputElement).value))" /></label>
-      <label>Decision strategy<select :value="modelValue.strategy" :disabled="busy" data-test="router-strategy" @change="update('strategy', ($event.target as HTMLSelectElement).value)"><option value="both">Both: Laya, then Jev</option><option value="laya-only">Laya only</option><option value="jev-only">Jev only</option></select></label>
       <label>Minimum confidence<input :value="modelValue.min_confidence ?? ''" type="number" min="0.0001" max="1" step="any" placeholder="Each model's own" :disabled="busy" data-test="router-confidence" @input="update('min_confidence', ($event.target as HTMLInputElement).value === '' ? undefined : Number(($event.target as HTMLInputElement).value))" /></label>
     </div>
     <fieldset><legend>Request size to model tier</legend>

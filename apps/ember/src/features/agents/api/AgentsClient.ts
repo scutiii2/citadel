@@ -17,8 +17,8 @@ interface ModelTier {
 export interface AgentListing {
   architect?: { kind: string; workers: string[] } | null;
   internal_role?: "router" | null;
-  decision?: { choose_agent?: boolean; choose_tier?: boolean; english?: boolean; typed?: boolean;
-    fallback?: boolean; fallback_available?: boolean; deadline_seconds?: number; local_status?: string } | null;
+  decision?: { choose_agent?: boolean; choose_tier?: boolean; fallback_available?: boolean; deadline_seconds?: number;
+    local_status?: string } | null;
   id: string;
   label: string;
   entry: boolean;
